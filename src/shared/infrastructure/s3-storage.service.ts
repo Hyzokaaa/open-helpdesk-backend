@@ -15,14 +15,15 @@ export class S3StorageService {
 
   constructor(private readonly config: ConfigService) {
     this.bucket = config.get('S3_BUCKET', 'helpdesk-attachments');
+
+    const endpoint = config.get<string>('S3_ENDPOINT');
     this.client = new S3Client({
-      endpoint: config.get('S3_ENDPOINT'),
+      ...(endpoint ? { endpoint, forcePathStyle: true } : {}),
       region: config.get('S3_REGION', 'us-east-1'),
       credentials: {
         accessKeyId: config.get('S3_ACCESS_KEY', ''),
         secretAccessKey: config.get('S3_SECRET_KEY', ''),
       },
-      forcePathStyle: true,
     });
   }
 
