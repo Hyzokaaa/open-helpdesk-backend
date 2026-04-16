@@ -8,8 +8,10 @@ import { TagModule } from './tag/tag.module';
 import { TicketModule } from './ticket/ticket.module';
 import { CommentModule } from './comment/comment.module';
 import { AttachmentModule } from './attachment/attachment.module';
+import { HealthController } from './health.controller';
 
 @Module({
+  controllers: [HealthController],
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRootAsync({
