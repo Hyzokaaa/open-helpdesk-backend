@@ -142,7 +142,7 @@ export class TicketController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
-    await this.ensureRoleOrCreator(workspaceId, id, user.userId, ADMIN_AGENT);
+    await this.ensureRole(workspaceId, user.userId, ADMIN_AGENT);
 
     const service = new ChangeTicketStatus(this.ticketRepository);
     const command = new ChangeTicketStatusCommand(service);
