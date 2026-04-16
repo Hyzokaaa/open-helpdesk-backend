@@ -1,0 +1,42 @@
+import { ConflictException } from '@nestjs/common';
+import { IdGenerator } from '../../../shared/domain/id-generator';
+import { PasswordHasher } from '../../../shared/infrastructure/password-hasher';
+import { User } from '../entities/user';
+import { UserRepository } from '../repositories/user.repository';
+
+interface CreateUserProps {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+}
+
+export class CreateUser {
+  constructor(
+    private readonly idGenerator: IdGenerator,
+    private readonly repository: UserRepository,
+    private readonly passwordHasher: PasswordHasher,
+  ) {}
+
+  async execute(props: CreateUserProps): Promise<User> {
+    const existing = await this.repository.findByEmail(props.email);
+    if (existing) {
+      throw new ConflictException('Email already registered');
+    }
+
+    const hashedPassword = await this.passwordHasher.hash(props.password);
+
+    const user = new User({
+      id: this.idGenerator.create(),
+      email: props.email,
+      password: hashedPassword,
+      firstName: props.firstName,
+      lastName: props.lastName,
+      isActive: true,
+      isSystemAdmin: false,
+    });
+
+    await this.repository.create(user);
+    return user;
+  }
+}

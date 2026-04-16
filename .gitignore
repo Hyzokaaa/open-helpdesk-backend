@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+coverage
+.claude
+.idea
+.vscode
+*.swp
+.DS_Store
+Thumbs.db
