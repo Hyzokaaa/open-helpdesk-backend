@@ -16,7 +16,7 @@ export class S3StorageService {
   constructor(private readonly config: ConfigService) {
     this.bucket = config.get('S3_BUCKET', 'helpdesk-attachments');
 
-    const endpoint = config.get<string>('S3_ENDPOINT');
+    const endpoint = config.get<string>('S3_ENDPOINT')?.trim() || undefined;
     this.client = new S3Client({
       ...(endpoint ? { endpoint, forcePathStyle: true } : {}),
       region: config.get('S3_REGION', 'us-east-1'),
