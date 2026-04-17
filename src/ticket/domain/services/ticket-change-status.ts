@@ -3,14 +3,17 @@ import { Ticket } from '../entities/ticket';
 import { TicketStatus } from '../enums/ticket-status.enum';
 import { TicketRepository } from '../repositories/ticket.repository';
 
+const ALL_EXCEPT_CLOSED = [
+  TicketStatus.PENDING,
+  TicketStatus.IN_PROGRESS,
+  TicketStatus.RESOLVED,
+  TicketStatus.CLOSED,
+];
+
 const ALLOWED_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
-  [TicketStatus.PENDING]: [TicketStatus.IN_PROGRESS, TicketStatus.CLOSED],
-  [TicketStatus.IN_PROGRESS]: [
-    TicketStatus.RESOLVED,
-    TicketStatus.PENDING,
-    TicketStatus.CLOSED,
-  ],
-  [TicketStatus.RESOLVED]: [TicketStatus.CLOSED, TicketStatus.IN_PROGRESS],
+  [TicketStatus.PENDING]: ALL_EXCEPT_CLOSED,
+  [TicketStatus.IN_PROGRESS]: ALL_EXCEPT_CLOSED,
+  [TicketStatus.RESOLVED]: ALL_EXCEPT_CLOSED,
   [TicketStatus.CLOSED]: [],
 };
 

@@ -11,6 +11,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { JwtAuthGuard } from '../../../../shared/nest/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
@@ -30,6 +31,7 @@ import { ListTicketsQuery } from '../../../application/queries/list-tickets.quer
 import { TypeOrmTicketRepository } from '../../typeorm/repositories/typeorm-ticket.repository';
 import { TypeOrmWorkspaceRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository';
 import { TypeOrmWorkspaceMemberRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
+import { TypeOrmUserRepository } from '../../../../user/infrastructure/typeorm/repositories/typeorm-user.repository';
 import { EnsureWorkspaceRole } from '../../../../workspace/domain/services/workspace-ensure-role';
 import { WorkspaceRole } from '../../../../workspace/domain/enums/workspace-role.enum';
 import { CreateTicketRequest } from '../dto/create-ticket.request';
@@ -37,6 +39,11 @@ import { UpdateTicketRequest } from '../dto/update-ticket.request';
 import { ChangeTicketStatusRequest } from '../dto/change-ticket-status.request';
 import { AssignTicketRequest } from '../dto/assign-ticket.request';
 import { TicketFilterDto } from '../dto/ticket-filter.dto';
+import {
+  TicketCreatedEvent,
+  TicketAssignedEvent,
+  StatusChangedEvent,
+} from '../../../../email/domain/events';
 
 const ALL_ROLES = [WorkspaceRole.ADMIN, WorkspaceRole.AGENT, WorkspaceRole.REPORTER];
 const ADMIN_AGENT = [WorkspaceRole.ADMIN, WorkspaceRole.AGENT];
@@ -48,7 +55,9 @@ export class TicketController {
     @Inject() private readonly ticketRepository: TypeOrmTicketRepository,
     @Inject() private readonly workspaceRepository: TypeOrmWorkspaceRepository,
     @Inject() private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
+    @Inject() private readonly userRepository: TypeOrmUserRepository,
     @Inject() private readonly idGenerator: UlidGenerator,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   @Post()
@@ -57,20 +66,35 @@ export class TicketController {
     @Body() body: CreateTicketRequest,
     @CurrentUser() user: AuthUser,
   ) {
-    const workspaceId = await this.resolveWorkspaceId(slug);
-    await this.ensureRole(workspaceId, user.userId, ALL_ROLES);
+    const workspace = await this.resolveWorkspace(slug);
+    await this.ensureRole(workspace.getId(), user.userId, ALL_ROLES);
 
     const service = new CreateTicket(this.idGenerator, this.ticketRepository);
     const command = new CreateTicketCommand(service);
-    return command.execute({
+    const result = await command.execute({
       name: body.name,
       description: body.description,
       priority: body.priority,
       category: body.category,
-      workspaceId,
+      workspaceId: workspace.getId(),
       creatorId: user.userId,
       tagIds: body.tagIds,
     });
+
+    const creator = await this.userRepository.findById(user.userId);
+    const event: TicketCreatedEvent = {
+      ticketId: result.id,
+      ticketName: body.name,
+      priority: body.priority,
+      category: body.category,
+      creatorName: creator ? `${creator.firstName} ${creator.lastName}` : user.email,
+      workspaceId: workspace.getId(),
+      workspaceName: workspace.name,
+      workspaceSlug: workspace.slug,
+    };
+    this.eventEmitter.emit('ticket.created', event);
+
+    return result;
   }
 
   @Get()
@@ -79,12 +103,12 @@ export class TicketController {
     @Query() filters: TicketFilterDto,
     @CurrentUser() user: AuthUser,
   ) {
-    const workspaceId = await this.resolveWorkspaceId(slug);
-    await this.ensureRole(workspaceId, user.userId, ALL_ROLES);
+    const workspace = await this.resolveWorkspace(slug);
+    await this.ensureRole(workspace.getId(), user.userId, ALL_ROLES);
 
     const query = new ListTicketsQuery(this.ticketRepository);
     return query.execute({
-      workspaceId,
+      workspaceId: workspace.getId(),
       filters: {
         status: filters.status,
         excludeStatus: filters.excludeStatus,
@@ -106,8 +130,8 @@ export class TicketController {
     @Param('id') id: string,
     @CurrentUser() user: AuthUser,
   ) {
-    const workspaceId = await this.resolveWorkspaceId(slug);
-    await this.ensureRole(workspaceId, user.userId, ALL_ROLES);
+    const workspace = await this.resolveWorkspace(slug);
+    await this.ensureRole(workspace.getId(), user.userId, ALL_ROLES);
 
     const query = new GetTicketQuery(this.ticketRepository);
     return query.execute({ ticketId: id });
@@ -120,8 +144,8 @@ export class TicketController {
     @Body() body: UpdateTicketRequest,
     @CurrentUser() user: AuthUser,
   ) {
-    const workspaceId = await this.resolveWorkspaceId(slug);
-    await this.ensureRoleOrCreator(workspaceId, id, user.userId, ADMIN_AGENT);
+    const workspace = await this.resolveWorkspace(slug);
+    await this.ensureRoleOrCreator(workspace.getId(), id, user.userId, ADMIN_AGENT);
 
     const service = new UpdateTicket(this.ticketRepository);
     const command = new UpdateTicketCommand(service);
@@ -142,12 +166,30 @@ export class TicketController {
     @Body() body: ChangeTicketStatusRequest,
     @CurrentUser() user: AuthUser,
   ) {
-    const workspaceId = await this.resolveWorkspaceId(slug);
-    await this.ensureRole(workspaceId, user.userId, ADMIN_AGENT);
+    const workspace = await this.resolveWorkspace(slug);
+    await this.ensureRole(workspace.getId(), user.userId, ADMIN_AGENT);
+
+    const ticket = await this.ticketRepository.findById(id);
+    if (!ticket) throw new NotFoundException('Ticket not found');
+
+    const oldStatus = ticket.status;
 
     const service = new ChangeTicketStatus(this.ticketRepository);
     const command = new ChangeTicketStatusCommand(service);
-    return command.execute({ ticketId: id, status: body.status });
+    const result = await command.execute({ ticketId: id, status: body.status });
+
+    const event: StatusChangedEvent = {
+      ticketId: id,
+      ticketName: ticket.name,
+      oldStatus,
+      newStatus: body.status,
+      workspaceId: workspace.getId(),
+      workspaceName: workspace.name,
+      workspaceSlug: workspace.slug,
+    };
+    this.eventEmitter.emit('ticket.statusChanged', event);
+
+    return result;
   }
 
   @Patch(':id/assign')
@@ -157,12 +199,29 @@ export class TicketController {
     @Body() body: AssignTicketRequest,
     @CurrentUser() user: AuthUser,
   ) {
-    const workspaceId = await this.resolveWorkspaceId(slug);
-    await this.ensureRole(workspaceId, user.userId, ADMIN_AGENT);
+    const workspace = await this.resolveWorkspace(slug);
+    await this.ensureRole(workspace.getId(), user.userId, ADMIN_AGENT);
+
+    const ticket = await this.ticketRepository.findById(id);
+    if (!ticket) throw new NotFoundException('Ticket not found');
+
+    const previousAssigneeId = ticket.assigneeId;
 
     const service = new AssignTicket(this.ticketRepository);
     const command = new AssignTicketCommand(service);
-    return command.execute({ ticketId: id, assigneeId: body.assigneeId });
+    const result = await command.execute({ ticketId: id, assigneeId: body.assigneeId });
+
+    const event: TicketAssignedEvent = {
+      ticketId: id,
+      ticketName: ticket.name,
+      newAssigneeId: body.assigneeId,
+      previousAssigneeId,
+      workspaceName: workspace.name,
+      workspaceSlug: workspace.slug,
+    };
+    this.eventEmitter.emit('ticket.assigned', event);
+
+    return result;
   }
 
   @Delete(':id')
@@ -171,18 +230,18 @@ export class TicketController {
     @Param('id') id: string,
     @CurrentUser() user: AuthUser,
   ) {
-    const workspaceId = await this.resolveWorkspaceId(slug);
-    await this.ensureRole(workspaceId, user.userId, ADMIN_AGENT);
+    const workspace = await this.resolveWorkspace(slug);
+    await this.ensureRole(workspace.getId(), user.userId, ADMIN_AGENT);
 
     const service = new DeleteTicket(this.ticketRepository);
     const command = new DeleteTicketCommand(service);
     return command.execute({ ticketId: id });
   }
 
-  private async resolveWorkspaceId(slug: string): Promise<string> {
+  private async resolveWorkspace(slug: string) {
     const workspace = await this.workspaceRepository.findBySlug(slug);
     if (!workspace) throw new NotFoundException('Workspace not found');
-    return workspace.getId();
+    return workspace;
   }
 
   private async ensureRole(
