@@ -9,6 +9,10 @@ export class TicketFilterDto extends PaginationDto {
   @IsOptional()
   status?: TicketStatus;
 
+  @IsEnum(TicketStatus)
+  @IsOptional()
+  excludeStatus?: TicketStatus;
+
   @IsEnum(TicketPriority)
   @IsOptional()
   priority?: TicketPriority;

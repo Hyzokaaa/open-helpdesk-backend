@@ -87,6 +87,7 @@ export class TicketController {
       workspaceId,
       filters: {
         status: filters.status,
+        excludeStatus: filters.excludeStatus,
         priority: filters.priority,
         tagIds: filters.tagIds,
         assigneeId: filters.assigneeId,

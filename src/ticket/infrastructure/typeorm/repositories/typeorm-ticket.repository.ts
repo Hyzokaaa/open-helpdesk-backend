@@ -52,6 +52,9 @@ export class TypeOrmTicketRepository implements TicketRepository {
     if (filters.status) {
       qb.andWhere('ticket.status = :status', { status: filters.status });
     }
+    if (filters.excludeStatus) {
+      qb.andWhere('ticket.status != :excludeStatus', { excludeStatus: filters.excludeStatus });
+    }
     if (filters.priority) {
       qb.andWhere('ticket.priority = :priority', {
         priority: filters.priority,
