@@ -38,6 +38,11 @@ export class TypeOrmUserRepository implements UserRepository {
     return models.map((m) => this.toDomain(m));
   }
 
+  async update(user: User): Promise<void> {
+    const model = this.toModel(user);
+    await this.repository.save(model);
+  }
+
   private toDomain(model: UserModel): User {
     return new User({
       id: model.id,

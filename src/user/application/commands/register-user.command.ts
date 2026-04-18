@@ -6,6 +6,7 @@ interface Props {
   password: string;
   firstName: string;
   lastName: string;
+  isSystemAdmin?: boolean;
 }
 
 export interface RegisterUserResponse {
@@ -22,6 +23,7 @@ export class RegisterUserCommand implements Command<Props, RegisterUserResponse>
       password: props.password,
       firstName: props.firstName,
       lastName: props.lastName,
+      isSystemAdmin: props.isSystemAdmin,
     });
 
     return { id: user.getId(), email: user.email };

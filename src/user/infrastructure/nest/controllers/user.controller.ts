@@ -4,6 +4,9 @@ import {
   ForbiddenException,
   Get,
   Inject,
+  NotFoundException,
+  Param,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -65,6 +68,28 @@ export class UserController {
       password: body.password,
       firstName: body.firstName,
       lastName: body.lastName,
+      isSystemAdmin: body.isSystemAdmin,
     });
+  }
+
+  @Patch(':id/system-admin')
+  async toggleSystemAdmin(
+    @Param('id') id: string,
+    @Body() body: { isSystemAdmin: boolean },
+    @CurrentUser() user: AuthUser,
+  ) {
+    if (!user.isSystemAdmin) {
+      throw new ForbiddenException('Only system admins can manage system admin roles');
+    }
+
+    const target = await this.userRepository.findById(id);
+    if (!target) {
+      throw new NotFoundException('User not found');
+    }
+
+    target.isSystemAdmin = body.isSystemAdmin;
+    await this.userRepository.update(target);
+
+    return { id: target.getId(), isSystemAdmin: target.isSystemAdmin };
   }
 }

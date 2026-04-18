@@ -9,6 +9,7 @@ interface CreateUserProps {
   password: string;
   firstName: string;
   lastName: string;
+  isSystemAdmin?: boolean;
 }
 
 export class CreateUser {
@@ -33,7 +34,7 @@ export class CreateUser {
       firstName: props.firstName,
       lastName: props.lastName,
       isActive: true,
-      isSystemAdmin: false,
+      isSystemAdmin: props.isSystemAdmin ?? false,
     });
 
     await this.repository.create(user);
