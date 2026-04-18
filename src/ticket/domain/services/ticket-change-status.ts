@@ -3,7 +3,7 @@ import { Ticket } from '../entities/ticket';
 import { TicketStatus } from '../enums/ticket-status.enum';
 import { TicketRepository } from '../repositories/ticket.repository';
 
-const ALL_EXCEPT_CLOSED = [
+const ALL_STATUSES = [
   TicketStatus.PENDING,
   TicketStatus.IN_PROGRESS,
   TicketStatus.RESOLVED,
@@ -11,10 +11,10 @@ const ALL_EXCEPT_CLOSED = [
 ];
 
 const ALLOWED_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
-  [TicketStatus.PENDING]: ALL_EXCEPT_CLOSED,
-  [TicketStatus.IN_PROGRESS]: ALL_EXCEPT_CLOSED,
-  [TicketStatus.RESOLVED]: ALL_EXCEPT_CLOSED,
-  [TicketStatus.CLOSED]: [],
+  [TicketStatus.PENDING]: ALL_STATUSES,
+  [TicketStatus.IN_PROGRESS]: ALL_STATUSES,
+  [TicketStatus.RESOLVED]: ALL_STATUSES,
+  [TicketStatus.CLOSED]: ALL_STATUSES,
 };
 
 interface ChangeTicketStatusProps {
