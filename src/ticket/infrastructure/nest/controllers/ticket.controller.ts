@@ -32,8 +32,8 @@ import { TypeOrmTicketRepository } from '../../typeorm/repositories/typeorm-tick
 import { TypeOrmWorkspaceRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository';
 import { TypeOrmWorkspaceMemberRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
 import { TypeOrmUserRepository } from '../../../../user/infrastructure/typeorm/repositories/typeorm-user.repository';
-import { EnsureWorkspaceRole } from '../../../../workspace/domain/services/workspace-ensure-role';
-import { WorkspaceRole } from '../../../../workspace/domain/enums/workspace-role.enum';
+import { EnsureWorkspacePermission } from '../../../../workspace/domain/services/workspace-ensure-permission';
+import { PERMISSIONS, Permission, hasPermission } from '../../../../workspace/domain/permissions';
 import { CreateTicketRequest } from '../dto/create-ticket.request';
 import { UpdateTicketRequest } from '../dto/update-ticket.request';
 import { ChangeTicketStatusRequest } from '../dto/change-ticket-status.request';
@@ -44,9 +44,6 @@ import {
   TicketAssignedEvent,
   StatusChangedEvent,
 } from '../../../../email/domain/events';
-
-const ALL_ROLES = [WorkspaceRole.ADMIN, WorkspaceRole.AGENT, WorkspaceRole.REPORTER];
-const ADMIN_AGENT = [WorkspaceRole.ADMIN, WorkspaceRole.AGENT];
 
 @Controller('workspaces/:slug/tickets')
 @UseGuards(JwtAuthGuard)
@@ -67,7 +64,7 @@ export class TicketController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspace = await this.resolveWorkspace(slug);
-    await this.ensureRole(workspace.getId(), user.userId, ALL_ROLES);
+    await this.ensure(workspace.getId(), user.userId, PERMISSIONS.TICKET_CREATE);
 
     const service = new CreateTicket(this.idGenerator, this.ticketRepository);
     const command = new CreateTicketCommand(service);
@@ -104,7 +101,7 @@ export class TicketController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspace = await this.resolveWorkspace(slug);
-    await this.ensureRole(workspace.getId(), user.userId, ALL_ROLES);
+    await this.ensure(workspace.getId(), user.userId, PERMISSIONS.TICKET_VIEW);
 
     const query = new ListTicketsQuery(this.ticketRepository);
     return query.execute({
@@ -131,7 +128,7 @@ export class TicketController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspace = await this.resolveWorkspace(slug);
-    await this.ensureRole(workspace.getId(), user.userId, ALL_ROLES);
+    await this.ensure(workspace.getId(), user.userId, PERMISSIONS.TICKET_VIEW);
 
     const query = new GetTicketQuery(this.ticketRepository);
     return query.execute({ ticketId: id });
@@ -145,13 +142,29 @@ export class TicketController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspace = await this.resolveWorkspace(slug);
-    await this.ensureRoleOrCreator(workspace.getId(), id, user.userId, ADMIN_AGENT);
+    const ticket = await this.ticketRepository.findById(id);
+    if (!ticket) throw new NotFoundException('Ticket not found');
+
+    // Closed tickets require special permission
+    if (ticket.status === 'closed') {
+      await this.ensure(workspace.getId(), user.userId, PERMISSIONS.TICKET_EDIT_CLOSED);
+    } else {
+      // For open tickets: check specific field permissions or creator
+      const isCreator = ticket.creatorId === user.userId;
+      if (!isCreator) {
+        await this.ensure(workspace.getId(), user.userId, PERMISSIONS.TICKET_EDIT_DESCRIPTION);
+      }
+    }
+
+    // Name requires specific permission
+    const ctx = await this.ensureAndGetContext(workspace.getId(), user.userId, PERMISSIONS.TICKET_VIEW);
+    const canEditName = ctx && hasPermission(ctx.role, PERMISSIONS.TICKET_EDIT_NAME);
 
     const service = new UpdateTicket(this.ticketRepository);
     const command = new UpdateTicketCommand(service);
     return command.execute({
       ticketId: id,
-      name: body.name,
+      name: canEditName ? body.name : undefined,
       description: body.description,
       priority: body.priority,
       category: body.category,
@@ -167,10 +180,14 @@ export class TicketController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspace = await this.resolveWorkspace(slug);
-    await this.ensureRole(workspace.getId(), user.userId, ADMIN_AGENT);
-
     const ticket = await this.ticketRepository.findById(id);
     if (!ticket) throw new NotFoundException('Ticket not found');
+
+    const permission = ticket.status === 'closed'
+      ? PERMISSIONS.TICKET_CHANGE_STATUS_CLOSED
+      : PERMISSIONS.TICKET_CHANGE_STATUS;
+
+    await this.ensure(workspace.getId(), user.userId, permission);
 
     const oldStatus = ticket.status;
 
@@ -200,7 +217,7 @@ export class TicketController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspace = await this.resolveWorkspace(slug);
-    await this.ensureRole(workspace.getId(), user.userId, ADMIN_AGENT);
+    await this.ensure(workspace.getId(), user.userId, PERMISSIONS.TICKET_ASSIGN);
 
     const ticket = await this.ticketRepository.findById(id);
     if (!ticket) throw new NotFoundException('Ticket not found');
@@ -231,7 +248,7 @@ export class TicketController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspace = await this.resolveWorkspace(slug);
-    await this.ensureRole(workspace.getId(), user.userId, ADMIN_AGENT);
+    await this.ensure(workspace.getId(), user.userId, PERMISSIONS.TICKET_DELETE);
 
     const service = new DeleteTicket(this.ticketRepository);
     const command = new DeleteTicketCommand(service);
@@ -244,27 +261,13 @@ export class TicketController {
     return workspace;
   }
 
-  private async ensureRole(
-    workspaceId: string,
-    userId: string,
-    allowedRoles: WorkspaceRole[],
-  ): Promise<void> {
-    const service = new EnsureWorkspaceRole(this.memberRepository);
-    await service.execute({ workspaceId, userId, allowedRoles });
+  private async ensure(workspaceId: string, userId: string, permission: Permission) {
+    const service = new EnsureWorkspacePermission(this.memberRepository);
+    return service.execute({ workspaceId, userId, permission });
   }
 
-  private async ensureRoleOrCreator(
-    workspaceId: string,
-    ticketId: string,
-    userId: string,
-    allowedRoles: WorkspaceRole[],
-  ): Promise<void> {
-    const ticket = await this.ticketRepository.findById(ticketId);
-    if (!ticket) throw new NotFoundException('Ticket not found');
-
-    if (ticket.creatorId === userId) return;
-
-    const service = new EnsureWorkspaceRole(this.memberRepository);
-    await service.execute({ workspaceId, userId, allowedRoles });
+  private async ensureAndGetContext(workspaceId: string, userId: string, permission: Permission) {
+    const service = new EnsureWorkspacePermission(this.memberRepository);
+    return service.execute({ workspaceId, userId, permission });
   }
 }

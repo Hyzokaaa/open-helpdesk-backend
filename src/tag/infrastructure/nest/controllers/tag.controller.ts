@@ -21,11 +21,9 @@ import { ListTagsQuery } from '../../../application/queries/list-tags.query';
 import { TypeOrmTagRepository } from '../../typeorm/repositories/typeorm-tag.repository';
 import { TypeOrmWorkspaceRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository';
 import { TypeOrmWorkspaceMemberRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
-import { EnsureWorkspaceRole } from '../../../../workspace/domain/services/workspace-ensure-role';
-import { WorkspaceRole } from '../../../../workspace/domain/enums/workspace-role.enum';
+import { EnsureWorkspacePermission } from '../../../../workspace/domain/services/workspace-ensure-permission';
+import { PERMISSIONS, Permission } from '../../../../workspace/domain/permissions';
 import { CreateTagRequest } from '../dto/create-tag.request';
-
-const ALL_ROLES = [WorkspaceRole.ADMIN, WorkspaceRole.AGENT, WorkspaceRole.REPORTER];
 
 @Controller('workspaces/:slug/tags')
 @UseGuards(JwtAuthGuard)
@@ -44,7 +42,7 @@ export class TagController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
-    await this.ensureRole(workspaceId, user.userId, [WorkspaceRole.ADMIN]);
+    await this.ensure(workspaceId, user.userId, PERMISSIONS.TAG_CREATE);
 
     const service = new CreateTag(this.idGenerator, this.tagRepository);
     const command = new CreateTagCommand(service);
@@ -61,7 +59,7 @@ export class TagController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
-    await this.ensureRole(workspaceId, user.userId, ALL_ROLES);
+    await this.ensure(workspaceId, user.userId, PERMISSIONS.TAG_VIEW);
 
     const query = new ListTagsQuery(this.tagRepository);
     return query.execute({ workspaceId });
@@ -74,7 +72,7 @@ export class TagController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
-    await this.ensureRole(workspaceId, user.userId, [WorkspaceRole.ADMIN]);
+    await this.ensure(workspaceId, user.userId, PERMISSIONS.TAG_DELETE);
 
     const service = new DeleteTag(this.tagRepository);
     const command = new DeleteTagCommand(service);
@@ -87,12 +85,8 @@ export class TagController {
     return workspace.getId();
   }
 
-  private async ensureRole(
-    workspaceId: string,
-    userId: string,
-    allowedRoles: WorkspaceRole[],
-  ): Promise<void> {
-    const service = new EnsureWorkspaceRole(this.memberRepository);
-    await service.execute({ workspaceId, userId, allowedRoles });
+  private async ensure(workspaceId: string, userId: string, permission: Permission) {
+    const service = new EnsureWorkspacePermission(this.memberRepository);
+    return service.execute({ workspaceId, userId, permission });
   }
 }

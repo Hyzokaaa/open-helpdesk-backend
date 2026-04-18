@@ -17,7 +17,8 @@ import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator'
 import { CreateWorkspace } from '../../../domain/services/workspace-create';
 import { AddWorkspaceMember } from '../../../domain/services/workspace-add-member';
 import { RemoveWorkspaceMember } from '../../../domain/services/workspace-remove-member';
-import { EnsureWorkspaceRole } from '../../../domain/services/workspace-ensure-role';
+import { EnsureWorkspacePermission } from '../../../domain/services/workspace-ensure-permission';
+import { PERMISSIONS, Permission } from '../../../domain/permissions';
 import { CreateWorkspaceCommand } from '../../../application/commands/create-workspace.command';
 import { AddMemberCommand } from '../../../application/commands/add-member.command';
 import { RemoveMemberCommand } from '../../../application/commands/remove-member.command';
@@ -29,7 +30,6 @@ import { TypeOrmWorkspaceRepository } from '../../typeorm/repositories/typeorm-w
 import { TypeOrmWorkspaceMemberRepository } from '../../typeorm/repositories/typeorm-workspace-member.repository';
 import { CreateWorkspaceRequest } from '../dto/create-workspace.request';
 import { AddMemberRequest } from '../dto/add-member.request';
-import { WorkspaceRole } from '../../../domain/enums/workspace-role.enum';
 
 @Controller('workspaces')
 @UseGuards(JwtAuthGuard)
@@ -77,7 +77,7 @@ export class WorkspaceController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
-    await this.ensureRole(workspaceId, user.userId, [WorkspaceRole.ADMIN]);
+    await this.ensure(workspaceId, user.userId, PERMISSIONS.WORKSPACE_MEMBERS_MANAGE);
 
     const service = new AddWorkspaceMember(this.idGenerator, this.memberRepository);
     const command = new AddMemberCommand(service);
@@ -86,6 +86,19 @@ export class WorkspaceController {
       userId: body.userId,
       role: body.role,
     });
+  }
+
+  @Get(':slug/permissions')
+  async myPermissions(
+    @Param('slug') slug: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const member = await this.memberRepository.findByWorkspaceAndUser(workspaceId, user.userId);
+    if (!member) return { permissions: [] };
+
+    const { getPermissionsForRole } = await import('../../../domain/permissions');
+    return { permissions: getPermissionsForRole(member.role) };
   }
 
   @Get(':slug/members')
@@ -102,7 +115,7 @@ export class WorkspaceController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
-    await this.ensureRole(workspaceId, user.userId, [WorkspaceRole.ADMIN]);
+    await this.ensure(workspaceId, user.userId, PERMISSIONS.WORKSPACE_MEMBERS_MANAGE);
 
     const service = new RemoveWorkspaceMember(this.memberRepository);
     const command = new RemoveMemberCommand(service);
@@ -115,12 +128,8 @@ export class WorkspaceController {
     return workspace.getId();
   }
 
-  private async ensureRole(
-    workspaceId: string,
-    userId: string,
-    allowedRoles: WorkspaceRole[],
-  ): Promise<void> {
-    const service = new EnsureWorkspaceRole(this.memberRepository);
-    await service.execute({ workspaceId, userId, allowedRoles });
+  private async ensure(workspaceId: string, userId: string, permission: Permission) {
+    const service = new EnsureWorkspacePermission(this.memberRepository);
+    return service.execute({ workspaceId, userId, permission });
   }
 }
