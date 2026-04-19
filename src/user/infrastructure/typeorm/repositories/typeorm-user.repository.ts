@@ -53,6 +53,7 @@ export class TypeOrmUserRepository implements UserRepository {
       isActive: model.isActive,
       isSystemAdmin: model.isSystemAdmin,
       language: model.language,
+      theme: model.theme,
     });
   }
 
@@ -66,6 +67,7 @@ export class TypeOrmUserRepository implements UserRepository {
     model.isActive = user.isActive;
     model.isSystemAdmin = user.isSystemAdmin;
     model.language = user.language;
+    model.theme = user.theme;
     return model;
   }
 }

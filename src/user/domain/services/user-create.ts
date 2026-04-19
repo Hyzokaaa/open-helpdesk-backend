@@ -36,6 +36,7 @@ export class CreateUser {
       isActive: true,
       isSystemAdmin: props.isSystemAdmin ?? false,
       language: 'en',
+      theme: 'system',
     });
 
     await this.repository.create(user);

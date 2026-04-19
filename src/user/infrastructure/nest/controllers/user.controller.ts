@@ -50,6 +50,20 @@ export class UserController {
     return { language: user.language };
   }
 
+  @Patch('me/theme')
+  async updateTheme(
+    @Body() body: { theme: string },
+    @CurrentUser() authUser: AuthUser,
+  ) {
+    const user = await this.userRepository.findById(authUser.userId);
+    if (!user) throw new NotFoundException('User not found');
+
+    user.theme = body.theme;
+    await this.userRepository.update(user);
+
+    return { theme: user.theme };
+  }
+
   @Get()
   async list() {
     const users = await this.userRepository.findAll();

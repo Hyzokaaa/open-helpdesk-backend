@@ -32,6 +32,9 @@ export class UserModel {
   @Column({ default: 'en' })
   language!: string;
 
+  @Column({ default: 'system' })
+  theme!: string;
+
   @CreateDateColumn()
   createdAt!: Date;
 

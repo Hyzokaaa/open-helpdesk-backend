@@ -47,6 +47,7 @@ export class SeederService implements OnModuleInit {
     user.isActive = true;
     user.isSystemAdmin = true;
     user.language = 'en';
+    user.theme = 'system';
 
     await this.userRepository.save(user);
     this.logger.log(`Admin user created: ${email}`);

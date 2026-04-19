@@ -9,6 +9,7 @@ interface Props {
   isActive: boolean;
   isSystemAdmin: boolean;
   language: string;
+  theme: string;
 }
 
 export class User {
@@ -20,6 +21,7 @@ export class User {
   isActive: boolean;
   isSystemAdmin: boolean;
   language: string;
+  theme: string;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -30,6 +32,7 @@ export class User {
     this.isActive = props.isActive;
     this.isSystemAdmin = props.isSystemAdmin;
     this.language = props.language;
+    this.theme = props.theme;
   }
 
   getId(): string {
