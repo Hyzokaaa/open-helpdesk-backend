@@ -36,6 +36,20 @@ export class UserController {
     return query.execute({ userId: user.userId });
   }
 
+  @Patch('me/language')
+  async updateLanguage(
+    @Body() body: { language: string },
+    @CurrentUser() authUser: AuthUser,
+  ) {
+    const user = await this.userRepository.findById(authUser.userId);
+    if (!user) throw new NotFoundException('User not found');
+
+    user.language = body.language;
+    await this.userRepository.update(user);
+
+    return { language: user.language };
+  }
+
   @Get()
   async list() {
     const users = await this.userRepository.findAll();

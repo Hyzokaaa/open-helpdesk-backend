@@ -29,34 +29,36 @@ export class TicketCreatedHandler {
     const agentMembers = members.filter(
       (m) => m.role === WorkspaceRole.ADMIN || m.role === WorkspaceRole.AGENT,
     );
-
     if (agentMembers.length === 0) return;
 
-    const users = await this.userRepository.findByIds(
-      agentMembers.map((m) => m.userId),
-    );
-
-    const emails = users.map((u) => u.email);
+    const users = await this.userRepository.findByIds(agentMembers.map((m) => m.userId));
     const template = new TicketCreatedTemplate();
     const ticketUrl = `${this.frontendUrl}/dashboard/workspaces/${event.workspaceSlug}/tickets/${event.ticketId}`;
 
-    const data = {
-      ticketName: event.ticketName,
-      ticketUrl,
-      creatorName: event.creatorName,
-      priority: event.priority,
-      category: event.category,
-      workspaceName: event.workspaceName,
-    };
+    // Group users by language
+    const byLang = new Map<string, string[]>();
+    for (const u of users) {
+      const lang = u.language || 'en';
+      if (!byLang.has(lang)) byLang.set(lang, []);
+      byLang.get(lang)!.push(u.email);
+    }
 
-    const result = await this.emailService.send({
-      to: emails,
-      subject: template.subject(data),
-      html: template.html(data),
-    });
+    for (const [lang, emails] of byLang) {
+      const data = {
+        ticketName: event.ticketName,
+        ticketUrl,
+        creatorName: event.creatorName,
+        priority: event.priority,
+        category: event.category,
+        workspaceName: event.workspaceName,
+        lang,
+      };
 
-    if (!result.success) {
-      this.logger.error(`Failed to send ticket created email for ${event.ticketId}`);
+      await this.emailService.send({
+        to: emails,
+        subject: template.subject(data),
+        html: template.html(data),
+      });
     }
   }
 }

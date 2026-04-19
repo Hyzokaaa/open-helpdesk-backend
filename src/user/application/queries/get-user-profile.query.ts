@@ -13,6 +13,7 @@ export interface UserProfileResponse {
   lastName: string;
   isActive: boolean;
   isSystemAdmin: boolean;
+  language: string;
 }
 
 export class GetUserProfileQuery implements Query<Props, UserProfileResponse> {
@@ -31,6 +32,7 @@ export class GetUserProfileQuery implements Query<Props, UserProfileResponse> {
       lastName: user.lastName,
       isActive: user.isActive,
       isSystemAdmin: user.isSystemAdmin,
+      language: user.language,
     };
   }
 }

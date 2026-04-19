@@ -27,46 +27,47 @@ export class NewCommentHandler {
     if (event.assigneeId && event.assigneeId !== event.authorId) {
       recipientIds.add(event.assigneeId);
     }
-
     for (const userId of event.mentionedUserIds) {
-      if (userId !== event.authorId) {
-        recipientIds.add(userId);
-      }
+      if (userId !== event.authorId) recipientIds.add(userId);
     }
-
     if (recipientIds.size === 0) return;
 
     const users = await this.userRepository.findByIds([...recipientIds]);
     if (users.length === 0) return;
 
-    const template = new NewCommentTemplate();
-    const ticketUrl = `${this.frontendUrl}/dashboard/workspaces/${event.workspaceSlug}/tickets/${event.ticketId}`;
-
     const cleanContent = event.commentContent.replace(
       /@\[([^\]]+)\]\([^)]+\)/g,
       '@$1',
     );
-    const preview =
-      cleanContent.length > 200
-        ? cleanContent.substring(0, 200) + '...'
-        : cleanContent;
+    const preview = cleanContent.length > 200
+      ? cleanContent.substring(0, 200) + '...'
+      : cleanContent;
 
-    const data = {
-      ticketName: event.ticketName,
-      ticketUrl,
-      authorName: event.authorName,
-      commentPreview: preview,
-      workspaceName: event.workspaceName,
-    };
+    const template = new NewCommentTemplate();
+    const ticketUrl = `${this.frontendUrl}/dashboard/workspaces/${event.workspaceSlug}/tickets/${event.ticketId}`;
 
-    const result = await this.emailService.send({
-      to: users.map((u) => u.email),
-      subject: template.subject(data),
-      html: template.html(data),
-    });
+    const byLang = new Map<string, string[]>();
+    for (const u of users) {
+      const lang = u.language || 'en';
+      if (!byLang.has(lang)) byLang.set(lang, []);
+      byLang.get(lang)!.push(u.email);
+    }
 
-    if (!result.success) {
-      this.logger.error(`Failed to send comment email for ticket ${event.ticketId}`);
+    for (const [lang, emails] of byLang) {
+      const data = {
+        ticketName: event.ticketName,
+        ticketUrl,
+        authorName: event.authorName,
+        commentPreview: preview,
+        workspaceName: event.workspaceName,
+        lang,
+      };
+
+      await this.emailService.send({
+        to: emails,
+        subject: template.subject(data),
+        html: template.html(data),
+      });
     }
   }
 }

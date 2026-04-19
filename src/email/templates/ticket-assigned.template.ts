@@ -1,68 +1,41 @@
-interface AssignedData {
+import { t } from './i18n';
+import { emailLayout, buttonHtml } from './base.template';
+
+interface Data {
   ticketName: string;
   ticketUrl: string;
-  assigneeName: string;
   workspaceName: string;
+  lang: string;
 }
 
-interface UnassignedData {
-  ticketName: string;
-  ticketUrl: string;
-  workspaceName: string;
+interface AssignedData extends Data {
+  assigneeName: string;
 }
 
 export class TicketAssignedTemplate {
   assignedSubject(data: AssignedData): string {
-    return `[${data.workspaceName}] Ticket assigned to you: ${data.ticketName}`;
+    return `[${data.workspaceName}] ${t('ticketAssigned.subject', data.lang)}: ${data.ticketName}`;
   }
 
   assignedHtml(data: AssignedData): string {
-    return `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0;">
-  <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-    <div style="text-align: center; margin-bottom: 30px;">
-      <h1 style="color: #6330f7; margin: 0;">DealerNode Helpdesk</h1>
-    </div>
-    <div style="background-color: #f9fafb; border-radius: 8px; padding: 30px; margin-bottom: 20px;">
-      <h2 style="color: #1f2937; margin-top: 0;">Ticket Assigned to You</h2>
-      <p style="color: #4b5563;">Hi <strong>${data.assigneeName}</strong>, a ticket has been assigned to you in <strong>${data.workspaceName}</strong>.</p>
+    const content = `
+      <h2 style="color: #1f2937; margin-top: 0;">${t('ticketAssigned.title', data.lang)}</h2>
+      <p style="color: #4b5563;">${t('ticketAssigned.body', data.lang, { assigneeName: `<strong>${data.assigneeName}</strong>`, workspaceName: `<strong>${data.workspaceName}</strong>` })}</p>
       <p style="color: #1f2937; font-weight: bold; font-size: 16px; margin: 20px 0;">${data.ticketName}</p>
-      <div style="text-align: center; margin: 30px 0;">
-        <a href="${data.ticketUrl}" style="background-color: #6330f7; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">View Ticket</a>
-      </div>
-    </div>
-  </div>
-</body>
-</html>`.trim();
+      ${buttonHtml(data.lang, data.ticketUrl)}`;
+    return emailLayout(data.lang, content);
   }
 
-  unassignedSubject(data: UnassignedData): string {
-    return `[${data.workspaceName}] You have been unassigned from: ${data.ticketName}`;
+  unassignedSubject(data: Data): string {
+    return `[${data.workspaceName}] ${t('ticketUnassigned.subject', data.lang)}: ${data.ticketName}`;
   }
 
-  unassignedHtml(data: UnassignedData): string {
-    return `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0;">
-  <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-    <div style="text-align: center; margin-bottom: 30px;">
-      <h1 style="color: #6330f7; margin: 0;">DealerNode Helpdesk</h1>
-    </div>
-    <div style="background-color: #f9fafb; border-radius: 8px; padding: 30px; margin-bottom: 20px;">
-      <h2 style="color: #1f2937; margin-top: 0;">Ticket Unassigned</h2>
-      <p style="color: #4b5563;">You have been unassigned from the following ticket in <strong>${data.workspaceName}</strong>.</p>
+  unassignedHtml(data: Data): string {
+    const content = `
+      <h2 style="color: #1f2937; margin-top: 0;">${t('ticketUnassigned.title', data.lang)}</h2>
+      <p style="color: #4b5563;">${t('ticketUnassigned.body', data.lang, { workspaceName: `<strong>${data.workspaceName}</strong>` })}</p>
       <p style="color: #1f2937; font-weight: bold; font-size: 16px; margin: 20px 0;">${data.ticketName}</p>
-      <div style="text-align: center; margin: 30px 0;">
-        <a href="${data.ticketUrl}" style="background-color: #6330f7; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">View Ticket</a>
-      </div>
-    </div>
-  </div>
-</body>
-</html>`.trim();
+      ${buttonHtml(data.lang, data.ticketUrl)}`;
+    return emailLayout(data.lang, content);
   }
 }

@@ -29,6 +29,9 @@ export class UserModel {
   @Column({ default: false })
   isSystemAdmin!: boolean;
 
+  @Column({ default: 'en' })
+  language!: string;
+
   @CreateDateColumn()
   createdAt!: Date;
 

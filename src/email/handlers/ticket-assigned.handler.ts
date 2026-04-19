@@ -25,15 +25,11 @@ export class TicketAssignedHandler {
     const template = new TicketAssignedTemplate();
     const ticketUrl = `${this.frontendUrl}/dashboard/workspaces/${event.workspaceSlug}/tickets/${event.ticketId}`;
 
-    // Notify previous assignee they've been unassigned
     if (event.previousAssigneeId && event.previousAssigneeId !== event.newAssigneeId) {
       const prevUser = await this.userRepository.findById(event.previousAssigneeId);
       if (prevUser) {
-        const data = {
-          ticketName: event.ticketName,
-          ticketUrl,
-          workspaceName: event.workspaceName,
-        };
+        const lang = prevUser.language || 'en';
+        const data = { ticketName: event.ticketName, ticketUrl, workspaceName: event.workspaceName, lang };
         await this.emailService.send({
           to: prevUser.email,
           subject: template.unassignedSubject(data),
@@ -42,15 +38,16 @@ export class TicketAssignedHandler {
       }
     }
 
-    // Notify new assignee
     if (event.newAssigneeId) {
       const newUser = await this.userRepository.findById(event.newAssigneeId);
       if (newUser) {
+        const lang = newUser.language || 'en';
         const data = {
           ticketName: event.ticketName,
           ticketUrl,
           assigneeName: `${newUser.firstName} ${newUser.lastName}`,
           workspaceName: event.workspaceName,
+          lang,
         };
         await this.emailService.send({
           to: newUser.email,

@@ -52,6 +52,7 @@ export class TypeOrmUserRepository implements UserRepository {
       lastName: model.lastName,
       isActive: model.isActive,
       isSystemAdmin: model.isSystemAdmin,
+      language: model.language,
     });
   }
 
@@ -64,6 +65,7 @@ export class TypeOrmUserRepository implements UserRepository {
     model.lastName = user.lastName;
     model.isActive = user.isActive;
     model.isSystemAdmin = user.isSystemAdmin;
+    model.language = user.language;
     return model;
   }
 }

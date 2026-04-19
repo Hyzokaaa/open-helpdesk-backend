@@ -35,6 +35,7 @@ export class CreateUser {
       lastName: props.lastName,
       isActive: true,
       isSystemAdmin: props.isSystemAdmin ?? false,
+      language: 'en',
     });
 
     await this.repository.create(user);

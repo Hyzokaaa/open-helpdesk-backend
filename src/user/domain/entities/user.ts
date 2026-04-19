@@ -8,6 +8,7 @@ interface Props {
   lastName: string;
   isActive: boolean;
   isSystemAdmin: boolean;
+  language: string;
 }
 
 export class User {
@@ -18,6 +19,7 @@ export class User {
   lastName: string;
   isActive: boolean;
   isSystemAdmin: boolean;
+  language: string;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -27,6 +29,7 @@ export class User {
     this.lastName = props.lastName;
     this.isActive = props.isActive;
     this.isSystemAdmin = props.isSystemAdmin;
+    this.language = props.language;
   }
 
   getId(): string {
