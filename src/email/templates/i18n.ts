@@ -90,6 +90,22 @@ const translations: Translations = {
     en: 'The status of {ticketName} has been updated.',
     es: 'El estado de {ticketName} ha sido actualizado.',
   },
+  // Priorities
+  'priority.low': { en: 'Low', es: 'Baja' },
+  'priority.medium': { en: 'Medium', es: 'Media' },
+  'priority.high': { en: 'High', es: 'Alta' },
+  'priority.critical': { en: 'Critical', es: 'Crítica' },
+
+  // Categories
+  'category.bug': { en: 'Bug', es: 'Error' },
+  'category.issue': { en: 'Issue', es: 'Incidencia' },
+  'category.task': { en: 'Task', es: 'Tarea' },
+
+  // Statuses
+  'status.pending': { en: 'Pending', es: 'Pendiente' },
+  'status.in-progress': { en: 'In Progress', es: 'En progreso' },
+  'status.resolved': { en: 'Resolved', es: 'Resuelto' },
+  'status.closed': { en: 'Closed', es: 'Cerrado' },
 };
 
 export function t(key: string, lang: string, vars?: Record<string, string>): string {
