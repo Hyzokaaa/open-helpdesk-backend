@@ -49,9 +49,9 @@ export class NotificationPreferenceModel {
   @Column({ default: true })
   inAppCommentCreated!: boolean;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt!: Date;
 }

@@ -7,10 +7,8 @@ import {
   Patch,
   Put,
   Query,
-  Res,
   UseGuards,
 } from '@nestjs/common';
-import { Response } from 'express';
 import { JwtAuthGuard } from '../../../../shared/nest/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
@@ -34,7 +32,6 @@ export class NotificationController {
   async list(
     @CurrentUser() user: AuthUser,
     @Query('unreadOnly') unreadOnly: string,
-    @Res({ passthrough: true }) res: Response,
   ) {
     const unread = unreadOnly === 'true';
     const [notifications, unreadCount] = await Promise.all([
@@ -42,17 +39,18 @@ export class NotificationController {
       this.notificationRepository.countUnread(user.userId),
     ]);
 
-    res.setHeader('X-Unread-Count', unreadCount.toString());
-
-    return notifications.map((n) => ({
-      id: n.getId(),
-      type: n.type,
-      title: n.title,
-      ticketId: n.ticketId,
-      workspaceSlug: n.workspaceSlug,
-      isRead: n.isRead,
-      createdAt: n.createdAt,
-    }));
+    return {
+      unreadCount,
+      notifications: notifications.map((n) => ({
+        id: n.getId(),
+        type: n.type,
+        title: n.title,
+        ticketId: n.ticketId,
+        workspaceSlug: n.workspaceSlug,
+        isRead: n.isRead,
+        createdAt: n.createdAt,
+      })),
+    };
   }
 
   @Patch(':id/read')

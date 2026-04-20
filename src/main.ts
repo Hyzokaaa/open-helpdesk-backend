@@ -12,7 +12,9 @@ async function bootstrap() {
     }),
   );
 
-  app.enableCors();
+  app.enableCors({
+    exposedHeaders: ['X-Unread-Count', 'Date'],
+  });
 
   await app.listen(3000);
 }

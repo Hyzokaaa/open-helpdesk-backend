@@ -24,6 +24,6 @@ export class TagModel {
   @Column()
   workspaceId!: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 }

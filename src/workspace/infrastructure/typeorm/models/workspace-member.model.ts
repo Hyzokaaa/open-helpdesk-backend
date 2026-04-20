@@ -30,6 +30,6 @@ export class WorkspaceMemberModel {
   @Column()
   role!: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 }
