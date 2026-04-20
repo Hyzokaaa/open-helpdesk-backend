@@ -9,11 +9,12 @@ import { StatusChangedHandler } from './handlers/status-changed.handler';
 import { UserModule } from '../user/user.module';
 import { WorkspaceModule } from '../workspace/workspace.module';
 import { NotificationModule } from '../notification/notification.module';
+import { SharedModule } from '../shared/shared.module';
 import { EMAIL_SERVICE } from './email.constants';
 
 @Global()
 @Module({
-  imports: [UserModule, WorkspaceModule, NotificationModule],
+  imports: [UserModule, WorkspaceModule, NotificationModule, SharedModule],
   providers: [
     {
       provide: EMAIL_SERVICE,
