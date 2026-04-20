@@ -5,7 +5,6 @@ interface Props {
   name: string;
   slug: string;
   description: string;
-  dealerId: string | null;
 }
 
 export class Workspace {
@@ -13,14 +12,12 @@ export class Workspace {
   name: string;
   slug: string;
   description: string;
-  dealerId: string | null;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
     this.name = props.name;
     this.slug = props.slug;
     this.description = props.description;
-    this.dealerId = props.dealerId;
   }
 
   getId(): string {

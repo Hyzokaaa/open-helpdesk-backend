@@ -42,7 +42,6 @@ export class TypeOrmWorkspaceRepository implements WorkspaceRepository {
       name: model.name,
       slug: model.slug,
       description: model.description,
-      dealerId: model.dealerId,
     });
   }
 
@@ -52,7 +51,6 @@ export class TypeOrmWorkspaceRepository implements WorkspaceRepository {
     model.name = workspace.name;
     model.slug = workspace.slug;
     model.description = workspace.description;
-    model.dealerId = workspace.dealerId;
     return model;
   }
 }

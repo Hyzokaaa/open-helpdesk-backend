@@ -20,8 +20,8 @@ export class WorkspaceModel {
   @Column({ default: '' })
   description!: string;
 
-  @Column({ type: 'varchar', nullable: true })
-  dealerId!: string | null;
+  @Column({ type: 'jsonb', nullable: true })
+  metadata!: Record<string, unknown> | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;

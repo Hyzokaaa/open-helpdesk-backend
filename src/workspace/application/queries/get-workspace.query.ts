@@ -11,7 +11,6 @@ export interface WorkspaceResponse {
   name: string;
   slug: string;
   description: string;
-  dealerId: string | null;
 }
 
 export class GetWorkspaceQuery implements Query<Props, WorkspaceResponse> {
@@ -28,7 +27,6 @@ export class GetWorkspaceQuery implements Query<Props, WorkspaceResponse> {
       name: workspace.name,
       slug: workspace.slug,
       description: workspace.description,
-      dealerId: workspace.dealerId,
     };
   }
 }

@@ -53,7 +53,6 @@ export class WorkspaceController {
     return command.execute({
       name: body.name,
       description: body.description,
-      dealerId: body.dealerId ?? null,
       creatorUserId: user.userId,
     });
   }

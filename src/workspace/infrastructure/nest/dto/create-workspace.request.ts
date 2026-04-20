@@ -8,8 +8,4 @@ export class CreateWorkspaceRequest {
   @IsString()
   @IsOptional()
   description: string = '';
-
-  @IsString()
-  @IsOptional()
-  dealerId?: string;
 }

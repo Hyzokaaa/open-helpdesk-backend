@@ -6,7 +6,6 @@ import { WorkspaceRole } from '../../domain/enums/workspace-role.enum';
 interface Props {
   name: string;
   description: string;
-  dealerId: string | null;
   creatorUserId: string;
 }
 
@@ -26,7 +25,6 @@ export class CreateWorkspaceCommand implements Command<Props, CreateWorkspaceRes
     const workspace = await this.createWorkspace.execute({
       name: props.name,
       description: props.description,
-      dealerId: props.dealerId,
     });
 
     await this.addMember.execute({
