@@ -3,6 +3,7 @@ export interface TicketCreatedEvent {
   ticketName: string;
   priority: string;
   category: string;
+  creatorId: string;
   creatorName: string;
   workspaceId: string;
   workspaceName: string;
@@ -35,6 +36,7 @@ export interface StatusChangedEvent {
   ticketName: string;
   oldStatus: string;
   newStatus: string;
+  changedById: string;
   workspaceId: string;
   workspaceName: string;
   workspaceSlug: string;

@@ -39,7 +39,10 @@ export class StatusChangedHandler {
     );
     if (agentMembers.length === 0) return;
 
-    const users = await this.userRepository.findByIds(agentMembers.map((m) => m.userId));
+    const allUsers = await this.userRepository.findByIds(agentMembers.map((m) => m.userId));
+    const users = allUsers.filter((u) => u.getId() !== event.changedById);
+    if (users.length === 0) return;
+
     const userIds = users.map((u) => u.getId());
     const prefs = await this.preferenceRepository.findByUserIds(userIds);
 
