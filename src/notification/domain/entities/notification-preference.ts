@@ -13,6 +13,7 @@ interface Props {
   inAppTicketAssigned: boolean;
   inAppStatusChanged: boolean;
   inAppCommentCreated: boolean;
+  bellUnreadOnly: boolean;
 }
 
 export class NotificationPreference {
@@ -28,6 +29,7 @@ export class NotificationPreference {
   inAppTicketAssigned: boolean;
   inAppStatusChanged: boolean;
   inAppCommentCreated: boolean;
+  bellUnreadOnly: boolean;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -42,6 +44,7 @@ export class NotificationPreference {
     this.inAppTicketAssigned = props.inAppTicketAssigned;
     this.inAppStatusChanged = props.inAppStatusChanged;
     this.inAppCommentCreated = props.inAppCommentCreated;
+    this.bellUnreadOnly = props.bellUnreadOnly;
   }
 
   getId(): string {

@@ -50,6 +50,7 @@ export class TypeOrmNotificationPreferenceRepository
       inAppTicketAssigned: model.inAppTicketAssigned,
       inAppStatusChanged: model.inAppStatusChanged,
       inAppCommentCreated: model.inAppCommentCreated,
+      bellUnreadOnly: model.bellUnreadOnly,
     });
   }
 
@@ -69,6 +70,7 @@ export class TypeOrmNotificationPreferenceRepository
     model.inAppTicketAssigned = pref.inAppTicketAssigned;
     model.inAppStatusChanged = pref.inAppStatusChanged;
     model.inAppCommentCreated = pref.inAppCommentCreated;
+    model.bellUnreadOnly = pref.bellUnreadOnly;
     return model;
   }
 }

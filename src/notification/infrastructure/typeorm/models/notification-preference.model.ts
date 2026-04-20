@@ -49,6 +49,9 @@ export class NotificationPreferenceModel {
   @Column({ default: true })
   inAppCommentCreated!: boolean;
 
+  @Column({ default: false })
+  bellUnreadOnly!: boolean;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 

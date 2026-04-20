@@ -84,6 +84,7 @@ export class NotificationController {
         inAppTicketAssigned: true,
         inAppStatusChanged: true,
         inAppCommentCreated: true,
+        bellUnreadOnly: false,
       };
     }
 
@@ -98,6 +99,7 @@ export class NotificationController {
       inAppTicketAssigned: pref.inAppTicketAssigned,
       inAppStatusChanged: pref.inAppStatusChanged,
       inAppCommentCreated: pref.inAppCommentCreated,
+      bellUnreadOnly: pref.bellUnreadOnly,
     };
   }
 
@@ -122,6 +124,7 @@ export class NotificationController {
         inAppTicketAssigned: true,
         inAppStatusChanged: true,
         inAppCommentCreated: true,
+        bellUnreadOnly: false,
       });
     }
 
@@ -135,6 +138,7 @@ export class NotificationController {
     if (body.inAppTicketAssigned !== undefined) pref.inAppTicketAssigned = body.inAppTicketAssigned;
     if (body.inAppStatusChanged !== undefined) pref.inAppStatusChanged = body.inAppStatusChanged;
     if (body.inAppCommentCreated !== undefined) pref.inAppCommentCreated = body.inAppCommentCreated;
+    if (body.bellUnreadOnly !== undefined) pref.bellUnreadOnly = body.bellUnreadOnly;
 
     await this.preferenceRepository.upsert(pref);
 
@@ -149,6 +153,7 @@ export class NotificationController {
       inAppTicketAssigned: pref.inAppTicketAssigned,
       inAppStatusChanged: pref.inAppStatusChanged,
       inAppCommentCreated: pref.inAppCommentCreated,
+      bellUnreadOnly: pref.bellUnreadOnly,
     };
   }
 }
