@@ -36,6 +36,21 @@ export class UserController {
     return query.execute({ userId: user.userId });
   }
 
+  @Patch('me/name')
+  async updateName(
+    @Body() body: { firstName: string; lastName: string },
+    @CurrentUser() authUser: AuthUser,
+  ) {
+    const user = await this.userRepository.findById(authUser.userId);
+    if (!user) throw new NotFoundException('User not found');
+
+    user.firstName = body.firstName;
+    user.lastName = body.lastName;
+    await this.userRepository.update(user);
+
+    return { firstName: user.firstName, lastName: user.lastName };
+  }
+
   @Patch('me/language')
   async updateLanguage(
     @Body() body: { language: string },
