@@ -20,7 +20,7 @@ export class SmtpEmailService implements EmailService {
     const user = config.get<string>('SMTP_USER');
     const password = config.get<string>('SMTP_PASSWORD');
     this.defaultFrom =
-      config.get<string>('EMAIL_FROM') || 'noreply@dealernode.com';
+      config.get<string>('EMAIL_FROM') || 'noreply@example.com';
 
     if (host && user && password) {
       this.transporter = nodemailer.createTransport({

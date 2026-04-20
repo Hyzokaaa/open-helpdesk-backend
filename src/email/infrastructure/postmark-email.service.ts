@@ -17,7 +17,7 @@ export class PostmarkEmailService implements EmailService {
   constructor(private readonly config: ConfigService) {
     const token = config.get<string>('POSTMARK_SERVER_TOKEN');
     this.defaultFrom =
-      config.get<string>('EMAIL_FROM') || 'noreply@dealernode.com';
+      config.get<string>('EMAIL_FROM') || 'noreply@example.com';
 
     if (token) {
       this.client = new postmark.ServerClient(token);

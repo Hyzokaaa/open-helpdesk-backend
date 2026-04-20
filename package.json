@@ -1,9 +1,9 @@
 {
-  "name": "dealernode-helpdesk",
+  "name": "open-helpdesk",
   "version": "0.0.1",
-  "description": "DealerNode Helpdesk - Multi-tenant ticket system",
+  "description": "Open Helpdesk - Multi-tenant ticket system",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "AGPL-3.0",
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",

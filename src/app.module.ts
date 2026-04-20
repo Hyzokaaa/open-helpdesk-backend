@@ -26,7 +26,7 @@ import { HealthController } from './health.controller';
         port: config.get('DB_PORT', 5432),
         username: config.get('DB_USER', 'postgres'),
         password: config.get('DB_PASSWORD', 'postgres'),
-        database: config.get('DB_NAME', 'dealernode_helpdesk'),
+        database: config.get('DB_NAME', 'open_helpdesk'),
         autoLoadEntities: true,
         synchronize: config.get('DB_SYNCHRONIZE', 'false') === 'true',
         migrationsRun: config.get('DB_RUN_MIGRATIONS', 'true') === 'true',
