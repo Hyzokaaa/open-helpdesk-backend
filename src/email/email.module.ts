@@ -8,11 +8,12 @@ import { NewCommentHandler } from './handlers/new-comment.handler';
 import { StatusChangedHandler } from './handlers/status-changed.handler';
 import { UserModule } from '../user/user.module';
 import { WorkspaceModule } from '../workspace/workspace.module';
+import { NotificationModule } from '../notification/notification.module';
 import { EMAIL_SERVICE } from './email.constants';
 
 @Global()
 @Module({
-  imports: [UserModule, WorkspaceModule],
+  imports: [UserModule, WorkspaceModule, NotificationModule],
   providers: [
     {
       provide: EMAIL_SERVICE,

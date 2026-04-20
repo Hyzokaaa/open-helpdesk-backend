@@ -9,6 +9,7 @@ import { TagModule } from './tag/tag.module';
 import { TicketModule } from './ticket/ticket.module';
 import { CommentModule } from './comment/comment.module';
 import { AttachmentModule } from './attachment/attachment.module';
+import { NotificationModule } from './notification/notification.module';
 import { EmailModule } from './email/email.module';
 import { HealthController } from './health.controller';
 
@@ -39,6 +40,7 @@ import { HealthController } from './health.controller';
     TicketModule,
     CommentModule,
     AttachmentModule,
+    NotificationModule,
     EmailModule,
   ],
 })
