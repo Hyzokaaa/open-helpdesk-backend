@@ -7,6 +7,7 @@ interface Props {
   workspaceId: string;
   userId: string;
   requestingUserId: string;
+  isSystemAdmin: boolean;
 }
 
 export class RemoveMemberCommand implements Command<Props, void> {
@@ -20,6 +21,7 @@ export class RemoveMemberCommand implements Command<Props, void> {
       workspaceId: props.workspaceId,
       userId: props.requestingUserId,
       permission: PERMISSIONS.WORKSPACE_MEMBERS_MANAGE,
+      isSystemAdmin: props.isSystemAdmin,
     });
 
     await this.removeMember.execute({

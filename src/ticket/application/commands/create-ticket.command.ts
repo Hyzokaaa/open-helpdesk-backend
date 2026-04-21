@@ -19,6 +19,7 @@ interface Props {
   userId: string;
   userEmail: string;
   tagIds: string[];
+  isSystemAdmin: boolean;
 }
 
 export interface CreateTicketResponse {
@@ -40,6 +41,7 @@ export class CreateTicketCommand implements Command<Props, CreateTicketResponse>
       workspaceId: props.workspaceId,
       userId: props.userId,
       permission: PERMISSIONS.TICKET_CREATE,
+      isSystemAdmin: props.isSystemAdmin,
     });
 
     const ticket = await this.createTicket.execute({

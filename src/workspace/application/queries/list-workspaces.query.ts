@@ -4,6 +4,7 @@ import { WorkspaceRepository } from '../../domain/repositories/workspace.reposit
 
 interface Props {
   userId: string;
+  isSystemAdmin?: boolean;
 }
 
 export interface WorkspaceListItem {
@@ -21,6 +22,22 @@ export class ListWorkspacesQuery implements Query<Props, WorkspaceListItem[]> {
   ) {}
 
   async execute(props: Props): Promise<WorkspaceListItem[]> {
+    if (props.isSystemAdmin) {
+      const allWorkspaces = await this.workspaceRepository.findAll();
+      const result: WorkspaceListItem[] = [];
+      for (const workspace of allWorkspaces) {
+        const membership = await this.memberRepository.findByWorkspaceAndUser(workspace.getId(), props.userId);
+        result.push({
+          id: workspace.getId(),
+          name: workspace.name,
+          slug: workspace.slug,
+          description: workspace.description,
+          role: membership?.role ?? 'admin',
+        });
+      }
+      return result;
+    }
+
     const memberships = await this.memberRepository.findByUserId(props.userId);
 
     const workspaces: WorkspaceListItem[] = [];

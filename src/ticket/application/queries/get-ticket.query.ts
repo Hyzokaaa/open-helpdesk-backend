@@ -8,6 +8,7 @@ interface Props {
   ticketId: string;
   workspaceId: string;
   userId: string;
+  isSystemAdmin: boolean;
 }
 
 export interface TicketDetailResponse {
@@ -35,6 +36,7 @@ export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
       workspaceId: props.workspaceId,
       userId: props.userId,
       permission: PERMISSIONS.TICKET_VIEW,
+      isSystemAdmin: props.isSystemAdmin,
     });
 
     const ticket = await this.repository.findById(props.ticketId);

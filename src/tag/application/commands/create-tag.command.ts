@@ -8,6 +8,7 @@ interface Props {
   color: string | null;
   workspaceId: string;
   userId: string;
+  isSystemAdmin: boolean;
 }
 
 export interface CreateTagResponse {
@@ -27,6 +28,7 @@ export class CreateTagCommand implements Command<Props, CreateTagResponse> {
       workspaceId: props.workspaceId,
       userId: props.userId,
       permission: PERMISSIONS.TAG_CREATE,
+      isSystemAdmin: props.isSystemAdmin,
     });
 
     const tag = await this.createTag.execute({

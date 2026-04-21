@@ -7,6 +7,7 @@ interface Props {
   id: string;
   workspaceId: string;
   userId: string;
+  isSystemAdmin: boolean;
 }
 
 export class DeleteTagCommand implements Command<Props, void> {
@@ -20,6 +21,7 @@ export class DeleteTagCommand implements Command<Props, void> {
       workspaceId: props.workspaceId,
       userId: props.userId,
       permission: PERMISSIONS.TAG_DELETE,
+      isSystemAdmin: props.isSystemAdmin,
     });
 
     await this.deleteTag.execute({ id: props.id });

@@ -10,6 +10,7 @@ import {
 interface Props {
   workspaceId: string;
   userId: string;
+  isSystemAdmin: boolean;
   filters: TicketFilters;
   page: number;
   limit: number;
@@ -40,6 +41,7 @@ export class ListTicketsQuery
       workspaceId: props.workspaceId,
       userId: props.userId,
       permission: PERMISSIONS.TICKET_VIEW,
+      isSystemAdmin: props.isSystemAdmin,
     });
 
     const result = await this.repository.findAll(

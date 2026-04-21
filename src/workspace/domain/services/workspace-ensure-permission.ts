@@ -7,6 +7,7 @@ interface EnsurePermissionProps {
   workspaceId: string;
   userId: string;
   permission: Permission;
+  isSystemAdmin?: boolean;
 }
 
 export interface MemberContext {
@@ -20,6 +21,10 @@ export class EnsureWorkspacePermission {
   ) {}
 
   async execute(props: EnsurePermissionProps): Promise<MemberContext> {
+    if (props.isSystemAdmin) {
+      return { userId: props.userId, role: WorkspaceRole.ADMIN };
+    }
+
     const member = await this.memberRepository.findByWorkspaceAndUser(
       props.workspaceId,
       props.userId,

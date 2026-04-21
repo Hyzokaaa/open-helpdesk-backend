@@ -72,6 +72,7 @@ export class TicketController {
       userId: user.userId,
       userEmail: user.email,
       tagIds: body.tagIds,
+      isSystemAdmin: user.isSystemAdmin,
     });
   }
 
@@ -99,6 +100,7 @@ export class TicketController {
       },
       page: filters.page,
       limit: filters.limit,
+      isSystemAdmin: user.isSystemAdmin,
     });
   }
 
@@ -111,7 +113,7 @@ export class TicketController {
     const workspace = await this.resolveWorkspace(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const query = new GetTicketQuery(this.ticketRepository, ensurePermission);
-    return query.execute({ ticketId: id, workspaceId: workspace.getId(), userId: user.userId });
+    return query.execute({ ticketId: id, workspaceId: workspace.getId(), userId: user.userId, isSystemAdmin: user.isSystemAdmin });
   }
 
   @Patch(':id')
@@ -134,6 +136,7 @@ export class TicketController {
       priority: body.priority,
       category: body.category,
       tagIds: body.tagIds,
+      isSystemAdmin: user.isSystemAdmin,
     });
   }
 
@@ -155,6 +158,7 @@ export class TicketController {
       workspaceName: workspace.name,
       workspaceSlug: workspace.slug,
       userId: user.userId,
+      isSystemAdmin: user.isSystemAdmin,
     });
   }
 
@@ -176,6 +180,7 @@ export class TicketController {
       workspaceName: workspace.name,
       workspaceSlug: workspace.slug,
       userId: user.userId,
+      isSystemAdmin: user.isSystemAdmin,
     });
   }
 
@@ -189,7 +194,7 @@ export class TicketController {
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new DeleteTicket(this.ticketRepository);
     const command = new DeleteTicketCommand(service, ensurePermission);
-    return command.execute({ ticketId: id, workspaceId: workspace.getId(), userId: user.userId });
+    return command.execute({ ticketId: id, workspaceId: workspace.getId(), userId: user.userId, isSystemAdmin: user.isSystemAdmin });
   }
 
   private async resolveWorkspace(slug: string) {

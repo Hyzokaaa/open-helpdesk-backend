@@ -11,6 +11,7 @@ interface Props {
   ticketId: string;
   workspaceId: string;
   userId: string;
+  isSystemAdmin: boolean;
   name?: string;
   description?: string;
   priority?: TicketPriority;
@@ -44,12 +45,14 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
         workspaceId: props.workspaceId,
         userId: props.userId,
         permission: PERMISSIONS.TICKET_EDIT_CLOSED,
+        isSystemAdmin: props.isSystemAdmin,
       });
     } else if (!isCreator) {
       await this.ensurePermission.execute({
         workspaceId: props.workspaceId,
         userId: props.userId,
         permission: PERMISSIONS.TICKET_EDIT_DESCRIPTION,
+        isSystemAdmin: props.isSystemAdmin,
       });
     }
 
@@ -57,6 +60,7 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
       workspaceId: props.workspaceId,
       userId: props.userId,
       permission: PERMISSIONS.TICKET_VIEW,
+      isSystemAdmin: props.isSystemAdmin,
     });
 
     const canEditName = hasPermission(ctx.role, PERMISSIONS.TICKET_EDIT_NAME);

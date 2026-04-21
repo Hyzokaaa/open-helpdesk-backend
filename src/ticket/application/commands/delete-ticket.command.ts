@@ -7,6 +7,7 @@ interface Props {
   ticketId: string;
   workspaceId: string;
   userId: string;
+  isSystemAdmin: boolean;
 }
 
 export class DeleteTicketCommand implements Command<Props, void> {
@@ -20,6 +21,7 @@ export class DeleteTicketCommand implements Command<Props, void> {
       workspaceId: props.workspaceId,
       userId: props.userId,
       permission: PERMISSIONS.TICKET_DELETE,
+      isSystemAdmin: props.isSystemAdmin,
     });
 
     await this.deleteTicket.execute({ ticketId: props.ticketId });

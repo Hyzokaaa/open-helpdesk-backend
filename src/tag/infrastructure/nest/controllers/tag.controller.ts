@@ -49,6 +49,7 @@ export class TagController {
       color: body.color ?? null,
       workspaceId,
       userId: user.userId,
+      isSystemAdmin: user.isSystemAdmin,
     });
   }
 
@@ -60,7 +61,7 @@ export class TagController {
     const workspaceId = await this.resolveWorkspaceId(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const query = new ListTagsQuery(this.tagRepository, ensurePermission);
-    return query.execute({ workspaceId, userId: user.userId });
+    return query.execute({ workspaceId, userId: user.userId, isSystemAdmin: user.isSystemAdmin });
   }
 
   @Delete(':id')
@@ -73,7 +74,7 @@ export class TagController {
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new DeleteTag(this.tagRepository);
     const command = new DeleteTagCommand(service, ensurePermission);
-    return command.execute({ id, workspaceId, userId: user.userId });
+    return command.execute({ id, workspaceId, userId: user.userId, isSystemAdmin: user.isSystemAdmin });
   }
 
   private async resolveWorkspaceId(slug: string): Promise<string> {

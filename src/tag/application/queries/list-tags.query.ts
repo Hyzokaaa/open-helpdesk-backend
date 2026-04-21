@@ -6,6 +6,7 @@ import { PERMISSIONS } from '../../../workspace/domain/permissions';
 interface Props {
   workspaceId: string;
   userId: string;
+  isSystemAdmin: boolean;
 }
 
 export interface TagListItem {
@@ -25,6 +26,7 @@ export class ListTagsQuery implements Query<Props, TagListItem[]> {
       workspaceId: props.workspaceId,
       userId: props.userId,
       permission: PERMISSIONS.TAG_VIEW,
+      isSystemAdmin: props.isSystemAdmin,
     });
 
     const tags = await this.repository.findByWorkspaceId(props.workspaceId);

@@ -14,6 +14,7 @@ interface Props {
   workspaceName: string;
   workspaceSlug: string;
   userId: string;
+  isSystemAdmin: boolean;
 }
 
 export interface AssignTicketResponse {
@@ -34,6 +35,7 @@ export class AssignTicketCommand implements Command<Props, AssignTicketResponse>
       workspaceId: props.workspaceId,
       userId: props.userId,
       permission: PERMISSIONS.TICKET_ASSIGN,
+      isSystemAdmin: props.isSystemAdmin,
     });
 
     const ticket = await this.ticketRepository.findById(props.ticketId);

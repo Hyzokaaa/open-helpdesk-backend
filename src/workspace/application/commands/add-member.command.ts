@@ -9,6 +9,7 @@ interface Props {
   userId: string;
   role: WorkspaceRole;
   requestingUserId: string;
+  isSystemAdmin: boolean;
 }
 
 export interface AddMemberResponse {
@@ -29,6 +30,7 @@ export class AddMemberCommand implements Command<Props, AddMemberResponse> {
       workspaceId: props.workspaceId,
       userId: props.requestingUserId,
       permission: PERMISSIONS.WORKSPACE_MEMBERS_MANAGE,
+      isSystemAdmin: props.isSystemAdmin,
     });
 
     const member = await this.addMember.execute({

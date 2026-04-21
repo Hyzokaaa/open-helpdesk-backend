@@ -15,6 +15,7 @@ interface Props {
   workspaceName: string;
   workspaceSlug: string;
   userId: string;
+  isSystemAdmin: boolean;
 }
 
 export interface ChangeStatusResponse {
@@ -43,6 +44,7 @@ export class ChangeTicketStatusCommand implements Command<Props, ChangeStatusRes
       workspaceId: props.workspaceId,
       userId: props.userId,
       permission,
+      isSystemAdmin: props.isSystemAdmin,
     });
 
     const oldStatus = ticket.status;

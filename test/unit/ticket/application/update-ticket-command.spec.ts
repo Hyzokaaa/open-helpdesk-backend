@@ -52,6 +52,7 @@ describe('UpdateTicketCommand', () => {
       ticketId: 'ticket-1',
       workspaceId: 'ws-1',
       userId: 'admin-1',
+      isSystemAdmin: false,
       name: 'Updated name',
     });
 
@@ -66,6 +67,7 @@ describe('UpdateTicketCommand', () => {
       ticketId: 'ticket-1',
       workspaceId: 'ws-1',
       userId: 'creator-1',
+      isSystemAdmin: false,
       name: 'Should be ignored',
       description: 'New desc',
     });
@@ -82,6 +84,7 @@ describe('UpdateTicketCommand', () => {
         ticketId: 'ticket-1',
         workspaceId: 'ws-1',
         userId: 'other-reporter',
+        isSystemAdmin: false,
         description: 'hack',
       }),
     ).rejects.toThrow(AccessDeniedError);
