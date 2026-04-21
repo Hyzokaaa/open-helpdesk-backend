@@ -1,4 +1,5 @@
 import { IdGenerator } from '../../../shared/domain/id-generator';
+import { sanitizeHtml } from '../../../shared/domain/sanitize-html';
 import { Comment } from '../entities/comment';
 import { CommentRepository } from '../repositories/comment.repository';
 
@@ -17,7 +18,7 @@ export class CreateComment {
   async execute(props: CreateCommentProps): Promise<Comment> {
     const comment = new Comment({
       id: this.idGenerator.create(),
-      content: props.content,
+      content: sanitizeHtml(props.content),
       ticketId: props.ticketId,
       authorId: props.authorId,
     });
