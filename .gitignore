@@ -6,5 +6,6 @@ coverage
 .idea
 .vscode
 *.swp
+*.tsbuildinfo
 .DS_Store
 Thumbs.db

@@ -19,6 +19,8 @@ import { CreateUser } from '../../../domain/services/user-create';
 import { RegisterUserCommand } from '../../../application/commands/register-user.command';
 import { UpdateUserProfileCommand } from '../../../application/commands/update-user-profile.command';
 import { ToggleSystemAdminCommand } from '../../../application/commands/toggle-system-admin.command';
+import { ChangePassword } from '../../../domain/services/user-change-password';
+import { ChangePasswordCommand } from '../../../application/commands/change-password.command';
 import { TypeOrmUserRepository } from '../../typeorm/repositories/typeorm-user.repository';
 import { RegisterUserRequest } from '../dto/register-user.request';
 
@@ -71,6 +73,20 @@ export class UserController {
     return command.execute({
       userId: authUser.userId,
       theme: body.theme,
+    });
+  }
+
+  @Patch('me/password')
+  changePassword(
+    @Body() body: { currentPassword: string; newPassword: string },
+    @CurrentUser() authUser: AuthUser,
+  ) {
+    const service = new ChangePassword(this.userRepository, this.passwordHasher);
+    const command = new ChangePasswordCommand(service);
+    return command.execute({
+      userId: authUser.userId,
+      currentPassword: body.currentPassword,
+      newPassword: body.newPassword,
     });
   }
 
