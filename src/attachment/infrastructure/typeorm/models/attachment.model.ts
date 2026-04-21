@@ -28,13 +28,13 @@ export class AttachmentModel {
   @Column()
   s3Key!: string;
 
-  @ManyToOne(() => TicketModel, { nullable: true })
+  @ManyToOne(() => TicketModel, { nullable: true, onDelete: 'CASCADE' })
   ticket!: TicketModel | null;
 
   @Column({ type: 'varchar', nullable: true })
   ticketId!: string | null;
 
-  @ManyToOne(() => CommentModel, { nullable: true })
+  @ManyToOne(() => CommentModel, { nullable: true, onDelete: 'CASCADE' })
   comment!: CommentModel | null;
 
   @Column({ type: 'varchar', nullable: true })

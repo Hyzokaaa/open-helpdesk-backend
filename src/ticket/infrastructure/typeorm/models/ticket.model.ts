@@ -33,7 +33,7 @@ export class TicketModel {
   @Column()
   category!: string;
 
-  @ManyToOne(() => WorkspaceModel)
+  @ManyToOne(() => WorkspaceModel, { onDelete: 'CASCADE' })
   workspace!: WorkspaceModel;
 
   @Column()

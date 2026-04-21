@@ -20,6 +20,15 @@ export class MockWorkspaceRepository implements WorkspaceRepository {
     return this.workspaces;
   }
 
+  async update(workspace: Workspace): Promise<void> {
+    const index = this.workspaces.findIndex((w) => w.getId() === workspace.getId());
+    if (index >= 0) this.workspaces[index] = workspace;
+  }
+
+  async delete(id: string): Promise<void> {
+    this.workspaces = this.workspaces.filter((w) => w.getId() !== id);
+  }
+
   async existsBySlug(slug: string): Promise<boolean> {
     return this.workspaces.some((w) => w.slug === slug);
   }

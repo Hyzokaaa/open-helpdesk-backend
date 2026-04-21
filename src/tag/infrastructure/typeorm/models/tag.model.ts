@@ -18,7 +18,7 @@ export class TagModel {
   @Column({ type: 'varchar', nullable: true })
   color!: string | null;
 
-  @ManyToOne(() => WorkspaceModel)
+  @ManyToOne(() => WorkspaceModel, { onDelete: 'CASCADE' })
   workspace!: WorkspaceModel;
 
   @Column()

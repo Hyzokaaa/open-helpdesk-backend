@@ -32,6 +32,15 @@ export class TypeOrmWorkspaceRepository implements WorkspaceRepository {
     return models.map((m) => this.toDomain(m));
   }
 
+  async update(workspace: Workspace): Promise<void> {
+    const model = this.toModel(workspace);
+    await this.repository.save(model);
+  }
+
+  async delete(id: string): Promise<void> {
+    await this.repository.delete(id);
+  }
+
   async existsBySlug(slug: string): Promise<boolean> {
     return await this.repository.existsBy({ slug });
   }

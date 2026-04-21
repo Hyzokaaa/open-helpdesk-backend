@@ -5,5 +5,7 @@ export interface WorkspaceRepository {
   findById(id: string): Promise<Workspace | null>;
   findBySlug(slug: string): Promise<Workspace | null>;
   findAll(): Promise<Workspace[]>;
+  update(workspace: Workspace): Promise<void>;
+  delete(id: string): Promise<void>;
   existsBySlug(slug: string): Promise<boolean>;
 }

@@ -15,7 +15,7 @@ export class WorkspaceMemberModel {
   @PrimaryColumn()
   id!: string;
 
-  @ManyToOne(() => WorkspaceModel)
+  @ManyToOne(() => WorkspaceModel, { onDelete: 'CASCADE' })
   workspace!: WorkspaceModel;
 
   @Column()

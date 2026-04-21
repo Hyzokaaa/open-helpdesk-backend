@@ -17,7 +17,7 @@ export class CommentModel {
   @Column('text')
   content!: string;
 
-  @ManyToOne(() => TicketModel)
+  @ManyToOne(() => TicketModel, { onDelete: 'CASCADE' })
   ticket!: TicketModel;
 
   @Column()
