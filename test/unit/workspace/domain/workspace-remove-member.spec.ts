@@ -37,4 +37,24 @@ describe('RemoveWorkspaceMember', () => {
       service.execute({ workspaceId: 'ws-1', userId: 'user-1' }),
     ).rejects.toThrow(DomainValidationError);
   });
+
+  it('should throw DomainValidationError when removing the last admin', async () => {
+    repository.seed(new WorkspaceMember({ id: 'm-1', workspaceId: 'ws-1', userId: 'admin-1', role: WorkspaceRole.ADMIN }));
+    repository.seed(new WorkspaceMember({ id: 'm-2', workspaceId: 'ws-1', userId: 'agent-1', role: WorkspaceRole.AGENT }));
+
+    await expect(
+      service.execute({ workspaceId: 'ws-1', userId: 'admin-1' }),
+    ).rejects.toThrow(DomainValidationError);
+  });
+
+  it('should allow removing an admin when another admin exists', async () => {
+    repository.seed(new WorkspaceMember({ id: 'm-1', workspaceId: 'ws-1', userId: 'admin-1', role: WorkspaceRole.ADMIN }));
+    repository.seed(new WorkspaceMember({ id: 'm-2', workspaceId: 'ws-1', userId: 'admin-2', role: WorkspaceRole.ADMIN }));
+
+    await service.execute({ workspaceId: 'ws-1', userId: 'admin-1' });
+
+    const remaining = await repository.findByWorkspaceId('ws-1');
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].userId).toBe('admin-2');
+  });
 });

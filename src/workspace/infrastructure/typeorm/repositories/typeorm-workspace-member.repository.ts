@@ -36,6 +36,11 @@ export class TypeOrmWorkspaceMemberRepository implements WorkspaceMemberReposito
     return model ? this.toDomain(model) : null;
   }
 
+  async update(member: WorkspaceMember): Promise<void> {
+    const model = this.toModel(member);
+    await this.repository.save(model);
+  }
+
   async delete(id: string): Promise<void> {
     await this.repository.delete(id);
   }

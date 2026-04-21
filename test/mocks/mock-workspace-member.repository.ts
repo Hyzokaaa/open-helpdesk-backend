@@ -20,6 +20,11 @@ export class MockWorkspaceMemberRepository implements WorkspaceMemberRepository 
     return this.members.find((m) => m.workspaceId === workspaceId && m.userId === userId) ?? null;
   }
 
+  async update(member: WorkspaceMember): Promise<void> {
+    const index = this.members.findIndex((m) => m.getId() === member.getId());
+    if (index >= 0) this.members[index] = member;
+  }
+
   async delete(id: string): Promise<void> {
     this.members = this.members.filter((m) => m.getId() !== id);
   }

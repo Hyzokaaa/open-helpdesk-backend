@@ -5,6 +5,7 @@ import {
   Get,
   Inject,
   Param,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -20,6 +21,12 @@ import { EnsureWorkspacePermission } from '../../../domain/services/workspace-en
 import { CreateWorkspaceCommand } from '../../../application/commands/create-workspace.command';
 import { AddMemberCommand } from '../../../application/commands/add-member.command';
 import { RemoveMemberCommand } from '../../../application/commands/remove-member.command';
+import { ChangeWorkspaceMemberRole } from '../../../domain/services/workspace-change-member-role';
+import { ChangeMemberRoleCommand } from '../../../application/commands/change-member-role.command';
+import { UpdateWorkspace } from '../../../domain/services/workspace-update';
+import { UpdateWorkspaceCommand } from '../../../application/commands/update-workspace.command';
+import { DeleteWorkspace } from '../../../domain/services/workspace-delete';
+import { DeleteWorkspaceCommand } from '../../../application/commands/delete-workspace.command';
 import { GetWorkspaceQuery } from '../../../application/queries/get-workspace.query';
 import { ListWorkspacesQuery } from '../../../application/queries/list-workspaces.query';
 import { ListWorkspaceMembersQuery } from '../../../application/queries/list-workspace-members.query';
@@ -56,13 +63,41 @@ export class WorkspaceController {
   @Get()
   list(@CurrentUser() user: AuthUser) {
     const query = new ListWorkspacesQuery(this.memberRepository, this.workspaceRepository);
-    return query.execute({ userId: user.userId });
+    return query.execute({ userId: user.userId, isSystemAdmin: user.isSystemAdmin });
   }
 
   @Get(':slug')
   get(@Param('slug') slug: string) {
     const query = new GetWorkspaceQuery(this.workspaceRepository);
     return query.execute({ slug });
+  }
+
+  @Patch(':slug')
+  async update(
+    @Param('slug') slug: string,
+    @Body() body: { name?: string; description?: string },
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const service = new UpdateWorkspace(this.workspaceRepository);
+    const command = new UpdateWorkspaceCommand(service);
+    return command.execute({
+      workspaceId,
+      name: body.name,
+      description: body.description,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+  }
+
+  @Delete(':slug')
+  async remove(
+    @Param('slug') slug: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const service = new DeleteWorkspace(this.workspaceRepository);
+    const command = new DeleteWorkspaceCommand(service);
+    return command.execute({ workspaceId, isSystemAdmin: user.isSystemAdmin });
   }
 
   @Post(':slug/members')
@@ -80,6 +115,7 @@ export class WorkspaceController {
       userId: body.userId,
       role: body.role,
       requestingUserId: user.userId,
+      isSystemAdmin: user.isSystemAdmin,
     });
   }
 
@@ -90,7 +126,7 @@ export class WorkspaceController {
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
     const query = new GetMyPermissionsQuery(this.memberRepository);
-    return query.execute({ workspaceId, userId: user.userId });
+    return query.execute({ workspaceId, userId: user.userId, isSystemAdmin: user.isSystemAdmin });
   }
 
   @Get(':slug/members')
@@ -98,6 +134,25 @@ export class WorkspaceController {
     const workspaceId = await this.resolveWorkspaceId(slug);
     const query = new ListWorkspaceMembersQuery(this.memberRepository, this.userRepository);
     return query.execute({ workspaceId });
+  }
+
+  @Patch(':slug/members/:userId/role')
+  async changeMemberRole(
+    @Param('slug') slug: string,
+    @Param('userId') userId: string,
+    @Body() body: { role: string },
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const service = new ChangeWorkspaceMemberRole(this.memberRepository);
+    const command = new ChangeMemberRoleCommand(service);
+    return command.execute({
+      workspaceId,
+      targetUserId: userId,
+      newRole: body.role as any,
+      requestingUserId: user.userId,
+      isSystemAdmin: user.isSystemAdmin,
+    });
   }
 
   @Delete(':slug/members/:userId')
@@ -110,7 +165,7 @@ export class WorkspaceController {
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new RemoveWorkspaceMember(this.memberRepository);
     const command = new RemoveMemberCommand(service, ensurePermission);
-    return command.execute({ workspaceId, userId, requestingUserId: user.userId });
+    return command.execute({ workspaceId, userId, requestingUserId: user.userId, isSystemAdmin: user.isSystemAdmin });
   }
 
   private async resolveWorkspaceId(slug: string): Promise<string> {

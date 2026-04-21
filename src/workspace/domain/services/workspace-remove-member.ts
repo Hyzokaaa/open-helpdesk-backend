@@ -1,4 +1,5 @@
 import { DomainValidationError, EntityNotFoundError } from '../../../shared/domain/errors';
+import { WorkspaceRole } from '../enums/workspace-role.enum';
 import { WorkspaceMemberRepository } from '../repositories/workspace-member.repository';
 
 interface RemoveMemberProps {
@@ -25,6 +26,15 @@ export class RemoveWorkspaceMember {
       throw new DomainValidationError(
         'Cannot remove the last member of a workspace',
       );
+    }
+
+    if (member.role === WorkspaceRole.ADMIN) {
+      const adminCount = members.filter((m) => m.role === WorkspaceRole.ADMIN).length;
+      if (adminCount <= 1) {
+        throw new DomainValidationError(
+          'Cannot remove the last admin of a workspace',
+        );
+      }
     }
 
     await this.repository.delete(member.getId());
