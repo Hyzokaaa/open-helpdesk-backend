@@ -41,6 +41,7 @@ export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 const ADMIN_PERMISSIONS: Permission[] = Object.values(PERMISSIONS);
 
 const AGENT_PERMISSIONS: Permission[] = [
+  PERMISSIONS.TAG_CREATE,
   PERMISSIONS.TAG_VIEW,
   PERMISSIONS.TICKET_CREATE,
   PERMISSIONS.TICKET_VIEW,

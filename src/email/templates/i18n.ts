@@ -92,6 +92,32 @@ const translations: Translations = {
     en: 'The status of {ticketName} has been updated.',
     es: 'El estado de {ticketName} ha sido actualizado.',
   },
+  // Password reset
+  'passwordReset.subject': {
+    en: 'Reset your password',
+    es: 'Restablecer tu contraseña',
+  },
+  'passwordReset.title': {
+    en: 'Password Reset',
+    es: 'Restablecer Contraseña',
+  },
+  'passwordReset.body': {
+    en: 'Hi {firstName}, we received a request to reset your password.',
+    es: 'Hola {firstName}, recibimos una solicitud para restablecer tu contraseña.',
+  },
+  'passwordReset.button': {
+    en: 'Reset Password',
+    es: 'Restablecer Contraseña',
+  },
+  'passwordReset.expiry': {
+    en: 'This link will expire in 1 hour.',
+    es: 'Este enlace expirará en 1 hora.',
+  },
+  'passwordReset.ignore': {
+    en: 'If you did not request this, you can safely ignore this email.',
+    es: 'Si no solicitaste esto, puedes ignorar este correo.',
+  },
+
   // Priorities
   'priority.low': { en: 'Low', es: 'Baja' },
   'priority.medium': { en: 'Medium', es: 'Media' },
