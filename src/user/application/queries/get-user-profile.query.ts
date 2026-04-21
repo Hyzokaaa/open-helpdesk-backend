@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { Query } from '../../../shared/domain/query';
 import { UserRepository } from '../../domain/repositories/user.repository';
 
@@ -23,7 +23,7 @@ export class GetUserProfileQuery implements Query<Props, UserProfileResponse> {
   async execute(props: Props): Promise<UserProfileResponse> {
     const user = await this.repository.findById(props.userId);
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new EntityNotFoundError('User not found');
     }
 
     return {

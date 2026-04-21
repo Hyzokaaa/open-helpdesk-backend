@@ -1,10 +1,8 @@
 import {
   Body,
   Controller,
-  ForbiddenException,
   Get,
   Inject,
-  NotFoundException,
   Param,
   Patch,
   Post,
@@ -16,8 +14,11 @@ import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
 import { BcryptPasswordHasher } from '../../../../shared/infrastructure/bcrypt-password-hasher';
 import { GetUserProfileQuery } from '../../../application/queries/get-user-profile.query';
+import { ListUsersQuery } from '../../../application/queries/list-users.query';
 import { CreateUser } from '../../../domain/services/user-create';
 import { RegisterUserCommand } from '../../../application/commands/register-user.command';
+import { UpdateUserProfileCommand } from '../../../application/commands/update-user-profile.command';
+import { ToggleSystemAdminCommand } from '../../../application/commands/toggle-system-admin.command';
 import { TypeOrmUserRepository } from '../../typeorm/repositories/typeorm-user.repository';
 import { RegisterUserRequest } from '../dto/register-user.request';
 
@@ -37,58 +38,46 @@ export class UserController {
   }
 
   @Patch('me/name')
-  async updateName(
+  updateName(
     @Body() body: { firstName: string; lastName: string },
     @CurrentUser() authUser: AuthUser,
   ) {
-    const user = await this.userRepository.findById(authUser.userId);
-    if (!user) throw new NotFoundException('User not found');
-
-    user.firstName = body.firstName;
-    user.lastName = body.lastName;
-    await this.userRepository.update(user);
-
-    return { firstName: user.firstName, lastName: user.lastName };
+    const command = new UpdateUserProfileCommand(this.userRepository);
+    return command.execute({
+      userId: authUser.userId,
+      firstName: body.firstName,
+      lastName: body.lastName,
+    });
   }
 
   @Patch('me/language')
-  async updateLanguage(
+  updateLanguage(
     @Body() body: { language: string },
     @CurrentUser() authUser: AuthUser,
   ) {
-    const user = await this.userRepository.findById(authUser.userId);
-    if (!user) throw new NotFoundException('User not found');
-
-    user.language = body.language;
-    await this.userRepository.update(user);
-
-    return { language: user.language };
+    const command = new UpdateUserProfileCommand(this.userRepository);
+    return command.execute({
+      userId: authUser.userId,
+      language: body.language,
+    });
   }
 
   @Patch('me/theme')
-  async updateTheme(
+  updateTheme(
     @Body() body: { theme: string },
     @CurrentUser() authUser: AuthUser,
   ) {
-    const user = await this.userRepository.findById(authUser.userId);
-    if (!user) throw new NotFoundException('User not found');
-
-    user.theme = body.theme;
-    await this.userRepository.update(user);
-
-    return { theme: user.theme };
+    const command = new UpdateUserProfileCommand(this.userRepository);
+    return command.execute({
+      userId: authUser.userId,
+      theme: body.theme,
+    });
   }
 
   @Get()
-  async list() {
-    const users = await this.userRepository.findAll();
-    return users.map((u) => ({
-      id: u.getId(),
-      email: u.email,
-      firstName: u.firstName,
-      lastName: u.lastName,
-      isSystemAdmin: u.isSystemAdmin,
-    }));
+  list() {
+    const query = new ListUsersQuery(this.userRepository);
+    return query.execute();
   }
 
   @Post()
@@ -96,15 +85,7 @@ export class UserController {
     @Body() body: RegisterUserRequest,
     @CurrentUser() user: AuthUser,
   ) {
-    if (!user.isSystemAdmin) {
-      throw new ForbiddenException('Only system admins can create users');
-    }
-
-    const service = new CreateUser(
-      this.idGenerator,
-      this.userRepository,
-      this.passwordHasher,
-    );
+    const service = new CreateUser(this.idGenerator, this.userRepository, this.passwordHasher);
     const command = new RegisterUserCommand(service);
     return command.execute({
       email: body.email,
@@ -112,27 +93,21 @@ export class UserController {
       firstName: body.firstName,
       lastName: body.lastName,
       isSystemAdmin: body.isSystemAdmin,
+      requestingUserIsAdmin: user.isSystemAdmin,
     });
   }
 
   @Patch(':id/system-admin')
-  async toggleSystemAdmin(
+  toggleSystemAdmin(
     @Param('id') id: string,
     @Body() body: { isSystemAdmin: boolean },
     @CurrentUser() user: AuthUser,
   ) {
-    if (!user.isSystemAdmin) {
-      throw new ForbiddenException('Only system admins can manage system admin roles');
-    }
-
-    const target = await this.userRepository.findById(id);
-    if (!target) {
-      throw new NotFoundException('User not found');
-    }
-
-    target.isSystemAdmin = body.isSystemAdmin;
-    await this.userRepository.update(target);
-
-    return { id: target.getId(), isSystemAdmin: target.isSystemAdmin };
+    const command = new ToggleSystemAdminCommand(this.userRepository);
+    return command.execute({
+      targetUserId: id,
+      isSystemAdmin: body.isSystemAdmin,
+      requestingUserIsAdmin: user.isSystemAdmin,
+    });
   }
 }

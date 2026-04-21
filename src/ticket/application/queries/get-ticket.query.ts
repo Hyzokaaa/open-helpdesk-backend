@@ -1,9 +1,13 @@
-import { NotFoundException } from '@nestjs/common';
+import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { Query } from '../../../shared/domain/query';
+import { EnsureWorkspacePermission } from '../../../workspace/domain/services/workspace-ensure-permission';
+import { PERMISSIONS } from '../../../workspace/domain/permissions';
 import { TicketRepository } from '../../domain/repositories/ticket.repository';
 
 interface Props {
   ticketId: string;
+  workspaceId: string;
+  userId: string;
 }
 
 export interface TicketDetailResponse {
@@ -21,12 +25,21 @@ export interface TicketDetailResponse {
 }
 
 export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
-  constructor(private readonly repository: TicketRepository) {}
+  constructor(
+    private readonly repository: TicketRepository,
+    private readonly ensurePermission: EnsureWorkspacePermission,
+  ) {}
 
   async execute(props: Props): Promise<TicketDetailResponse> {
+    await this.ensurePermission.execute({
+      workspaceId: props.workspaceId,
+      userId: props.userId,
+      permission: PERMISSIONS.TICKET_VIEW,
+    });
+
     const ticket = await this.repository.findById(props.ticketId);
     if (!ticket) {
-      throw new NotFoundException('Ticket not found');
+      throw new EntityNotFoundError('Ticket not found');
     }
 
     return {

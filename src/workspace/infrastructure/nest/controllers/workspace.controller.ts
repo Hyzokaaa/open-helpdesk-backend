@@ -2,10 +2,8 @@ import {
   Body,
   Controller,
   Delete,
-  ForbiddenException,
   Get,
   Inject,
-  NotFoundException,
   Param,
   Post,
   UseGuards,
@@ -14,17 +12,18 @@ import { JwtAuthGuard } from '../../../../shared/nest/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
+import { EntityNotFoundError } from '../../../../shared/domain/errors';
 import { CreateWorkspace } from '../../../domain/services/workspace-create';
 import { AddWorkspaceMember } from '../../../domain/services/workspace-add-member';
 import { RemoveWorkspaceMember } from '../../../domain/services/workspace-remove-member';
 import { EnsureWorkspacePermission } from '../../../domain/services/workspace-ensure-permission';
-import { PERMISSIONS, Permission } from '../../../domain/permissions';
 import { CreateWorkspaceCommand } from '../../../application/commands/create-workspace.command';
 import { AddMemberCommand } from '../../../application/commands/add-member.command';
 import { RemoveMemberCommand } from '../../../application/commands/remove-member.command';
 import { GetWorkspaceQuery } from '../../../application/queries/get-workspace.query';
 import { ListWorkspacesQuery } from '../../../application/queries/list-workspaces.query';
 import { ListWorkspaceMembersQuery } from '../../../application/queries/list-workspace-members.query';
+import { GetMyPermissionsQuery } from '../../../application/queries/get-my-permissions.query';
 import { TypeOrmUserRepository } from '../../../../user/infrastructure/typeorm/repositories/typeorm-user.repository';
 import { TypeOrmWorkspaceRepository } from '../../typeorm/repositories/typeorm-workspace.repository';
 import { TypeOrmWorkspaceMemberRepository } from '../../typeorm/repositories/typeorm-workspace-member.repository';
@@ -43,10 +42,6 @@ export class WorkspaceController {
 
   @Post()
   create(@Body() body: CreateWorkspaceRequest, @CurrentUser() user: AuthUser) {
-    if (!user.isSystemAdmin) {
-      throw new ForbiddenException('Only system admins can create workspaces');
-    }
-
     const createService = new CreateWorkspace(this.idGenerator, this.workspaceRepository);
     const addMemberService = new AddWorkspaceMember(this.idGenerator, this.memberRepository);
     const command = new CreateWorkspaceCommand(createService, addMemberService);
@@ -54,6 +49,7 @@ export class WorkspaceController {
       name: body.name,
       description: body.description,
       creatorUserId: user.userId,
+      isSystemAdmin: user.isSystemAdmin,
     });
   }
 
@@ -76,14 +72,14 @@ export class WorkspaceController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
-    await this.ensure(workspaceId, user.userId, PERMISSIONS.WORKSPACE_MEMBERS_MANAGE);
-
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new AddWorkspaceMember(this.idGenerator, this.memberRepository);
-    const command = new AddMemberCommand(service);
+    const command = new AddMemberCommand(service, ensurePermission);
     return command.execute({
       workspaceId,
       userId: body.userId,
       role: body.role,
+      requestingUserId: user.userId,
     });
   }
 
@@ -93,11 +89,8 @@ export class WorkspaceController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
-    const member = await this.memberRepository.findByWorkspaceAndUser(workspaceId, user.userId);
-    if (!member) return { permissions: [] };
-
-    const { getPermissionsForRole } = await import('../../../domain/permissions');
-    return { permissions: getPermissionsForRole(member.role) };
+    const query = new GetMyPermissionsQuery(this.memberRepository);
+    return query.execute({ workspaceId, userId: user.userId });
   }
 
   @Get(':slug/members')
@@ -114,21 +107,15 @@ export class WorkspaceController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
-    await this.ensure(workspaceId, user.userId, PERMISSIONS.WORKSPACE_MEMBERS_MANAGE);
-
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new RemoveWorkspaceMember(this.memberRepository);
-    const command = new RemoveMemberCommand(service);
-    return command.execute({ workspaceId, userId });
+    const command = new RemoveMemberCommand(service, ensurePermission);
+    return command.execute({ workspaceId, userId, requestingUserId: user.userId });
   }
 
   private async resolveWorkspaceId(slug: string): Promise<string> {
     const workspace = await this.workspaceRepository.findBySlug(slug);
-    if (!workspace) throw new NotFoundException('Workspace not found');
+    if (!workspace) throw new EntityNotFoundError('Workspace not found');
     return workspace.getId();
-  }
-
-  private async ensure(workspaceId: string, userId: string, permission: Permission) {
-    const service = new EnsureWorkspacePermission(this.memberRepository);
-    return service.execute({ workspaceId, userId, permission });
   }
 }

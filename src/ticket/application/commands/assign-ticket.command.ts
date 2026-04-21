@@ -1,9 +1,19 @@
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Command } from '../../../shared/domain/command';
+import { EntityNotFoundError } from '../../../shared/domain/errors';
+import { TicketRepository } from '../../domain/repositories/ticket.repository';
 import { AssignTicket } from '../../domain/services/ticket-assign';
+import { EnsureWorkspacePermission } from '../../../workspace/domain/services/workspace-ensure-permission';
+import { PERMISSIONS } from '../../../workspace/domain/permissions';
+import { TicketAssignedEvent } from '../../../email/domain/events';
 
 interface Props {
   ticketId: string;
   assigneeId: string | null;
+  workspaceId: string;
+  workspaceName: string;
+  workspaceSlug: string;
+  userId: string;
 }
 
 export interface AssignTicketResponse {
@@ -12,14 +22,43 @@ export interface AssignTicketResponse {
 }
 
 export class AssignTicketCommand implements Command<Props, AssignTicketResponse> {
-  constructor(private readonly assignTicket: AssignTicket) {}
+  constructor(
+    private readonly assignTicket: AssignTicket,
+    private readonly ticketRepository: TicketRepository,
+    private readonly ensurePermission: EnsureWorkspacePermission,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async execute(props: Props): Promise<AssignTicketResponse> {
-    const ticket = await this.assignTicket.execute(props);
+    await this.ensurePermission.execute({
+      workspaceId: props.workspaceId,
+      userId: props.userId,
+      permission: PERMISSIONS.TICKET_ASSIGN,
+    });
+
+    const ticket = await this.ticketRepository.findById(props.ticketId);
+    if (!ticket) throw new EntityNotFoundError('Ticket not found');
+
+    const previousAssigneeId = ticket.assigneeId;
+
+    const updated = await this.assignTicket.execute({
+      ticketId: props.ticketId,
+      assigneeId: props.assigneeId,
+    });
+
+    const event: TicketAssignedEvent = {
+      ticketId: props.ticketId,
+      ticketName: ticket.name,
+      newAssigneeId: props.assigneeId,
+      previousAssigneeId,
+      workspaceName: props.workspaceName,
+      workspaceSlug: props.workspaceSlug,
+    };
+    this.eventEmitter.emit('ticket.assigned', event);
 
     return {
-      id: ticket.getId(),
-      assigneeId: ticket.assigneeId,
+      id: updated.getId(),
+      assigneeId: updated.assigneeId,
     };
   }
 }

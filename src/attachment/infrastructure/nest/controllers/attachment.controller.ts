@@ -14,9 +14,11 @@ import { JwtAuthGuard } from '../../../../shared/nest/guards/jwt-auth.guard';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
 import { S3StorageService } from '../../../../shared/infrastructure/s3-storage.service';
 import { CreateAttachment } from '../../../domain/services/attachment-create';
-import { UploadAttachmentCommand } from '../../../application/commands/upload-attachment.command';
-import { GetAttachmentQuery } from '../../../application/queries/get-attachment.query';
 import { DeleteAttachment } from '../../../domain/services/attachment-delete';
+import { UploadAttachmentCommand } from '../../../application/commands/upload-attachment.command';
+import { DeleteAttachmentCommand } from '../../../application/commands/delete-attachment.command';
+import { GetAttachmentQuery } from '../../../application/queries/get-attachment.query';
+import { ListTicketAttachmentsQuery } from '../../../application/queries/list-ticket-attachments.query';
 import { TypeOrmAttachmentRepository } from '../../typeorm/repositories/typeorm-attachment.repository';
 
 @Controller()
@@ -34,11 +36,7 @@ export class AttachmentController {
     @Param('ticketId') ticketId: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    const service = new CreateAttachment(
-      this.idGenerator,
-      this.attachmentRepository,
-      this.s3Storage,
-    );
+    const service = new CreateAttachment(this.idGenerator, this.attachmentRepository, this.s3Storage);
     const command = new UploadAttachmentCommand(service);
     return command.execute({
       buffer: file.buffer,
@@ -51,18 +49,9 @@ export class AttachmentController {
   }
 
   @Get('workspaces/:slug/tickets/:ticketId/attachments')
-  async listByTicket(@Param('ticketId') ticketId: string) {
-    const attachments = await this.attachmentRepository.findByTicketId(ticketId);
-    const items = await Promise.all(
-      attachments.map(async (a) => ({
-        id: a.getId(),
-        originalName: a.originalName,
-        mimeType: a.mimeType,
-        size: a.size,
-        downloadUrl: await this.s3Storage.getPresignedUrl(a.s3Key),
-      })),
-    );
-    return items;
+  listByTicket(@Param('ticketId') ticketId: string) {
+    const query = new ListTicketAttachmentsQuery(this.attachmentRepository, this.s3Storage);
+    return query.execute({ ticketId });
   }
 
   @Post('workspaces/:slug/tickets/:ticketId/comments/:commentId/attachments')
@@ -71,11 +60,7 @@ export class AttachmentController {
     @Param('commentId') commentId: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    const service = new CreateAttachment(
-      this.idGenerator,
-      this.attachmentRepository,
-      this.s3Storage,
-    );
+    const service = new CreateAttachment(this.idGenerator, this.attachmentRepository, this.s3Storage);
     const command = new UploadAttachmentCommand(service);
     return command.execute({
       buffer: file.buffer,
@@ -89,16 +74,14 @@ export class AttachmentController {
 
   @Get('attachments/:id')
   get(@Param('id') id: string) {
-    const query = new GetAttachmentQuery(
-      this.attachmentRepository,
-      this.s3Storage,
-    );
+    const query = new GetAttachmentQuery(this.attachmentRepository, this.s3Storage);
     return query.execute({ attachmentId: id });
   }
 
   @Delete('attachments/:id')
   remove(@Param('id') id: string) {
     const service = new DeleteAttachment(this.attachmentRepository, this.s3Storage);
-    return service.execute({ attachmentId: id });
+    const command = new DeleteAttachmentCommand(service);
+    return command.execute({ attachmentId: id });
   }
 }

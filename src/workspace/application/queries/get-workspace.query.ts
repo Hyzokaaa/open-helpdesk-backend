@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { Query } from '../../../shared/domain/query';
 import { WorkspaceRepository } from '../../domain/repositories/workspace.repository';
 
@@ -19,7 +19,7 @@ export class GetWorkspaceQuery implements Query<Props, WorkspaceResponse> {
   async execute(props: Props): Promise<WorkspaceResponse> {
     const workspace = await this.repository.findBySlug(props.slug);
     if (!workspace) {
-      throw new NotFoundException('Workspace not found');
+      throw new EntityNotFoundError('Workspace not found');
     }
 
     return {

@@ -1,7 +1,12 @@
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Command } from '../../../shared/domain/command';
 import { TicketCategory } from '../../domain/enums/ticket-category.enum';
 import { TicketPriority } from '../../domain/enums/ticket-priority.enum';
 import { CreateTicket } from '../../domain/services/ticket-create';
+import { EnsureWorkspacePermission } from '../../../workspace/domain/services/workspace-ensure-permission';
+import { UserRepository } from '../../../user/domain/repositories/user.repository';
+import { PERMISSIONS } from '../../../workspace/domain/permissions';
+import { TicketCreatedEvent } from '../../../email/domain/events';
 
 interface Props {
   name: string;
@@ -9,7 +14,10 @@ interface Props {
   priority: TicketPriority;
   category: TicketCategory;
   workspaceId: string;
-  creatorId: string;
+  workspaceName: string;
+  workspaceSlug: string;
+  userId: string;
+  userEmail: string;
   tagIds: string[];
 }
 
@@ -20,18 +28,43 @@ export interface CreateTicketResponse {
 }
 
 export class CreateTicketCommand implements Command<Props, CreateTicketResponse> {
-  constructor(private readonly createTicket: CreateTicket) {}
+  constructor(
+    private readonly createTicket: CreateTicket,
+    private readonly ensurePermission: EnsureWorkspacePermission,
+    private readonly userRepository: UserRepository,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async execute(props: Props): Promise<CreateTicketResponse> {
+    await this.ensurePermission.execute({
+      workspaceId: props.workspaceId,
+      userId: props.userId,
+      permission: PERMISSIONS.TICKET_CREATE,
+    });
+
     const ticket = await this.createTicket.execute({
       name: props.name,
       description: props.description,
       priority: props.priority,
       category: props.category,
       workspaceId: props.workspaceId,
-      creatorId: props.creatorId,
+      creatorId: props.userId,
       tagIds: props.tagIds,
     });
+
+    const creator = await this.userRepository.findById(props.userId);
+    const event: TicketCreatedEvent = {
+      ticketId: ticket.getId(),
+      ticketName: props.name,
+      priority: props.priority,
+      category: props.category,
+      creatorId: props.userId,
+      creatorName: creator ? `${creator.firstName} ${creator.lastName}` : props.userEmail,
+      workspaceId: props.workspaceId,
+      workspaceName: props.workspaceName,
+      workspaceSlug: props.workspaceSlug,
+    };
+    this.eventEmitter.emit('ticket.created', event);
 
     return {
       id: ticket.getId(),

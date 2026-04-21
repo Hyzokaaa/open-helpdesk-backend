@@ -15,7 +15,10 @@ import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
 import { TypeOrmNotificationRepository } from '../../typeorm/repositories/typeorm-notification.repository';
 import { TypeOrmNotificationPreferenceRepository } from '../../typeorm/repositories/typeorm-notification-preference.repository';
-import { NotificationPreference } from '../../../domain/entities/notification-preference';
+import { UpdateNotificationPreference } from '../../../domain/services/notification-preference-update';
+import { UpdatePreferencesCommand } from '../../../application/commands/update-preferences.command';
+import { ListNotificationsQuery } from '../../../application/queries/list-notifications.query';
+import { GetPreferencesQuery } from '../../../application/queries/get-preferences.query';
 
 @Controller('notifications')
 @UseGuards(JwtAuthGuard)
@@ -29,28 +32,12 @@ export class NotificationController {
   ) {}
 
   @Get()
-  async list(
+  list(
     @CurrentUser() user: AuthUser,
     @Query('unreadOnly') unreadOnly: string,
   ) {
-    const unread = unreadOnly === 'true';
-    const [notifications, unreadCount] = await Promise.all([
-      this.notificationRepository.findByUserId(user.userId, unread),
-      this.notificationRepository.countUnread(user.userId),
-    ]);
-
-    return {
-      unreadCount,
-      notifications: notifications.map((n) => ({
-        id: n.getId(),
-        type: n.type,
-        title: n.title,
-        ticketId: n.ticketId,
-        workspaceSlug: n.workspaceSlug,
-        isRead: n.isRead,
-        createdAt: n.createdAt,
-      })),
-    };
+    const query = new ListNotificationsQuery(this.notificationRepository);
+    return query.execute({ userId: user.userId, unreadOnly: unreadOnly === 'true' });
   }
 
   @Patch(':id/read')
@@ -69,91 +56,18 @@ export class NotificationController {
   }
 
   @Get('preferences')
-  async getPreferences(@CurrentUser() user: AuthUser) {
-    const pref = await this.preferenceRepository.findByUserId(user.userId);
-
-    if (!pref) {
-      return {
-        emailEnabled: true,
-        inAppEnabled: true,
-        emailTicketCreated: true,
-        emailTicketAssigned: true,
-        emailStatusChanged: true,
-        emailCommentCreated: true,
-        inAppTicketCreated: true,
-        inAppTicketAssigned: true,
-        inAppStatusChanged: true,
-        inAppCommentCreated: true,
-        bellUnreadOnly: false,
-      };
-    }
-
-    return {
-      emailEnabled: pref.emailEnabled,
-      inAppEnabled: pref.inAppEnabled,
-      emailTicketCreated: pref.emailTicketCreated,
-      emailTicketAssigned: pref.emailTicketAssigned,
-      emailStatusChanged: pref.emailStatusChanged,
-      emailCommentCreated: pref.emailCommentCreated,
-      inAppTicketCreated: pref.inAppTicketCreated,
-      inAppTicketAssigned: pref.inAppTicketAssigned,
-      inAppStatusChanged: pref.inAppStatusChanged,
-      inAppCommentCreated: pref.inAppCommentCreated,
-      bellUnreadOnly: pref.bellUnreadOnly,
-    };
+  getPreferences(@CurrentUser() user: AuthUser) {
+    const query = new GetPreferencesQuery(this.preferenceRepository);
+    return query.execute({ userId: user.userId });
   }
 
   @Put('preferences')
-  async updatePreferences(
+  updatePreferences(
     @Body() body: Record<string, boolean>,
     @CurrentUser() user: AuthUser,
   ) {
-    let pref = await this.preferenceRepository.findByUserId(user.userId);
-
-    if (!pref) {
-      pref = new NotificationPreference({
-        id: this.idGenerator.create(),
-        userId: user.userId,
-        emailEnabled: true,
-        inAppEnabled: true,
-        emailTicketCreated: true,
-        emailTicketAssigned: true,
-        emailStatusChanged: true,
-        emailCommentCreated: true,
-        inAppTicketCreated: true,
-        inAppTicketAssigned: true,
-        inAppStatusChanged: true,
-        inAppCommentCreated: true,
-        bellUnreadOnly: false,
-      });
-    }
-
-    if (body.emailEnabled !== undefined) pref.emailEnabled = body.emailEnabled;
-    if (body.inAppEnabled !== undefined) pref.inAppEnabled = body.inAppEnabled;
-    if (body.emailTicketCreated !== undefined) pref.emailTicketCreated = body.emailTicketCreated;
-    if (body.emailTicketAssigned !== undefined) pref.emailTicketAssigned = body.emailTicketAssigned;
-    if (body.emailStatusChanged !== undefined) pref.emailStatusChanged = body.emailStatusChanged;
-    if (body.emailCommentCreated !== undefined) pref.emailCommentCreated = body.emailCommentCreated;
-    if (body.inAppTicketCreated !== undefined) pref.inAppTicketCreated = body.inAppTicketCreated;
-    if (body.inAppTicketAssigned !== undefined) pref.inAppTicketAssigned = body.inAppTicketAssigned;
-    if (body.inAppStatusChanged !== undefined) pref.inAppStatusChanged = body.inAppStatusChanged;
-    if (body.inAppCommentCreated !== undefined) pref.inAppCommentCreated = body.inAppCommentCreated;
-    if (body.bellUnreadOnly !== undefined) pref.bellUnreadOnly = body.bellUnreadOnly;
-
-    await this.preferenceRepository.upsert(pref);
-
-    return {
-      emailEnabled: pref.emailEnabled,
-      inAppEnabled: pref.inAppEnabled,
-      emailTicketCreated: pref.emailTicketCreated,
-      emailTicketAssigned: pref.emailTicketAssigned,
-      emailStatusChanged: pref.emailStatusChanged,
-      emailCommentCreated: pref.emailCommentCreated,
-      inAppTicketCreated: pref.inAppTicketCreated,
-      inAppTicketAssigned: pref.inAppTicketAssigned,
-      inAppStatusChanged: pref.inAppStatusChanged,
-      inAppCommentCreated: pref.inAppCommentCreated,
-      bellUnreadOnly: pref.bellUnreadOnly,
-    };
+    const service = new UpdateNotificationPreference(this.idGenerator, this.preferenceRepository);
+    const command = new UpdatePreferencesCommand(service);
+    return command.execute({ userId: user.userId, ...body });
   }
 }

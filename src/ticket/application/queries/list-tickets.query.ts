@@ -1,5 +1,7 @@
 import { Query } from '../../../shared/domain/query';
 import { PaginatedResult } from '../../../shared/domain/paginated-result';
+import { EnsureWorkspacePermission } from '../../../workspace/domain/services/workspace-ensure-permission';
+import { PERMISSIONS } from '../../../workspace/domain/permissions';
 import {
   TicketFilters,
   TicketRepository,
@@ -7,6 +9,7 @@ import {
 
 interface Props {
   workspaceId: string;
+  userId: string;
   filters: TicketFilters;
   page: number;
   limit: number;
@@ -27,9 +30,18 @@ export interface TicketListItem {
 export class ListTicketsQuery
   implements Query<Props, PaginatedResult<TicketListItem>>
 {
-  constructor(private readonly repository: TicketRepository) {}
+  constructor(
+    private readonly repository: TicketRepository,
+    private readonly ensurePermission: EnsureWorkspacePermission,
+  ) {}
 
   async execute(props: Props): Promise<PaginatedResult<TicketListItem>> {
+    await this.ensurePermission.execute({
+      workspaceId: props.workspaceId,
+      userId: props.userId,
+      permission: PERMISSIONS.TICKET_VIEW,
+    });
+
     const result = await this.repository.findAll(
       props.workspaceId,
       props.filters,

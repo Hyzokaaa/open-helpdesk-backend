@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { Query } from '../../../shared/domain/query';
 import { S3StorageService } from '../../../shared/infrastructure/s3-storage.service';
 import { AttachmentRepository } from '../../domain/repositories/attachment.repository';
@@ -24,7 +24,7 @@ export class GetAttachmentQuery implements Query<Props, AttachmentResponse> {
   async execute(props: Props): Promise<AttachmentResponse> {
     const attachment = await this.repository.findById(props.attachmentId);
     if (!attachment) {
-      throw new NotFoundException('Attachment not found');
+      throw new EntityNotFoundError('Attachment not found');
     }
 
     const downloadUrl = await this.storage.getPresignedUrl(attachment.s3Key);

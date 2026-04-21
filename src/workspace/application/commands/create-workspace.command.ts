@@ -1,4 +1,5 @@
 import { Command } from '../../../shared/domain/command';
+import { AccessDeniedError } from '../../../shared/domain/errors';
 import { CreateWorkspace } from '../../domain/services/workspace-create';
 import { AddWorkspaceMember } from '../../domain/services/workspace-add-member';
 import { WorkspaceRole } from '../../domain/enums/workspace-role.enum';
@@ -7,6 +8,7 @@ interface Props {
   name: string;
   description: string;
   creatorUserId: string;
+  isSystemAdmin: boolean;
 }
 
 export interface CreateWorkspaceResponse {
@@ -22,6 +24,10 @@ export class CreateWorkspaceCommand implements Command<Props, CreateWorkspaceRes
   ) {}
 
   async execute(props: Props): Promise<CreateWorkspaceResponse> {
+    if (!props.isSystemAdmin) {
+      throw new AccessDeniedError('Only system admins can create workspaces');
+    }
+
     const workspace = await this.createWorkspace.execute({
       name: props.name,
       description: props.description,

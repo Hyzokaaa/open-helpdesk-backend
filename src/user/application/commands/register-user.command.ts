@@ -1,4 +1,5 @@
 import { Command } from '../../../shared/domain/command';
+import { AccessDeniedError } from '../../../shared/domain/errors';
 import { CreateUser } from '../../domain/services/user-create';
 
 interface Props {
@@ -7,6 +8,7 @@ interface Props {
   firstName: string;
   lastName: string;
   isSystemAdmin?: boolean;
+  requestingUserIsAdmin: boolean;
 }
 
 export interface RegisterUserResponse {
@@ -18,6 +20,10 @@ export class RegisterUserCommand implements Command<Props, RegisterUserResponse>
   constructor(private readonly createUser: CreateUser) {}
 
   async execute(props: Props): Promise<RegisterUserResponse> {
+    if (!props.requestingUserIsAdmin) {
+      throw new AccessDeniedError('Only system admins can create users');
+    }
+
     const user = await this.createUser.execute({
       email: props.email,
       password: props.password,
