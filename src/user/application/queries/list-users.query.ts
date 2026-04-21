@@ -9,6 +9,7 @@ export interface UserListItem {
   firstName: string;
   lastName: string;
   isSystemAdmin: boolean;
+  isActive: boolean;
 }
 
 export class ListUsersQuery implements Query<Props, UserListItem[]> {
@@ -22,6 +23,7 @@ export class ListUsersQuery implements Query<Props, UserListItem[]> {
       firstName: u.firstName,
       lastName: u.lastName,
       isSystemAdmin: u.isSystemAdmin,
+      isActive: u.isActive,
     }));
   }
 }

@@ -19,6 +19,7 @@ import { CreateUser } from '../../../domain/services/user-create';
 import { RegisterUserCommand } from '../../../application/commands/register-user.command';
 import { UpdateUserProfileCommand } from '../../../application/commands/update-user-profile.command';
 import { ToggleSystemAdminCommand } from '../../../application/commands/toggle-system-admin.command';
+import { ToggleUserActiveCommand } from '../../../application/commands/toggle-user-active.command';
 import { ChangePassword } from '../../../domain/services/user-change-password';
 import { ChangePasswordCommand } from '../../../application/commands/change-password.command';
 import { TypeOrmUserRepository } from '../../typeorm/repositories/typeorm-user.repository';
@@ -123,6 +124,20 @@ export class UserController {
     return command.execute({
       targetUserId: id,
       isSystemAdmin: body.isSystemAdmin,
+      requestingUserIsAdmin: user.isSystemAdmin,
+    });
+  }
+
+  @Patch(':id/active')
+  toggleActive(
+    @Param('id') id: string,
+    @Body() body: { isActive: boolean },
+    @CurrentUser() user: AuthUser,
+  ) {
+    const command = new ToggleUserActiveCommand(this.userRepository);
+    return command.execute({
+      targetUserId: id,
+      isActive: body.isActive,
       requestingUserIsAdmin: user.isSystemAdmin,
     });
   }
