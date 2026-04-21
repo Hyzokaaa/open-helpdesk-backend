@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { TicketRepository } from '../repositories/ticket.repository';
 
 interface DeleteTicketProps {
@@ -11,7 +11,7 @@ export class DeleteTicket {
   async execute(props: DeleteTicketProps): Promise<void> {
     const ticket = await this.repository.findById(props.ticketId);
     if (!ticket) {
-      throw new NotFoundException('Ticket not found');
+      throw new EntityNotFoundError('Ticket not found');
     }
 
     await this.repository.softDelete(props.ticketId);

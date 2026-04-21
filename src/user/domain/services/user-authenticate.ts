@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { InvalidCredentialsError } from '../../../shared/domain/errors';
 import { PasswordHasher } from '../../../shared/infrastructure/password-hasher';
 import { User } from '../entities/user';
 import { UserRepository } from '../repositories/user.repository';
@@ -17,7 +17,7 @@ export class AuthenticateUser {
   async execute(props: AuthenticateUserProps): Promise<User> {
     const user = await this.repository.findByEmail(props.email);
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new InvalidCredentialsError('Invalid credentials');
     }
 
     const isValid = await this.passwordHasher.compare(
@@ -25,7 +25,7 @@ export class AuthenticateUser {
       user.password,
     );
     if (!isValid) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new InvalidCredentialsError('Invalid credentials');
     }
 
     return user;

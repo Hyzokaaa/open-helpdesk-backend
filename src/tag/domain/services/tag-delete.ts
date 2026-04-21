@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { TagRepository } from '../repositories/tag.repository';
 
 interface DeleteTagProps {
@@ -11,7 +11,7 @@ export class DeleteTag {
   async execute(props: DeleteTagProps): Promise<void> {
     const tag = await this.repository.findById(props.id);
     if (!tag) {
-      throw new NotFoundException('Tag not found');
+      throw new EntityNotFoundError('Tag not found');
     }
 
     await this.repository.delete(props.id);

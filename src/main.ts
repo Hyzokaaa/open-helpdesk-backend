@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { DomainExceptionFilter } from './shared/nest/filters/domain-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -12,10 +13,12 @@ async function bootstrap() {
     }),
   );
 
+  app.useGlobalFilters(new DomainExceptionFilter());
+
   app.enableCors({
     exposedHeaders: ['X-Unread-Count', 'Date'],
   });
 
-  await app.listen(3000);
+  await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();

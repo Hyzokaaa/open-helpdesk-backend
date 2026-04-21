@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictError } from '../../../shared/domain/errors';
 import { IdGenerator } from '../../../shared/domain/id-generator';
 import { WorkspaceMember } from '../entities/workspace-member';
 import { WorkspaceRole } from '../enums/workspace-role.enum';
@@ -22,7 +22,7 @@ export class AddWorkspaceMember {
       props.userId,
     );
     if (existing) {
-      throw new ConflictException('User is already a member of this workspace');
+      throw new ConflictError('User is already a member of this workspace');
     }
 
     const member = new WorkspaceMember({

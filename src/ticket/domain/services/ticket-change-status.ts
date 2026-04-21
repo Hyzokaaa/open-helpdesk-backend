@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { DomainValidationError, EntityNotFoundError } from '../../../shared/domain/errors';
 import { Ticket } from '../entities/ticket';
 import { TicketStatus } from '../enums/ticket-status.enum';
 import { TicketRepository } from '../repositories/ticket.repository';
@@ -28,12 +28,12 @@ export class ChangeTicketStatus {
   async execute(props: ChangeTicketStatusProps): Promise<Ticket> {
     const ticket = await this.repository.findById(props.ticketId);
     if (!ticket) {
-      throw new NotFoundException('Ticket not found');
+      throw new EntityNotFoundError('Ticket not found');
     }
 
     const allowed = ALLOWED_TRANSITIONS[ticket.status];
     if (!allowed.includes(props.status)) {
-      throw new BadRequestException(
+      throw new DomainValidationError(
         `Cannot transition from '${ticket.status}' to '${props.status}'`,
       );
     }

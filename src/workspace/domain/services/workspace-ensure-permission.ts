@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { AccessDeniedError } from '../../../shared/domain/errors';
 import { WorkspaceRole } from '../enums/workspace-role.enum';
 import { WorkspaceMemberRepository } from '../repositories/workspace-member.repository';
 import { Permission, hasPermission } from '../permissions';
@@ -26,11 +26,11 @@ export class EnsureWorkspacePermission {
     );
 
     if (!member) {
-      throw new ForbiddenException('You are not a member of this workspace');
+      throw new AccessDeniedError('You are not a member of this workspace');
     }
 
     if (!hasPermission(member.role, props.permission)) {
-      throw new ForbiddenException(
+      throw new AccessDeniedError(
         `Insufficient permissions: ${props.permission}`,
       );
     }

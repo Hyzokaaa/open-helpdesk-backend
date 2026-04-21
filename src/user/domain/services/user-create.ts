@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictError } from '../../../shared/domain/errors';
 import { IdGenerator } from '../../../shared/domain/id-generator';
 import { PasswordHasher } from '../../../shared/infrastructure/password-hasher';
 import { User } from '../entities/user';
@@ -22,7 +22,7 @@ export class CreateUser {
   async execute(props: CreateUserProps): Promise<User> {
     const existing = await this.repository.findByEmail(props.email);
     if (existing) {
-      throw new ConflictException('Email already registered');
+      throw new ConflictError('Email already registered');
     }
 
     const hashedPassword = await this.passwordHasher.hash(props.password);

@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { Ticket } from '../entities/ticket';
 import { TicketCategory } from '../enums/ticket-category.enum';
 import { TicketPriority } from '../enums/ticket-priority.enum';
@@ -19,7 +19,7 @@ export class UpdateTicket {
   async execute(props: UpdateTicketProps): Promise<Ticket> {
     const ticket = await this.repository.findById(props.ticketId);
     if (!ticket) {
-      throw new NotFoundException('Ticket not found');
+      throw new EntityNotFoundError('Ticket not found');
     }
 
     if (props.name !== undefined) ticket.name = props.name;
