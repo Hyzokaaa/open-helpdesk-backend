@@ -9,7 +9,7 @@ import { TypeOrmUserRepository } from '../../user/infrastructure/typeorm/reposit
 import { TypeOrmNotificationRepository } from '../../notification/infrastructure/typeorm/repositories/typeorm-notification.repository';
 import { TypeOrmNotificationPreferenceRepository } from '../../notification/infrastructure/typeorm/repositories/typeorm-notification-preference.repository';
 import { UlidGenerator } from '../../shared/infrastructure/ulid-generator';
-import { Notification } from '../../notification/domain/entities/notification';
+import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
 
 @Injectable()
@@ -32,32 +32,26 @@ export class TicketAssignedHandler {
   async handle(event: TicketAssignedEvent): Promise<void> {
     const template = new TicketAssignedTemplate();
     const ticketUrl = `${this.frontendUrl}/dashboard/workspaces/${event.workspaceSlug}/tickets/${event.ticketId}`;
+    const dispatch = new DispatchNotifications(this.idGenerator, this.notificationRepository, this.preferenceRepository);
 
-    // Unassigned notification to previous assignee
+    // Unassigned — notify previous assignee
     if (event.previousAssigneeId && event.previousAssigneeId !== event.newAssigneeId) {
-      const prevUser = await this.userRepository.findById(event.previousAssigneeId);
-      if (prevUser) {
-        const pref = (await this.preferenceRepository.findByUserIds([prevUser.getId()])).get(prevUser.getId());
+      const prevUsers = await this.userRepository.findByIds([event.previousAssigneeId]);
+      if (prevUsers.length > 0) {
+        const { emailRecipients } = await dispatch.execute({
+          users: prevUsers,
+          type: NotificationType.TICKET_ASSIGNED,
+          title: `Unassigned: ${event.ticketName}`,
+          ticketId: event.ticketId,
+          workspaceSlug: event.workspaceSlug,
+          inAppPrefKey: 'inAppTicketAssigned',
+          emailPrefKey: 'emailTicketAssigned',
+        });
 
-        if (!pref || (pref.inAppEnabled && pref.inAppTicketAssigned)) {
-          await this.notificationRepository.create(
-            new Notification({
-              id: this.idGenerator.create(),
-              userId: prevUser.getId(),
-              type: NotificationType.TICKET_ASSIGNED,
-              title: `Unassigned: ${event.ticketName}`,
-              ticketId: event.ticketId,
-              workspaceSlug: event.workspaceSlug,
-              isRead: false,
-            }),
-          );
-        }
-
-        if (!pref || (pref.emailEnabled && pref.emailTicketAssigned)) {
-          const lang = prevUser.language || 'en';
+        for (const [lang, emails] of emailRecipients) {
           const data = { ticketName: event.ticketName, ticketUrl, workspaceName: event.workspaceName, lang };
           await this.emailService.send({
-            to: prevUser.email,
+            to: emails,
             subject: template.unassignedSubject(data),
             html: template.unassignedHtml(data),
           });
@@ -65,37 +59,30 @@ export class TicketAssignedHandler {
       }
     }
 
-    // Assigned notification to new assignee
+    // Assigned — notify new assignee
     if (event.newAssigneeId) {
-      const newUser = await this.userRepository.findById(event.newAssigneeId);
-      if (newUser) {
-        const pref = (await this.preferenceRepository.findByUserIds([newUser.getId()])).get(newUser.getId());
+      const newUsers = await this.userRepository.findByIds([event.newAssigneeId]);
+      if (newUsers.length > 0) {
+        const { emailRecipients } = await dispatch.execute({
+          users: newUsers,
+          type: NotificationType.TICKET_ASSIGNED,
+          title: `Assigned: ${event.ticketName}`,
+          ticketId: event.ticketId,
+          workspaceSlug: event.workspaceSlug,
+          inAppPrefKey: 'inAppTicketAssigned',
+          emailPrefKey: 'emailTicketAssigned',
+        });
 
-        if (!pref || (pref.inAppEnabled && pref.inAppTicketAssigned)) {
-          await this.notificationRepository.create(
-            new Notification({
-              id: this.idGenerator.create(),
-              userId: newUser.getId(),
-              type: NotificationType.TICKET_ASSIGNED,
-              title: `Assigned: ${event.ticketName}`,
-              ticketId: event.ticketId,
-              workspaceSlug: event.workspaceSlug,
-              isRead: false,
-            }),
-          );
-        }
-
-        if (!pref || (pref.emailEnabled && pref.emailTicketAssigned)) {
-          const lang = newUser.language || 'en';
+        for (const [lang, emails] of emailRecipients) {
           const data = {
             ticketName: event.ticketName,
             ticketUrl,
-            assigneeName: `${newUser.firstName} ${newUser.lastName}`,
+            assigneeName: `${newUsers[0].firstName} ${newUsers[0].lastName}`,
             workspaceName: event.workspaceName,
             lang,
           };
           await this.emailService.send({
-            to: newUser.email,
+            to: emails,
             subject: template.assignedSubject(data),
             html: template.assignedHtml(data),
           });

@@ -20,6 +20,9 @@ import { RegisterUserCommand } from '../../../application/commands/register-user
 import { UpdateUserProfileCommand } from '../../../application/commands/update-user-profile.command';
 import { ToggleSystemAdminCommand } from '../../../application/commands/toggle-system-admin.command';
 import { ToggleUserActiveCommand } from '../../../application/commands/toggle-user-active.command';
+import { UpdateUserProfile } from '../../../domain/services/user-update-profile';
+import { ToggleSystemAdmin } from '../../../domain/services/user-toggle-system-admin';
+import { ToggleUserActive } from '../../../domain/services/user-toggle-active';
 import { ChangePassword } from '../../../domain/services/user-change-password';
 import { ChangePasswordCommand } from '../../../application/commands/change-password.command';
 import { TypeOrmUserRepository } from '../../typeorm/repositories/typeorm-user.repository';
@@ -45,7 +48,8 @@ export class UserController {
     @Body() body: { firstName: string; lastName: string },
     @CurrentUser() authUser: AuthUser,
   ) {
-    const command = new UpdateUserProfileCommand(this.userRepository);
+    const service = new UpdateUserProfile(this.userRepository);
+    const command = new UpdateUserProfileCommand(service);
     return command.execute({
       userId: authUser.userId,
       firstName: body.firstName,
@@ -58,7 +62,8 @@ export class UserController {
     @Body() body: { language: string },
     @CurrentUser() authUser: AuthUser,
   ) {
-    const command = new UpdateUserProfileCommand(this.userRepository);
+    const service = new UpdateUserProfile(this.userRepository);
+    const command = new UpdateUserProfileCommand(service);
     return command.execute({
       userId: authUser.userId,
       language: body.language,
@@ -70,7 +75,8 @@ export class UserController {
     @Body() body: { theme: string },
     @CurrentUser() authUser: AuthUser,
   ) {
-    const command = new UpdateUserProfileCommand(this.userRepository);
+    const service = new UpdateUserProfile(this.userRepository);
+    const command = new UpdateUserProfileCommand(service);
     return command.execute({
       userId: authUser.userId,
       theme: body.theme,
@@ -120,7 +126,8 @@ export class UserController {
     @Body() body: { isSystemAdmin: boolean },
     @CurrentUser() user: AuthUser,
   ) {
-    const command = new ToggleSystemAdminCommand(this.userRepository);
+    const service = new ToggleSystemAdmin(this.userRepository);
+    const command = new ToggleSystemAdminCommand(service);
     return command.execute({
       targetUserId: id,
       isSystemAdmin: body.isSystemAdmin,
@@ -134,7 +141,8 @@ export class UserController {
     @Body() body: { isActive: boolean },
     @CurrentUser() user: AuthUser,
   ) {
-    const command = new ToggleUserActiveCommand(this.userRepository);
+    const service = new ToggleUserActive(this.userRepository);
+    const command = new ToggleUserActiveCommand(service);
     return command.execute({
       targetUserId: id,
       isActive: body.isActive,

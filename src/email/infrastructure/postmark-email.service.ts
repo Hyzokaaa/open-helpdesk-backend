@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as postmark from 'postmark';
 import {
@@ -7,7 +7,6 @@ import {
   SendEmailResult,
 } from '../domain/email.service';
 
-@Injectable()
 export class PostmarkEmailService implements EmailService {
   private readonly logger = new Logger(PostmarkEmailService.name);
   private readonly client: postmark.ServerClient | null;

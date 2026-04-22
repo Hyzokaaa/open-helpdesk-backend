@@ -1,12 +1,12 @@
 type Translations = Record<string, Record<string, string>>;
 
-const appName = process.env.APP_NAME || 'Open Helpdesk';
+const APP_NAME = process.env.APP_NAME || 'Open Helpdesk';
 
 const translations: Translations = {
   // Shared
   'email.header': {
-    en: appName,
-    es: appName,
+    en: APP_NAME,
+    es: APP_NAME,
   },
   'email.viewTicket': {
     en: 'View Ticket',

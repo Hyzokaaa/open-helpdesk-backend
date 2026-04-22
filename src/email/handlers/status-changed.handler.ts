@@ -10,8 +10,8 @@ import { TypeOrmUserRepository } from '../../user/infrastructure/typeorm/reposit
 import { TypeOrmNotificationRepository } from '../../notification/infrastructure/typeorm/repositories/typeorm-notification.repository';
 import { TypeOrmNotificationPreferenceRepository } from '../../notification/infrastructure/typeorm/repositories/typeorm-notification-preference.repository';
 import { UlidGenerator } from '../../shared/infrastructure/ulid-generator';
-import { WorkspaceRole } from '../../workspace/domain/enums/workspace-role.enum';
-import { Notification } from '../../notification/domain/entities/notification';
+import { ResolveNotificationRecipients } from '../../notification/domain/services/notification-resolve-recipients';
+import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
 
 @Injectable()
@@ -33,68 +33,34 @@ export class StatusChangedHandler {
 
   @OnEvent('ticket.statusChanged')
   async handle(event: StatusChangedEvent): Promise<void> {
-    const members = await this.memberRepository.findByWorkspaceId(event.workspaceId);
-    const agentMembers = members.filter(
-      (m) => m.role === WorkspaceRole.ADMIN || m.role === WorkspaceRole.AGENT,
-    );
-    if (agentMembers.length === 0) return;
-
-    const allUsers = await this.userRepository.findByIds(agentMembers.map((m) => m.userId));
-    const users = allUsers.filter((u) => u.getId() !== event.changedById);
+    const resolveRecipients = new ResolveNotificationRecipients(this.memberRepository, this.userRepository);
+    const users = await resolveRecipients.execute({
+      workspaceId: event.workspaceId,
+      excludeUserId: event.changedById,
+    });
     if (users.length === 0) return;
 
-    const userIds = users.map((u) => u.getId());
-    const prefs = await this.preferenceRepository.findByUserIds(userIds);
-
-    // In-app notifications
-    for (const user of users) {
-      const pref = prefs.get(user.getId());
-      if (!pref || (pref.inAppEnabled && pref.inAppStatusChanged)) {
-        await this.notificationRepository.create(
-          new Notification({
-            id: this.idGenerator.create(),
-            userId: user.getId(),
-            type: NotificationType.STATUS_CHANGED,
-            title: `${event.ticketName}: ${event.oldStatus} → ${event.newStatus}`,
-            ticketId: event.ticketId,
-            workspaceSlug: event.workspaceSlug,
-            isRead: false,
-          }),
-        );
-      }
-    }
-
-    // Email notifications
-    const emailUsers = users.filter((u) => {
-      const pref = prefs.get(u.getId());
-      return !pref || (pref.emailEnabled && pref.emailStatusChanged);
+    const dispatch = new DispatchNotifications(this.idGenerator, this.notificationRepository, this.preferenceRepository);
+    const { emailRecipients } = await dispatch.execute({
+      users,
+      type: NotificationType.STATUS_CHANGED,
+      title: `${event.ticketName}: ${event.oldStatus} → ${event.newStatus}`,
+      ticketId: event.ticketId,
+      workspaceSlug: event.workspaceSlug,
+      inAppPrefKey: 'inAppStatusChanged',
+      emailPrefKey: 'emailStatusChanged',
     });
-    if (emailUsers.length === 0) return;
+
+    if (emailRecipients.size === 0) return;
 
     const template = new StatusChangedTemplate();
     const ticketUrl = `${this.frontendUrl}/dashboard/workspaces/${event.workspaceSlug}/tickets/${event.ticketId}`;
 
-    const byLang = new Map<string, string[]>();
-    for (const u of emailUsers) {
-      const lang = u.language || 'en';
-      if (!byLang.has(lang)) byLang.set(lang, []);
-      byLang.get(lang)!.push(u.email);
-    }
-
-    for (const [lang, emails] of byLang) {
-      const data = {
-        ticketName: event.ticketName,
-        ticketUrl,
-        oldStatus: event.oldStatus,
-        newStatus: event.newStatus,
-        workspaceName: event.workspaceName,
-        lang,
-      };
-
+    for (const [lang, emails] of emailRecipients) {
       await this.emailService.send({
         to: emails,
-        subject: template.subject(data),
-        html: template.html(data),
+        subject: template.subject({ ticketName: event.ticketName, ticketUrl, oldStatus: event.oldStatus, newStatus: event.newStatus, workspaceName: event.workspaceName, lang }),
+        html: template.html({ ticketName: event.ticketName, ticketUrl, oldStatus: event.oldStatus, newStatus: event.newStatus, workspaceName: event.workspaceName, lang }),
       });
     }
   }

@@ -1,6 +1,6 @@
 import { Command } from '../../../shared/domain/command';
-import { AccessDeniedError, EntityNotFoundError } from '../../../shared/domain/errors';
-import { UserRepository } from '../../domain/repositories/user.repository';
+import { AccessDeniedError } from '../../../shared/domain/errors';
+import { ToggleUserActive } from '../../domain/services/user-toggle-active';
 
 interface Props {
   targetUserId: string;
@@ -14,19 +14,18 @@ export interface ToggleUserActiveResponse {
 }
 
 export class ToggleUserActiveCommand implements Command<Props, ToggleUserActiveResponse> {
-  constructor(private readonly repository: UserRepository) {}
+  constructor(private readonly toggleActive: ToggleUserActive) {}
 
   async execute(props: Props): Promise<ToggleUserActiveResponse> {
     if (!props.requestingUserIsAdmin) {
       throw new AccessDeniedError('Only system admins can activate/deactivate users');
     }
 
-    const target = await this.repository.findById(props.targetUserId);
-    if (!target) throw new EntityNotFoundError('User not found');
+    const user = await this.toggleActive.execute({
+      targetUserId: props.targetUserId,
+      isActive: props.isActive,
+    });
 
-    target.isActive = props.isActive;
-    await this.repository.update(target);
-
-    return { id: target.getId(), isActive: target.isActive };
+    return { id: user.getId(), isActive: user.isActive };
   }
 }

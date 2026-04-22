@@ -1,6 +1,5 @@
 import { Command } from '../../../shared/domain/command';
-import { EntityNotFoundError } from '../../../shared/domain/errors';
-import { UserRepository } from '../../domain/repositories/user.repository';
+import { UpdateUserProfile } from '../../domain/services/user-update-profile';
 
 interface Props {
   userId: string;
@@ -18,18 +17,16 @@ export interface UpdateUserProfileResponse {
 }
 
 export class UpdateUserProfileCommand implements Command<Props, UpdateUserProfileResponse> {
-  constructor(private readonly repository: UserRepository) {}
+  constructor(private readonly updateProfile: UpdateUserProfile) {}
 
   async execute(props: Props): Promise<UpdateUserProfileResponse> {
-    const user = await this.repository.findById(props.userId);
-    if (!user) throw new EntityNotFoundError('User not found');
-
-    if (props.firstName !== undefined) user.firstName = props.firstName;
-    if (props.lastName !== undefined) user.lastName = props.lastName;
-    if (props.language !== undefined) user.language = props.language;
-    if (props.theme !== undefined) user.theme = props.theme;
-
-    await this.repository.update(user);
+    const user = await this.updateProfile.execute({
+      userId: props.userId,
+      firstName: props.firstName,
+      lastName: props.lastName,
+      language: props.language,
+      theme: props.theme,
+    });
 
     return {
       firstName: user.firstName,
