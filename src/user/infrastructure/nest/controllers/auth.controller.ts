@@ -1,6 +1,6 @@
 import { Body, Controller, Inject, Post } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { JwtTokenService } from '../../../../shared/infrastructure/jwt-token-service';
 import { BcryptPasswordHasher } from '../../../../shared/infrastructure/bcrypt-password-hasher';
 import { EmailService } from '../../../../email/domain/email.service';
 import { EMAIL_SERVICE } from '../../../../email/email.constants';
@@ -20,7 +20,7 @@ export class AuthController {
   constructor(
     @Inject() private readonly userRepository: TypeOrmUserRepository,
     @Inject() private readonly passwordHasher: BcryptPasswordHasher,
-    @Inject() private readonly jwtService: JwtService,
+    @Inject() private readonly tokenService: JwtTokenService,
     @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
     private readonly config: ConfigService,
   ) {
@@ -30,7 +30,7 @@ export class AuthController {
   @Post('login')
   login(@Body() body: LoginUserRequest) {
     const service = new AuthenticateUser(this.userRepository, this.passwordHasher);
-    const command = new LoginUserCommand(service, this.jwtService);
+    const command = new LoginUserCommand(service, this.tokenService);
     return command.execute({
       email: body.email,
       password: body.password,
@@ -40,7 +40,7 @@ export class AuthController {
   @Post('forgot-password')
   async forgotPassword(@Body() body: { email: string }) {
     const service = new RequestPasswordReset(this.userRepository);
-    const command = new RequestPasswordResetCommand(service, this.jwtService, this.emailService);
+    const command = new RequestPasswordResetCommand(service, this.tokenService, this.emailService);
     await command.execute({ email: body.email, frontendUrl: this.frontendUrl });
     return { message: 'If the email exists, a reset link has been sent' };
   }
@@ -48,7 +48,7 @@ export class AuthController {
   @Post('reset-password')
   async resetPassword(@Body() body: { token: string; newPassword: string }) {
     const service = new ResetPassword(this.userRepository, this.passwordHasher);
-    const command = new ResetPasswordCommand(service, this.jwtService);
+    const command = new ResetPasswordCommand(service, this.tokenService);
     await command.execute({ token: body.token, newPassword: body.newPassword });
     return { message: 'Password has been reset' };
   }

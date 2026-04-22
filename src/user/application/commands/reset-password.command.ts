@@ -1,4 +1,4 @@
-import { JwtService } from '@nestjs/jwt';
+import { TokenService } from '../../../shared/domain/token-service';
 import { Command } from '../../../shared/domain/command';
 import { InvalidCredentialsError } from '../../../shared/domain/errors';
 import { ResetPassword } from '../../domain/services/user-reset-password';
@@ -11,13 +11,13 @@ interface Props {
 export class ResetPasswordCommand implements Command<Props, void> {
   constructor(
     private readonly resetPassword: ResetPassword,
-    private readonly jwtService: JwtService,
+    private readonly tokenService: TokenService,
   ) {}
 
   async execute(props: Props): Promise<void> {
     let payload: { sub: string; type: string };
     try {
-      payload = this.jwtService.verify(props.token);
+      payload = this.tokenService.verify(props.token);
     } catch {
       throw new InvalidCredentialsError('Invalid or expired reset token');
     }

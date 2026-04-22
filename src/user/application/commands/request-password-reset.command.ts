@@ -1,4 +1,4 @@
-import { JwtService } from '@nestjs/jwt';
+import { TokenService } from '../../../shared/domain/token-service';
 import { Command } from '../../../shared/domain/command';
 import { EmailService } from '../../../email/domain/email.service';
 import { RequestPasswordReset } from '../../domain/services/user-request-password-reset';
@@ -12,7 +12,7 @@ interface Props {
 export class RequestPasswordResetCommand implements Command<Props, void> {
   constructor(
     private readonly requestReset: RequestPasswordReset,
-    private readonly jwtService: JwtService,
+    private readonly tokenService: TokenService,
     private readonly emailService: EmailService,
   ) {}
 
@@ -20,7 +20,7 @@ export class RequestPasswordResetCommand implements Command<Props, void> {
     const result = await this.requestReset.execute({ email: props.email });
     if (!result) return;
 
-    const token = this.jwtService.sign(
+    const token = this.tokenService.sign(
       { sub: result.userId, type: 'password-reset' },
       { expiresIn: '1h' },
     );

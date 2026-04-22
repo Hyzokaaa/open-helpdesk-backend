@@ -1,4 +1,4 @@
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EventPublisher } from '../../../shared/domain/event-publisher';
 import { Command } from '../../../shared/domain/command';
 import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { TicketRepository } from '../../domain/repositories/ticket.repository';
@@ -27,7 +27,7 @@ export class AssignTicketCommand implements Command<Props, AssignTicketResponse>
     private readonly assignTicket: AssignTicket,
     private readonly ticketRepository: TicketRepository,
     private readonly ensurePermission: EnsureWorkspacePermission,
-    private readonly eventEmitter: EventEmitter2,
+    private readonly eventPublisher: EventPublisher,
   ) {}
 
   async execute(props: Props): Promise<AssignTicketResponse> {
@@ -56,7 +56,7 @@ export class AssignTicketCommand implements Command<Props, AssignTicketResponse>
       workspaceName: props.workspaceName,
       workspaceSlug: props.workspaceSlug,
     };
-    this.eventEmitter.emit('ticket.assigned', event);
+    this.eventPublisher.emit('ticket.assigned', event);
 
     return {
       id: updated.getId(),

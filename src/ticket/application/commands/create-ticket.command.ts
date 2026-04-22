@@ -1,4 +1,4 @@
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EventPublisher } from '../../../shared/domain/event-publisher';
 import { Command } from '../../../shared/domain/command';
 import { TicketCategory } from '../../domain/enums/ticket-category.enum';
 import { TicketPriority } from '../../domain/enums/ticket-priority.enum';
@@ -33,7 +33,7 @@ export class CreateTicketCommand implements Command<Props, CreateTicketResponse>
     private readonly createTicket: CreateTicket,
     private readonly ensurePermission: EnsureWorkspacePermission,
     private readonly userRepository: UserRepository,
-    private readonly eventEmitter: EventEmitter2,
+    private readonly eventPublisher: EventPublisher,
   ) {}
 
   async execute(props: Props): Promise<CreateTicketResponse> {
@@ -66,7 +66,7 @@ export class CreateTicketCommand implements Command<Props, CreateTicketResponse>
       workspaceName: props.workspaceName,
       workspaceSlug: props.workspaceSlug,
     };
-    this.eventEmitter.emit('ticket.created', event);
+    this.eventPublisher.emit('ticket.created', event);
 
     return {
       id: ticket.getId(),

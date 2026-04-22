@@ -1,5 +1,5 @@
 import { InvalidCredentialsError } from '../../../shared/domain/errors';
-import { PasswordHasher } from '../../../shared/infrastructure/password-hasher';
+import { PasswordHasher } from '../../../shared/domain/password-hasher';
 import { User } from '../entities/user';
 import { UserRepository } from '../repositories/user.repository';
 

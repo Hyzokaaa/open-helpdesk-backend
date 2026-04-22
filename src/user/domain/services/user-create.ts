@@ -1,6 +1,6 @@
 import { ConflictError } from '../../../shared/domain/errors';
 import { IdGenerator } from '../../../shared/domain/id-generator';
-import { PasswordHasher } from '../../../shared/infrastructure/password-hasher';
+import { PasswordHasher } from '../../../shared/domain/password-hasher';
 import { User } from '../entities/user';
 import { UserRepository } from '../repositories/user.repository';
 

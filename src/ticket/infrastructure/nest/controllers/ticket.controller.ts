@@ -10,7 +10,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { NestEventPublisher } from '../../../../shared/infrastructure/nest-event-publisher';
 import { JwtAuthGuard } from '../../../../shared/nest/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
@@ -48,7 +48,7 @@ export class TicketController {
     @Inject() private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
     @Inject() private readonly userRepository: TypeOrmUserRepository,
     @Inject() private readonly idGenerator: UlidGenerator,
-    private readonly eventEmitter: EventEmitter2,
+    @Inject() private readonly eventPublisher: NestEventPublisher,
   ) {}
 
   @Post()
@@ -60,7 +60,7 @@ export class TicketController {
     const workspace = await this.resolveWorkspace(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new CreateTicket(this.idGenerator, this.ticketRepository);
-    const command = new CreateTicketCommand(service, ensurePermission, this.userRepository, this.eventEmitter);
+    const command = new CreateTicketCommand(service, ensurePermission, this.userRepository, this.eventPublisher);
     return command.execute({
       name: body.name,
       description: body.description,
@@ -150,7 +150,7 @@ export class TicketController {
     const workspace = await this.resolveWorkspace(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new ChangeTicketStatus(this.ticketRepository);
-    const command = new ChangeTicketStatusCommand(service, this.ticketRepository, ensurePermission, this.eventEmitter);
+    const command = new ChangeTicketStatusCommand(service, this.ticketRepository, ensurePermission, this.eventPublisher);
     return command.execute({
       ticketId: id,
       status: body.status,
@@ -172,7 +172,7 @@ export class TicketController {
     const workspace = await this.resolveWorkspace(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new AssignTicket(this.ticketRepository);
-    const command = new AssignTicketCommand(service, this.ticketRepository, ensurePermission, this.eventEmitter);
+    const command = new AssignTicketCommand(service, this.ticketRepository, ensurePermission, this.eventPublisher);
     return command.execute({
       ticketId: id,
       assigneeId: body.assigneeId,

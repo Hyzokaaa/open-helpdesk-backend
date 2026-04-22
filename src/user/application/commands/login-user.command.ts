@@ -1,4 +1,4 @@
-import { JwtService } from '@nestjs/jwt';
+import { TokenService } from '../../../shared/domain/token-service';
 import { Command } from '../../../shared/domain/command';
 import { AuthenticateUser } from '../../domain/services/user-authenticate';
 
@@ -14,7 +14,7 @@ export interface LoginUserResponse {
 export class LoginUserCommand implements Command<Props, LoginUserResponse> {
   constructor(
     private readonly authenticateUser: AuthenticateUser,
-    private readonly jwtService: JwtService,
+    private readonly tokenService: TokenService,
   ) {}
 
   async execute(props: Props): Promise<LoginUserResponse> {
@@ -24,7 +24,7 @@ export class LoginUserCommand implements Command<Props, LoginUserResponse> {
     });
 
     const payload = { sub: user.getId(), email: user.email, isSystemAdmin: user.isSystemAdmin };
-    const accessToken = this.jwtService.sign(payload);
+    const accessToken = this.tokenService.sign(payload);
 
     return { accessToken };
   }

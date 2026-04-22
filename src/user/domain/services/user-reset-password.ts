@@ -1,5 +1,5 @@
 import { EntityNotFoundError } from '../../../shared/domain/errors';
-import { PasswordHasher } from '../../../shared/infrastructure/password-hasher';
+import { PasswordHasher } from '../../../shared/domain/password-hasher';
 import { UserRepository } from '../repositories/user.repository';
 
 interface ResetPasswordProps {

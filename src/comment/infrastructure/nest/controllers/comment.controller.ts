@@ -8,7 +8,7 @@ import {
   Query,
   UseGuards,
 } from "@nestjs/common";
-import { EventEmitter2 } from "@nestjs/event-emitter";
+import { NestEventPublisher } from "../../../../shared/infrastructure/nest-event-publisher";
 import { JwtAuthGuard } from "../../../../shared/nest/guards/jwt-auth.guard";
 import { CurrentUser } from "../../../../shared/nest/decorators/current-user.decorator";
 import { AuthUser } from "../../../../shared/nest/strategies/jwt.strategy";
@@ -32,7 +32,7 @@ export class CommentController {
     @Inject() private readonly workspaceRepository: TypeOrmWorkspaceRepository,
     @Inject() private readonly userRepository: TypeOrmUserRepository,
     @Inject() private readonly idGenerator: UlidGenerator,
-    private readonly eventEmitter: EventEmitter2,
+    @Inject() private readonly eventPublisher: NestEventPublisher,
   ) {}
 
   @Post()
@@ -48,7 +48,7 @@ export class CommentController {
       this.ticketRepository,
       this.workspaceRepository,
       this.userRepository,
-      this.eventEmitter,
+      this.eventPublisher,
     );
     return command.execute({
       content: body.content,

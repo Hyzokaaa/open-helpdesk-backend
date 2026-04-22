@@ -7,9 +7,10 @@ import {
   GetObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { StorageService } from '../domain/storage-service';
 
 @Injectable()
-export class S3StorageService {
+export class S3StorageService implements StorageService {
   private readonly client: S3Client;
   private readonly bucket: string;
 

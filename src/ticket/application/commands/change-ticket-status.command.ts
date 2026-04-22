@@ -1,4 +1,4 @@
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EventPublisher } from '../../../shared/domain/event-publisher';
 import { Command } from '../../../shared/domain/command';
 import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { TicketStatus } from '../../domain/enums/ticket-status.enum';
@@ -29,7 +29,7 @@ export class ChangeTicketStatusCommand implements Command<Props, ChangeStatusRes
     private readonly changeStatus: ChangeTicketStatus,
     private readonly ticketRepository: TicketRepository,
     private readonly ensurePermission: EnsureWorkspacePermission,
-    private readonly eventEmitter: EventEmitter2,
+    private readonly eventPublisher: EventPublisher,
   ) {}
 
   async execute(props: Props): Promise<ChangeStatusResponse> {
@@ -63,7 +63,7 @@ export class ChangeTicketStatusCommand implements Command<Props, ChangeStatusRes
       workspaceName: props.workspaceName,
       workspaceSlug: props.workspaceSlug,
     };
-    this.eventEmitter.emit('ticket.statusChanged', event);
+    this.eventPublisher.emit('ticket.statusChanged', event);
 
     return {
       id: updated.getId(),

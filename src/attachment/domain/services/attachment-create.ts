@@ -1,5 +1,5 @@
 import { IdGenerator } from '../../../shared/domain/id-generator';
-import { S3StorageService } from '../../../shared/infrastructure/s3-storage.service';
+import { StorageService } from '../../../shared/domain/storage-service';
 import { Attachment } from '../entities/attachment';
 import { AttachmentRepository } from '../repositories/attachment.repository';
 
@@ -16,7 +16,7 @@ export class CreateAttachment {
   constructor(
     private readonly idGenerator: IdGenerator,
     private readonly repository: AttachmentRepository,
-    private readonly storage: S3StorageService,
+    private readonly storage: StorageService,
   ) {}
 
   async execute(props: CreateAttachmentProps): Promise<Attachment> {

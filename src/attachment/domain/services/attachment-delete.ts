@@ -1,5 +1,5 @@
 import { EntityNotFoundError } from '../../../shared/domain/errors';
-import { S3StorageService } from '../../../shared/infrastructure/s3-storage.service';
+import { StorageService } from '../../../shared/domain/storage-service';
 import { AttachmentRepository } from '../repositories/attachment.repository';
 
 interface DeleteAttachmentProps {
@@ -9,7 +9,7 @@ interface DeleteAttachmentProps {
 export class DeleteAttachment {
   constructor(
     private readonly repository: AttachmentRepository,
-    private readonly storage: S3StorageService,
+    private readonly storage: StorageService,
   ) {}
 
   async execute(props: DeleteAttachmentProps): Promise<void> {

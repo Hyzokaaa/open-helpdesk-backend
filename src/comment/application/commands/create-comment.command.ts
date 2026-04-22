@@ -1,6 +1,7 @@
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EventPublisher } from '../../../shared/domain/event-publisher';
 import { Command } from '../../../shared/domain/command';
 import { CreateComment } from '../../domain/services/comment-create';
+import { ExtractMentions } from '../../domain/services/comment-extract-mentions';
 import { TicketRepository } from '../../../ticket/domain/repositories/ticket.repository';
 import { WorkspaceRepository } from '../../../workspace/domain/repositories/workspace.repository';
 import { UserRepository } from '../../../user/domain/repositories/user.repository';
@@ -26,7 +27,7 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
     private readonly ticketRepository: TicketRepository,
     private readonly workspaceRepository: WorkspaceRepository,
     private readonly userRepository: UserRepository,
-    private readonly eventEmitter: EventEmitter2,
+    private readonly eventPublisher: EventPublisher,
   ) {}
 
   async execute(props: Props): Promise<CreateCommentResponse> {
@@ -41,7 +42,8 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
     const author = await this.userRepository.findById(props.authorId);
 
     if (ticket && workspace && author) {
-      const mentionedUserIds = this.extractMentions(props.content);
+      const extractMentions = new ExtractMentions();
+      const mentionedUserIds = extractMentions.execute(props.content);
 
       const event: NewCommentEvent = {
         ticketId: props.ticketId,
@@ -54,7 +56,7 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
         workspaceName: workspace.name,
         workspaceSlug: workspace.slug,
       };
-      this.eventEmitter.emit('comment.created', event);
+      this.eventPublisher.emit('comment.created', event);
     }
 
     return {
@@ -63,15 +65,5 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
       ticketId: comment.ticketId,
       authorId: comment.authorId,
     };
-  }
-
-  private extractMentions(content: string): string[] {
-    const regex = /@\[[^\]]+\]\(([^)]+)\)/g;
-    const ids: string[] = [];
-    let match;
-    while ((match = regex.exec(content)) !== null) {
-      ids.push(match[1]);
-    }
-    return ids;
   }
 }

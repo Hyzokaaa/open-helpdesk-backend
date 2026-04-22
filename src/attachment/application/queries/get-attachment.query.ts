@@ -1,6 +1,6 @@
 import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { Query } from '../../../shared/domain/query';
-import { S3StorageService } from '../../../shared/infrastructure/s3-storage.service';
+import { StorageService } from '../../../shared/domain/storage-service';
 import { AttachmentRepository } from '../../domain/repositories/attachment.repository';
 
 interface Props {
@@ -18,7 +18,7 @@ export interface AttachmentResponse {
 export class GetAttachmentQuery implements Query<Props, AttachmentResponse> {
   constructor(
     private readonly repository: AttachmentRepository,
-    private readonly storage: S3StorageService,
+    private readonly storage: StorageService,
   ) {}
 
   async execute(props: Props): Promise<AttachmentResponse> {
