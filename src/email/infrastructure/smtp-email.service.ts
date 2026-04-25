@@ -17,7 +17,7 @@ export class SmtpEmailService implements EmailService {
     const host = config.get<string>('SMTP_HOST');
     const port = config.get<number>('SMTP_PORT', 465);
     const user = config.get<string>('SMTP_USER');
-    const password = config.get<string>('SMTP_PASSWORD');
+    const password = config.get<string>('SMTP_PASS');
     this.defaultFrom =
       config.get<string>('EMAIL_FROM') || 'noreply@example.com';
 
