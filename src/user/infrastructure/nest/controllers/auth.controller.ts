@@ -1,4 +1,5 @@
 import { Body, Controller, Inject, Post } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import { JwtTokenService } from '../../../../shared/infrastructure/jwt-token-service';
 import { BcryptPasswordHasher } from '../../../../shared/infrastructure/bcrypt-password-hasher';
@@ -27,6 +28,7 @@ export class AuthController {
     this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
   }
 
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @Post('login')
   login(@Body() body: LoginUserRequest) {
     const service = new AuthenticateUser(this.userRepository, this.passwordHasher);
@@ -37,6 +39,7 @@ export class AuthController {
     });
   }
 
+  @Throttle({ default: { ttl: 3600000, limit: 3 } })
   @Post('forgot-password')
   async forgotPassword(@Body() body: { email: string }) {
     const service = new RequestPasswordReset(this.userRepository);
