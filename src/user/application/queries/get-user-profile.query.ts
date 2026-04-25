@@ -13,6 +13,7 @@ export interface UserProfileResponse {
   lastName: string;
   isActive: boolean;
   isSystemAdmin: boolean;
+  isEmailVerified: boolean;
   language: string;
   theme: string;
 }
@@ -33,6 +34,7 @@ export class GetUserProfileQuery implements Query<Props, UserProfileResponse> {
       lastName: user.lastName,
       isActive: user.isActive,
       isSystemAdmin: user.isSystemAdmin,
+      isEmailVerified: user.isEmailVerified,
       language: user.language,
       theme: user.theme,
     };

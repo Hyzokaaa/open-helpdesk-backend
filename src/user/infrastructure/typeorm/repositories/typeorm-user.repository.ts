@@ -52,6 +52,7 @@ export class TypeOrmUserRepository implements UserRepository {
       lastName: model.lastName,
       isActive: model.isActive,
       isSystemAdmin: model.isSystemAdmin,
+      isEmailVerified: model.isEmailVerified,
       language: model.language,
       theme: model.theme,
     });
@@ -66,6 +67,7 @@ export class TypeOrmUserRepository implements UserRepository {
     model.lastName = user.lastName;
     model.isActive = user.isActive;
     model.isSystemAdmin = user.isSystemAdmin;
+    model.isEmailVerified = user.isEmailVerified;
     model.language = user.language;
     model.theme = user.theme;
     return model;

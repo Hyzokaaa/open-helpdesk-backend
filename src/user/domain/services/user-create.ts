@@ -10,6 +10,7 @@ interface CreateUserProps {
   firstName: string;
   lastName: string;
   isSystemAdmin?: boolean;
+  isEmailVerified?: boolean;
 }
 
 export class CreateUser {
@@ -35,6 +36,7 @@ export class CreateUser {
       lastName: props.lastName,
       isActive: true,
       isSystemAdmin: props.isSystemAdmin ?? false,
+      isEmailVerified: props.isEmailVerified ?? true,
       language: 'en',
       theme: 'system',
     });

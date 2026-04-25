@@ -39,6 +39,7 @@ describe('CreateUser', () => {
         lastName: 'User',
         isActive: true,
         isSystemAdmin: false,
+        isEmailVerified: true,
         language: 'en',
         theme: 'system',
       }),

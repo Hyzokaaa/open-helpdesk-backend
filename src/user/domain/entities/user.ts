@@ -8,6 +8,7 @@ interface Props {
   lastName: string;
   isActive: boolean;
   isSystemAdmin: boolean;
+  isEmailVerified: boolean;
   language: string;
   theme: string;
 }
@@ -20,6 +21,7 @@ export class User {
   lastName: string;
   isActive: boolean;
   isSystemAdmin: boolean;
+  isEmailVerified: boolean;
   language: string;
   theme: string;
 
@@ -31,6 +33,7 @@ export class User {
     this.lastName = props.lastName;
     this.isActive = props.isActive;
     this.isSystemAdmin = props.isSystemAdmin;
+    this.isEmailVerified = props.isEmailVerified;
     this.language = props.language;
     this.theme = props.theme;
   }
