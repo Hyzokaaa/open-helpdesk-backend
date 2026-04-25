@@ -29,6 +29,29 @@ describe('CreateUser', () => {
     expect(user.isSystemAdmin).toBe(false);
   });
 
+  it('should default isEmailVerified to true', async () => {
+    const user = await service.execute({
+      email: 'admin@example.com',
+      password: 'pass',
+      firstName: 'Admin',
+      lastName: 'User',
+    });
+
+    expect(user.isEmailVerified).toBe(true);
+  });
+
+  it('should respect isEmailVerified when set to false', async () => {
+    const user = await service.execute({
+      email: 'signup@example.com',
+      password: 'pass',
+      firstName: 'Signup',
+      lastName: 'User',
+      isEmailVerified: false,
+    });
+
+    expect(user.isEmailVerified).toBe(false);
+  });
+
   it('should throw ConflictError when email already exists', async () => {
     repository.seed(
       new User({
