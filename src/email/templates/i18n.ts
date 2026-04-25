@@ -118,6 +118,32 @@ const translations: Translations = {
     es: 'Si no solicitaste esto, puedes ignorar este correo.',
   },
 
+  // Email verification
+  'emailVerification.subject': {
+    en: 'Verify your email',
+    es: 'Verifica tu correo',
+  },
+  'emailVerification.title': {
+    en: 'Email Verification',
+    es: 'Verificación de Correo',
+  },
+  'emailVerification.body': {
+    en: 'Hi {firstName}, please verify your email to get started.',
+    es: 'Hola {firstName}, por favor verifica tu correo para comenzar.',
+  },
+  'emailVerification.button': {
+    en: 'Verify Email',
+    es: 'Verificar Correo',
+  },
+  'emailVerification.expiry': {
+    en: 'This link will expire in 24 hours.',
+    es: 'Este enlace expirará en 24 horas.',
+  },
+  'emailVerification.ignore': {
+    en: 'If you did not create an account, you can safely ignore this email.',
+    es: 'Si no creaste una cuenta, puedes ignorar este correo.',
+  },
+
   // Priorities
   'priority.low': { en: 'Low', es: 'Baja' },
   'priority.medium': { en: 'Medium', es: 'Media' },
