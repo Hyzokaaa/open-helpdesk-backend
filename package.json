@@ -1,5 +1,5 @@
 {
-  "name": "open-helpdesk-backend",
+  "name": "open-helpdesk-core",
   "version": "1.0.0",
   "description": "Open Helpdesk - Multi-tenant ticket system",
   "license": "AGPL-3.0",
