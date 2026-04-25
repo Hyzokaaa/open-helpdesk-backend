@@ -1,9 +1,10 @@
 {
-  "name": "open-helpdesk",
-  "version": "0.0.1",
+  "name": "open-helpdesk-backend",
+  "version": "1.0.0",
   "description": "Open Helpdesk - Multi-tenant ticket system",
-  "private": true,
   "license": "AGPL-3.0",
+  "main": "dist/app.module.js",
+  "types": "dist/app.module.d.ts",
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
