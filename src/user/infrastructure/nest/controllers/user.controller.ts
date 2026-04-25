@@ -6,10 +6,9 @@ import {
   Param,
   Patch,
   Post,
-  UseGuards,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../../../../shared/nest/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
+import { SkipEmailVerification } from '../../../../shared/nest/decorators/skip-email-verification.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
 import { BcryptPasswordHasher } from '../../../../shared/infrastructure/bcrypt-password-hasher';
@@ -29,7 +28,6 @@ import { TypeOrmUserRepository } from '../../typeorm/repositories/typeorm-user.r
 import { RegisterUserRequest } from '../dto/register-user.request';
 
 @Controller('users')
-@UseGuards(JwtAuthGuard)
 export class UserController {
   constructor(
     @Inject() private readonly userRepository: TypeOrmUserRepository,
@@ -37,6 +35,7 @@ export class UserController {
     @Inject() private readonly passwordHasher: BcryptPasswordHasher,
   ) {}
 
+  @SkipEmailVerification()
   @Get('me')
   me(@CurrentUser() user: AuthUser) {
     const query = new GetUserProfileQuery(this.userRepository);
@@ -57,6 +56,7 @@ export class UserController {
     });
   }
 
+  @SkipEmailVerification()
   @Patch('me/language')
   updateLanguage(
     @Body() body: { language: string },
@@ -70,6 +70,7 @@ export class UserController {
     });
   }
 
+  @SkipEmailVerification()
   @Patch('me/theme')
   updateTheme(
     @Body() body: { theme: string },

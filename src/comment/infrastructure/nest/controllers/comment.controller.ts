@@ -6,10 +6,8 @@ import {
   Param,
   Post,
   Query,
-  UseGuards,
 } from "@nestjs/common";
 import { NestEventPublisher } from "../../../../shared/infrastructure/nest-event-publisher";
-import { JwtAuthGuard } from "../../../../shared/nest/guards/jwt-auth.guard";
 import { CurrentUser } from "../../../../shared/nest/decorators/current-user.decorator";
 import { AuthUser } from "../../../../shared/nest/strategies/jwt.strategy";
 import { UlidGenerator } from "../../../../shared/infrastructure/ulid-generator";
@@ -24,7 +22,6 @@ import { TypeOrmUserRepository } from "../../../../user/infrastructure/typeorm/r
 import { CreateCommentRequest } from "../dto/create-comment.request";
 
 @Controller("workspaces/:slug/tickets/:ticketId/comments")
-@UseGuards(JwtAuthGuard)
 export class CommentController {
   constructor(
     @Inject() private readonly commentRepository: TypeOrmCommentRepository,

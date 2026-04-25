@@ -7,9 +7,7 @@ import {
   Param,
   Patch,
   Post,
-  UseGuards,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../../../../shared/nest/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
@@ -38,7 +36,6 @@ import { CreateWorkspaceRequest } from '../dto/create-workspace.request';
 import { AddMemberRequest } from '../dto/add-member.request';
 
 @Controller('workspaces')
-@UseGuards(JwtAuthGuard)
 export class WorkspaceController {
   constructor(
     @Inject() private readonly workspaceRepository: TypeOrmWorkspaceRepository,

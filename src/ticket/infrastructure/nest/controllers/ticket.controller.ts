@@ -8,10 +8,8 @@ import {
   Patch,
   Post,
   Query,
-  UseGuards,
 } from '@nestjs/common';
 import { NestEventPublisher } from '../../../../shared/infrastructure/nest-event-publisher';
-import { JwtAuthGuard } from '../../../../shared/nest/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
@@ -40,7 +38,6 @@ import { AssignTicketRequest } from '../dto/assign-ticket.request';
 import { TicketFilterDto } from '../dto/ticket-filter.dto';
 
 @Controller('workspaces/:slug/tickets')
-@UseGuards(JwtAuthGuard)
 export class TicketController {
   constructor(
     @Inject() private readonly ticketRepository: TypeOrmTicketRepository,

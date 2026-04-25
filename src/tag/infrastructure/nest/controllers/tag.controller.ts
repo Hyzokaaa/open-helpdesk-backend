@@ -6,9 +6,7 @@ import {
   Inject,
   Param,
   Post,
-  UseGuards,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../../../../shared/nest/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
@@ -25,7 +23,6 @@ import { EnsureWorkspacePermission } from '../../../../workspace/domain/services
 import { CreateTagRequest } from '../dto/create-tag.request';
 
 @Controller('workspaces/:slug/tags')
-@UseGuards(JwtAuthGuard)
 export class TagController {
   constructor(
     @Inject() private readonly tagRepository: TypeOrmTagRepository,

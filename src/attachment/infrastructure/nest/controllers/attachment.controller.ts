@@ -6,11 +6,9 @@ import {
   Param,
   Post,
   UploadedFile,
-  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { JwtAuthGuard } from '../../../../shared/nest/guards/jwt-auth.guard';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
 import { S3StorageService } from '../../../../shared/infrastructure/s3-storage.service';
 import { CreateAttachment } from '../../../domain/services/attachment-create';
@@ -22,7 +20,6 @@ import { ListTicketAttachmentsQuery } from '../../../application/queries/list-ti
 import { TypeOrmAttachmentRepository } from '../../typeorm/repositories/typeorm-attachment.repository';
 
 @Controller()
-@UseGuards(JwtAuthGuard)
 export class AttachmentController {
   constructor(
     @Inject() private readonly attachmentRepository: TypeOrmAttachmentRepository,

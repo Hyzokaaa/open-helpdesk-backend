@@ -7,9 +7,7 @@ import {
   Patch,
   Put,
   Query,
-  UseGuards,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../../../../shared/nest/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
@@ -21,7 +19,6 @@ import { ListNotificationsQuery } from '../../../application/queries/list-notifi
 import { GetPreferencesQuery } from '../../../application/queries/get-preferences.query';
 
 @Controller('notifications')
-@UseGuards(JwtAuthGuard)
 export class NotificationController {
   constructor(
     @Inject()
