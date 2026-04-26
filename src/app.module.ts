@@ -17,9 +17,10 @@ import { NotificationModule } from './notification/notification.module';
 import { EmailModule } from './email/email.module';
 import { AccountModule } from './account/account.module';
 import { HealthController } from './health.controller';
+import { ChangelogController } from './changelog/changelog.controller';
 
 @Module({
-  controllers: [HealthController],
+  controllers: [HealthController, ChangelogController],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
