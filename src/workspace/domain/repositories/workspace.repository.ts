@@ -8,4 +8,5 @@ export interface WorkspaceRepository {
   update(workspace: Workspace): Promise<void>;
   delete(id: string): Promise<void>;
   existsBySlug(slug: string): Promise<boolean>;
+  countByAccountId(accountId: string): Promise<number>;
 }

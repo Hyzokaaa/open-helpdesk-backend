@@ -33,6 +33,10 @@ export class MockWorkspaceRepository implements WorkspaceRepository {
     return this.workspaces.some((w) => w.slug === slug);
   }
 
+  async countByAccountId(accountId: string): Promise<number> {
+    return this.workspaces.filter((w) => w.accountId === accountId).length;
+  }
+
   seed(workspace: Workspace): void {
     this.workspaces.push(workspace);
   }

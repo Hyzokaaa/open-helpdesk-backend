@@ -9,6 +9,7 @@ interface Props {
   description: string;
   creatorUserId: string;
   isSystemAdmin: boolean;
+  accountId?: string;
 }
 
 export interface CreateWorkspaceResponse {
@@ -31,6 +32,7 @@ export class CreateWorkspaceCommand implements Command<Props, CreateWorkspaceRes
     const workspace = await this.createWorkspace.execute({
       name: props.name,
       description: props.description,
+      accountId: props.accountId,
     });
 
     await this.addMember.execute({

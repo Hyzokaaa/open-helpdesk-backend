@@ -20,6 +20,9 @@ export class WorkspaceModel {
   @Column({ default: '' })
   description!: string;
 
+  @Column({ type: 'varchar', nullable: true })
+  accountId!: string | null;
+
   @Column({ type: 'jsonb', nullable: true })
   metadata!: Record<string, unknown> | null;
 

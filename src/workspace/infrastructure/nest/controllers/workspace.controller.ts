@@ -32,6 +32,7 @@ import { GetMyPermissionsQuery } from '../../../application/queries/get-my-permi
 import { TypeOrmUserRepository } from '../../../../user/infrastructure/typeorm/repositories/typeorm-user.repository';
 import { TypeOrmWorkspaceRepository } from '../../typeorm/repositories/typeorm-workspace.repository';
 import { TypeOrmWorkspaceMemberRepository } from '../../typeorm/repositories/typeorm-workspace-member.repository';
+import { TypeOrmAccountRepository } from '../../../../account/infrastructure/typeorm/repositories/typeorm-account.repository';
 import { CreateWorkspaceRequest } from '../dto/create-workspace.request';
 import { AddMemberRequest } from '../dto/add-member.request';
 
@@ -42,10 +43,12 @@ export class WorkspaceController {
     @Inject() private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
     @Inject() private readonly userRepository: TypeOrmUserRepository,
     @Inject() private readonly idGenerator: UlidGenerator,
+    @Inject() private readonly accountRepository: TypeOrmAccountRepository,
   ) {}
 
   @Post()
-  create(@Body() body: CreateWorkspaceRequest, @CurrentUser() user: AuthUser) {
+  async create(@Body() body: CreateWorkspaceRequest, @CurrentUser() user: AuthUser) {
+    const account = await this.accountRepository.findByOwnerId(user.userId);
     const createService = new CreateWorkspace(this.idGenerator, this.workspaceRepository);
     const addMemberService = new AddWorkspaceMember(this.idGenerator, this.memberRepository);
     const command = new CreateWorkspaceCommand(createService, addMemberService);
@@ -54,12 +57,13 @@ export class WorkspaceController {
       description: body.description,
       creatorUserId: user.userId,
       isSystemAdmin: user.isSystemAdmin,
+      accountId: account?.getId(),
     });
   }
 
   @Get()
   list(@CurrentUser() user: AuthUser) {
-    const query = new ListWorkspacesQuery(this.memberRepository, this.workspaceRepository);
+    const query = new ListWorkspacesQuery(this.memberRepository, this.workspaceRepository, this.accountRepository, this.userRepository);
     return query.execute({ userId: user.userId, isSystemAdmin: user.isSystemAdmin });
   }
 

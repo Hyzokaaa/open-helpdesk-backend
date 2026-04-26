@@ -45,12 +45,17 @@ export class TypeOrmWorkspaceRepository implements WorkspaceRepository {
     return await this.repository.existsBy({ slug });
   }
 
+  async countByAccountId(accountId: string): Promise<number> {
+    return this.repository.count({ where: { accountId } });
+  }
+
   private toDomain(model: WorkspaceModel): Workspace {
     return new Workspace({
       id: model.id,
       name: model.name,
       slug: model.slug,
       description: model.description,
+      accountId: model.accountId,
     });
   }
 
@@ -60,6 +65,7 @@ export class TypeOrmWorkspaceRepository implements WorkspaceRepository {
     model.name = workspace.name;
     model.slug = workspace.slug;
     model.description = workspace.description;
+    model.accountId = workspace.accountId;
     return model;
   }
 }

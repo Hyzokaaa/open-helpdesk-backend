@@ -6,6 +6,7 @@ import { WorkspaceRepository } from '../repositories/workspace.repository';
 interface CreateWorkspaceProps {
   name: string;
   description: string;
+  accountId?: string;
 }
 
 export class CreateWorkspace {
@@ -22,6 +23,7 @@ export class CreateWorkspace {
       name: props.name,
       slug,
       description: props.description,
+      accountId: props.accountId,
     });
 
     await this.repository.create(workspace);
