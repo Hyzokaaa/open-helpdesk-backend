@@ -46,6 +46,7 @@ export class SeederService implements OnModuleInit {
     user.lastName = 'Admin';
     user.isActive = true;
     user.isSystemAdmin = true;
+    user.isEmailVerified = true;
     user.language = 'en';
     user.theme = 'system';
 
