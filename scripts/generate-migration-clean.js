@@ -17,6 +17,7 @@
 const { execSync } = require('child_process');
 const path = require('path');
 
+const typeormCli = require.resolve('typeorm/cli.js');
 const migrationName = process.argv[2];
 
 if (!migrationName) {
@@ -67,7 +68,7 @@ waitForDb();
 
 // 4. Run existing migrations
 run(
-  'npx ts-node -P ./tsconfig.json -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:run -d ./src/database/typeorm.config.ts',
+  `npx ts-node -P ./tsconfig.json -r tsconfig-paths/register ${typeormCli} migration:run -d ./src/database/typeorm.config.ts`,
   'Running existing migrations',
 );
 
@@ -77,7 +78,7 @@ const migrationPath = path.join('./src/database/migrations/', migrationName);
 console.log(`\n⏳ Generating migration: ${migrationName}...`);
 try {
   execSync(
-    `npx ts-node -P ./tsconfig.json -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:generate -d ./src/database/typeorm.config.ts ${migrationPath}`,
+    `npx ts-node -P ./tsconfig.json -r tsconfig-paths/register ${typeormCli} migration:generate -d ./src/database/typeorm.config.ts ${migrationPath}`,
     { stdio: 'inherit' },
   );
 } catch {
@@ -87,7 +88,7 @@ try {
 
 // 6. Run all migrations to restore DB state
 run(
-  'npx ts-node -P ./tsconfig.json -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:run -d ./src/database/typeorm.config.ts',
+  `npx ts-node -P ./tsconfig.json -r tsconfig-paths/register ${typeormCli} migration:run -d ./src/database/typeorm.config.ts`,
   'Running all migrations (including new one)',
 );
 
