@@ -15,6 +15,7 @@ import { CommentModule } from './comment/comment.module';
 import { AttachmentModule } from './attachment/attachment.module';
 import { NotificationModule } from './notification/notification.module';
 import { EmailModule } from './email/email.module';
+import { AccountModule } from './account/account.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -52,6 +53,7 @@ import { HealthController } from './health.controller';
     AttachmentModule,
     NotificationModule,
     EmailModule,
+    AccountModule,
   ],
 })
 export class AppModule {}
