@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { MoreThanOrEqual, Repository } from 'typeorm';
 import { PaginatedResult } from '../../../../shared/domain/paginated-result';
 import { Ticket } from '../../../domain/entities/ticket';
 import { TicketCategory } from '../../../domain/enums/ticket-category.enum';
@@ -108,6 +108,13 @@ export class TypeOrmTicketRepository implements TicketRepository {
 
   async softDelete(id: string): Promise<void> {
     await this.repository.softDelete(id);
+  }
+
+  async countByWorkspaceIdSince(workspaceId: string, since: Date): Promise<number> {
+    return this.repository.count({
+      where: { workspaceId, createdAt: MoreThanOrEqual(since) },
+      withDeleted: false,
+    });
   }
 
   async update(ticket: Ticket): Promise<void> {

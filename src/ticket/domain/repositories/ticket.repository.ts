@@ -25,4 +25,5 @@ export interface TicketRepository {
   ): Promise<PaginatedResult<Ticket>>;
   update(ticket: Ticket): Promise<void>;
   softDelete(id: string): Promise<void>;
+  countByWorkspaceIdSince(workspaceId: string, since: Date): Promise<number>;
 }

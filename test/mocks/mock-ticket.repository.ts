@@ -32,6 +32,12 @@ export class MockTicketRepository implements TicketRepository {
     this.tickets = this.tickets.filter((t) => t.getId() !== id);
   }
 
+  async countByWorkspaceIdSince(workspaceId: string, since: Date): Promise<number> {
+    return this.tickets.filter(
+      (t) => t.workspaceId === workspaceId && t.createdAt && t.createdAt >= since,
+    ).length;
+  }
+
   getAll(): Ticket[] {
     return this.tickets;
   }
