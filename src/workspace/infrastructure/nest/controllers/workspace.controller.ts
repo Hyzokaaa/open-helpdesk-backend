@@ -58,7 +58,6 @@ export class WorkspaceController {
       name: body.name,
       description: body.description,
       creatorUserId: user.userId,
-      isSystemAdmin: user.isSystemAdmin,
       accountId: account?.getId(),
     });
   }
