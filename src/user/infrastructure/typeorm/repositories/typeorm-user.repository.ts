@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
+import { SortOptions } from '../../../../shared/domain/sort-options';
 import { User } from '../../../domain/entities/user';
 import { UserRepository } from '../../../domain/repositories/user.repository';
 import { UserModel } from '../models/user.model';
@@ -27,8 +28,23 @@ export class TypeOrmUserRepository implements UserRepository {
     return model ? this.toDomain(model) : null;
   }
 
-  async findAll(): Promise<User[]> {
-    const models = await this.repository.find();
+  private static readonly VALID_SORT_FIELDS: Record<string, { col: string; lower: boolean }> = {
+    firstName: { col: 'user.firstName', lower: true },
+    lastName: { col: 'user.lastName', lower: true },
+    email: { col: 'user.email', lower: true },
+    isSystemAdmin: { col: 'user.isSystemAdmin', lower: false },
+    isActive: { col: 'user.isActive', lower: false },
+    createdAt: { col: 'user.createdAt', lower: false },
+  };
+
+  async findAll(sort?: SortOptions): Promise<User[]> {
+    const qb = this.repository.createQueryBuilder('user');
+    const field = TypeOrmUserRepository.VALID_SORT_FIELDS[sort?.sortBy ?? '']
+      ?? { col: 'user.createdAt', lower: false };
+    const sortOrder = sort?.sortOrder === 'ASC' ? 'ASC' : 'DESC';
+    const expr = field.lower ? `LOWER(${field.col})` : field.col;
+    qb.orderBy(expr, sortOrder);
+    const models = await qb.getMany();
     return models.map((m) => this.toDomain(m));
   }
 

@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
@@ -35,6 +36,7 @@ import { TypeOrmWorkspaceMemberRepository } from '../../typeorm/repositories/typ
 import { TypeOrmAccountRepository } from '../../../../account/infrastructure/typeorm/repositories/typeorm-account.repository';
 import { CreateWorkspaceRequest } from '../dto/create-workspace.request';
 import { AddMemberRequest } from '../dto/add-member.request';
+import { SortDto } from '../../../../shared/nest/dto/sort.dto';
 
 @Controller('workspaces')
 export class WorkspaceController {
@@ -62,9 +64,9 @@ export class WorkspaceController {
   }
 
   @Get()
-  list(@CurrentUser() user: AuthUser) {
+  list(@Query() sort: SortDto, @CurrentUser() user: AuthUser) {
     const query = new ListWorkspacesQuery(this.memberRepository, this.workspaceRepository, this.accountRepository, this.userRepository);
-    return query.execute({ userId: user.userId, isSystemAdmin: user.isSystemAdmin });
+    return query.execute({ userId: user.userId, isSystemAdmin: user.isSystemAdmin, sort });
   }
 
   @Get(':slug')

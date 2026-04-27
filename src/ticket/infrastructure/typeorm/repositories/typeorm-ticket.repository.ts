@@ -83,17 +83,18 @@ export class TypeOrmTicketRepository implements TicketRepository {
       );
     }
 
-    const VALID_SORT_FIELDS: Record<string, string> = {
-      name: 'ticket.name',
-      priority: 'ticket.priority',
-      status: 'ticket.status',
-      category: 'ticket.category',
-      createdAt: 'ticket.createdAt',
+    const VALID_SORT_FIELDS: Record<string, { col: string; lower: boolean }> = {
+      name: { col: 'ticket.name', lower: true },
+      priority: { col: 'ticket.priority', lower: false },
+      status: { col: 'ticket.status', lower: false },
+      category: { col: 'ticket.category', lower: false },
+      createdAt: { col: 'ticket.createdAt', lower: false },
     };
 
-    const sortColumn = VALID_SORT_FIELDS[filters.sortBy ?? ''] ?? 'ticket.createdAt';
+    const field = VALID_SORT_FIELDS[filters.sortBy ?? ''] ?? { col: 'ticket.createdAt', lower: false };
     const sortOrder = filters.sortOrder === 'ASC' ? 'ASC' : 'DESC';
-    qb.orderBy(sortColumn, sortOrder);
+    const expr = field.lower ? `LOWER(${field.col})` : field.col;
+    qb.orderBy(expr, sortOrder);
     qb.skip((page - 1) * limit).take(limit);
 
     const [models, total] = await qb.getManyAndCount();

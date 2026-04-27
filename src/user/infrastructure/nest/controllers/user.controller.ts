@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { SkipEmailVerification } from '../../../../shared/nest/decorators/skip-email-verification.decorator';
@@ -26,6 +27,7 @@ import { ChangePassword } from '../../../domain/services/user-change-password';
 import { ChangePasswordCommand } from '../../../application/commands/change-password.command';
 import { TypeOrmUserRepository } from '../../typeorm/repositories/typeorm-user.repository';
 import { RegisterUserRequest } from '../dto/register-user.request';
+import { SortDto } from '../../../../shared/nest/dto/sort.dto';
 
 @Controller('users')
 export class UserController {
@@ -99,9 +101,9 @@ export class UserController {
   }
 
   @Get()
-  list() {
+  list(@Query() sort: SortDto) {
     const query = new ListUsersQuery(this.userRepository);
-    return query.execute();
+    return query.execute({ sort });
   }
 
   @Post()

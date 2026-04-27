@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { SortOptions } from '../../../../shared/domain/sort-options';
 import { Workspace } from '../../../domain/entities/workspace';
 import { WorkspaceRepository } from '../../../domain/repositories/workspace.repository';
 import { WorkspaceModel } from '../models/workspace.model';
@@ -27,8 +28,20 @@ export class TypeOrmWorkspaceRepository implements WorkspaceRepository {
     return model ? this.toDomain(model) : null;
   }
 
-  async findAll(): Promise<Workspace[]> {
-    const models = await this.repository.find();
+  private static readonly VALID_SORT_FIELDS: Record<string, { col: string; lower: boolean }> = {
+    name: { col: 'workspace.name', lower: true },
+    slug: { col: 'workspace.slug', lower: true },
+    createdAt: { col: 'workspace.createdAt', lower: false },
+  };
+
+  async findAll(sort?: SortOptions): Promise<Workspace[]> {
+    const qb = this.repository.createQueryBuilder('workspace');
+    const field = TypeOrmWorkspaceRepository.VALID_SORT_FIELDS[sort?.sortBy ?? '']
+      ?? { col: 'workspace.createdAt', lower: false };
+    const sortOrder = sort?.sortOrder === 'ASC' ? 'ASC' : 'DESC';
+    const expr = field.lower ? `LOWER(${field.col})` : field.col;
+    qb.orderBy(expr, sortOrder);
+    const models = await qb.getMany();
     return models.map((m) => this.toDomain(m));
   }
 

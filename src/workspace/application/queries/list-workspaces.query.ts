@@ -1,4 +1,5 @@
 import { Query } from '../../../shared/domain/query';
+import { SortOptions } from '../../../shared/domain/sort-options';
 import { AccountRepository } from '../../../account/domain/repositories/account.repository';
 import { UserRepository } from '../../../user/domain/repositories/user.repository';
 import { WorkspaceMemberRepository } from '../../domain/repositories/workspace-member.repository';
@@ -7,6 +8,7 @@ import { WorkspaceRepository } from '../../domain/repositories/workspace.reposit
 interface Props {
   userId: string;
   isSystemAdmin?: boolean;
+  sort?: SortOptions;
 }
 
 export interface WorkspaceListItem {
@@ -28,7 +30,7 @@ export class ListWorkspacesQuery implements Query<Props, WorkspaceListItem[]> {
 
   async execute(props: Props): Promise<WorkspaceListItem[]> {
     if (props.isSystemAdmin) {
-      const allWorkspaces = await this.workspaceRepository.findAll();
+      const allWorkspaces = await this.workspaceRepository.findAll(props.sort);
       const result: WorkspaceListItem[] = [];
       for (const workspace of allWorkspaces) {
         const membership = await this.memberRepository.findByWorkspaceAndUser(workspace.getId(), props.userId);
