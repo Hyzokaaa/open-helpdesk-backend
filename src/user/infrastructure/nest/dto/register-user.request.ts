@@ -19,4 +19,8 @@ export class RegisterUserRequest {
   @IsBoolean()
   @IsOptional()
   isSystemAdmin?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  isEmailVerified?: boolean;
 }

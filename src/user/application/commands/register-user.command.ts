@@ -8,6 +8,7 @@ interface Props {
   firstName: string;
   lastName: string;
   isSystemAdmin?: boolean;
+  isEmailVerified?: boolean;
   requestingUserIsAdmin: boolean;
 }
 
@@ -30,6 +31,7 @@ export class RegisterUserCommand implements Command<Props, RegisterUserResponse>
       firstName: props.firstName,
       lastName: props.lastName,
       isSystemAdmin: props.isSystemAdmin,
+      isEmailVerified: props.isEmailVerified,
     });
 
     return { id: user.getId(), email: user.email };

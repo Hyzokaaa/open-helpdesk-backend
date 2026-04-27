@@ -117,6 +117,7 @@ export class UserController {
       firstName: body.firstName,
       lastName: body.lastName,
       isSystemAdmin: body.isSystemAdmin,
+      isEmailVerified: body.isEmailVerified,
       requestingUserIsAdmin: user.isSystemAdmin,
     });
   }
