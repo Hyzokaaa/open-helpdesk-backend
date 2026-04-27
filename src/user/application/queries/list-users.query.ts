@@ -1,8 +1,6 @@
 import { Query } from '../../../shared/domain/query';
 import { UserRepository } from '../../domain/repositories/user.repository';
 
-interface Props {}
-
 export interface UserListItem {
   id: string;
   email: string;
@@ -10,9 +8,10 @@ export interface UserListItem {
   lastName: string;
   isSystemAdmin: boolean;
   isActive: boolean;
+  planId?: string;
 }
 
-export class ListUsersQuery implements Query<Props, UserListItem[]> {
+export class ListUsersQuery implements Query<void, UserListItem[]> {
   constructor(private readonly repository: UserRepository) {}
 
   async execute(): Promise<UserListItem[]> {
