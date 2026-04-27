@@ -32,12 +32,22 @@ export class CreateWorkspace {
 
   private async generateUniqueSlug(name: string): Promise<string> {
     const base = slugify(name);
-    if (!(await this.repository.existsBySlug(base))) return base;
+    const maxAttempts = 5;
 
-    let counter = 2;
-    while (await this.repository.existsBySlug(`${base}-${counter}`)) {
-      counter++;
+    for (let i = 0; i < maxAttempts; i++) {
+      const slug = `${base}-${this.randomSuffix()}`;
+      if (!(await this.repository.existsBySlug(slug))) return slug;
     }
-    return `${base}-${counter}`;
+
+    return `${base}-${this.randomSuffix()}${this.randomSuffix()}`;
+  }
+
+  private randomSuffix(): string {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < 4; i++) {
+      result += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return result;
   }
 }
