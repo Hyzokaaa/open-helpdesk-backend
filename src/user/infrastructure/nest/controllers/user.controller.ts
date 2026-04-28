@@ -26,6 +26,8 @@ import { ToggleUserActive } from '../../../domain/services/user-toggle-active';
 import { ChangePassword } from '../../../domain/services/user-change-password';
 import { ChangePasswordCommand } from '../../../application/commands/change-password.command';
 import { TypeOrmUserRepository } from '../../typeorm/repositories/typeorm-user.repository';
+import { TypeOrmAccountRepository } from '../../../../account/infrastructure/typeorm/repositories/typeorm-account.repository';
+import { Account } from '../../../../account/domain/entities/account';
 import { RegisterUserRequest } from '../dto/register-user.request';
 import { SortDto } from '../../../../shared/nest/dto/sort.dto';
 
@@ -33,6 +35,7 @@ import { SortDto } from '../../../../shared/nest/dto/sort.dto';
 export class UserController {
   constructor(
     @Inject() private readonly userRepository: TypeOrmUserRepository,
+    @Inject() private readonly accountRepository: TypeOrmAccountRepository,
     @Inject() private readonly idGenerator: UlidGenerator,
     @Inject() private readonly passwordHasher: BcryptPasswordHasher,
   ) {}
@@ -107,13 +110,13 @@ export class UserController {
   }
 
   @Post()
-  create(
+  async create(
     @Body() body: RegisterUserRequest,
     @CurrentUser() user: AuthUser,
   ) {
     const service = new CreateUser(this.idGenerator, this.userRepository, this.passwordHasher);
     const command = new RegisterUserCommand(service);
-    return command.execute({
+    const result = await command.execute({
       email: body.email,
       password: body.password,
       firstName: body.firstName,
@@ -122,6 +125,15 @@ export class UserController {
       isEmailVerified: body.isEmailVerified,
       requestingUserIsAdmin: user.isSystemAdmin,
     });
+
+    const account = new Account({
+      id: this.idGenerator.create(),
+      ownerId: result.id,
+      name: `${body.firstName}'s Account`,
+    });
+    await this.accountRepository.create(account);
+
+    return result;
   }
 
   @Patch(':id/system-admin')
