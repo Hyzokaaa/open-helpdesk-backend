@@ -22,34 +22,25 @@ export const coreChangelog: ChangelogVersion[] = [
       {
         title: { en: 'Admin Panel', es: 'Panel de Administración' },
         features: [
-          { en: 'Admin split into separate Users and Workspaces pages with sub-routes', es: 'Administración dividida en páginas separadas de Usuarios y Espacios con sub-rutas' },
-          { en: 'Three-dot action menu on table rows (replaces inline buttons)', es: 'Menú de acciones con tres puntos en filas de tabla (reemplaza botones en línea)' },
-          { en: 'Column sorting on users table (name, email, role, status) and workspaces table (name, slug, description, owner)', es: 'Ordenamiento de columnas en tabla de usuarios (nombre, email, rol, estado) y tabla de espacios (nombre, slug, descripción, propietario)' },
-          { en: 'Drag-and-drop column reordering on all tables using @dnd-kit', es: 'Reordenamiento de columnas arrastrando en todas las tablas con @dnd-kit' },
-          { en: 'Case-insensitive sorting with LOWER() on text fields', es: 'Ordenamiento insensible a mayúsculas con LOWER() en campos de texto' },
+          { en: 'Separate Users and Workspaces management pages', es: 'Páginas separadas de gestión de Usuarios y Espacios' },
+          { en: 'Action menu on table rows for quick operations', es: 'Menú de acciones en filas de tabla para operaciones rápidas' },
+          { en: 'Sortable columns on users and workspaces tables', es: 'Columnas ordenables en tablas de usuarios y espacios' },
+          { en: 'Drag-and-drop column reordering on all tables', es: 'Reordenamiento de columnas arrastrando en todas las tablas' },
         ],
       },
       {
         title: { en: 'Workspaces', es: 'Espacios de Trabajo' },
         features: [
-          { en: 'Any authenticated user can create workspaces (not just system admins)', es: 'Cualquier usuario autenticado puede crear espacios (no solo admins del sistema)' },
-          { en: 'Workspace slugs now use random 4-char suffix for uniqueness', es: 'Los slugs de espacios ahora usan sufijo aleatorio de 4 caracteres para unicidad' },
-          { en: 'Dashboard landing page with workspace cards grid and role badges', es: 'Página de inicio del dashboard con cuadrícula de tarjetas de espacios e insignias de rol' },
+          { en: 'Any user can now create workspaces', es: 'Cualquier usuario puede crear espacios de trabajo' },
+          { en: 'Dashboard landing page with workspace cards and role badges', es: 'Página de inicio con tarjetas de espacios e insignias de rol' },
         ],
       },
       {
         title: { en: 'Sidebar', es: 'Barra Lateral' },
         features: [
-          { en: 'Stripe-style workspace switcher with initials and dropdown', es: 'Selector de workspace estilo Stripe con iniciales y desplegable' },
-          { en: 'Collapsible sections (Workspace, Settings, Administration) with independent state', es: 'Secciones colapsables (Workspace, Settings, Administration) con estado independiente' },
-          { en: 'Workspace context persists when navigating to Settings or Administration', es: 'El contexto del workspace se mantiene al navegar a Configuración o Administración' },
-        ],
-      },
-      {
-        title: { en: 'Accounts', es: 'Cuentas' },
-        features: [
-          { en: 'Account created automatically for every new user (seeder, admin creation, signup)', es: 'Cuenta creada automáticamente para cada usuario nuevo (seeder, creación por admin, registro)' },
-          { en: 'Migration to create accounts for existing users without one', es: 'Migración para crear cuentas para usuarios existentes sin una' },
+          { en: 'Workspace switcher with quick selection dropdown', es: 'Selector de workspace con desplegable de selección rápida' },
+          { en: 'Collapsible navigation sections', es: 'Secciones de navegación colapsables' },
+          { en: 'Workspace context persists across all sections', es: 'El contexto del workspace se mantiene en todas las secciones' },
         ],
       },
     ],
