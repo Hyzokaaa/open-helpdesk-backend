@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserModel } from '../../user/infrastructure/typeorm/models/user.model';
+import { AccountModel } from '../../account/infrastructure/typeorm/models/account.model';
 import { BcryptPasswordHasher } from './bcrypt-password-hasher';
 import { UlidGenerator } from './ulid-generator';
 
@@ -13,6 +14,8 @@ export class SeederService implements OnModuleInit {
   constructor(
     @InjectRepository(UserModel)
     private readonly userRepository: Repository<UserModel>,
+    @InjectRepository(AccountModel)
+    private readonly accountRepository: Repository<AccountModel>,
     private readonly config: ConfigService,
     private readonly passwordHasher: BcryptPasswordHasher,
     private readonly idGenerator: UlidGenerator,
@@ -33,6 +36,15 @@ export class SeederService implements OnModuleInit {
 
     const existing = await this.userRepository.findOneBy({ email });
     if (existing) {
+      const hasAccount = await this.accountRepository.findOneBy({ ownerId: existing.id });
+      if (!hasAccount) {
+        const account = new AccountModel();
+        account.id = this.idGenerator.create();
+        account.ownerId = existing.id;
+        account.name = `${existing.firstName}'s Account`;
+        await this.accountRepository.save(account);
+        this.logger.log(`Account created for existing admin: ${email}`);
+      }
       this.logger.log(`Admin user already exists: ${email}`);
       return;
     }
@@ -51,6 +63,13 @@ export class SeederService implements OnModuleInit {
     user.theme = 'system';
 
     await this.userRepository.save(user);
+
+    const account = new AccountModel();
+    account.id = this.idGenerator.create();
+    account.ownerId = user.id;
+    account.name = `${user.firstName}'s Account`;
+    await this.accountRepository.save(account);
+
     this.logger.log(`Admin user created: ${email}`);
   }
 }

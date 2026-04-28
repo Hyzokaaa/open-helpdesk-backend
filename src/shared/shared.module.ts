@@ -11,11 +11,12 @@ import { JwtTokenService } from './infrastructure/jwt-token-service';
 import { SeederService } from './infrastructure/seeder.service';
 import { JwtStrategy } from './nest/strategies/jwt.strategy';
 import { UserModel } from '../user/infrastructure/typeorm/models/user.model';
+import { AccountModel } from '../account/infrastructure/typeorm/models/account.model';
 
 @Module({
   imports: [
     PassportModule,
-    TypeOrmModule.forFeature([UserModel]),
+    TypeOrmModule.forFeature([UserModel, AccountModel]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
