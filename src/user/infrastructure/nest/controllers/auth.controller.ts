@@ -1,9 +1,8 @@
-import { Body, Controller, Inject, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Inject, Post } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import { Public } from '../../../../shared/nest/decorators/public.decorator';
 import { SkipEmailVerification } from '../../../../shared/nest/decorators/skip-email-verification.decorator';
-import { JwtAuthGuard } from '../../../../shared/nest/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { JwtTokenService } from '../../../../shared/infrastructure/jwt-token-service';
@@ -22,7 +21,6 @@ import { ResendVerificationCommand } from '../../../application/commands/resend-
 import { TypeOrmUserRepository } from '../../typeorm/repositories/typeorm-user.repository';
 import { LoginUserRequest } from '../dto/login-user.request';
 
-@Public()
 @Controller('auth')
 export class AuthController {
   private readonly frontendUrl: string;
@@ -37,6 +35,7 @@ export class AuthController {
     this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
   }
 
+  @Public()
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @Post('login')
   login(@Body() body: LoginUserRequest) {
@@ -48,6 +47,7 @@ export class AuthController {
     });
   }
 
+  @Public()
   @Throttle({ default: { ttl: 3600000, limit: 3 } })
   @Post('forgot-password')
   async forgotPassword(@Body() body: { email: string }) {
@@ -57,6 +57,7 @@ export class AuthController {
     return { message: 'If the email exists, a reset link has been sent' };
   }
 
+  @Public()
   @Post('reset-password')
   async resetPassword(@Body() body: { token: string; newPassword: string }) {
     const service = new ResetPassword(this.userRepository, this.passwordHasher);
@@ -65,6 +66,7 @@ export class AuthController {
     return { message: 'Password has been reset' };
   }
 
+  @Public()
   @Post('verify-email')
   async verifyEmail(@Body() body: { token: string }) {
     const service = new VerifyEmail(this.userRepository);
@@ -74,7 +76,6 @@ export class AuthController {
   }
 
   @SkipEmailVerification()
-  @UseGuards(JwtAuthGuard)
   @Throttle({ default: { ttl: 3600000, limit: 3 } })
   @Post('resend-verification')
   async resendVerification(@CurrentUser() user: AuthUser) {

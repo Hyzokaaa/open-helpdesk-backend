@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Inject, Param, Post } from '@nestjs/common';
 import { Public } from '../../../../shared/nest/decorators/public.decorator';
+import { SkipEmailVerification } from '../../../../shared/nest/decorators/skip-email-verification.decorator';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
@@ -30,6 +31,7 @@ export class InvitationPublicController {
     return query.execute({ token });
   }
 
+  @SkipEmailVerification()
   @Post('accept')
   async accept(
     @Body() body: { token: string },
@@ -40,6 +42,7 @@ export class InvitationPublicController {
     return command.execute({ token: body.token, userId: user.userId, userEmail: user.email });
   }
 
+  @SkipEmailVerification()
   @Post('reject')
   async reject(
     @Body() body: { token: string },
