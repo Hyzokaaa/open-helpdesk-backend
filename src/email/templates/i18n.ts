@@ -144,6 +144,28 @@ const translations: Translations = {
     es: 'Si no creaste una cuenta, puedes ignorar este correo.',
   },
 
+  // Workspace invitation
+  'invitation.subject': {
+    en: 'You\'ve been invited to a workspace',
+    es: 'Has sido invitado a un espacio de trabajo',
+  },
+  'invitation.title': {
+    en: 'Workspace Invitation',
+    es: 'Invitación a Espacio de Trabajo',
+  },
+  'invitation.body': {
+    en: '{inviterName} has invited you to join <strong>{workspaceName}</strong>.',
+    es: '{inviterName} te ha invitado a unirte a <strong>{workspaceName}</strong>.',
+  },
+  'invitation.button': {
+    en: 'View Invitation',
+    es: 'Ver Invitación',
+  },
+  'invitation.expiry': {
+    en: 'This invitation will expire in 7 days.',
+    es: 'Esta invitación expirará en 7 días.',
+  },
+
   // Priorities
   'priority.low': { en: 'Low', es: 'Baja' },
   'priority.medium': { en: 'Medium', es: 'Media' },
