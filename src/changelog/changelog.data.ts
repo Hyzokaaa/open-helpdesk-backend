@@ -38,10 +38,12 @@ export const coreChangelog: ChangelogVersion[] = [
       {
         title: { en: 'Invitations', es: 'Invitaciones' },
         features: [
-          { en: 'Invite users to workspaces by email', es: 'Invitar usuarios a espacios de trabajo por correo' },
+          { en: 'Invite users to workspaces by email with role selection', es: 'Invitar usuarios a espacios por correo con selección de rol' },
+          { en: 'Send multiple invitations at once', es: 'Enviar múltiples invitaciones a la vez' },
           { en: 'Invited users can accept or reject from the invitation link', es: 'Los usuarios invitados pueden aceptar o rechazar desde el enlace' },
           { en: 'New users are auto-joined to the workspace after signup', es: 'Los usuarios nuevos se unen automáticamente al espacio tras registrarse' },
-          { en: 'View and cancel pending invitations from the members page', es: 'Ver y cancelar invitaciones pendientes desde la página de miembros' },
+          { en: 'Dedicated invitations page with pending invitations table', es: 'Página dedicada de invitaciones con tabla de invitaciones pendientes' },
+          { en: 'Admins and agents can send invitations', es: 'Administradores y agentes pueden enviar invitaciones' },
         ],
       },
       {
