@@ -16,6 +16,30 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.3.0',
+    date: '2026-04-30',
+    categories: [
+      {
+        title: { en: 'Workspace Branding', es: 'Marca del Workspace' },
+        features: [
+          { en: 'Color palette per workspace — all members see the chosen theme', es: 'Paleta de colores por workspace — todos los miembros ven el tema elegido' },
+          { en: '7 predefined palettes: green, blue, purple, orange, rose, teal, indigo', es: '7 paletas predefinidas: verde, azul, púrpura, naranja, rosa, turquesa, índigo' },
+          { en: 'Custom color picker with HSV selector and live preview', es: 'Selector de color personalizado con selector HSV y vista previa en vivo' },
+          { en: 'Light and dark mode preview in custom color modal', es: 'Vista previa en modo claro y oscuro en el modal de color personalizado' },
+          { en: 'Palette persists across workspace sections (settings, admin, etc.)', es: 'La paleta persiste en todas las secciones del workspace (ajustes, admin, etc.)' },
+          { en: 'Adaptive primary color: darker in light mode, lighter in dark mode for readability', es: 'Color primario adaptativo: más oscuro en modo claro, más claro en modo oscuro para legibilidad' },
+        ],
+      },
+      {
+        title: { en: 'Workspace Settings', es: 'Configuración del Workspace' },
+        features: [
+          { en: 'Workspace settings page accessible to workspace admins (not just system admins)', es: 'Página de configuración del workspace accesible para admins del workspace (no solo admins del sistema)' },
+          { en: 'New permission: workspace.settings.manage for workspace admins', es: 'Nuevo permiso: workspace.settings.manage para admins del workspace' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.2.0',
     date: '2026-04-28',
     categories: [
