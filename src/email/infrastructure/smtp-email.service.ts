@@ -22,11 +22,13 @@ export class SmtpEmailService implements EmailService {
       config.get<string>('EMAIL_FROM') || 'noreply@example.com';
 
     if (host && user && password) {
+      const rejectUnauthorized = config.get<string>('SMTP_TLS_REJECT_UNAUTHORIZED', 'true') !== 'false';
       this.transporter = nodemailer.createTransport({
         host,
         port,
         secure: port === 465,
         auth: { user, pass: password },
+        tls: { rejectUnauthorized },
       });
       this.logger.log(`SMTP email service initialized (${host}:${port})`);
     } else {
