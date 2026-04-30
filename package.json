@@ -19,6 +19,7 @@
     "migration:generate": "npx ts-node -P ./tsconfig.json -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:generate -d ./src/database/typeorm.config.ts",
     "migration:run": "npx ts-node -P ./tsconfig.json -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:run -d ./src/database/typeorm.config.ts",
     "migration:revert": "npx ts-node -P ./tsconfig.json -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:revert -d ./src/database/typeorm.config.ts",
+    "sync-lockfile": "node scripts/sync-lockfile.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
