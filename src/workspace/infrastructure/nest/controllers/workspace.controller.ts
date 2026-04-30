@@ -24,6 +24,9 @@ import { ChangeWorkspaceMemberRole } from '../../../domain/services/workspace-ch
 import { ChangeMemberRoleCommand } from '../../../application/commands/change-member-role.command';
 import { UpdateWorkspace } from '../../../domain/services/workspace-update';
 import { UpdateWorkspaceCommand } from '../../../application/commands/update-workspace.command';
+import { UpdateWorkspacePalette } from '../../../domain/services/workspace-update-palette';
+import { UpdateWorkspacePaletteCommand } from '../../../application/commands/update-workspace-palette.command';
+import { PERMISSIONS } from '../../../domain/permissions';
 import { DeleteWorkspace } from '../../../domain/services/workspace-delete';
 import { DeleteWorkspaceCommand } from '../../../application/commands/delete-workspace.command';
 import { GetWorkspaceQuery } from '../../../application/queries/get-workspace.query';
@@ -168,6 +171,25 @@ export class WorkspaceController {
     const service = new RemoveWorkspaceMember(this.memberRepository);
     const command = new RemoveMemberCommand(service, ensurePermission);
     return command.execute({ workspaceId, userId, requestingUserId: user.userId, isSystemAdmin: user.isSystemAdmin });
+  }
+
+  @Patch(':slug/palette')
+  async updatePalette(
+    @Param('slug') slug: string,
+    @Body() body: { palette: string | null },
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+    const service = new UpdateWorkspacePalette(this.workspaceRepository);
+    const command = new UpdateWorkspacePaletteCommand(service);
+    return command.execute({ workspaceId, palette: body.palette });
   }
 
   private async resolveWorkspaceId(slug: string): Promise<string> {

@@ -11,6 +11,7 @@ export interface WorkspaceResponse {
   name: string;
   slug: string;
   description: string;
+  palette: string | null;
 }
 
 export class GetWorkspaceQuery implements Query<Props, WorkspaceResponse> {
@@ -27,6 +28,7 @@ export class GetWorkspaceQuery implements Query<Props, WorkspaceResponse> {
       name: workspace.name,
       slug: workspace.slug,
       description: workspace.description,
+      palette: workspace.palette,
     };
   }
 }

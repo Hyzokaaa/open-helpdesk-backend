@@ -18,6 +18,7 @@ export interface WorkspaceListItem {
   description: string;
   role: string;
   ownerName?: string;
+  palette: string | null;
 }
 
 export class ListWorkspacesQuery implements Query<Props, WorkspaceListItem[]> {
@@ -49,6 +50,7 @@ export class ListWorkspacesQuery implements Query<Props, WorkspaceListItem[]> {
           description: workspace.description,
           role: membership?.role ?? 'admin',
           ownerName,
+          palette: workspace.palette,
         });
       }
       return result;
@@ -66,6 +68,7 @@ export class ListWorkspacesQuery implements Query<Props, WorkspaceListItem[]> {
           slug: workspace.slug,
           description: workspace.description,
           role: membership.role,
+          palette: workspace.palette,
         });
       }
     }

@@ -6,6 +6,7 @@ interface Props {
   slug: string;
   description: string;
   accountId?: string | null;
+  palette?: string | null;
 }
 
 export class Workspace {
@@ -14,6 +15,7 @@ export class Workspace {
   slug: string;
   description: string;
   accountId: string | null;
+  palette: string | null;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -21,6 +23,7 @@ export class Workspace {
     this.slug = props.slug;
     this.description = props.description;
     this.accountId = props.accountId ?? null;
+    this.palette = props.palette ?? null;
   }
 
   getId(): string {

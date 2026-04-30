@@ -5,6 +5,7 @@ export const PERMISSIONS = {
   WORKSPACE_CREATE: 'workspace.create',
   WORKSPACE_MEMBERS_MANAGE: 'workspace.members.manage',
   WORKSPACE_INVITATIONS_MANAGE: 'workspace.invitations.manage',
+  WORKSPACE_SETTINGS_MANAGE: 'workspace.settings.manage',
 
   // Tags
   TAG_CREATE: 'tag.create',
