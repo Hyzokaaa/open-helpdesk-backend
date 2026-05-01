@@ -46,6 +46,13 @@ export const coreChangelog: ChangelogVersion[] = [
           { en: 'Column drag disabled on mobile to prevent scroll conflicts', es: 'Arrastre de columnas desactivado en móvil para evitar conflictos con el scroll' },
         ],
       },
+      {
+        title: { en: 'UI Improvements', es: 'Mejoras de Interfaz' },
+        features: [
+          { en: 'Create user and create workspace forms now open in a Sheet overlay', es: 'Los formularios de crear usuario y workspace ahora abren en un panel deslizable' },
+          { en: 'Smart app title: auto-splits name and subtitle in sidebar (e.g. "Open" + "Helpdesk")', es: 'Título inteligente: divide automáticamente nombre y subtítulo en la barra lateral (ej. "Open" + "Helpdesk")' },
+        ],
+      },
     ],
   },
   {
