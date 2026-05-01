@@ -50,7 +50,10 @@ export const coreChangelog: ChangelogVersion[] = [
         title: { en: 'UI Improvements', es: 'Mejoras de Interfaz' },
         features: [
           { en: 'Create user and create workspace forms now open in a Sheet overlay', es: 'Los formularios de crear usuario y workspace ahora abren en un panel deslizable' },
+          { en: 'Add member sheet with multi-add support (same pattern as invitations)', es: 'Panel de agregar miembro con soporte multi-agregar (mismo patrón que invitaciones)' },
           { en: 'Smart app title: auto-splits name and subtitle in sidebar (e.g. "Open" + "Helpdesk")', es: 'Título inteligente: divide automáticamente nombre y subtítulo en la barra lateral (ej. "Open" + "Helpdesk")' },
+          { en: 'Solid primary buttons replacing gradients for better consistency', es: 'Botones primarios sólidos reemplazando degradados para mejor consistencia' },
+          { en: 'Auto-contrast text on primary backgrounds adapts to light custom palettes', es: 'Texto con contraste automático sobre fondos primarios se adapta a paletas custom claras' },
         ],
       },
     ],
