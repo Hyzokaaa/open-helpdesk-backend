@@ -37,6 +37,15 @@ export const coreChangelog: ChangelogVersion[] = [
           { en: 'New permission: workspace.settings.manage for workspace admins', es: 'Nuevo permiso: workspace.settings.manage para admins del workspace' },
         ],
       },
+      {
+        title: { en: 'Mobile Support', es: 'Soporte Móvil' },
+        features: [
+          { en: 'Mobile sidebar drawer with hamburger menu and backdrop overlay', es: 'Barra lateral móvil con menú hamburguesa y fondo oscuro' },
+          { en: 'Horizontal scroll on all data tables for small screens', es: 'Scroll horizontal en todas las tablas de datos para pantallas pequeñas' },
+          { en: 'Notification panel repositioned for mobile viewports', es: 'Panel de notificaciones reposicionado para pantallas móviles' },
+          { en: 'Column drag disabled on mobile to prevent scroll conflicts', es: 'Arrastre de columnas desactivado en móvil para evitar conflictos con el scroll' },
+        ],
+      },
     ],
   },
   {
