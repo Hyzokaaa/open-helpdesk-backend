@@ -37,6 +37,14 @@ export const coreChangelog: ChangelogVersion[] = [
           { en: 'Updates automatically when the ticket is modified', es: 'Se actualiza automáticamente cuando el ticket es modificado' },
         ],
       },
+      {
+        title: { en: 'Invitations', es: 'Invitaciones' },
+        features: [
+          { en: 'Send multiple invitations at once in a single batch', es: 'Envía múltiples invitaciones a la vez en un solo lote' },
+          { en: 'Prevents duplicate emails, already-invited users, and existing members before sending', es: 'Previene emails duplicados, usuarios ya invitados y miembros existentes antes de enviar' },
+          { en: 'Agent seat validation — checks plan limits before inviting admins or agents', es: 'Validación de asientos de agente — verifica los límites del plan antes de invitar admins o agentes' },
+        ],
+      },
     ],
   },
   {
