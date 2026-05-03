@@ -51,14 +51,13 @@ export const coreChangelog: ChangelogVersion[] = [
           { en: 'Custom color picker with HSV selector and live preview', es: 'Selector de color personalizado con selector HSV y vista previa en vivo' },
           { en: 'Light and dark mode preview in custom color modal', es: 'Vista previa en modo claro y oscuro en el modal de color personalizado' },
           { en: 'Palette persists across workspace sections (settings, admin, etc.)', es: 'La paleta persiste en todas las secciones del workspace (ajustes, admin, etc.)' },
-          { en: 'Adaptive primary color: darker in light mode, lighter in dark mode for readability', es: 'Color primario adaptativo: más oscuro en modo claro, más claro en modo oscuro para legibilidad' },
+          { en: 'Adaptive primary color — adjusts contrast automatically for light and dark mode', es: 'Color primario adaptativo — ajusta el contraste automáticamente para modo claro y oscuro' },
         ],
       },
       {
         title: { en: 'Workspace Settings', es: 'Configuración del Workspace' },
         features: [
           { en: 'Workspace settings page accessible to workspace admins (not just system admins)', es: 'Página de configuración del workspace accesible para admins del workspace (no solo admins del sistema)' },
-          { en: 'New permission: workspace.settings.manage for workspace admins', es: 'Nuevo permiso: workspace.settings.manage para admins del workspace' },
         ],
       },
       {
@@ -73,8 +72,8 @@ export const coreChangelog: ChangelogVersion[] = [
       {
         title: { en: 'UI Improvements', es: 'Mejoras de Interfaz' },
         features: [
-          { en: 'Create user and create workspace forms now open in a Sheet overlay', es: 'Los formularios de crear usuario y workspace ahora abren en un panel deslizable' },
-          { en: 'Add member sheet with multi-add support (same pattern as invitations)', es: 'Panel de agregar miembro con soporte multi-agregar (mismo patrón que invitaciones)' },
+          { en: 'Create user and create workspace forms now open in a side panel', es: 'Los formularios de crear usuario y workspace ahora abren en un panel lateral' },
+          { en: 'Add multiple members at once from the members page', es: 'Agregar múltiples miembros a la vez desde la página de miembros' },
           { en: 'Smart app title: auto-splits name and subtitle in sidebar (e.g. "Open" + "Helpdesk")', es: 'Título inteligente: divide automáticamente nombre y subtítulo en la barra lateral (ej. "Open" + "Helpdesk")' },
           { en: 'Solid primary buttons replacing gradients for better consistency', es: 'Botones primarios sólidos reemplazando degradados para mejor consistencia' },
           { en: 'Auto-contrast text on primary backgrounds adapts to light custom palettes', es: 'Texto con contraste automático sobre fondos primarios se adapta a paletas custom claras' },
@@ -130,9 +129,8 @@ export const coreChangelog: ChangelogVersion[] = [
       {
         title: { en: 'Authentication & Account', es: 'Autenticación y Cuenta' },
         features: [
-          { en: 'Email/password login with JWT authentication', es: 'Inicio de sesión con email/contraseña y autenticación JWT' },
-          { en: 'Forgot password flow with email reset link (1-hour expiry)', es: 'Flujo de contraseña olvidada con enlace de restablecimiento por email (expira en 1 hora)' },
-          { en: 'Password reset via token-authenticated link', es: 'Restablecimiento de contraseña mediante enlace con token' },
+          { en: 'Email and password login with secure authentication', es: 'Inicio de sesión con email y contraseña con autenticación segura' },
+          { en: 'Forgot password flow with email reset link (1-hour expiry)', es: 'Recuperación de contraseña con enlace por email (expira en 1 hora)' },
           { en: 'Change password from settings (requires current password)', es: 'Cambio de contraseña desde configuración (requiere contraseña actual)' },
           { en: 'Users created only by system admins (no public registration)', es: 'Usuarios creados solo por administradores del sistema (sin registro público)' },
         ],
@@ -143,7 +141,7 @@ export const coreChangelog: ChangelogVersion[] = [
           { en: 'Create users with name, email, and password (system admin only)', es: 'Crear usuarios con nombre, email y contraseña (solo admin del sistema)' },
           { en: 'Promote/demote users to system admin', es: 'Promover/degradar usuarios a administrador del sistema' },
           { en: 'List all users in admin panel', es: 'Listar todos los usuarios en panel de administración' },
-          { en: 'Activate/deactivate users (soft delete)', es: 'Activar/desactivar usuarios (eliminación lógica)' },
+          { en: 'Activate or deactivate user accounts', es: 'Activar o desactivar cuentas de usuario' },
           { en: 'Admin panel with user and workspace management tables', es: 'Panel de administración con tablas de gestión de usuarios y espacios' },
           { en: 'Confirmation modals for all admin actions (promote, demote, activate, deactivate)', es: 'Modales de confirmación para todas las acciones de administración (promover, degradar, activar, desactivar)' },
         ],
@@ -152,11 +150,11 @@ export const coreChangelog: ChangelogVersion[] = [
         title: { en: 'Workspaces', es: 'Espacios de Trabajo' },
         features: [
           { en: 'Create workspaces with name and description (system admin only)', es: 'Crear espacios de trabajo con nombre y descripción (solo admin del sistema)' },
-          { en: 'Edit workspace in Sheet overlay panel with two-column layout', es: 'Editar espacio en panel lateral deslizable con diseño de dos columnas' },
+          { en: 'Edit workspace in a side panel with two-column layout', es: 'Editar espacio en un panel lateral con diseño de dos columnas' },
           { en: 'Delete workspace with danger zone and irreversibility warning', es: 'Eliminar espacio con zona de peligro y advertencia de irreversibilidad' },
           { en: 'System admins see and access all workspaces', es: 'Los administradores del sistema ven y acceden a todos los espacios' },
           { en: 'Auto-assign creator as workspace admin', es: 'Asignación automática del creador como admin del espacio' },
-          { en: 'Cascade deletes: workspace removal cleans up all related data', es: 'Eliminación en cascada: borrar un espacio limpia todos los datos relacionados' },
+          { en: 'Deleting a workspace removes all its tickets, members, and tags', es: 'Eliminar un espacio borra todos sus tickets, miembros y etiquetas' },
         ],
       },
       {
@@ -179,10 +177,10 @@ export const coreChangelog: ChangelogVersion[] = [
           { en: 'Filter by status, priority, tags, and assignee', es: 'Filtrar por estado, prioridad, etiquetas y asignado' },
           { en: 'Sort by name, category, priority, status, or date', es: 'Ordenar por nombre, categoría, prioridad, estado o fecha' },
           { en: 'Paginated list with active/closed tab split', es: 'Lista paginada con separación de pestañas activo/cerrado' },
-          { en: 'Ticket detail and creation in Sheet overlay panel', es: 'Detalle y creación de ticket en panel lateral deslizable' },
+          { en: 'Ticket detail and creation in a side panel', es: 'Detalle y creación de ticket en un panel lateral' },
           { en: 'Inline editing of title, description, priority, and category', es: 'Edición en línea de título, descripción, prioridad y categoría' },
-          { en: 'Permission-based field editing (closed tickets require special permission)', es: 'Edición de campos basada en permisos (tickets cerrados requieren permiso especial)' },
-          { en: 'Discard confirmation when closing form with unsaved changes', es: 'Confirmación de descarte al cerrar formulario con cambios sin guardar' },
+          { en: 'Closed tickets require admin permission to edit', es: 'Los tickets cerrados requieren permiso de admin para editar' },
+          { en: 'Confirmation prompt when closing a form with unsaved changes', es: 'Confirmación al cerrar un formulario con cambios sin guardar' },
         ],
       },
       {
@@ -191,8 +189,7 @@ export const coreChangelog: ChangelogVersion[] = [
           { en: '@mention system with autocomplete dropdown', es: 'Sistema de @menciones con autocompletado desplegable' },
           { en: 'Keyboard navigation in mention dropdown (arrows, Enter, Escape)', es: 'Navegación por teclado en el desplegable de menciones (flechas, Enter, Escape)' },
           { en: 'Submit with Enter, newline with Shift+Enter', es: 'Enviar con Enter, nueva línea con Shift+Enter' },
-          { en: 'HTML sanitization to prevent XSS', es: 'Sanitización de HTML para prevenir XSS' },
-          { en: 'Paste handler strips formatting (plain text only)', es: 'El pegado elimina formato (solo texto plano)' },
+          { en: 'Pasted text is automatically cleaned to plain text', es: 'El texto pegado se limpia automáticamente a texto plano' },
         ],
       },
       {
@@ -204,7 +201,7 @@ export const coreChangelog: ChangelogVersion[] = [
           { en: 'Lightbox viewer with zoom and pan for images', es: 'Visor en pantalla completa con zoom y desplazamiento para imágenes' },
           { en: 'Video playback with native controls', es: 'Reproducción de video con controles nativos' },
           { en: 'Delete attachment with confirmation', es: 'Eliminar adjunto con confirmación' },
-          { en: 'S3-compatible storage (AWS S3 or custom endpoint)', es: 'Almacenamiento compatible con S3 (AWS S3 o endpoint personalizado)' },
+          { en: 'Cloud storage for files (S3-compatible)', es: 'Almacenamiento en la nube para archivos (compatible con S3)' },
         ],
       },
       {
@@ -220,22 +217,22 @@ export const coreChangelog: ChangelogVersion[] = [
         title: { en: 'Permissions', es: 'Permisos' },
         features: [
           { en: 'Role-based access: admin, agent, reporter', es: 'Acceso basado en roles: admin, agente, reportero' },
-          { en: '20 granular permissions across all modules', es: '20 permisos granulares en todos los módulos' },
-          { en: 'System admin bypasses all workspace permissions', es: 'El admin del sistema omite todos los permisos de workspace' },
-          { en: 'UI elements rendered conditionally based on permissions', es: 'Elementos de UI renderizados condicionalmente según permisos' },
+          { en: '20+ permissions covering all features', es: '20+ permisos cubriendo todas las funcionalidades' },
+          { en: 'System admins have full access to all workspaces', es: 'Los admins del sistema tienen acceso completo a todos los workspaces' },
+          { en: 'Buttons and actions are shown or hidden based on your role', es: 'Botones y acciones se muestran u ocultan según tu rol' },
         ],
       },
       {
         title: { en: 'Notifications', es: 'Notificaciones' },
         features: [
           { en: 'In-app notifications with bell icon and unread indicator', es: 'Notificaciones in-app con icono de campana e indicador de no leídos' },
-          { en: 'Email notifications via SMTP or Postmark', es: 'Notificaciones por email vía SMTP o Postmark' },
-          { en: 'Events: ticket created, assigned, status changed, new comment', es: 'Eventos: ticket creado, asignado, cambio de estado, nuevo comentario' },
-          { en: 'Per-event toggles for email and in-app channels', es: 'Toggles por evento para canales de email e in-app' },
-          { en: 'Notification preferences page with matrix UI', es: 'Página de preferencias de notificaciones con interfaz matricial' },
+          { en: 'Email notifications for important events', es: 'Notificaciones por email para eventos importantes' },
+          { en: 'Notifies on ticket creation, assignment, status change, and new comments', es: 'Notifica al crear tickets, asignar, cambiar estado y nuevos comentarios' },
+          { en: 'Choose which notifications you receive by email or in-app', es: 'Elige qué notificaciones recibes por email o en la app' },
+          { en: 'Notification preferences page with per-event toggles', es: 'Página de preferencias de notificaciones con controles por evento' },
           { en: 'Mark as read individually or all at once', es: 'Marcar como leído individualmente o todos a la vez' },
           { en: 'Navigate to related ticket on click', es: 'Navegar al ticket relacionado al hacer clic' },
-          { en: 'Unread count polled every 30 seconds', es: 'Conteo de no leídos consultado cada 30 segundos' },
+          { en: 'Unread count updates automatically', es: 'El conteo de no leídos se actualiza automáticamente' },
         ],
       },
       {
@@ -243,8 +240,8 @@ export const coreChangelog: ChangelogVersion[] = [
         features: [
           { en: 'Full UI translated: English and Spanish', es: 'UI completamente traducida: inglés y español' },
           { en: 'Language selector in user preferences', es: 'Selector de idioma en preferencias de usuario' },
-          { en: 'Email templates translated (en/es)', es: 'Plantillas de email traducidas (en/es)' },
-          { en: 'Enum labels translated (priorities, statuses, categories)', es: 'Etiquetas de enums traducidas (prioridades, estados, categorías)' },
+          { en: 'Email templates translated (English and Spanish)', es: 'Plantillas de email traducidas (inglés y español)' },
+          { en: 'All labels translated — priorities, statuses, categories, roles', es: 'Todas las etiquetas traducidas — prioridades, estados, categorías, roles' },
         ],
       },
       {
