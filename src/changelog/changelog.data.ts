@@ -16,6 +16,30 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.4.0',
+    date: '2026-05-03',
+    categories: [
+      {
+        title: { en: 'Audit Log', es: 'Registro de Auditoría' },
+        features: [
+          { en: 'Audit log page — see who did what and when across your workspace', es: 'Página de auditoría — ve quién hizo qué y cuándo en tu workspace' },
+          { en: 'Filter by action, entity type, or user with paginated results', es: 'Filtra por acción, tipo de entidad o usuario con resultados paginados' },
+          { en: 'Tracks tickets, comments, members, workspace settings, and user changes', es: 'Rastrea tickets, comentarios, miembros, configuración del workspace y cambios de usuario' },
+          { en: 'Shows what changed before and after each action', es: 'Muestra qué cambió antes y después de cada acción' },
+          { en: 'Visible only to workspace admins', es: 'Visible solo para administradores del workspace' },
+        ],
+      },
+      {
+        title: { en: 'Ticket Activity', es: 'Actividad del Ticket' },
+        features: [
+          { en: 'Activity timeline in ticket detail — see the full history of changes', es: 'Línea de tiempo en el detalle del ticket — ve el historial completo de cambios' },
+          { en: 'Latest 5 entries shown by default, expand to see all', es: 'Últimas 5 entradas visibles por defecto, expande para ver todas' },
+          { en: 'Updates automatically when the ticket is modified', es: 'Se actualiza automáticamente cuando el ticket es modificado' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.3.0',
     date: '2026-04-30',
     categories: [
