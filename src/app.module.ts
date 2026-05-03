@@ -16,11 +16,13 @@ import { AttachmentModule } from './attachment/attachment.module';
 import { NotificationModule } from './notification/notification.module';
 import { EmailModule } from './email/email.module';
 import { AccountModule } from './account/account.module';
+import { AuditLogModule } from './audit-log/audit-log.module';
 import { HealthController } from './health.controller';
 import { ChangelogController } from './changelog/changelog.controller';
+import { AuditLogController } from './audit-log/infrastructure/nest/controllers/audit-log.controller';
 
 @Module({
-  controllers: [HealthController, ChangelogController],
+  controllers: [HealthController, ChangelogController, AuditLogController],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
@@ -55,6 +57,7 @@ import { ChangelogController } from './changelog/changelog.controller';
     NotificationModule,
     EmailModule,
     AccountModule,
+    AuditLogModule,
   ],
 })
 export class AppModule {}

@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { SharedModule } from '../shared/shared.module';
 import { UserModule } from '../user/user.module';
 import { AccountModule } from '../account/account.module';
+import { AuditLogModule } from '../audit-log/audit-log.module';
 import { WorkspaceModel } from './infrastructure/typeorm/models/workspace.model';
 import { WorkspaceMemberModel } from './infrastructure/typeorm/models/workspace-member.model';
 import { WorkspaceInvitationModel } from './infrastructure/typeorm/models/workspace-invitation.model';
@@ -18,6 +19,7 @@ import { InvitationPublicController } from './infrastructure/nest/controllers/in
     SharedModule,
     UserModule,
     AccountModule,
+    AuditLogModule,
     TypeOrmModule.forFeature([WorkspaceModel, WorkspaceMemberModel, WorkspaceInvitationModel]),
   ],
   controllers: [WorkspaceController, WorkspaceInvitationController, InvitationPublicController],

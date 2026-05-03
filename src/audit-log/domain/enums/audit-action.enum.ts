@@ -1,0 +1,17 @@
+export enum AuditAction {
+  TICKET_CREATED = 'ticket-created',
+  TICKET_UPDATED = 'ticket-updated',
+  TICKET_STATUS_CHANGED = 'ticket-status-changed',
+  TICKET_ASSIGNED = 'ticket-assigned',
+  TICKET_DELETED = 'ticket-deleted',
+  COMMENT_CREATED = 'comment-created',
+  WORKSPACE_CREATED = 'workspace-created',
+  WORKSPACE_UPDATED = 'workspace-updated',
+  WORKSPACE_DELETED = 'workspace-deleted',
+  MEMBER_ADDED = 'member-added',
+  MEMBER_REMOVED = 'member-removed',
+  MEMBER_ROLE_CHANGED = 'member-role-changed',
+  USER_ACTIVATED = 'user-activated',
+  USER_DEACTIVATED = 'user-deactivated',
+  USER_ADMIN_TOGGLED = 'user-admin-toggled',
+}

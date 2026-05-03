@@ -6,6 +6,8 @@ import { UpdateTicket } from '../../domain/services/ticket-update';
 import { EnsureWorkspacePermission } from '../../../workspace/domain/services/workspace-ensure-permission';
 import { PERMISSIONS, hasPermission } from '../../../workspace/domain/permissions';
 import { EntityNotFoundError } from '../../../shared/domain/errors';
+import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
+import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
 
 interface Props {
   ticketId: string;
@@ -31,6 +33,7 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
     private readonly updateTicket: UpdateTicket,
     private readonly ticketRepository: TicketRepository,
     private readonly ensurePermission: EnsureWorkspacePermission,
+    private readonly createAuditLog: CreateAuditLogEntry,
   ) {}
 
   async execute(props: Props): Promise<UpdateTicketResponse> {
@@ -65,6 +68,8 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
 
     const canEditName = hasPermission(ctx.role, PERMISSIONS.TICKET_EDIT_NAME);
 
+    const before = { name: ticket.name, priority: ticket.priority, category: ticket.category };
+
     const updated = await this.updateTicket.execute({
       ticketId: props.ticketId,
       name: canEditName ? props.name : undefined,
@@ -72,6 +77,16 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
       priority: props.priority,
       category: props.category,
       tagIds: props.tagIds,
+    });
+
+    const after = { name: updated.name, priority: updated.priority, category: updated.category };
+    await this.createAuditLog.execute({
+      action: AuditAction.TICKET_UPDATED,
+      entityType: 'ticket',
+      entityId: updated.getId(),
+      userId: props.userId,
+      workspaceId: props.workspaceId,
+      metadata: { ticketName: updated.name, before, after },
     });
 
     return {

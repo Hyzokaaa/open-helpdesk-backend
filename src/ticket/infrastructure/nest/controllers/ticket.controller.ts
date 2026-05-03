@@ -30,7 +30,9 @@ import { TypeOrmTicketRepository } from '../../typeorm/repositories/typeorm-tick
 import { TypeOrmWorkspaceRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository';
 import { TypeOrmWorkspaceMemberRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
 import { TypeOrmUserRepository } from '../../../../user/infrastructure/typeorm/repositories/typeorm-user.repository';
+import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
 import { EnsureWorkspacePermission } from '../../../../workspace/domain/services/workspace-ensure-permission';
+import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit-log-create';
 import { CreateTicketRequest } from '../dto/create-ticket.request';
 import { UpdateTicketRequest } from '../dto/update-ticket.request';
 import { ChangeTicketStatusRequest } from '../dto/change-ticket-status.request';
@@ -46,6 +48,7 @@ export class TicketController {
     @Inject() private readonly userRepository: TypeOrmUserRepository,
     @Inject() private readonly idGenerator: UlidGenerator,
     @Inject() private readonly eventPublisher: NestEventPublisher,
+    @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
   ) {}
 
   @Post()
@@ -57,7 +60,8 @@ export class TicketController {
     const workspace = await this.resolveWorkspace(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new CreateTicket(this.idGenerator, this.ticketRepository);
-    const command = new CreateTicketCommand(service, ensurePermission, this.userRepository, this.eventPublisher);
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    const command = new CreateTicketCommand(service, ensurePermission, this.userRepository, this.eventPublisher, auditLog);
     return command.execute({
       name: body.name,
       description: body.description,
@@ -123,7 +127,8 @@ export class TicketController {
     const workspace = await this.resolveWorkspace(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new UpdateTicket(this.ticketRepository);
-    const command = new UpdateTicketCommand(service, this.ticketRepository, ensurePermission);
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    const command = new UpdateTicketCommand(service, this.ticketRepository, ensurePermission, auditLog);
     return command.execute({
       ticketId: id,
       workspaceId: workspace.getId(),
@@ -147,7 +152,8 @@ export class TicketController {
     const workspace = await this.resolveWorkspace(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new ChangeTicketStatus(this.ticketRepository);
-    const command = new ChangeTicketStatusCommand(service, this.ticketRepository, ensurePermission, this.eventPublisher);
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    const command = new ChangeTicketStatusCommand(service, this.ticketRepository, ensurePermission, this.eventPublisher, auditLog);
     return command.execute({
       ticketId: id,
       status: body.status,
@@ -169,10 +175,16 @@ export class TicketController {
     const workspace = await this.resolveWorkspace(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new AssignTicket(this.ticketRepository);
-    const command = new AssignTicketCommand(service, this.ticketRepository, ensurePermission, this.eventPublisher);
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    const ticket = await this.ticketRepository.findById(id);
+    const assignee = body.assigneeId ? await this.userRepository.findById(body.assigneeId) : null;
+    const prevAssignee = ticket?.assigneeId ? await this.userRepository.findById(ticket.assigneeId) : null;
+    const command = new AssignTicketCommand(service, this.ticketRepository, ensurePermission, this.eventPublisher, auditLog);
     return command.execute({
       ticketId: id,
       assigneeId: body.assigneeId,
+      assigneeLabel: assignee ? `${assignee.firstName} ${assignee.lastName} (${assignee.email})` : null,
+      previousAssigneeLabel: prevAssignee ? `${prevAssignee.firstName} ${prevAssignee.lastName} (${prevAssignee.email})` : null,
       workspaceId: workspace.getId(),
       workspaceName: workspace.name,
       workspaceSlug: workspace.slug,
@@ -190,7 +202,8 @@ export class TicketController {
     const workspace = await this.resolveWorkspace(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new DeleteTicket(this.ticketRepository);
-    const command = new DeleteTicketCommand(service, ensurePermission);
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    const command = new DeleteTicketCommand(service, ensurePermission, this.ticketRepository, auditLog);
     return command.execute({ ticketId: id, workspaceId: workspace.getId(), userId: user.userId, isSystemAdmin: user.isSystemAdmin });
   }
 

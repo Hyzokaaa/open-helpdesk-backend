@@ -7,6 +7,8 @@ import { EnsureWorkspacePermission } from '../../../workspace/domain/services/wo
 import { UserRepository } from '../../../user/domain/repositories/user.repository';
 import { PERMISSIONS } from '../../../workspace/domain/permissions';
 import { TicketCreatedEvent } from '../../../email/domain/events';
+import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
+import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
 
 interface Props {
   name: string;
@@ -34,6 +36,7 @@ export class CreateTicketCommand implements Command<Props, CreateTicketResponse>
     private readonly ensurePermission: EnsureWorkspacePermission,
     private readonly userRepository: UserRepository,
     private readonly eventPublisher: EventPublisher,
+    private readonly createAuditLog: CreateAuditLogEntry,
   ) {}
 
   async execute(props: Props): Promise<CreateTicketResponse> {
@@ -67,6 +70,15 @@ export class CreateTicketCommand implements Command<Props, CreateTicketResponse>
       workspaceSlug: props.workspaceSlug,
     };
     this.eventPublisher.emit('ticket.created', event);
+
+    await this.createAuditLog.execute({
+      action: AuditAction.TICKET_CREATED,
+      entityType: 'ticket',
+      entityId: ticket.getId(),
+      userId: props.userId,
+      workspaceId: props.workspaceId,
+      metadata: { name: props.name, priority: props.priority, category: props.category },
+    });
 
     return {
       id: ticket.getId(),

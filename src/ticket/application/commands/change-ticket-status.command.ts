@@ -7,6 +7,8 @@ import { ChangeTicketStatus } from '../../domain/services/ticket-change-status';
 import { EnsureWorkspacePermission } from '../../../workspace/domain/services/workspace-ensure-permission';
 import { PERMISSIONS } from '../../../workspace/domain/permissions';
 import { StatusChangedEvent } from '../../../email/domain/events';
+import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
+import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
 
 interface Props {
   ticketId: string;
@@ -30,6 +32,7 @@ export class ChangeTicketStatusCommand implements Command<Props, ChangeStatusRes
     private readonly ticketRepository: TicketRepository,
     private readonly ensurePermission: EnsureWorkspacePermission,
     private readonly eventPublisher: EventPublisher,
+    private readonly createAuditLog: CreateAuditLogEntry,
   ) {}
 
   async execute(props: Props): Promise<ChangeStatusResponse> {
@@ -64,6 +67,15 @@ export class ChangeTicketStatusCommand implements Command<Props, ChangeStatusRes
       workspaceSlug: props.workspaceSlug,
     };
     this.eventPublisher.emit('ticket.statusChanged', event);
+
+    await this.createAuditLog.execute({
+      action: AuditAction.TICKET_STATUS_CHANGED,
+      entityType: 'ticket',
+      entityId: props.ticketId,
+      userId: props.userId,
+      workspaceId: props.workspaceId,
+      metadata: { ticketName: ticket.name, before: { status: oldStatus }, after: { status: props.status } },
+    });
 
     return {
       id: updated.getId(),

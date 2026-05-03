@@ -3,6 +3,8 @@ import { AddWorkspaceMember } from '../../domain/services/workspace-add-member';
 import { EnsureWorkspacePermission } from '../../domain/services/workspace-ensure-permission';
 import { PERMISSIONS } from '../../domain/permissions';
 import { WorkspaceRole } from '../../domain/enums/workspace-role.enum';
+import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
+import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
 
 interface Props {
   workspaceId: string;
@@ -10,6 +12,7 @@ interface Props {
   role: WorkspaceRole;
   requestingUserId: string;
   isSystemAdmin: boolean;
+  targetLabel: string;
 }
 
 export interface AddMemberResponse {
@@ -23,6 +26,7 @@ export class AddMemberCommand implements Command<Props, AddMemberResponse> {
   constructor(
     private readonly addMember: AddWorkspaceMember,
     private readonly ensurePermission: EnsureWorkspacePermission,
+    private readonly createAuditLog: CreateAuditLogEntry,
   ) {}
 
   async execute(props: Props): Promise<AddMemberResponse> {
@@ -37,6 +41,15 @@ export class AddMemberCommand implements Command<Props, AddMemberResponse> {
       workspaceId: props.workspaceId,
       userId: props.userId,
       role: props.role,
+    });
+
+    await this.createAuditLog.execute({
+      action: AuditAction.MEMBER_ADDED,
+      entityType: 'workspace-member',
+      entityId: member.getId(),
+      userId: props.requestingUserId,
+      workspaceId: props.workspaceId,
+      metadata: { target: props.targetLabel, role: props.role },
     });
 
     return {

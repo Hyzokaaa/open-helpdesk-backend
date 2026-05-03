@@ -1,6 +1,8 @@
 import { Command } from '../../../shared/domain/command';
 import { ChangeWorkspaceMemberRole } from '../../domain/services/workspace-change-member-role';
 import { WorkspaceRole } from '../../domain/enums/workspace-role.enum';
+import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
+import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
 
 interface Props {
   workspaceId: string;
@@ -8,6 +10,7 @@ interface Props {
   newRole: WorkspaceRole;
   requestingUserId: string;
   isSystemAdmin: boolean;
+  targetLabel: string;
 }
 
 export interface ChangeMemberRoleResponse {
@@ -16,10 +19,23 @@ export interface ChangeMemberRoleResponse {
 }
 
 export class ChangeMemberRoleCommand implements Command<Props, ChangeMemberRoleResponse> {
-  constructor(private readonly changeRole: ChangeWorkspaceMemberRole) {}
+  constructor(
+    private readonly changeRole: ChangeWorkspaceMemberRole,
+    private readonly createAuditLog: CreateAuditLogEntry,
+  ) {}
 
   async execute(props: Props): Promise<ChangeMemberRoleResponse> {
     const member = await this.changeRole.execute(props);
+
+    await this.createAuditLog.execute({
+      action: AuditAction.MEMBER_ROLE_CHANGED,
+      entityType: 'workspace-member',
+      entityId: props.targetUserId,
+      userId: props.requestingUserId,
+      workspaceId: props.workspaceId,
+      metadata: { target: props.targetLabel, after: { role: props.newRole } },
+    });
+
     return { userId: member.userId, role: member.role };
   }
 }

@@ -36,6 +36,9 @@ export const PERMISSIONS = {
   // Users
   USER_CREATE: 'user.create',
   USER_LIST: 'user.list',
+
+  // Audit Log
+  AUDIT_LOG_VIEW: 'audit-log.view',
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

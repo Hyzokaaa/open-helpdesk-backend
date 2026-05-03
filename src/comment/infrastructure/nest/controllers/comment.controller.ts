@@ -19,6 +19,8 @@ import { TypeOrmCommentRepository } from "../../typeorm/repositories/typeorm-com
 import { TypeOrmTicketRepository } from "../../../../ticket/infrastructure/typeorm/repositories/typeorm-ticket.repository";
 import { TypeOrmWorkspaceRepository } from "../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository";
 import { TypeOrmUserRepository } from "../../../../user/infrastructure/typeorm/repositories/typeorm-user.repository";
+import { TypeOrmAuditLogRepository } from "../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository";
+import { CreateAuditLogEntry } from "../../../../audit-log/domain/services/audit-log-create";
 import { CreateCommentRequest } from "../dto/create-comment.request";
 
 @Controller("workspaces/:slug/tickets/:ticketId/comments")
@@ -30,6 +32,7 @@ export class CommentController {
     @Inject() private readonly userRepository: TypeOrmUserRepository,
     @Inject() private readonly idGenerator: UlidGenerator,
     @Inject() private readonly eventPublisher: NestEventPublisher,
+    @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
   ) {}
 
   @Post()
@@ -40,12 +43,14 @@ export class CommentController {
     @CurrentUser() user: AuthUser,
   ) {
     const service = new CreateComment(this.idGenerator, this.commentRepository);
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     const command = new CreateCommentCommand(
       service,
       this.ticketRepository,
       this.workspaceRepository,
       this.userRepository,
       this.eventPublisher,
+      auditLog,
     );
     return command.execute({
       content: body.content,

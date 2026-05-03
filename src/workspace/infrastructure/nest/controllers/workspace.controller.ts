@@ -37,6 +37,8 @@ import { TypeOrmUserRepository } from '../../../../user/infrastructure/typeorm/r
 import { TypeOrmWorkspaceRepository } from '../../typeorm/repositories/typeorm-workspace.repository';
 import { TypeOrmWorkspaceMemberRepository } from '../../typeorm/repositories/typeorm-workspace-member.repository';
 import { TypeOrmAccountRepository } from '../../../../account/infrastructure/typeorm/repositories/typeorm-account.repository';
+import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
+import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit-log-create';
 import { CreateWorkspaceRequest } from '../dto/create-workspace.request';
 import { AddMemberRequest } from '../dto/add-member.request';
 import { SortDto } from '../../../../shared/nest/dto/sort.dto';
@@ -49,6 +51,7 @@ export class WorkspaceController {
     @Inject() private readonly userRepository: TypeOrmUserRepository,
     @Inject() private readonly idGenerator: UlidGenerator,
     @Inject() private readonly accountRepository: TypeOrmAccountRepository,
+    @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
   ) {}
 
   @Post()
@@ -56,7 +59,8 @@ export class WorkspaceController {
     const account = await this.accountRepository.findByOwnerId(user.userId);
     const createService = new CreateWorkspace(this.idGenerator, this.workspaceRepository);
     const addMemberService = new AddWorkspaceMember(this.idGenerator, this.memberRepository);
-    const command = new CreateWorkspaceCommand(createService, addMemberService);
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    const command = new CreateWorkspaceCommand(createService, addMemberService, auditLog);
     return command.execute({
       name: body.name,
       description: body.description,
@@ -85,12 +89,14 @@ export class WorkspaceController {
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
     const service = new UpdateWorkspace(this.workspaceRepository);
-    const command = new UpdateWorkspaceCommand(service);
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    const command = new UpdateWorkspaceCommand(service, auditLog);
     return command.execute({
       workspaceId,
       name: body.name,
       description: body.description,
       isSystemAdmin: user.isSystemAdmin,
+      userId: user.userId,
     });
   }
 
@@ -101,8 +107,9 @@ export class WorkspaceController {
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
     const service = new DeleteWorkspace(this.workspaceRepository);
-    const command = new DeleteWorkspaceCommand(service);
-    return command.execute({ workspaceId, isSystemAdmin: user.isSystemAdmin });
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    const command = new DeleteWorkspaceCommand(service, auditLog);
+    return command.execute({ workspaceId, isSystemAdmin: user.isSystemAdmin, userId: user.userId });
   }
 
   @Post(':slug/members')
@@ -114,13 +121,16 @@ export class WorkspaceController {
     const workspaceId = await this.resolveWorkspaceId(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new AddWorkspaceMember(this.idGenerator, this.memberRepository);
-    const command = new AddMemberCommand(service, ensurePermission);
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    const targetUser = await this.userRepository.findById(body.userId);
+    const command = new AddMemberCommand(service, ensurePermission, auditLog);
     return command.execute({
       workspaceId,
       userId: body.userId,
       role: body.role,
       requestingUserId: user.userId,
       isSystemAdmin: user.isSystemAdmin,
+      targetLabel: targetUser ? `${targetUser.firstName} ${targetUser.lastName} (${targetUser.email})` : body.userId,
     });
   }
 
@@ -149,14 +159,17 @@ export class WorkspaceController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
+    const targetUser = await this.userRepository.findById(userId);
     const service = new ChangeWorkspaceMemberRole(this.memberRepository);
-    const command = new ChangeMemberRoleCommand(service);
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    const command = new ChangeMemberRoleCommand(service, auditLog);
     return command.execute({
       workspaceId,
       targetUserId: userId,
       newRole: body.role as any,
       requestingUserId: user.userId,
       isSystemAdmin: user.isSystemAdmin,
+      targetLabel: targetUser ? `${targetUser.firstName} ${targetUser.lastName} (${targetUser.email})` : userId,
     });
   }
 
@@ -169,8 +182,10 @@ export class WorkspaceController {
     const workspaceId = await this.resolveWorkspaceId(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new RemoveWorkspaceMember(this.memberRepository);
-    const command = new RemoveMemberCommand(service, ensurePermission);
-    return command.execute({ workspaceId, userId, requestingUserId: user.userId, isSystemAdmin: user.isSystemAdmin });
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    const targetUser = await this.userRepository.findById(userId);
+    const command = new RemoveMemberCommand(service, ensurePermission, auditLog);
+    return command.execute({ workspaceId, userId, requestingUserId: user.userId, isSystemAdmin: user.isSystemAdmin, targetLabel: targetUser ? `${targetUser.firstName} ${targetUser.lastName} (${targetUser.email})` : userId });
   }
 
   @Patch(':slug/palette')

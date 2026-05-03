@@ -6,6 +6,8 @@ import { TicketRepository } from '../../../ticket/domain/repositories/ticket.rep
 import { WorkspaceRepository } from '../../../workspace/domain/repositories/workspace.repository';
 import { UserRepository } from '../../../user/domain/repositories/user.repository';
 import { NewCommentEvent } from '../../../email/domain/events';
+import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
+import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
 
 interface Props {
   content: string;
@@ -28,6 +30,7 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
     private readonly workspaceRepository: WorkspaceRepository,
     private readonly userRepository: UserRepository,
     private readonly eventPublisher: EventPublisher,
+    private readonly createAuditLog: CreateAuditLogEntry,
   ) {}
 
   async execute(props: Props): Promise<CreateCommentResponse> {
@@ -57,6 +60,17 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
         workspaceSlug: workspace.slug,
       };
       this.eventPublisher.emit('comment.created', event);
+    }
+
+    if (ticket && workspace) {
+      await this.createAuditLog.execute({
+        action: AuditAction.COMMENT_CREATED,
+        entityType: 'ticket',
+        entityId: props.ticketId,
+        userId: props.authorId,
+        workspaceId: workspace.getId(),
+        metadata: { ticketName: ticket.name, commentId: comment.getId(), content: props.content },
+      });
     }
 
     return {

@@ -27,6 +27,8 @@ import { ChangePassword } from '../../../domain/services/user-change-password';
 import { ChangePasswordCommand } from '../../../application/commands/change-password.command';
 import { TypeOrmUserRepository } from '../../typeorm/repositories/typeorm-user.repository';
 import { TypeOrmAccountRepository } from '../../../../account/infrastructure/typeorm/repositories/typeorm-account.repository';
+import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
+import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit-log-create';
 import { Account } from '../../../../account/domain/entities/account';
 import { RegisterUserRequest } from '../dto/register-user.request';
 import { SortDto } from '../../../../shared/nest/dto/sort.dto';
@@ -38,6 +40,7 @@ export class UserController {
     @Inject() private readonly accountRepository: TypeOrmAccountRepository,
     @Inject() private readonly idGenerator: UlidGenerator,
     @Inject() private readonly passwordHasher: BcryptPasswordHasher,
+    @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
   ) {}
 
   @SkipEmailVerification()
@@ -143,11 +146,13 @@ export class UserController {
     @CurrentUser() user: AuthUser,
   ) {
     const service = new ToggleSystemAdmin(this.userRepository);
-    const command = new ToggleSystemAdminCommand(service);
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    const command = new ToggleSystemAdminCommand(service, auditLog);
     return command.execute({
       targetUserId: id,
       isSystemAdmin: body.isSystemAdmin,
       requestingUserIsAdmin: user.isSystemAdmin,
+      requestingUserId: user.userId,
     });
   }
 
@@ -158,11 +163,13 @@ export class UserController {
     @CurrentUser() user: AuthUser,
   ) {
     const service = new ToggleUserActive(this.userRepository);
-    const command = new ToggleUserActiveCommand(service);
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    const command = new ToggleUserActiveCommand(service, auditLog);
     return command.execute({
       targetUserId: id,
       isActive: body.isActive,
       requestingUserIsAdmin: user.isSystemAdmin,
+      requestingUserId: user.userId,
     });
   }
 }
