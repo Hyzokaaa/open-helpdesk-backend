@@ -37,6 +37,12 @@ export const PERMISSIONS = {
   USER_CREATE: 'user.create',
   USER_LIST: 'user.list',
 
+  // Canned Responses
+  CANNED_RESPONSE_CREATE: 'canned-response.create',
+  CANNED_RESPONSE_EDIT: 'canned-response.edit',
+  CANNED_RESPONSE_DELETE: 'canned-response.delete',
+  CANNED_RESPONSE_VIEW: 'canned-response.view',
+
   // Audit Log
   AUDIT_LOG_VIEW: 'audit-log.view',
 } as const;
@@ -61,6 +67,10 @@ const AGENT_PERMISSIONS: Permission[] = [
   PERMISSIONS.ATTACHMENT_UPLOAD,
   PERMISSIONS.ATTACHMENT_DELETE,
   PERMISSIONS.USER_LIST,
+  PERMISSIONS.CANNED_RESPONSE_CREATE,
+  PERMISSIONS.CANNED_RESPONSE_EDIT,
+  PERMISSIONS.CANNED_RESPONSE_DELETE,
+  PERMISSIONS.CANNED_RESPONSE_VIEW,
 ];
 
 const REPORTER_PERMISSIONS: Permission[] = [
@@ -71,6 +81,7 @@ const REPORTER_PERMISSIONS: Permission[] = [
   PERMISSIONS.ATTACHMENT_UPLOAD,
   PERMISSIONS.ATTACHMENT_DELETE,
   PERMISSIONS.USER_LIST,
+  PERMISSIONS.CANNED_RESPONSE_VIEW,
 ];
 
 const ROLE_PERMISSIONS: Record<WorkspaceRole, Permission[]> = {
