@@ -44,6 +44,10 @@ export const PERMISSIONS = {
   CANNED_RESPONSE_DELETE: 'canned-response.delete',
   CANNED_RESPONSE_VIEW: 'canned-response.view',
 
+  // Custom Fields
+  CUSTOM_FIELD_MANAGE: 'custom-field.manage',
+  CUSTOM_FIELD_VIEW: 'custom-field.view',
+
   // Audit Log
   AUDIT_LOG_VIEW: 'audit-log.view',
 } as const;
@@ -72,6 +76,7 @@ const AGENT_PERMISSIONS: Permission[] = [
   PERMISSIONS.CANNED_RESPONSE_EDIT,
   PERMISSIONS.CANNED_RESPONSE_DELETE,
   PERMISSIONS.CANNED_RESPONSE_VIEW,
+  PERMISSIONS.CUSTOM_FIELD_VIEW,
 ];
 
 const REPORTER_PERMISSIONS: Permission[] = [
@@ -83,6 +88,7 @@ const REPORTER_PERMISSIONS: Permission[] = [
   PERMISSIONS.ATTACHMENT_DELETE,
   PERMISSIONS.USER_LIST,
   PERMISSIONS.CANNED_RESPONSE_VIEW,
+  PERMISSIONS.CUSTOM_FIELD_VIEW,
 ];
 
 const ROLE_PERMISSIONS: Record<WorkspaceRole, Permission[]> = {
