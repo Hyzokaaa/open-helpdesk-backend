@@ -13,6 +13,7 @@ interface CreateTicketProps {
   workspaceId: string;
   creatorId: string;
   tagIds: string[];
+  customFields?: Record<string, unknown>;
 }
 
 export class CreateTicket {
@@ -36,6 +37,7 @@ export class CreateTicket {
       createdAt: null,
       deletedAt: null,
       tagIds: props.tagIds,
+      customFields: props.customFields ?? {},
     });
 
     await this.repository.create(ticket);

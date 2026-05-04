@@ -26,6 +26,7 @@ export interface TicketListItem {
   assigneeId: string | null;
   createdAt: Date | null;
   tagIds: string[];
+  customFields: Record<string, unknown>;
 }
 
 export class ListTicketsQuery
@@ -67,6 +68,7 @@ export class ListTicketsQuery
         assigneeId: ticket.assigneeId,
         createdAt: ticket.createdAt,
         tagIds: ticket.tagIds,
+        customFields: ticket.customFields,
       })),
       total: result.total,
       page: result.page,

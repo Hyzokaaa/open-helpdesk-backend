@@ -33,6 +33,8 @@ import { TypeOrmUserRepository } from '../../../../user/infrastructure/typeorm/r
 import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
 import { EnsureWorkspacePermission } from '../../../../workspace/domain/services/workspace-ensure-permission';
 import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit-log-create';
+import { TypeOrmCustomFieldDefinitionRepository } from '../../../../custom-field/infrastructure/typeorm/repositories/typeorm-custom-field-definition.repository';
+import { ValidateCustomFieldValues } from '../../../../custom-field/domain/services/custom-field-validate-values';
 import { CreateTicketRequest } from '../dto/create-ticket.request';
 import { UpdateTicketRequest } from '../dto/update-ticket.request';
 import { ChangeTicketStatusRequest } from '../dto/change-ticket-status.request';
@@ -49,6 +51,7 @@ export class TicketController {
     @Inject() private readonly idGenerator: UlidGenerator,
     @Inject() private readonly eventPublisher: NestEventPublisher,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
+    @Inject() private readonly customFieldDefinitionRepository: TypeOrmCustomFieldDefinitionRepository,
   ) {}
 
   @Post()
@@ -61,7 +64,8 @@ export class TicketController {
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new CreateTicket(this.idGenerator, this.ticketRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-    const command = new CreateTicketCommand(service, ensurePermission, this.userRepository, this.eventPublisher, auditLog);
+    const validateCustomFields = new ValidateCustomFieldValues(this.customFieldDefinitionRepository);
+    const command = new CreateTicketCommand(service, ensurePermission, this.userRepository, this.eventPublisher, auditLog, validateCustomFields);
     return command.execute({
       name: body.name,
       description: body.description,
@@ -73,6 +77,7 @@ export class TicketController {
       userId: user.userId,
       userEmail: user.email,
       tagIds: body.tagIds,
+      customFields: body.customFields,
       isSystemAdmin: user.isSystemAdmin,
     });
   }
@@ -128,7 +133,8 @@ export class TicketController {
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new UpdateTicket(this.ticketRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-    const command = new UpdateTicketCommand(service, this.ticketRepository, ensurePermission, auditLog);
+    const validateCustomFields = new ValidateCustomFieldValues(this.customFieldDefinitionRepository);
+    const command = new UpdateTicketCommand(service, this.ticketRepository, ensurePermission, auditLog, validateCustomFields);
     return command.execute({
       ticketId: id,
       workspaceId: workspace.getId(),
@@ -138,6 +144,7 @@ export class TicketController {
       priority: body.priority,
       category: body.category,
       tagIds: body.tagIds,
+      customFields: body.customFields,
       isSystemAdmin: user.isSystemAdmin,
     });
   }

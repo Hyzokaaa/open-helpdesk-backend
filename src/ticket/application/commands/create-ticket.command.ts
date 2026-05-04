@@ -9,6 +9,7 @@ import { PERMISSIONS } from '../../../workspace/domain/permissions';
 import { TicketCreatedEvent } from '../../../email/domain/events';
 import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
+import { ValidateCustomFieldValues } from '../../../custom-field/domain/services/custom-field-validate-values';
 
 interface Props {
   name: string;
@@ -21,6 +22,7 @@ interface Props {
   userId: string;
   userEmail: string;
   tagIds: string[];
+  customFields?: Record<string, unknown>;
   isSystemAdmin: boolean;
 }
 
@@ -37,6 +39,7 @@ export class CreateTicketCommand implements Command<Props, CreateTicketResponse>
     private readonly userRepository: UserRepository,
     private readonly eventPublisher: EventPublisher,
     private readonly createAuditLog: CreateAuditLogEntry,
+    private readonly validateCustomFields: ValidateCustomFieldValues,
   ) {}
 
   async execute(props: Props): Promise<CreateTicketResponse> {
@@ -47,6 +50,12 @@ export class CreateTicketCommand implements Command<Props, CreateTicketResponse>
       isSystemAdmin: props.isSystemAdmin,
     });
 
+    const validatedCustomFields = await this.validateCustomFields.execute({
+      workspaceId: props.workspaceId,
+      customFields: props.customFields,
+      isCreate: true,
+    });
+
     const ticket = await this.createTicket.execute({
       name: props.name,
       description: props.description,
@@ -55,6 +64,7 @@ export class CreateTicketCommand implements Command<Props, CreateTicketResponse>
       workspaceId: props.workspaceId,
       creatorId: props.userId,
       tagIds: props.tagIds,
+      customFields: validatedCustomFields,
     });
 
     const creator = await this.userRepository.findById(props.userId);

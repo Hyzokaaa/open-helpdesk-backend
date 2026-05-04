@@ -17,6 +17,7 @@ interface Props {
   createdAt: Date | null;
   deletedAt: Date | null;
   tagIds: string[];
+  customFields: Record<string, unknown>;
 }
 
 export class Ticket {
@@ -33,6 +34,7 @@ export class Ticket {
   createdAt: Date | null;
   deletedAt: Date | null;
   tagIds: string[];
+  customFields: Record<string, unknown>;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -48,6 +50,7 @@ export class Ticket {
     this.createdAt = props.createdAt;
     this.deletedAt = props.deletedAt;
     this.tagIds = props.tagIds;
+    this.customFields = props.customFields ?? {};
   }
 
   getId(): string {

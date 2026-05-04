@@ -143,6 +143,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
       createdAt: model.createdAt,
       deletedAt: model.deletedAt,
       tagIds: model.tags ? model.tags.map((t) => t.id) : [],
+      customFields: model.customFields ?? {},
     });
   }
 
@@ -158,6 +159,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
     model.creatorId = ticket.creatorId;
     model.assigneeId = ticket.assigneeId;
     model.resolvedAt = ticket.resolvedAt;
+    model.customFields = ticket.customFields;
     return model;
   }
 }

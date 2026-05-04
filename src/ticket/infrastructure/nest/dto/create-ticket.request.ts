@@ -2,6 +2,7 @@ import {
   IsArray,
   IsEnum,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
 } from 'class-validator';
@@ -27,4 +28,8 @@ export class CreateTicketRequest {
   @IsString({ each: true })
   @IsOptional()
   tagIds: string[] = [];
+
+  @IsObject()
+  @IsOptional()
+  customFields?: Record<string, unknown>;
 }
