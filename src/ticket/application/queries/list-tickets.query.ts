@@ -1,7 +1,7 @@
 import { Query } from '../../../shared/domain/query';
 import { PaginatedResult } from '../../../shared/domain/paginated-result';
 import { EnsureWorkspacePermission } from '../../../workspace/domain/services/workspace-ensure-permission';
-import { PERMISSIONS } from '../../../workspace/domain/permissions';
+import { PERMISSIONS, hasPermission } from '../../../workspace/domain/permissions';
 import {
   TicketFilters,
   TicketRepository,
@@ -37,16 +37,21 @@ export class ListTicketsQuery
   ) {}
 
   async execute(props: Props): Promise<PaginatedResult<TicketListItem>> {
-    await this.ensurePermission.execute({
+    const ctx = await this.ensurePermission.execute({
       workspaceId: props.workspaceId,
       userId: props.userId,
-      permission: PERMISSIONS.TICKET_VIEW,
+      anyOf: [PERMISSIONS.TICKET_VIEW, PERMISSIONS.TICKET_VIEW_OWN],
       isSystemAdmin: props.isSystemAdmin,
     });
 
+    const filters = { ...props.filters };
+    if (!hasPermission(ctx.role, PERMISSIONS.TICKET_VIEW)) {
+      filters.creatorId = props.userId;
+    }
+
     const result = await this.repository.findAll(
       props.workspaceId,
-      props.filters,
+      filters,
       props.page,
       props.limit,
     );

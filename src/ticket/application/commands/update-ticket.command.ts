@@ -62,7 +62,7 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
     const ctx = await this.ensurePermission.execute({
       workspaceId: props.workspaceId,
       userId: props.userId,
-      permission: PERMISSIONS.TICKET_VIEW,
+      anyOf: [PERMISSIONS.TICKET_VIEW, PERMISSIONS.TICKET_VIEW_OWN],
       isSystemAdmin: props.isSystemAdmin,
     });
 

@@ -6,7 +6,8 @@ import { Permission, hasPermission } from '../permissions';
 interface EnsurePermissionProps {
   workspaceId: string;
   userId: string;
-  permission: Permission;
+  permission?: Permission;
+  anyOf?: Permission[];
   isSystemAdmin?: boolean;
 }
 
@@ -34,7 +35,14 @@ export class EnsureWorkspacePermission {
       throw new AccessDeniedError('You are not a member of this workspace');
     }
 
-    if (!hasPermission(member.role, props.permission)) {
+    if (props.anyOf) {
+      const hasAny = props.anyOf.some((p) => hasPermission(member.role, p));
+      if (!hasAny) {
+        throw new AccessDeniedError(
+          `Insufficient permissions: ${props.anyOf.join(' | ')}`,
+        );
+      }
+    } else if (props.permission && !hasPermission(member.role, props.permission)) {
       throw new AccessDeniedError(
         `Insufficient permissions: ${props.permission}`,
       );

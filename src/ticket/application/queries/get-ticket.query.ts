@@ -1,7 +1,8 @@
 import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { Query } from '../../../shared/domain/query';
 import { EnsureWorkspacePermission } from '../../../workspace/domain/services/workspace-ensure-permission';
-import { PERMISSIONS } from '../../../workspace/domain/permissions';
+import { PERMISSIONS, hasPermission } from '../../../workspace/domain/permissions';
+import { AccessDeniedError } from '../../../shared/domain/errors';
 import { TicketRepository } from '../../domain/repositories/ticket.repository';
 
 interface Props {
@@ -32,16 +33,20 @@ export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
   ) {}
 
   async execute(props: Props): Promise<TicketDetailResponse> {
-    await this.ensurePermission.execute({
+    const ctx = await this.ensurePermission.execute({
       workspaceId: props.workspaceId,
       userId: props.userId,
-      permission: PERMISSIONS.TICKET_VIEW,
+      anyOf: [PERMISSIONS.TICKET_VIEW, PERMISSIONS.TICKET_VIEW_OWN],
       isSystemAdmin: props.isSystemAdmin,
     });
 
     const ticket = await this.repository.findById(props.ticketId);
     if (!ticket) {
       throw new EntityNotFoundError('Ticket not found');
+    }
+
+    if (!hasPermission(ctx.role, PERMISSIONS.TICKET_VIEW) && ticket.creatorId !== props.userId) {
+      throw new AccessDeniedError('You can only view your own tickets');
     }
 
     return {

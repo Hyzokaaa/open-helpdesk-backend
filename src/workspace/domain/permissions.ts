@@ -15,6 +15,7 @@ export const PERMISSIONS = {
   // Tickets
   TICKET_CREATE: 'ticket.create',
   TICKET_VIEW: 'ticket.view',
+  TICKET_VIEW_OWN: 'ticket.view.own',
   TICKET_EDIT_NAME: 'ticket.edit.name',
   TICKET_EDIT_DESCRIPTION: 'ticket.edit.description',
   TICKET_EDIT_PRIORITY: 'ticket.edit.priority',
@@ -76,7 +77,7 @@ const AGENT_PERMISSIONS: Permission[] = [
 const REPORTER_PERMISSIONS: Permission[] = [
   PERMISSIONS.TAG_VIEW,
   PERMISSIONS.TICKET_CREATE,
-  PERMISSIONS.TICKET_VIEW,
+  PERMISSIONS.TICKET_VIEW_OWN,
   PERMISSIONS.COMMENT_CREATE,
   PERMISSIONS.ATTACHMENT_UPLOAD,
   PERMISSIONS.ATTACHMENT_DELETE,
