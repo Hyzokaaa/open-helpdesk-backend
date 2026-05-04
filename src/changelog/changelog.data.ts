@@ -28,11 +28,29 @@ export const coreChangelog: ChangelogVersion[] = [
         ],
       },
       {
+        title: { en: 'Custom Fields', es: 'Campos Personalizados' },
+        features: [
+          { en: 'Define custom fields per workspace — text, number, select, multi-select, date, checkbox', es: 'Define campos personalizados por workspace — texto, número, selección, selección múltiple, fecha, casilla' },
+          { en: 'Custom fields appear in ticket creation and detail views', es: 'Los campos personalizados aparecen en la creación y detalle de tickets' },
+          { en: 'Required fields are validated before saving', es: 'Los campos obligatorios se validan antes de guardar' },
+          { en: 'Manage field definitions from a dedicated admin page', es: 'Gestiona las definiciones de campos desde una página dedicada de admin' },
+        ],
+      },
+      {
         title: { en: 'Reporter Experience', es: 'Experiencia del Reportero' },
         features: [
           { en: 'Reporters now see only their own tickets — cleaner, focused view', es: 'Los reporteros ahora solo ven sus propios tickets — vista limpia y enfocada' },
           { en: 'Sidebar shows only relevant sections based on your role', es: 'La barra lateral muestra solo secciones relevantes según tu rol' },
           { en: 'Attachment deletion restricted to files you uploaded', es: 'Eliminación de adjuntos restringida a archivos que tú subiste' },
+          { en: 'Reporters cannot edit priority, category, or tags — only description and custom fields', es: 'Los reporteros no pueden editar prioridad, categoría ni etiquetas — solo descripción y campos personalizados' },
+        ],
+      },
+      {
+        title: { en: 'UI Improvements', es: 'Mejoras de Interfaz' },
+        features: [
+          { en: 'All destructive actions now show a confirmation dialog instead of browser default', es: 'Todas las acciones destructivas ahora muestran un diálogo de confirmación en vez del predeterminado del navegador' },
+          { en: 'Canned responses and custom fields pages use standard table layout with action menus', es: 'Las páginas de respuestas predefinidas y campos personalizados usan el diseño de tabla estándar con menús de acción' },
+          { en: 'Create and edit forms open in a side panel for consistency', es: 'Los formularios de crear y editar abren en un panel lateral para consistencia' },
         ],
       },
     ],
