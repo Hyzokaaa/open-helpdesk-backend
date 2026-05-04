@@ -16,6 +16,28 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.5.0',
+    date: '2026-05-04',
+    categories: [
+      {
+        title: { en: 'Canned Responses', es: 'Respuestas Predefinidas' },
+        features: [
+          { en: 'Canned responses — create reusable reply templates for your workspace', es: 'Respuestas predefinidas — crea plantillas de respuesta reutilizables para tu workspace' },
+          { en: 'Quick insert with "/" while writing comments — type, select, done', es: 'Inserción rápida con "/" al escribir comentarios — escribe, selecciona, listo' },
+          { en: 'Manage responses from a dedicated page (admins and agents)', es: 'Gestiona respuestas desde una página dedicada (admins y agentes)' },
+        ],
+      },
+      {
+        title: { en: 'Reporter Experience', es: 'Experiencia del Reportero' },
+        features: [
+          { en: 'Reporters now see only their own tickets — cleaner, focused view', es: 'Los reporteros ahora solo ven sus propios tickets — vista limpia y enfocada' },
+          { en: 'Sidebar shows only relevant sections based on your role', es: 'La barra lateral muestra solo secciones relevantes según tu rol' },
+          { en: 'Attachment deletion restricted to files you uploaded', es: 'Eliminación de adjuntos restringida a archivos que tú subiste' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.4.0',
     date: '2026-05-03',
     categories: [
