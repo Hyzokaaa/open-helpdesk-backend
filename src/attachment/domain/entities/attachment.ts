@@ -9,6 +9,7 @@ interface Props {
   s3Key: string;
   ticketId: string | null;
   commentId: string | null;
+  uploadedById: string | null;
 }
 
 export class Attachment {
@@ -20,6 +21,7 @@ export class Attachment {
   s3Key: string;
   ticketId: string | null;
   commentId: string | null;
+  uploadedById: string | null;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -30,6 +32,7 @@ export class Attachment {
     this.s3Key = props.s3Key;
     this.ticketId = props.ticketId;
     this.commentId = props.commentId;
+    this.uploadedById = props.uploadedById;
   }
 
   getId(): string {

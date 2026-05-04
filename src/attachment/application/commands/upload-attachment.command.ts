@@ -8,6 +8,7 @@ interface Props {
   size: number;
   ticketId: string | null;
   commentId: string | null;
+  uploadedById: string | null;
 }
 
 export interface UploadAttachmentResponse {
@@ -28,6 +29,7 @@ export class UploadAttachmentCommand implements Command<Props, UploadAttachmentR
       size: props.size,
       ticketId: props.ticketId,
       commentId: props.commentId,
+      uploadedById: props.uploadedById,
     });
 
     return {

@@ -46,6 +46,7 @@ export class TypeOrmAttachmentRepository implements AttachmentRepository {
       s3Key: model.s3Key,
       ticketId: model.ticketId,
       commentId: model.commentId,
+      uploadedById: model.uploadedById,
     });
   }
 
@@ -59,6 +60,7 @@ export class TypeOrmAttachmentRepository implements AttachmentRepository {
     model.s3Key = attachment.s3Key;
     model.ticketId = attachment.ticketId;
     model.commentId = attachment.commentId;
+    model.uploadedById = attachment.uploadedById;
     return model;
   }
 }

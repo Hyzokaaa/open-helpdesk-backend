@@ -9,8 +9,11 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
+import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
 import { S3StorageService } from '../../../../shared/infrastructure/s3-storage.service';
+import { AccessDeniedError } from '../../../../shared/domain/errors';
 import { CreateAttachment } from '../../../domain/services/attachment-create';
 import { DeleteAttachment } from '../../../domain/services/attachment-delete';
 import { UploadAttachmentCommand } from '../../../application/commands/upload-attachment.command';
@@ -32,6 +35,7 @@ export class AttachmentController {
   uploadToTicket(
     @Param('ticketId') ticketId: string,
     @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: AuthUser,
   ) {
     const service = new CreateAttachment(this.idGenerator, this.attachmentRepository, this.s3Storage);
     const command = new UploadAttachmentCommand(service);
@@ -42,6 +46,7 @@ export class AttachmentController {
       size: file.size,
       ticketId,
       commentId: null,
+      uploadedById: user.userId,
     });
   }
 
@@ -56,6 +61,7 @@ export class AttachmentController {
   uploadToComment(
     @Param('commentId') commentId: string,
     @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: AuthUser,
   ) {
     const service = new CreateAttachment(this.idGenerator, this.attachmentRepository, this.s3Storage);
     const command = new UploadAttachmentCommand(service);
@@ -66,6 +72,7 @@ export class AttachmentController {
       size: file.size,
       ticketId: null,
       commentId,
+      uploadedById: user.userId,
     });
   }
 
@@ -76,7 +83,15 @@ export class AttachmentController {
   }
 
   @Delete('attachments/:id')
-  remove(@Param('id') id: string) {
+  async remove(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const attachment = await this.attachmentRepository.findById(id);
+    if (attachment && attachment.uploadedById && attachment.uploadedById !== user.userId && !user.isSystemAdmin) {
+      throw new AccessDeniedError('You can only delete your own attachments');
+    }
+
     const service = new DeleteAttachment(this.attachmentRepository, this.s3Storage);
     const command = new DeleteAttachmentCommand(service);
     return command.execute({ attachmentId: id });

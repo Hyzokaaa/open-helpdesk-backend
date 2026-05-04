@@ -40,6 +40,9 @@ export class AttachmentModel {
   @Column({ type: 'varchar', nullable: true })
   commentId!: string | null;
 
+  @Column({ type: 'varchar', nullable: true })
+  uploadedById!: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 }

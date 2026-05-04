@@ -10,6 +10,7 @@ interface CreateAttachmentProps {
   size: number;
   ticketId: string | null;
   commentId: string | null;
+  uploadedById: string | null;
 }
 
 export class CreateAttachment {
@@ -34,6 +35,7 @@ export class CreateAttachment {
       s3Key,
       ticketId: props.ticketId,
       commentId: props.commentId,
+      uploadedById: props.uploadedById,
     });
 
     await this.repository.create(attachment);
