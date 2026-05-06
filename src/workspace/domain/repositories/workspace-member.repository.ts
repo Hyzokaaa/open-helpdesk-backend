@@ -7,4 +7,5 @@ export interface WorkspaceMemberRepository {
   findByWorkspaceAndUser(workspaceId: string, userId: string): Promise<WorkspaceMember | null>;
   update(member: WorkspaceMember): Promise<void>;
   delete(id: string): Promise<void>;
+  findByWorkspaceIdOrderByCreatedAt(workspaceId: string): Promise<WorkspaceMember[]>;
 }

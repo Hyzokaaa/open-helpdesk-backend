@@ -10,4 +10,5 @@ export interface WorkspaceRepository {
   delete(id: string): Promise<void>;
   existsBySlug(slug: string): Promise<boolean>;
   countByAccountId(accountId: string): Promise<number>;
+  findByAccountIdOrderByCreatedAt(accountId: string): Promise<Workspace[]>;
 }

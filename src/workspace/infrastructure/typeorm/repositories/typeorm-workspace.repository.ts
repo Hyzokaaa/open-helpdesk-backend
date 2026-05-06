@@ -70,6 +70,14 @@ export class TypeOrmWorkspaceRepository implements WorkspaceRepository {
     return this.repository.count({ where: { accountId } });
   }
 
+  async findByAccountIdOrderByCreatedAt(accountId: string): Promise<Workspace[]> {
+    const models = await this.repository.find({
+      where: { accountId },
+      order: { createdAt: 'ASC' },
+    });
+    return models.map((m) => this.toDomain(m));
+  }
+
   private toDomain(model: WorkspaceModel): Workspace {
     return new Workspace({
       id: model.id,

@@ -37,6 +37,10 @@ export class MockWorkspaceRepository implements WorkspaceRepository {
     return this.workspaces.filter((w) => w.accountId === accountId).length;
   }
 
+  async findByAccountIdOrderByCreatedAt(accountId: string): Promise<Workspace[]> {
+    return this.workspaces.filter((w) => w.accountId === accountId);
+  }
+
   seed(workspace: Workspace): void {
     this.workspaces.push(workspace);
   }

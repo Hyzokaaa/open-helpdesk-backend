@@ -45,6 +45,14 @@ export class TypeOrmWorkspaceMemberRepository implements WorkspaceMemberReposito
     await this.repository.delete(id);
   }
 
+  async findByWorkspaceIdOrderByCreatedAt(workspaceId: string): Promise<WorkspaceMember[]> {
+    const models = await this.repository.find({
+      where: { workspaceId },
+      order: { createdAt: 'ASC' },
+    });
+    return models.map((m) => this.toDomain(m));
+  }
+
   private toDomain(model: WorkspaceMemberModel): WorkspaceMember {
     return new WorkspaceMember({
       id: model.id,
