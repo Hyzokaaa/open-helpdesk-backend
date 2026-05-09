@@ -16,6 +16,32 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.6.0',
+    date: '2026-05-09',
+    categories: [
+      {
+        title: { en: 'Reports Dashboard', es: 'Panel de Reportes' },
+        features: [
+          { en: 'Reports page with key metrics — open tickets, resolved count, resolution time, first response time', es: 'Página de reportes con métricas clave — tickets abiertos, resueltos, tiempo de resolución, primera respuesta' },
+          { en: 'Tickets over time chart — see creation and resolution trends', es: 'Gráfica de tickets en el tiempo — ve tendencias de creación y resolución' },
+          { en: 'Breakdown by status, priority, and category with visual charts', es: 'Desglose por estado, prioridad y categoría con gráficas visuales' },
+          { en: 'Top agents ranking — who resolved the most tickets', es: 'Ranking de mejores agentes — quién resolvió más tickets' },
+          { en: 'Date range filter — view data for last 7, 30, or 90 days', es: 'Filtro por rango de fechas — ve datos de los últimos 7, 30 o 90 días' },
+        ],
+      },
+      {
+        title: { en: 'Ticket Lifecycle', es: 'Ciclo de Vida del Ticket' },
+        features: [
+          { en: 'New "Discarded" status replaces "Closed" — for spam, duplicates, and unanswered tickets', es: 'Nuevo estado "Descartado" reemplaza "Cerrado" — para spam, duplicados y tickets sin respuesta' },
+          { en: 'Discard reason required when discarding — duplicate, spam, no response, or won\'t fix', es: 'Razón de descarte obligatoria al descartar — duplicado, spam, sin respuesta o no se corregirá' },
+          { en: 'Three ticket tabs: Active, Resolved, and Discarded', es: 'Tres pestañas de tickets: Activos, Resueltos y Descartados' },
+          { en: 'Resolved tickets track who resolved them — accurate agent performance metrics', es: 'Los tickets resueltos registran quién los resolvió — métricas de rendimiento precisas' },
+          { en: 'Discarded tickets are excluded from resolution metrics and agent rankings', es: 'Los tickets descartados se excluyen de métricas de resolución y rankings de agentes' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.5.0',
     date: '2026-05-04',
     categories: [
