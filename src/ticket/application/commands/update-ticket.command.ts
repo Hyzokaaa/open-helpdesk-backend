@@ -43,14 +43,14 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
     const ticket = await this.ticketRepository.findById(props.ticketId);
     if (!ticket) throw new EntityNotFoundError('Ticket not found');
 
-    const isClosed = ticket.status === 'closed';
+    const isClosed = ticket.status === 'discarded' || ticket.status === 'resolved';
     const isCreator = ticket.creatorId === props.userId;
 
     if (isClosed) {
       await this.ensurePermission.execute({
         workspaceId: props.workspaceId,
         userId: props.userId,
-        permission: PERMISSIONS.TICKET_EDIT_CLOSED,
+        permission: PERMISSIONS.TICKET_EDIT_DISCARDED,
         isSystemAdmin: props.isSystemAdmin,
       });
     } else if (!isCreator) {

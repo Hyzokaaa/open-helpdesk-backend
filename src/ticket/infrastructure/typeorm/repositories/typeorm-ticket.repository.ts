@@ -5,6 +5,7 @@ import { PaginatedResult } from '../../../../shared/domain/paginated-result';
 import { Ticket } from '../../../domain/entities/ticket';
 import { TicketCategory } from '../../../domain/enums/ticket-category.enum';
 import { TicketPriority } from '../../../domain/enums/ticket-priority.enum';
+import { TicketDiscardReason } from '../../../domain/enums/ticket-discard-reason.enum';
 import { TicketStatus } from '../../../domain/enums/ticket-status.enum';
 import {
   TicketFilters,
@@ -53,7 +54,8 @@ export class TypeOrmTicketRepository implements TicketRepository {
       qb.andWhere('ticket.status = :status', { status: filters.status });
     }
     if (filters.excludeStatus) {
-      qb.andWhere('ticket.status != :excludeStatus', { excludeStatus: filters.excludeStatus });
+      const excluded = filters.excludeStatus.split(',');
+      qb.andWhere('ticket.status NOT IN (:...excluded)', { excluded });
     }
     if (filters.priority) {
       qb.andWhere('ticket.priority = :priority', {
@@ -140,10 +142,12 @@ export class TypeOrmTicketRepository implements TicketRepository {
       creatorId: model.creatorId,
       assigneeId: model.assigneeId,
       resolvedAt: model.resolvedAt,
+      resolvedById: model.resolvedById,
       createdAt: model.createdAt,
       deletedAt: model.deletedAt,
       tagIds: model.tags ? model.tags.map((t) => t.id) : [],
       customFields: model.customFields ?? {},
+      discardReason: model.discardReason as TicketDiscardReason | null,
     });
   }
 
@@ -159,7 +163,9 @@ export class TypeOrmTicketRepository implements TicketRepository {
     model.creatorId = ticket.creatorId;
     model.assigneeId = ticket.assigneeId;
     model.resolvedAt = ticket.resolvedAt;
+    model.resolvedById = ticket.resolvedById;
     model.customFields = ticket.customFields;
+    model.discardReason = ticket.discardReason;
     return model;
   }
 }

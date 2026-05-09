@@ -34,10 +34,12 @@ export class CreateTicket {
       creatorId: props.creatorId,
       assigneeId: null,
       resolvedAt: null,
+      resolvedById: null,
       createdAt: null,
       deletedAt: null,
       tagIds: props.tagIds,
       customFields: props.customFields ?? {},
+      discardReason: null,
     });
 
     await this.repository.create(ticket);

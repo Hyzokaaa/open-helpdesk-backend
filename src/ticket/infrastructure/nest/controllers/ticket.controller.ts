@@ -164,6 +164,7 @@ export class TicketController {
     return command.execute({
       ticketId: id,
       status: body.status,
+      discardReason: body.discardReason,
       workspaceId: workspace.getId(),
       workspaceName: workspace.name,
       workspaceSlug: workspace.slug,

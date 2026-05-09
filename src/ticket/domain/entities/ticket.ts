@@ -1,6 +1,7 @@
 import { Id } from '../../../shared/domain/id';
 import { TicketCategory } from '../enums/ticket-category.enum';
 import { TicketPriority } from '../enums/ticket-priority.enum';
+import { TicketDiscardReason } from '../enums/ticket-discard-reason.enum';
 import { TicketStatus } from '../enums/ticket-status.enum';
 
 interface Props {
@@ -14,10 +15,12 @@ interface Props {
   creatorId: string;
   assigneeId: string | null;
   resolvedAt: Date | null;
+  resolvedById: string | null;
   createdAt: Date | null;
   deletedAt: Date | null;
   tagIds: string[];
   customFields: Record<string, unknown>;
+  discardReason: TicketDiscardReason | null;
 }
 
 export class Ticket {
@@ -31,10 +34,12 @@ export class Ticket {
   creatorId: string;
   assigneeId: string | null;
   resolvedAt: Date | null;
+  resolvedById: string | null;
   createdAt: Date | null;
   deletedAt: Date | null;
   tagIds: string[];
   customFields: Record<string, unknown>;
+  discardReason: TicketDiscardReason | null;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -47,10 +52,12 @@ export class Ticket {
     this.creatorId = props.creatorId;
     this.assigneeId = props.assigneeId;
     this.resolvedAt = props.resolvedAt;
+    this.resolvedById = props.resolvedById ?? null;
     this.createdAt = props.createdAt;
     this.deletedAt = props.deletedAt;
     this.tagIds = props.tagIds;
     this.customFields = props.customFields ?? {};
+    this.discardReason = props.discardReason ?? null;
   }
 
   getId(): string {

@@ -54,8 +54,14 @@ export class TicketModel {
   @Column({ type: 'timestamp', nullable: true })
   resolvedAt!: Date | null;
 
+  @Column({ type: 'varchar', nullable: true })
+  resolvedById!: string | null;
+
   @Column({ type: 'jsonb', default: {} })
   customFields!: Record<string, unknown>;
+
+  @Column({ type: 'varchar', nullable: true })
+  discardReason!: string | null;
 
   @ManyToMany(() => TagModel)
   @JoinTable({ name: 'ticket_tag' })

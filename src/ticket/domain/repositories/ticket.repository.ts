@@ -5,7 +5,7 @@ import { TicketStatus } from '../enums/ticket-status.enum';
 
 export interface TicketFilters {
   status?: TicketStatus;
-  excludeStatus?: TicketStatus;
+  excludeStatus?: string;
   priority?: TicketPriority;
   tagIds?: string[];
   assigneeId?: string;

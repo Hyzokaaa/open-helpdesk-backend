@@ -22,10 +22,10 @@ export const PERMISSIONS = {
   TICKET_EDIT_CATEGORY: 'ticket.edit.category',
   TICKET_EDIT_TAGS: 'ticket.edit.tags',
   TICKET_CHANGE_STATUS: 'ticket.change.status',
-  TICKET_CHANGE_STATUS_CLOSED: 'ticket.change.status.closed',
+  TICKET_CHANGE_STATUS_DISCARDED: 'ticket.change.status.discarded',
   TICKET_ASSIGN: 'ticket.assign',
   TICKET_DELETE: 'ticket.delete',
-  TICKET_EDIT_CLOSED: 'ticket.edit.closed',
+  TICKET_EDIT_DISCARDED: 'ticket.edit.discarded',
 
   // Comments
   COMMENT_CREATE: 'comment.create',

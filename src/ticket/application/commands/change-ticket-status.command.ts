@@ -1,6 +1,7 @@
 import { EventPublisher } from '../../../shared/domain/event-publisher';
 import { Command } from '../../../shared/domain/command';
 import { EntityNotFoundError } from '../../../shared/domain/errors';
+import { TicketDiscardReason } from '../../domain/enums/ticket-discard-reason.enum';
 import { TicketStatus } from '../../domain/enums/ticket-status.enum';
 import { TicketRepository } from '../../domain/repositories/ticket.repository';
 import { ChangeTicketStatus } from '../../domain/services/ticket-change-status';
@@ -13,6 +14,7 @@ import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
 interface Props {
   ticketId: string;
   status: TicketStatus;
+  discardReason?: TicketDiscardReason;
   workspaceId: string;
   workspaceName: string;
   workspaceSlug: string;
@@ -39,8 +41,8 @@ export class ChangeTicketStatusCommand implements Command<Props, ChangeStatusRes
     const ticket = await this.ticketRepository.findById(props.ticketId);
     if (!ticket) throw new EntityNotFoundError('Ticket not found');
 
-    const permission = ticket.status === 'closed'
-      ? PERMISSIONS.TICKET_CHANGE_STATUS_CLOSED
+    const permission = ticket.status === 'discarded'
+      ? PERMISSIONS.TICKET_CHANGE_STATUS_DISCARDED
       : PERMISSIONS.TICKET_CHANGE_STATUS;
 
     await this.ensurePermission.execute({
@@ -54,6 +56,8 @@ export class ChangeTicketStatusCommand implements Command<Props, ChangeStatusRes
     const updated = await this.changeStatus.execute({
       ticketId: props.ticketId,
       status: props.status,
+      discardReason: props.discardReason,
+      userId: props.userId,
     });
 
     const event: StatusChangedEvent = {
