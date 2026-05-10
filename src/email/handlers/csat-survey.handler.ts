@@ -11,6 +11,7 @@ import { TypeOrmTicketRepository } from '../../ticket/infrastructure/typeorm/rep
 import { TypeOrmCsatResponseRepository } from '../../csat/infrastructure/typeorm/repositories/typeorm-csat-response.repository';
 import { UlidGenerator } from '../../shared/infrastructure/ulid-generator';
 import { CsatResponse } from '../../csat/domain/entities/csat-response';
+import { CSAT_SURVEY_GUARD, CsatSurveyGuard } from '../../csat/domain/csat-survey-guard';
 
 @Injectable()
 export class CsatSurveyHandler {
@@ -19,6 +20,7 @@ export class CsatSurveyHandler {
 
   constructor(
     @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
+    @Inject(CSAT_SURVEY_GUARD) private readonly surveyGuard: CsatSurveyGuard,
     private readonly userRepository: TypeOrmUserRepository,
     private readonly ticketRepository: TypeOrmTicketRepository,
     private readonly csatRepository: TypeOrmCsatResponseRepository,
@@ -31,6 +33,9 @@ export class CsatSurveyHandler {
   @OnEvent('ticket.statusChanged')
   async handle(event: StatusChangedEvent): Promise<void> {
     if (event.newStatus !== 'resolved') return;
+
+    const allowed = await this.surveyGuard.canSendSurvey(event.workspaceSlug);
+    if (!allowed) return;
 
     const ticket = await this.ticketRepository.findById(event.ticketId);
     if (!ticket) return;

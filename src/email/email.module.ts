@@ -14,6 +14,7 @@ import { SharedModule } from '../shared/shared.module';
 import { CsatModule } from '../csat/csat.module';
 import { TicketModule } from '../ticket/ticket.module';
 import { EMAIL_SERVICE } from './email.constants';
+import { CSAT_SURVEY_GUARD } from '../csat/domain/csat-survey-guard';
 
 @Global()
 @Module({
@@ -35,7 +36,8 @@ import { EMAIL_SERVICE } from './email.constants';
     NewCommentHandler,
     StatusChangedHandler,
     CsatSurveyHandler,
+    { provide: CSAT_SURVEY_GUARD, useValue: { canSendSurvey: async () => true } },
   ],
-  exports: [EMAIL_SERVICE],
+  exports: [EMAIL_SERVICE, CSAT_SURVEY_GUARD],
 })
 export class EmailModule {}

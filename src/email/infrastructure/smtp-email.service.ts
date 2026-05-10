@@ -30,7 +30,7 @@ export class SmtpEmailService implements EmailService {
         auth: { user, pass: password },
         tls: { rejectUnauthorized },
         family: 4,
-      });
+      } as any);
       this.logger.log(`SMTP email service initialized (${host}:${port})`);
     } else {
       this.transporter = null;
