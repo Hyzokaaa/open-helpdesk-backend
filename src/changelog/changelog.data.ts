@@ -39,6 +39,22 @@ export const coreChangelog: ChangelogVersion[] = [
           { en: 'Discarded tickets are excluded from resolution metrics and agent rankings', es: 'Los tickets descartados se excluyen de métricas de resolución y rankings de agentes' },
         ],
       },
+      {
+        title: { en: 'Customer Satisfaction', es: 'Satisfacción del Cliente' },
+        features: [
+          { en: 'Satisfaction survey sent automatically when a ticket is resolved', es: 'Encuesta de satisfacción enviada automáticamente al resolver un ticket' },
+          { en: 'One-click rating from email — Good, Neutral, or Bad, no login required', es: 'Calificación con un click desde el email — Buena, Neutral o Mala, sin necesidad de iniciar sesión' },
+          { en: 'CSAT score and breakdown displayed in the reports dashboard', es: 'Puntaje CSAT y desglose mostrados en el panel de reportes' },
+          { en: 'Surveys are skipped when the resolver is also the ticket creator', es: 'Las encuestas se omiten cuando quien resuelve es también quien creó el ticket' },
+        ],
+      },
+      {
+        title: { en: 'Permissions', es: 'Permisos' },
+        features: [
+          { en: 'Reporters can no longer edit tickets after creation — updates happen through comments', es: 'Los reporteros ya no pueden editar tickets después de crearlos — las actualizaciones se hacen por comentarios' },
+          { en: 'Canned responses reserved for agents and admins only', es: 'Respuestas predefinidas reservadas solo para agentes y administradores' },
+        ],
+      },
     ],
   },
   {
