@@ -1,29 +1,30 @@
-import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { EventEmitterModule } from '@nestjs/event-emitter';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { JwtAuthGuard } from './shared/nest/guards/jwt-auth.guard';
-import { EmailVerifiedGuard } from './shared/nest/guards/email-verified.guard';
-import { SharedModule } from './shared/shared.module';
-import { UserModule } from './user/user.module';
-import { WorkspaceModule } from './workspace/workspace.module';
-import { TagModule } from './tag/tag.module';
-import { TicketModule } from './ticket/ticket.module';
-import { CommentModule } from './comment/comment.module';
-import { AttachmentModule } from './attachment/attachment.module';
-import { NotificationModule } from './notification/notification.module';
-import { EmailModule } from './email/email.module';
-import { AccountModule } from './account/account.module';
-import { AuditLogModule } from './audit-log/audit-log.module';
-import { CannedResponseModule } from './canned-response/canned-response.module';
-import { CustomFieldModule } from './custom-field/custom-field.module';
-import { ReportModule } from './report/report.module';
-import { CsatModule } from './csat/csat.module';
-import { HealthController } from './health.controller';
-import { ChangelogController } from './changelog/changelog.controller';
-import { AuditLogController } from './audit-log/infrastructure/nest/controllers/audit-log.controller';
+import { Module } from "@nestjs/common";
+import { APP_GUARD } from "@nestjs/core";
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { EventEmitterModule } from "@nestjs/event-emitter";
+import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
+import { JwtAuthGuard } from "./shared/nest/guards/jwt-auth.guard";
+import { EmailVerifiedGuard } from "./shared/nest/guards/email-verified.guard";
+import { SharedModule } from "./shared/shared.module";
+import { UserModule } from "./user/user.module";
+import { WorkspaceModule } from "./workspace/workspace.module";
+import { TagModule } from "./tag/tag.module";
+import { TicketModule } from "./ticket/ticket.module";
+import { CommentModule } from "./comment/comment.module";
+import { AttachmentModule } from "./attachment/attachment.module";
+import { NotificationModule } from "./notification/notification.module";
+import { EmailModule } from "./email/email.module";
+import { AccountModule } from "./account/account.module";
+import { AuditLogModule } from "./audit-log/audit-log.module";
+import { CannedResponseModule } from "./canned-response/canned-response.module";
+import { CustomFieldModule } from "./custom-field/custom-field.module";
+import { ReportModule } from "./report/report.module";
+import { CsatModule } from "./csat/csat.module";
+import { HealthController } from "./health.controller";
+import { ChangelogController } from "./changelog/changelog.controller";
+import { AuditLogController } from "./audit-log/infrastructure/nest/controllers/audit-log.controller";
+import { CSAT_SURVEY_GUARD } from "./csat/domain/csat-survey-guard";
 
 @Module({
   controllers: [HealthController, ChangelogController, AuditLogController],
@@ -31,6 +32,10 @@ import { AuditLogController } from './audit-log/infrastructure/nest/controllers/
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: EmailVerifiedGuard },
+    {
+      provide: CSAT_SURVEY_GUARD,
+      useValue: { canSendSurvey: async () => true },
+    },
   ],
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -39,16 +44,16 @@ import { AuditLogController } from './audit-log/infrastructure/nest/controllers/
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        type: 'postgres',
-        host: config.get('DB_HOST', 'localhost'),
-        port: config.get('DB_PORT', 5432),
-        username: config.get('DB_USER', 'postgres'),
-        password: config.get('DB_PASSWORD', 'postgres'),
-        database: config.get('DB_NAME', 'open_helpdesk'),
+        type: "postgres",
+        host: config.get("DB_HOST", "localhost"),
+        port: config.get("DB_PORT", 5432),
+        username: config.get("DB_USER", "postgres"),
+        password: config.get("DB_PASSWORD", "postgres"),
+        database: config.get("DB_NAME", "open_helpdesk"),
         autoLoadEntities: true,
-        synchronize: config.get('DB_SYNCHRONIZE', 'false') === 'true',
-        migrationsRun: config.get('DB_RUN_MIGRATIONS', 'true') === 'true',
-        migrations: [__dirname + '/database/migrations/*{.ts,.js}'],
+        synchronize: config.get("DB_SYNCHRONIZE", "false") === "true",
+        migrationsRun: config.get("DB_RUN_MIGRATIONS", "true") === "true",
+        migrations: [__dirname + "/database/migrations/*{.ts,.js}"],
       }),
     }),
     SharedModule,
