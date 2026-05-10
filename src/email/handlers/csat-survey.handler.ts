@@ -1,4 +1,5 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { OnEvent } from '@nestjs/event-emitter';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
@@ -14,13 +15,14 @@ import { CsatResponse } from '../../csat/domain/entities/csat-response';
 import { CSAT_SURVEY_GUARD, CsatSurveyGuard } from '../../csat/domain/csat-survey-guard';
 
 @Injectable()
-export class CsatSurveyHandler {
+export class CsatSurveyHandler implements OnModuleInit {
   private readonly logger = new Logger(CsatSurveyHandler.name);
   private readonly apiUrl: string;
+  private surveyGuard: CsatSurveyGuard | null = null;
 
   constructor(
     @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
-    @Inject(CSAT_SURVEY_GUARD) private readonly surveyGuard: CsatSurveyGuard,
+    private readonly moduleRef: ModuleRef,
     private readonly userRepository: TypeOrmUserRepository,
     private readonly ticketRepository: TypeOrmTicketRepository,
     private readonly csatRepository: TypeOrmCsatResponseRepository,
@@ -30,12 +32,24 @@ export class CsatSurveyHandler {
     this.apiUrl = config.get('API_URL', 'http://localhost:3000');
   }
 
+  onModuleInit(): void {
+    try {
+      this.surveyGuard = this.moduleRef.get(CSAT_SURVEY_GUARD, { strict: false });
+      this.logger.log('CSAT survey guard found — surveys will be plan-gated');
+    } catch {
+      this.surveyGuard = null;
+      this.logger.log('No CSAT survey guard found — surveys enabled for all workspaces');
+    }
+  }
+
   @OnEvent('ticket.statusChanged')
   async handle(event: StatusChangedEvent): Promise<void> {
     if (event.newStatus !== 'resolved') return;
 
-    const allowed = await this.surveyGuard.canSendSurvey(event.workspaceSlug);
-    if (!allowed) return;
+    if (this.surveyGuard) {
+      const allowed = await this.surveyGuard.canSendSurvey(event.workspaceSlug);
+      if (!allowed) return;
+    }
 
     const ticket = await this.ticketRepository.findById(event.ticketId);
     if (!ticket) return;

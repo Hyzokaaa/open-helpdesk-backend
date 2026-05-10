@@ -24,18 +24,12 @@ import { CsatModule } from "./csat/csat.module";
 import { HealthController } from "./health.controller";
 import { ChangelogController } from "./changelog/changelog.controller";
 import { AuditLogController } from "./audit-log/infrastructure/nest/controllers/audit-log.controller";
-import { CSAT_SURVEY_GUARD } from "./csat/domain/csat-survey-guard";
-
 @Module({
   controllers: [HealthController, ChangelogController, AuditLogController],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: EmailVerifiedGuard },
-    {
-      provide: CSAT_SURVEY_GUARD,
-      useValue: { canSendSurvey: async () => true },
-    },
   ],
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
