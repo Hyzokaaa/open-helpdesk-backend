@@ -20,6 +20,7 @@ import { AuditLogModule } from './audit-log/audit-log.module';
 import { CannedResponseModule } from './canned-response/canned-response.module';
 import { CustomFieldModule } from './custom-field/custom-field.module';
 import { ReportModule } from './report/report.module';
+import { CsatModule } from './csat/csat.module';
 import { HealthController } from './health.controller';
 import { ChangelogController } from './changelog/changelog.controller';
 import { AuditLogController } from './audit-log/infrastructure/nest/controllers/audit-log.controller';
@@ -64,6 +65,7 @@ import { AuditLogController } from './audit-log/infrastructure/nest/controllers/
     CannedResponseModule,
     CustomFieldModule,
     ReportModule,
+    CsatModule,
   ],
 })
 export class AppModule {}

@@ -181,7 +181,28 @@ const translations: Translations = {
   'status.pending': { en: 'Pending', es: 'Pendiente' },
   'status.in-progress': { en: 'In Progress', es: 'En progreso' },
   'status.resolved': { en: 'Resolved', es: 'Resuelto' },
-  'status.closed': { en: 'Closed', es: 'Cerrado' },
+  'status.discarded': { en: 'Discarded', es: 'Descartado' },
+
+  // CSAT survey
+  'csat.subject': {
+    en: 'How was your experience?',
+    es: '¿Cómo fue tu experiencia?',
+  },
+  'csat.title': {
+    en: 'Your ticket has been resolved',
+    es: 'Tu ticket ha sido resuelto',
+  },
+  'csat.body': {
+    en: 'Your ticket {ticketName} has been resolved. We\'d love to hear your feedback.',
+    es: 'Tu ticket {ticketName} ha sido resuelto. Nos encantaría conocer tu opinión.',
+  },
+  'csat.question': {
+    en: 'How would you rate your experience?',
+    es: '¿Cómo calificarías tu experiencia?',
+  },
+  'csat.good': { en: 'Good', es: 'Buena' },
+  'csat.neutral': { en: 'Neutral', es: 'Neutral' },
+  'csat.bad': { en: 'Bad', es: 'Mala' },
 };
 
 export function t(key: string, lang: string, vars?: Record<string, string>): string {

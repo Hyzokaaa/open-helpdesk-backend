@@ -6,15 +6,18 @@ import { TicketCreatedHandler } from './handlers/ticket-created.handler';
 import { TicketAssignedHandler } from './handlers/ticket-assigned.handler';
 import { NewCommentHandler } from './handlers/new-comment.handler';
 import { StatusChangedHandler } from './handlers/status-changed.handler';
+import { CsatSurveyHandler } from './handlers/csat-survey.handler';
 import { UserModule } from '../user/user.module';
 import { WorkspaceModule } from '../workspace/workspace.module';
 import { NotificationModule } from '../notification/notification.module';
 import { SharedModule } from '../shared/shared.module';
+import { CsatModule } from '../csat/csat.module';
+import { TicketModule } from '../ticket/ticket.module';
 import { EMAIL_SERVICE } from './email.constants';
 
 @Global()
 @Module({
-  imports: [UserModule, WorkspaceModule, NotificationModule, SharedModule],
+  imports: [UserModule, WorkspaceModule, NotificationModule, SharedModule, CsatModule, TicketModule],
   providers: [
     {
       provide: EMAIL_SERVICE,
@@ -31,6 +34,7 @@ import { EMAIL_SERVICE } from './email.constants';
     TicketAssignedHandler,
     NewCommentHandler,
     StatusChangedHandler,
+    CsatSurveyHandler,
   ],
   exports: [EMAIL_SERVICE],
 })

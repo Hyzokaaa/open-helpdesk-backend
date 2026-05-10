@@ -16,12 +16,15 @@ export interface ReportResult {
     resolvedThisPeriod: number;
     avgResolutionTimeHours: number | null;
     avgFirstResponseTimeHours: number | null;
+    csatScore: number | null;
+    csatResponseCount: number;
   };
   ticketsOverTime: { date: string; created: number; resolved: number }[];
   ticketsByStatus: { status: string; count: number }[];
   ticketsByPriority: { priority: string; count: number }[];
   ticketsByCategory: { category: string; count: number }[];
   topAgents: { resolvedById: string; name: string; resolved: number }[];
+  csatBreakdown: { rating: string; count: number }[];
 }
 
 export class GetWorkspaceReportQuery {
@@ -45,6 +48,7 @@ export class GetWorkspaceReportQuery {
       ticketsByPriority,
       ticketsByCategory,
       topAgents,
+      csatData,
     ] = await Promise.all([
       this.getOverview(props),
       this.getTicketsOverTime(props),
@@ -52,9 +56,14 @@ export class GetWorkspaceReportQuery {
       this.getTicketsByField(props, 'priority'),
       this.getTicketsByField(props, 'category'),
       this.getTopAgents(props),
+      this.getCsatData(props),
     ]);
 
-    return { overview, ticketsOverTime, ticketsByStatus, ticketsByPriority, ticketsByCategory, topAgents };
+    return {
+      overview: { ...overview, csatScore: csatData.score, csatResponseCount: csatData.total },
+      ticketsOverTime, ticketsByStatus, ticketsByPriority, ticketsByCategory, topAgents,
+      csatBreakdown: csatData.breakdown,
+    };
   }
 
   private async getOverview(props: Props) {
@@ -165,5 +174,30 @@ export class GetWorkspaceReportQuery {
       name: r.name,
       resolved: parseInt(r.resolved, 10),
     }));
+  }
+
+  private async getCsatData(props: Props) {
+    const [summary] = await this.dataSource.query(
+      `SELECT
+        AVG(CASE rating WHEN 'good' THEN 100 WHEN 'neutral' THEN 50 WHEN 'bad' THEN 0 END) as score,
+        COUNT(*) as total
+       FROM csat_responses
+       WHERE "workspaceId" = $1 AND "respondedAt" >= $2 AND "respondedAt" < $3 AND rating IS NOT NULL`,
+      [props.workspaceId, props.dateFrom, props.dateTo],
+    );
+
+    const breakdownRows = await this.dataSource.query(
+      `SELECT rating, COUNT(*) as count
+       FROM csat_responses
+       WHERE "workspaceId" = $1 AND "respondedAt" >= $2 AND "respondedAt" < $3 AND rating IS NOT NULL
+       GROUP BY rating ORDER BY count DESC`,
+      [props.workspaceId, props.dateFrom, props.dateTo],
+    );
+
+    return {
+      score: summary.score ? parseFloat(summary.score) : null,
+      total: parseInt(summary.total, 10),
+      breakdown: breakdownRows.map((r: any) => ({ rating: r.rating, count: parseInt(r.count, 10) })),
+    };
   }
 }
