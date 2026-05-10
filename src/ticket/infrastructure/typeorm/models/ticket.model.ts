@@ -51,7 +51,7 @@ export class TicketModel {
   @Column({ type: 'varchar', nullable: true })
   assigneeId!: string | null;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   resolvedAt!: Date | null;
 
   @Column({ type: 'varchar', nullable: true })

@@ -43,24 +43,14 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
     const ticket = await this.ticketRepository.findById(props.ticketId);
     if (!ticket) throw new EntityNotFoundError('Ticket not found');
 
-    const isClosed = ticket.status === 'discarded' || ticket.status === 'resolved';
-    const isCreator = ticket.creatorId === props.userId;
+    const isTerminal = ticket.status === 'discarded' || ticket.status === 'resolved';
 
-    if (isClosed) {
-      await this.ensurePermission.execute({
-        workspaceId: props.workspaceId,
-        userId: props.userId,
-        permission: PERMISSIONS.TICKET_EDIT_DISCARDED,
-        isSystemAdmin: props.isSystemAdmin,
-      });
-    } else if (!isCreator) {
-      await this.ensurePermission.execute({
-        workspaceId: props.workspaceId,
-        userId: props.userId,
-        permission: PERMISSIONS.TICKET_EDIT_DESCRIPTION,
-        isSystemAdmin: props.isSystemAdmin,
-      });
-    }
+    await this.ensurePermission.execute({
+      workspaceId: props.workspaceId,
+      userId: props.userId,
+      permission: isTerminal ? PERMISSIONS.TICKET_EDIT_DISCARDED : PERMISSIONS.TICKET_EDIT_DESCRIPTION,
+      isSystemAdmin: props.isSystemAdmin,
+    });
 
     const ctx = await this.ensurePermission.execute({
       workspaceId: props.workspaceId,
@@ -73,11 +63,12 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
     const canEditPriority = hasPermission(ctx.role, PERMISSIONS.TICKET_EDIT_PRIORITY);
     const canEditCategory = hasPermission(ctx.role, PERMISSIONS.TICKET_EDIT_CATEGORY);
     const canEditTags = hasPermission(ctx.role, PERMISSIONS.TICKET_EDIT_TAGS);
+    const canEditCustomFields = hasPermission(ctx.role, PERMISSIONS.TICKET_EDIT_DESCRIPTION);
 
     const before = { name: ticket.name, priority: ticket.priority, category: ticket.category };
 
     let validatedCustomFields: Record<string, unknown> | undefined;
-    if (props.customFields) {
+    if (props.customFields && canEditCustomFields) {
       validatedCustomFields = await this.validateCustomFields.execute({
         workspaceId: props.workspaceId,
         customFields: props.customFields,

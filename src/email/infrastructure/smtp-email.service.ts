@@ -29,6 +29,7 @@ export class SmtpEmailService implements EmailService {
         secure: port === 465,
         auth: { user, pass: password },
         tls: { rejectUnauthorized },
+        family: 4,
       });
       this.logger.log(`SMTP email service initialized (${host}:${port})`);
     } else {
