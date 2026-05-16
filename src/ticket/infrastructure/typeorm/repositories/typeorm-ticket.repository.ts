@@ -95,8 +95,12 @@ export class TypeOrmTicketRepository implements TicketRepository {
 
     const field = VALID_SORT_FIELDS[filters.sortBy ?? ''] ?? { col: 'ticket.createdAt', lower: false };
     const sortOrder = filters.sortOrder === 'ASC' ? 'ASC' : 'DESC';
-    const expr = field.lower ? `LOWER(${field.col})` : field.col;
-    qb.orderBy(expr, sortOrder);
+    if (field.lower) {
+      qb.addSelect(`LOWER(${field.col})`, 'sort_key');
+      qb.orderBy('sort_key', sortOrder);
+    } else {
+      qb.orderBy(field.col, sortOrder);
+    }
     qb.skip((page - 1) * limit).take(limit);
 
     const [models, total] = await qb.getManyAndCount();
