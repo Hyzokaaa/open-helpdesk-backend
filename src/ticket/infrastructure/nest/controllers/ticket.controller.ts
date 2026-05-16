@@ -35,9 +35,13 @@ import { EnsureWorkspacePermission } from '../../../../workspace/domain/services
 import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit-log-create';
 import { TypeOrmCustomFieldDefinitionRepository } from '../../../../custom-field/infrastructure/typeorm/repositories/typeorm-custom-field-definition.repository';
 import { ValidateCustomFieldValues } from '../../../../custom-field/domain/services/custom-field-validate-values';
+import { BulkChangeStatusCommand } from '../../../application/commands/bulk-change-status.command';
+import { BulkDeleteCommand } from '../../../application/commands/bulk-delete.command';
 import { CreateTicketRequest } from '../dto/create-ticket.request';
 import { UpdateTicketRequest } from '../dto/update-ticket.request';
 import { ChangeTicketStatusRequest } from '../dto/change-ticket-status.request';
+import { BulkChangeStatusRequest } from '../dto/bulk-change-status.request';
+import { BulkDeleteRequest } from '../dto/bulk-delete.request';
 import { AssignTicketRequest } from '../dto/assign-ticket.request';
 import { TicketFilterDto } from '../dto/ticket-filter.dto';
 
@@ -106,6 +110,50 @@ export class TicketController {
       },
       page: filters.page,
       limit: filters.limit,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+  }
+
+  @Patch('bulk/status')
+  async bulkChangeStatus(
+    @Param('slug') slug: string,
+    @Body() body: BulkChangeStatusRequest,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspace = await this.resolveWorkspace(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    const service = new ChangeTicketStatus(this.ticketRepository);
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    const changeStatusCommand = new ChangeTicketStatusCommand(service, this.ticketRepository, ensurePermission, this.eventPublisher, auditLog);
+    const command = new BulkChangeStatusCommand(changeStatusCommand);
+    return command.execute({
+      ticketIds: body.ticketIds,
+      status: body.status,
+      discardReason: body.discardReason,
+      workspaceId: workspace.getId(),
+      workspaceName: workspace.name,
+      workspaceSlug: workspace.slug,
+      userId: user.userId,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+  }
+
+  @Post('bulk/delete')
+  async bulkDelete(
+    @Param('slug') slug: string,
+    @Body() body: BulkDeleteRequest,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspace = await this.resolveWorkspace(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    const service = new DeleteTicket(this.ticketRepository);
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    const deleteCommand = new DeleteTicketCommand(service, ensurePermission, this.ticketRepository, auditLog);
+    const command = new BulkDeleteCommand(deleteCommand);
+    return command.execute({
+      ticketIds: body.ticketIds,
+      workspaceId: workspace.getId(),
+      userId: user.userId,
       isSystemAdmin: user.isSystemAdmin,
     });
   }
