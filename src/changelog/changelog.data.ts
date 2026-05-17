@@ -16,6 +16,20 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.7.0',
+    date: '2026-05-16',
+    categories: [
+      {
+        title: { en: 'Ticket Management', es: 'Gestión de Tickets' },
+        features: [
+          { en: 'Bulk actions — select multiple tickets and change status or delete in one click', es: 'Acciones masivas — selecciona varios tickets y cambia su estado o elimínalos en un click' },
+          { en: 'Edit mode with save button — make changes and review before saving', es: 'Modo de edición con botón guardar — haz cambios y revísalos antes de guardar' },
+          { en: 'Password visibility toggle on login, signup, and reset password', es: 'Botón para ver contraseña en login, registro y restablecimiento de contraseña' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.6.0',
     date: '2026-05-09',
     categories: [
