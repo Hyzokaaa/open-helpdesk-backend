@@ -27,6 +27,16 @@ export const coreChangelog: ChangelogVersion[] = [
           { en: 'Password visibility toggle on login, signup, and reset password', es: 'Botón para ver contraseña en login, registro y restablecimiento de contraseña' },
         ],
       },
+      {
+        title: { en: 'Ticket Board', es: 'Tablero de Tickets' },
+        features: [
+          { en: 'Kanban board view — see tickets organized by status in columns', es: 'Vista de tablero Kanban — ve los tickets organizados por estado en columnas' },
+          { en: 'Drag and drop tickets between columns to change status instantly', es: 'Arrastra y suelta tickets entre columnas para cambiar el estado al instante' },
+          { en: 'Custom ticket ordering per column — saved for each user', es: 'Orden personalizado de tickets por columna — guardado para cada usuario' },
+          { en: 'Auto-refresh every 30 seconds — no need to reload the page', es: 'Actualización automática cada 30 segundos — sin necesidad de recargar la página' },
+          { en: 'Priority-colored cards — identify urgent tickets at a glance', es: 'Tarjetas coloreadas por prioridad — identifica tickets urgentes de un vistazo' },
+        ],
+      },
     ],
   },
   {
