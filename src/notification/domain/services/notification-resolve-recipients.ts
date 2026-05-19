@@ -16,7 +16,7 @@ export class ResolveNotificationRecipients {
   ) {}
 
   async execute(props: ResolveRecipientsProps): Promise<User[]> {
-    const roles = props.roles ?? [WorkspaceRole.ADMIN, WorkspaceRole.AGENT];
+    const roles = props.roles ?? [WorkspaceRole.ADMIN, WorkspaceRole.SUPERVISOR, WorkspaceRole.AGENT];
     const members = await this.memberRepository.findByWorkspaceId(props.workspaceId);
     const filtered = members.filter((m) => roles.includes(m.role as WorkspaceRole));
     if (filtered.length === 0) return [];
