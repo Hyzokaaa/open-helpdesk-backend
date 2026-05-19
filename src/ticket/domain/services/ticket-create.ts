@@ -28,7 +28,7 @@ export class CreateTicket {
       name: props.name,
       description: props.description,
       priority: props.priority,
-      status: TicketStatus.PENDING,
+      status: TicketStatus.OPEN,
       category: props.category,
       workspaceId: props.workspaceId,
       creatorId: props.creatorId,

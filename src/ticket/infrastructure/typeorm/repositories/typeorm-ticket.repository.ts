@@ -22,6 +22,12 @@ export class TypeOrmTicketRepository implements TicketRepository {
   ) {}
 
   async create(ticket: Ticket): Promise<void> {
+    const [{ max }] = await this.repository.query(
+      `SELECT COALESCE(MAX("ticketNumber"), 0) as max FROM tickets WHERE "workspaceId" = $1`,
+      [ticket.workspaceId],
+    );
+    ticket.ticketNumber = Number(max) + 1;
+
     const model = this.toModel(ticket);
     model.tags = ticket.tagIds.map((id) => {
       const tag = new TagModel();
@@ -70,6 +76,12 @@ export class TypeOrmTicketRepository implements TicketRepository {
     if (filters.creatorId) {
       qb.andWhere('ticket.creatorId = :creatorId', {
         creatorId: filters.creatorId,
+      });
+    }
+    if (filters.agentUserId) {
+      qb.andWhere('(ticket.assigneeId = :agentUserId OR ticket.status = :openStatus)', {
+        agentUserId: filters.agentUserId,
+        openStatus: 'open',
       });
     }
     if (filters.tagIds && filters.tagIds.length > 0) {
@@ -149,6 +161,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
       resolvedById: model.resolvedById,
       createdAt: model.createdAt,
       deletedAt: model.deletedAt,
+      ticketNumber: model.ticketNumber,
       tagIds: model.tags ? model.tags.map((t) => t.id) : [],
       customFields: model.customFields ?? {},
       discardReason: model.discardReason as TicketDiscardReason | null,
@@ -168,6 +181,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
     model.assigneeId = ticket.assigneeId;
     model.resolvedAt = ticket.resolvedAt;
     model.resolvedById = ticket.resolvedById;
+    model.ticketNumber = ticket.ticketNumber;
     model.customFields = ticket.customFields;
     model.discardReason = ticket.discardReason;
     return model;

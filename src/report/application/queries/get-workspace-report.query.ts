@@ -69,7 +69,7 @@ export class GetWorkspaceReportQuery {
   private async getOverview(props: Props) {
     const [openResult] = await this.dataSource.query(
       `SELECT COUNT(*) as count FROM tickets
-       WHERE "workspaceId" = $1 AND status IN ('pending', 'in-progress') AND "deletedAt" IS NULL`,
+       WHERE "workspaceId" = $1 AND status IN ('open', 'pending', 'in-progress') AND "deletedAt" IS NULL`,
       [props.workspaceId],
     );
 

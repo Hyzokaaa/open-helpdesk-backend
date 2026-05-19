@@ -2,6 +2,7 @@ import { Query } from '../../../shared/domain/query';
 import { PaginatedResult } from '../../../shared/domain/paginated-result';
 import { EnsureWorkspacePermission } from '../../../workspace/domain/services/workspace-ensure-permission';
 import { PERMISSIONS, hasPermission } from '../../../workspace/domain/permissions';
+import { WorkspaceRole } from '../../../workspace/domain/enums/workspace-role.enum';
 import {
   TicketFilters,
   TicketRepository,
@@ -24,6 +25,7 @@ export interface TicketListItem {
   category: string;
   creatorId: string;
   assigneeId: string | null;
+  ticketNumber: number;
   createdAt: Date | null;
   tagIds: string[];
   customFields: Record<string, unknown>;
@@ -47,7 +49,11 @@ export class ListTicketsQuery
 
     const filters = { ...props.filters };
     if (!hasPermission(ctx.role, PERMISSIONS.TICKET_VIEW)) {
-      filters.creatorId = props.userId;
+      if (hasPermission(ctx.role, PERMISSIONS.TICKET_CREATE) && ctx.role !== WorkspaceRole.REPORTER) {
+        filters.agentUserId = props.userId;
+      } else {
+        filters.creatorId = props.userId;
+      }
     }
 
     const result = await this.repository.findAll(
@@ -66,6 +72,7 @@ export class ListTicketsQuery
         category: ticket.category,
         creatorId: ticket.creatorId,
         assigneeId: ticket.assigneeId,
+        ticketNumber: ticket.ticketNumber,
         createdAt: ticket.createdAt,
         tagIds: ticket.tagIds,
         customFields: ticket.customFields,

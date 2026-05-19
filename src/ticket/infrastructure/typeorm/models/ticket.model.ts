@@ -57,6 +57,9 @@ export class TicketModel {
   @Column({ type: 'varchar', nullable: true })
   resolvedById!: string | null;
 
+  @Column({ default: 0 })
+  ticketNumber!: number;
+
   @Column({ type: 'jsonb', default: {} })
   customFields!: Record<string, unknown>;
 

@@ -5,17 +5,21 @@ import { TicketStatus } from '../enums/ticket-status.enum';
 import { TicketRepository } from '../repositories/ticket.repository';
 
 const ALL_STATUSES = [
+  TicketStatus.OPEN,
   TicketStatus.PENDING,
   TicketStatus.IN_PROGRESS,
   TicketStatus.RESOLVED,
   TicketStatus.DISCARDED,
 ];
 
+const ALL_EXCEPT_OPEN = ALL_STATUSES.filter((s) => s !== TicketStatus.OPEN);
+
 const ALLOWED_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
-  [TicketStatus.PENDING]: ALL_STATUSES,
-  [TicketStatus.IN_PROGRESS]: ALL_STATUSES,
-  [TicketStatus.RESOLVED]: ALL_STATUSES,
-  [TicketStatus.DISCARDED]: ALL_STATUSES,
+  [TicketStatus.OPEN]: ALL_STATUSES,
+  [TicketStatus.PENDING]: ALL_EXCEPT_OPEN,
+  [TicketStatus.IN_PROGRESS]: ALL_EXCEPT_OPEN,
+  [TicketStatus.RESOLVED]: ALL_EXCEPT_OPEN,
+  [TicketStatus.DISCARDED]: ALL_EXCEPT_OPEN,
 };
 
 interface ChangeTicketStatusProps {
@@ -23,6 +27,7 @@ interface ChangeTicketStatusProps {
   status: TicketStatus;
   discardReason?: TicketDiscardReason;
   userId: string;
+  canMoveToOpen?: boolean;
 }
 
 export class ChangeTicketStatus {
@@ -34,11 +39,17 @@ export class ChangeTicketStatus {
       throw new EntityNotFoundError('Ticket not found');
     }
 
-    const allowed = ALLOWED_TRANSITIONS[ticket.status];
+    const allowed = props.canMoveToOpen
+      ? ALL_STATUSES
+      : ALLOWED_TRANSITIONS[ticket.status];
     if (!allowed.includes(props.status)) {
       throw new DomainValidationError(
         `Cannot transition from '${ticket.status}' to '${props.status}'`,
       );
+    }
+
+    if (ticket.status === TicketStatus.OPEN && props.status !== TicketStatus.OPEN && !ticket.assigneeId) {
+      ticket.assigneeId = props.userId;
     }
 
     ticket.status = props.status;

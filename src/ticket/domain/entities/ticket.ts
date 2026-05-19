@@ -18,6 +18,7 @@ interface Props {
   resolvedById: string | null;
   createdAt: Date | null;
   deletedAt: Date | null;
+  ticketNumber?: number;
   tagIds: string[];
   customFields: Record<string, unknown>;
   discardReason: TicketDiscardReason | null;
@@ -37,6 +38,7 @@ export class Ticket {
   resolvedById: string | null;
   createdAt: Date | null;
   deletedAt: Date | null;
+  ticketNumber: number;
   tagIds: string[];
   customFields: Record<string, unknown>;
   discardReason: TicketDiscardReason | null;
@@ -55,6 +57,7 @@ export class Ticket {
     this.resolvedById = props.resolvedById ?? null;
     this.createdAt = props.createdAt;
     this.deletedAt = props.deletedAt;
+    this.ticketNumber = props.ticketNumber ?? 0;
     this.tagIds = props.tagIds;
     this.customFields = props.customFields ?? {};
     this.discardReason = props.discardReason ?? null;

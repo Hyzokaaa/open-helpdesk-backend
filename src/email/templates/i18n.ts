@@ -178,6 +178,7 @@ const translations: Translations = {
   'category.task': { en: 'Task', es: 'Tarea' },
 
   // Statuses
+  'status.open': { en: 'Open', es: 'Abierto' },
   'status.pending': { en: 'Pending', es: 'Pendiente' },
   'status.in-progress': { en: 'In Progress', es: 'En progreso' },
   'status.resolved': { en: 'Resolved', es: 'Resuelto' },
