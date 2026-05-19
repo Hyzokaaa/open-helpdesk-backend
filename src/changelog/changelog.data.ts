@@ -16,6 +16,28 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.8.0',
+    date: '2026-05-18',
+    categories: [
+      {
+        title: { en: 'Ticket Workflow', es: 'Flujo de Tickets' },
+        features: [
+          { en: 'New "Open" status — tickets start unassigned in a shared pool for agents to pick up', es: 'Nuevo estado "Abierto" — los tickets comienzan sin asignar en un pool compartido para que los agentes los tomen' },
+          { en: 'Auto-assign on pickup — moving a ticket from Open assigns it to you automatically', es: 'Asignación automática al tomar — mover un ticket de Abierto te lo asigna automáticamente' },
+          { en: 'Sequential ticket numbers — reference tickets as #1, #2, #3 instead of long IDs', es: 'Números de ticket secuenciales — referencia tickets como #1, #2, #3 en vez de IDs largos' },
+        ],
+      },
+      {
+        title: { en: 'Roles & Visibility', es: 'Roles y Visibilidad' },
+        features: [
+          { en: 'Supervisor role — can assign tickets, see all tickets, and access audit log', es: 'Rol Supervisor — puede asignar tickets, ver todos los tickets y acceder al registro de auditoría' },
+          { en: 'Agents now see only their assigned tickets and the open pool', es: 'Los agentes ahora solo ven sus tickets asignados y el pool de abiertos' },
+          { en: 'Compact board cards — priority shown by colored border, more tickets visible at once', es: 'Tarjetas compactas en el tablero — prioridad indicada por borde de color, más tickets visibles a la vez' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.7.0',
     date: '2026-05-16',
     categories: [
