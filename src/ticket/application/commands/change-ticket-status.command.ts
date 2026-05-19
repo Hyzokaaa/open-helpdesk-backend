@@ -7,6 +7,7 @@ import { TicketRepository } from '../../domain/repositories/ticket.repository';
 import { ChangeTicketStatus } from '../../domain/services/ticket-change-status';
 import { EnsureWorkspacePermission } from '../../../workspace/domain/services/workspace-ensure-permission';
 import { PERMISSIONS } from '../../../workspace/domain/permissions';
+import { WorkspaceRole } from '../../../workspace/domain/enums/workspace-role.enum';
 import { StatusChangedEvent } from '../../../email/domain/events';
 import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
@@ -45,12 +46,14 @@ export class ChangeTicketStatusCommand implements Command<Props, ChangeStatusRes
       ? PERMISSIONS.TICKET_CHANGE_STATUS_DISCARDED
       : PERMISSIONS.TICKET_CHANGE_STATUS;
 
-    await this.ensurePermission.execute({
+    const ctx = await this.ensurePermission.execute({
       workspaceId: props.workspaceId,
       userId: props.userId,
       permission,
       isSystemAdmin: props.isSystemAdmin,
     });
+
+    const canMoveToOpen = ctx.role === WorkspaceRole.ADMIN || ctx.role === WorkspaceRole.SUPERVISOR;
 
     const oldStatus = ticket.status;
     const updated = await this.changeStatus.execute({
@@ -58,6 +61,7 @@ export class ChangeTicketStatusCommand implements Command<Props, ChangeStatusRes
       status: props.status,
       discardReason: props.discardReason,
       userId: props.userId,
+      canMoveToOpen,
     });
 
     const event: StatusChangedEvent = {

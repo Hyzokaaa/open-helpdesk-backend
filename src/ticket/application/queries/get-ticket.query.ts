@@ -2,6 +2,7 @@ import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { Query } from '../../../shared/domain/query';
 import { EnsureWorkspacePermission } from '../../../workspace/domain/services/workspace-ensure-permission';
 import { PERMISSIONS, hasPermission } from '../../../workspace/domain/permissions';
+import { WorkspaceRole } from '../../../workspace/domain/enums/workspace-role.enum';
 import { AccessDeniedError } from '../../../shared/domain/errors';
 import { TicketRepository } from '../../domain/repositories/ticket.repository';
 
@@ -47,8 +48,14 @@ export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
       throw new EntityNotFoundError('Ticket not found');
     }
 
-    if (!hasPermission(ctx.role, PERMISSIONS.TICKET_VIEW) && ticket.creatorId !== props.userId) {
-      throw new AccessDeniedError('You can only view your own tickets');
+    if (!hasPermission(ctx.role, PERMISSIONS.TICKET_VIEW)) {
+      const isAgent = ctx.role === WorkspaceRole.AGENT;
+      const canSee = isAgent
+        ? (ticket.assigneeId === props.userId || ticket.status === 'open')
+        : ticket.creatorId === props.userId;
+      if (!canSee) {
+        throw new AccessDeniedError('You do not have access to this ticket');
+      }
     }
 
     return {

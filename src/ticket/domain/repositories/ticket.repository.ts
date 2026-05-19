@@ -10,6 +10,7 @@ export interface TicketFilters {
   tagIds?: string[];
   assigneeId?: string;
   creatorId?: string;
+  agentUserId?: string;
   sortBy?: string;
   sortOrder?: 'ASC' | 'DESC';
 }
