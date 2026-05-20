@@ -35,6 +35,14 @@ export const coreChangelog: ChangelogVersion[] = [
           { en: 'Compact board cards — priority shown by colored border, more tickets visible at once', es: 'Tarjetas compactas en el tablero — prioridad indicada por borde de color, más tickets visibles a la vez' },
         ],
       },
+      {
+        title: { en: 'Reports Redesign', es: 'Rediseño de Reportes' },
+        features: [
+          { en: 'Refreshed dashboard with donut charts, area charts, and a unified color palette', es: 'Dashboard renovado con gráficas de dona, gráficas de área y una paleta de colores unificada' },
+          { en: 'Overview cards with colored indicators and larger metrics at a glance', es: 'Tarjetas de resumen con indicadores de color y métricas más grandes de un vistazo' },
+          { en: 'Cleaner chart axes, rounded bars, and subtle gradients', es: 'Ejes de gráficas más limpios, barras redondeadas y gradientes sutiles' },
+        ],
+      },
     ],
   },
   {
