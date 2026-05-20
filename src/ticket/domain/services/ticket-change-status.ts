@@ -52,6 +52,10 @@ export class ChangeTicketStatus {
       ticket.assigneeId = props.userId;
     }
 
+    if (props.status === TicketStatus.OPEN) {
+      ticket.assigneeId = null;
+    }
+
     ticket.status = props.status;
 
     if (props.status === TicketStatus.RESOLVED) {
