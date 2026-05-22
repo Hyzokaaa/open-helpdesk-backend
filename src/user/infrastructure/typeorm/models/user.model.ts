@@ -38,6 +38,9 @@ export class UserModel {
   @Column({ default: 'system' })
   theme!: string;
 
+  @Column({ default: false })
+  autoCreated!: boolean;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 

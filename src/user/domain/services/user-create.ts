@@ -11,6 +11,7 @@ interface CreateUserProps {
   lastName: string;
   isSystemAdmin?: boolean;
   isEmailVerified?: boolean;
+  autoCreated?: boolean;
 }
 
 export class CreateUser {
@@ -39,6 +40,7 @@ export class CreateUser {
       isEmailVerified: props.isEmailVerified ?? true,
       language: 'en',
       theme: 'system',
+      autoCreated: props.autoCreated ?? false,
     });
 
     await this.repository.create(user);

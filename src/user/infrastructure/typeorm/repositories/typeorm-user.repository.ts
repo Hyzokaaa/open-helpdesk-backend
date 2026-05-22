@@ -71,6 +71,7 @@ export class TypeOrmUserRepository implements UserRepository {
       isEmailVerified: model.isEmailVerified,
       language: model.language,
       theme: model.theme,
+      autoCreated: model.autoCreated,
     });
   }
 
@@ -86,6 +87,7 @@ export class TypeOrmUserRepository implements UserRepository {
     model.isEmailVerified = user.isEmailVerified;
     model.language = user.language;
     model.theme = user.theme;
+    model.autoCreated = user.autoCreated;
     return model;
   }
 }

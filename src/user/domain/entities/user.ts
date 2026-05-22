@@ -11,6 +11,7 @@ interface Props {
   isEmailVerified: boolean;
   language: string;
   theme: string;
+  autoCreated?: boolean;
 }
 
 export class User {
@@ -24,6 +25,7 @@ export class User {
   isEmailVerified: boolean;
   language: string;
   theme: string;
+  autoCreated: boolean;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -36,6 +38,7 @@ export class User {
     this.isEmailVerified = props.isEmailVerified;
     this.language = props.language;
     this.theme = props.theme;
+    this.autoCreated = props.autoCreated ?? false;
   }
 
   getId(): string {
