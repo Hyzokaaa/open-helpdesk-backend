@@ -60,6 +60,10 @@ export class SmtpEmailService implements EmailService {
           to: recipient,
           subject: params.subject,
           html: params.html,
+          ...(params.replyTo && { replyTo: params.replyTo }),
+          ...(params.messageId && { messageId: params.messageId }),
+          ...(params.inReplyTo && { inReplyTo: params.inReplyTo }),
+          ...(params.references && { references: params.references }),
         });
 
         this.logger.log(`Email sent to ${recipient}: ${params.subject}`);

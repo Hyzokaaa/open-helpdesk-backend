@@ -3,6 +3,10 @@ export interface SendEmailParams {
   subject: string;
   html: string;
   from?: string;
+  replyTo?: string;
+  messageId?: string;
+  inReplyTo?: string;
+  references?: string;
 }
 
 export interface SendEmailResult {

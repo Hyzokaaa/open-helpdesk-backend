@@ -10,6 +10,7 @@ import { TypeOrmUserRepository } from '../../user/infrastructure/typeorm/reposit
 import { TypeOrmNotificationRepository } from '../../notification/infrastructure/typeorm/repositories/typeorm-notification.repository';
 import { TypeOrmNotificationPreferenceRepository } from '../../notification/infrastructure/typeorm/repositories/typeorm-notification-preference.repository';
 import { UlidGenerator } from '../../shared/infrastructure/ulid-generator';
+import { TypeOrmMailboxRepository } from '../../mailbox/infrastructure/typeorm/repositories/typeorm-mailbox.repository';
 import { ResolveNotificationRecipients } from '../../notification/domain/services/notification-resolve-recipients';
 import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
@@ -18,6 +19,7 @@ import { NotificationType } from '../../notification/domain/enums/notification-t
 export class TicketCreatedHandler {
   private readonly logger = new Logger(TicketCreatedHandler.name);
   private readonly frontendUrl: string;
+  private readonly emailDomain?: string;
 
   constructor(
     @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
@@ -26,9 +28,11 @@ export class TicketCreatedHandler {
     private readonly notificationRepository: TypeOrmNotificationRepository,
     private readonly preferenceRepository: TypeOrmNotificationPreferenceRepository,
     private readonly idGenerator: UlidGenerator,
+    private readonly mailboxRepository: TypeOrmMailboxRepository,
     private readonly config: ConfigService,
   ) {
     this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
+    this.emailDomain = config.get<string>('EMAIL_DOMAIN');
   }
 
   @OnEvent('ticket.created')
@@ -55,12 +59,15 @@ export class TicketCreatedHandler {
 
     const template = new TicketCreatedTemplate();
     const ticketUrl = `${this.frontendUrl}/dashboard/workspaces/${event.workspaceSlug}/tickets/${event.ticketId}`;
+    const mailbox = this.emailDomain ? await this.mailboxRepository.findByWorkspaceId(event.workspaceId) : null;
 
     for (const [lang, emails] of emailRecipients) {
       await this.emailService.send({
         to: emails,
         subject: template.subject({ ticketName: event.ticketName, ticketUrl, creatorName: event.creatorName, priority: event.priority, category: event.category, workspaceName: event.workspaceName, lang }),
         html: template.html({ ticketName: event.ticketName, ticketUrl, creatorName: event.creatorName, priority: event.priority, category: event.category, workspaceName: event.workspaceName, lang }),
+        ...(this.emailDomain && { messageId: `<ticket-${event.ticketId}@${this.emailDomain}>` }),
+        ...(mailbox && { replyTo: mailbox.address }),
       });
     }
   }

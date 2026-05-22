@@ -13,10 +13,11 @@ import { NotificationModule } from '../notification/notification.module';
 import { SharedModule } from '../shared/shared.module';
 import { CsatModule } from '../csat/csat.module';
 import { TicketModule } from '../ticket/ticket.module';
+import { MailboxModule } from '../mailbox/mailbox.module';
 import { EMAIL_SERVICE } from './email.constants';
 @Global()
 @Module({
-  imports: [UserModule, WorkspaceModule, NotificationModule, SharedModule, CsatModule, TicketModule],
+  imports: [UserModule, WorkspaceModule, NotificationModule, SharedModule, CsatModule, TicketModule, MailboxModule],
   providers: [
     {
       provide: EMAIL_SERVICE,

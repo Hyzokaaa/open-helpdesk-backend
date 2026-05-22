@@ -15,6 +15,7 @@ export interface TicketAssignedEvent {
   ticketName: string;
   newAssigneeId: string | null;
   previousAssigneeId: string | null;
+  workspaceId: string;
   workspaceName: string;
   workspaceSlug: string;
 }
@@ -22,11 +23,13 @@ export interface TicketAssignedEvent {
 export interface NewCommentEvent {
   ticketId: string;
   ticketName: string;
+  commentId: string;
   authorId: string;
   authorName: string;
   commentContent: string;
   assigneeId: string | null;
   mentionedUserIds: string[];
+  workspaceId: string;
   workspaceName: string;
   workspaceSlug: string;
 }

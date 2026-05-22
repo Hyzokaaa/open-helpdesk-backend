@@ -51,11 +51,13 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
       const event: NewCommentEvent = {
         ticketId: props.ticketId,
         ticketName: ticket.name,
+        commentId: comment.getId(),
         authorId: props.authorId,
         authorName: `${author.firstName} ${author.lastName}`,
         commentContent: props.content,
         assigneeId: ticket.assigneeId,
         mentionedUserIds,
+        workspaceId: workspace.getId(),
         workspaceName: workspace.name,
         workspaceSlug: workspace.slug,
       };

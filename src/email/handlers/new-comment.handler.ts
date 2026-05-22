@@ -9,6 +9,7 @@ import { TypeOrmUserRepository } from '../../user/infrastructure/typeorm/reposit
 import { TypeOrmNotificationRepository } from '../../notification/infrastructure/typeorm/repositories/typeorm-notification.repository';
 import { TypeOrmNotificationPreferenceRepository } from '../../notification/infrastructure/typeorm/repositories/typeorm-notification-preference.repository';
 import { UlidGenerator } from '../../shared/infrastructure/ulid-generator';
+import { TypeOrmMailboxRepository } from '../../mailbox/infrastructure/typeorm/repositories/typeorm-mailbox.repository';
 import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
 
@@ -16,6 +17,7 @@ import { NotificationType } from '../../notification/domain/enums/notification-t
 export class NewCommentHandler {
   private readonly logger = new Logger(NewCommentHandler.name);
   private readonly frontendUrl: string;
+  private readonly emailDomain?: string;
 
   constructor(
     @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
@@ -23,9 +25,11 @@ export class NewCommentHandler {
     private readonly notificationRepository: TypeOrmNotificationRepository,
     private readonly preferenceRepository: TypeOrmNotificationPreferenceRepository,
     private readonly idGenerator: UlidGenerator,
+    private readonly mailboxRepository: TypeOrmMailboxRepository,
     private readonly config: ConfigService,
   ) {
     this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
+    this.emailDomain = config.get<string>('EMAIL_DOMAIN');
   }
 
   @OnEvent('comment.created')
@@ -60,12 +64,19 @@ export class NewCommentHandler {
 
     const template = new NewCommentTemplate();
     const ticketUrl = `${this.frontendUrl}/dashboard/workspaces/${event.workspaceSlug}/tickets/${event.ticketId}`;
+    const mailbox = this.emailDomain ? await this.mailboxRepository.findByWorkspaceId(event.workspaceId) : null;
 
     for (const [lang, emails] of emailRecipients) {
       await this.emailService.send({
         to: emails,
         subject: template.subject({ ticketName: event.ticketName, ticketUrl, authorName: event.authorName, commentPreview: preview, workspaceName: event.workspaceName, lang }),
         html: template.html({ ticketName: event.ticketName, ticketUrl, authorName: event.authorName, commentPreview: preview, workspaceName: event.workspaceName, lang }),
+        ...(this.emailDomain && {
+          messageId: `<comment-${event.commentId}@${this.emailDomain}>`,
+          inReplyTo: `<ticket-${event.ticketId}@${this.emailDomain}>`,
+          references: `<ticket-${event.ticketId}@${this.emailDomain}>`,
+        }),
+        ...(mailbox && { replyTo: mailbox.address }),
       });
     }
   }

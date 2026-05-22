@@ -58,6 +58,7 @@ export class AssignTicketCommand implements Command<Props, AssignTicketResponse>
       ticketName: ticket.name,
       newAssigneeId: props.assigneeId,
       previousAssigneeId,
+      workspaceId: props.workspaceId,
       workspaceName: props.workspaceName,
       workspaceSlug: props.workspaceSlug,
     };

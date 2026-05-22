@@ -44,11 +44,18 @@ export class PostmarkEmailService implements EmailService {
 
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
+        const headers: postmark.Models.Header[] = [];
+        if (params.messageId) headers.push({ Name: 'Message-ID', Value: params.messageId });
+        if (params.inReplyTo) headers.push({ Name: 'In-Reply-To', Value: params.inReplyTo });
+        if (params.references) headers.push({ Name: 'References', Value: params.references });
+
         await this.client.sendEmail({
           From: sender,
           To: recipient,
           Subject: params.subject,
           HtmlBody: params.html,
+          ...(params.replyTo && { ReplyTo: params.replyTo }),
+          ...(headers.length > 0 && { Headers: headers }),
           TrackOpens: false,
           TrackLinks: postmark.Models.LinkTrackingOptions.None,
         });
