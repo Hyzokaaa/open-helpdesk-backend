@@ -38,10 +38,13 @@ import { TypeOrmWorkspaceRepository } from '../../typeorm/repositories/typeorm-w
 import { TypeOrmWorkspaceMemberRepository } from '../../typeorm/repositories/typeorm-workspace-member.repository';
 import { TypeOrmAccountRepository } from '../../../../account/infrastructure/typeorm/repositories/typeorm-account.repository';
 import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
+import { TypeOrmMailboxRepository } from '../../../../mailbox/infrastructure/typeorm/repositories/typeorm-mailbox.repository';
 import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit-log-create';
+import { CreateMailbox } from '../../../../mailbox/domain/services/mailbox-create';
 import { CreateWorkspaceRequest } from '../dto/create-workspace.request';
 import { AddMemberRequest } from '../dto/add-member.request';
 import { SortDto } from '../../../../shared/nest/dto/sort.dto';
+import { ConfigService } from '@nestjs/config';
 
 @Controller('workspaces')
 export class WorkspaceController {
@@ -52,6 +55,8 @@ export class WorkspaceController {
     @Inject() private readonly idGenerator: UlidGenerator,
     @Inject() private readonly accountRepository: TypeOrmAccountRepository,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
+    @Inject() private readonly mailboxRepository: TypeOrmMailboxRepository,
+    @Inject() private readonly config: ConfigService,
   ) {}
 
   @Post()
@@ -60,12 +65,15 @@ export class WorkspaceController {
     const createService = new CreateWorkspace(this.idGenerator, this.workspaceRepository);
     const addMemberService = new AddWorkspaceMember(this.idGenerator, this.memberRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-    const command = new CreateWorkspaceCommand(createService, addMemberService, auditLog);
+    const createMailbox = new CreateMailbox(this.idGenerator, this.mailboxRepository);
+    const command = new CreateWorkspaceCommand(createService, addMemberService, auditLog, createMailbox);
+    const supportEmailDomain = this.config.get<string>('SUPPORT_EMAIL_DOMAIN', 'support.openhelpdesk.dev');
     return command.execute({
       name: body.name,
       description: body.description,
       creatorUserId: user.userId,
       accountId: account?.getId(),
+      supportEmailDomain,
     });
   }
 

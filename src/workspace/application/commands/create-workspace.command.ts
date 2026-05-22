@@ -4,12 +4,14 @@ import { AddWorkspaceMember } from '../../domain/services/workspace-add-member';
 import { WorkspaceRole } from '../../domain/enums/workspace-role.enum';
 import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
+import { CreateMailbox } from '../../../mailbox/domain/services/mailbox-create';
 
 interface Props {
   name: string;
   description: string;
   creatorUserId: string;
   accountId?: string;
+  supportEmailDomain?: string;
 }
 
 export interface CreateWorkspaceResponse {
@@ -23,6 +25,7 @@ export class CreateWorkspaceCommand implements Command<Props, CreateWorkspaceRes
     private readonly createWorkspace: CreateWorkspace,
     private readonly addMember: AddWorkspaceMember,
     private readonly createAuditLog: CreateAuditLogEntry,
+    private readonly createMailbox?: CreateMailbox,
   ) {}
 
   async execute(props: Props): Promise<CreateWorkspaceResponse> {
@@ -37,6 +40,14 @@ export class CreateWorkspaceCommand implements Command<Props, CreateWorkspaceRes
       userId: props.creatorUserId,
       role: WorkspaceRole.ADMIN,
     });
+
+    if (this.createMailbox && props.supportEmailDomain) {
+      await this.createMailbox.execute({
+        workspaceSlug: workspace.slug,
+        workspaceId: workspace.getId(),
+        emailDomain: props.supportEmailDomain,
+      });
+    }
 
     await this.createAuditLog.execute({
       action: AuditAction.WORKSPACE_CREATED,
