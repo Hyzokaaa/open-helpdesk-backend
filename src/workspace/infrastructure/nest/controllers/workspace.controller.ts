@@ -87,7 +87,7 @@ export class WorkspaceController {
 
   @Get(':slug')
   get(@Param('slug') slug: string) {
-    const query = new GetWorkspaceQuery(this.workspaceRepository);
+    const query = new GetWorkspaceQuery(this.workspaceRepository, this.mailboxRepository);
     return query.execute({ slug });
   }
 
