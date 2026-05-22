@@ -65,9 +65,11 @@ export class WorkspaceController {
     const createService = new CreateWorkspace(this.idGenerator, this.workspaceRepository);
     const addMemberService = new AddWorkspaceMember(this.idGenerator, this.memberRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-    const createMailbox = new CreateMailbox(this.idGenerator, this.mailboxRepository);
+    const supportEmailDomain = this.config.get<string>('SUPPORT_EMAIL_DOMAIN');
+    const createMailbox = supportEmailDomain
+      ? new CreateMailbox(this.idGenerator, this.mailboxRepository)
+      : undefined;
     const command = new CreateWorkspaceCommand(createService, addMemberService, auditLog, createMailbox);
-    const supportEmailDomain = this.config.get<string>('SUPPORT_EMAIL_DOMAIN', 'support.openhelpdesk.dev');
     return command.execute({
       name: body.name,
       description: body.description,
