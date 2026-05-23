@@ -13,7 +13,11 @@ export class ParseInboundEmail {
 
   execute(payload: MtaHookPayload): ParsedInboundEmail {
     const fromAddress = payload.envelope.from.address.toLowerCase();
-    const toAddresses = payload.envelope.to.map((t) => t.address.toLowerCase());
+    const envelopeTo = payload.envelope.to.map((t) => t.address.toLowerCase());
+    const headerTo = this.parseAddressesFromHeader(
+      this.findHeader(payload.message.headers, 'to'),
+    );
+    const toAddresses = [...new Set([...envelopeTo, ...headerTo])];
 
     const subject = this.findHeader(payload.message.headers, 'subject') || '(No subject)';
     const inReplyTo = this.findHeader(payload.message.headers, 'in-reply-to');
@@ -36,6 +40,12 @@ export class ParseInboundEmail {
       body: body || '(No content)',
       inReplyToTicketId,
     };
+  }
+
+  private parseAddressesFromHeader(header: string | null): string[] {
+    if (!header) return [];
+    const matches = header.match(/[\w.+-]+@[\w.-]+\.\w+/g);
+    return matches ? matches.map((a) => a.toLowerCase()) : [];
   }
 
   private findHeader(headers: [string, string][], name: string): string | null {
