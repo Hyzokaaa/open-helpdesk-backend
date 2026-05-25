@@ -46,7 +46,6 @@ export class InboundEmailController {
 
   @Post('email')
   async handleMtaHook(@Body() payload: MtaHookPayload) {
-    this.logger.log(`MTA Hook payload: ${JSON.stringify(payload).substring(0, 2000)}`);
     try {
       const parser = new ParseInboundEmail(this.emailDomain);
       const createUser = new CreateUser(this.idGenerator, this.userRepository, this.passwordHasher);
