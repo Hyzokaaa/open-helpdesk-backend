@@ -18,6 +18,7 @@ export interface CreateWorkspaceResponse {
   id: string;
   name: string;
   slug: string;
+  supportEmail: string | null;
 }
 
 export class CreateWorkspaceCommand implements Command<Props, CreateWorkspaceResponse> {
@@ -41,12 +42,14 @@ export class CreateWorkspaceCommand implements Command<Props, CreateWorkspaceRes
       role: WorkspaceRole.ADMIN,
     });
 
+    let supportEmail: string | null = null;
     if (this.createMailbox && props.supportEmailDomain) {
-      await this.createMailbox.execute({
+      const mailbox = await this.createMailbox.execute({
         workspaceSlug: workspace.slug,
         workspaceId: workspace.getId(),
         emailDomain: props.supportEmailDomain,
       });
+      supportEmail = mailbox.address;
     }
 
     await this.createAuditLog.execute({
@@ -58,6 +61,6 @@ export class CreateWorkspaceCommand implements Command<Props, CreateWorkspaceRes
       metadata: { name: workspace.name, slug: workspace.slug },
     });
 
-    return { id: workspace.getId(), name: workspace.name, slug: workspace.slug };
+    return { id: workspace.getId(), name: workspace.name, slug: workspace.slug, supportEmail };
   }
 }
