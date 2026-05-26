@@ -16,6 +16,21 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.9.0',
+    date: '2026-05-25',
+    categories: [
+      {
+        title: { en: 'Email-to-Ticket', es: 'Email a Ticket' },
+        features: [
+          { en: 'Your customers can create tickets by sending an email — no login needed', es: 'Tus clientes pueden crear tickets enviando un email — sin necesidad de iniciar sesión' },
+          { en: 'Email replies are added as comments to the original ticket automatically', es: 'Las respuestas por email se agregan como comentarios al ticket original automáticamente' },
+          { en: 'All emails about a ticket are threaded in one conversation', es: 'Todos los emails sobre un ticket se agrupan en una conversación' },
+          { en: 'Support email address visible in workspace settings — ready to share with your customers', es: 'Dirección de email de soporte visible en la configuración del workspace — lista para compartir con tus clientes' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.8.0',
     date: '2026-05-18',
     categories: [
