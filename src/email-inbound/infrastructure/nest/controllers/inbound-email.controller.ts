@@ -27,7 +27,7 @@ import { ConfigService } from '@nestjs/config';
 @Controller('inbound')
 export class InboundEmailController {
   private readonly logger = new Logger(InboundEmailController.name);
-  private readonly emailDomain: string;
+  private readonly emailDomain: string | undefined;
 
   constructor(
     @Inject() private readonly mailboxRepository: TypeOrmMailboxRepository,
@@ -41,11 +41,16 @@ export class InboundEmailController {
     @Inject() private readonly eventPublisher: NestEventPublisher,
     @Inject() private readonly config: ConfigService,
   ) {
-    this.emailDomain = config.getOrThrow<string>('EMAIL_DOMAIN');
+    this.emailDomain = config.get<string>('EMAIL_DOMAIN');
   }
 
   @Post('email')
   async handleMtaHook(@Body() payload: MtaHookPayload) {
+    if (!this.emailDomain) {
+      this.logger.warn('EMAIL_DOMAIN not configured — set it in your .env to enable email-to-ticket');
+      return { action: 'accept' };
+    }
+
     try {
       const parser = new ParseInboundEmail(this.emailDomain);
       const createUser = new CreateUser(this.idGenerator, this.userRepository, this.passwordHasher);
