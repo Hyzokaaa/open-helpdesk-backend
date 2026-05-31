@@ -16,6 +16,27 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.10.0',
+    date: '2026-05-31',
+    categories: [
+      {
+        title: { en: 'Email Mailbox Management', es: 'Gestión de Buzones de Email' },
+        features: [
+          { en: 'Connect any IMAP mailbox to receive tickets — works with Gmail, Outlook, or any email provider', es: 'Conecta cualquier buzón IMAP para recibir tickets — funciona con Gmail, Outlook o cualquier proveedor de email' },
+          { en: 'Multiple mailboxes per workspace — route different email addresses to the same workspace', es: 'Múltiples buzones por workspace — dirige diferentes direcciones de email al mismo workspace' },
+          { en: 'Test connection before saving — verify IMAP credentials and browse available folders', es: 'Prueba la conexión antes de guardar — verifica credenciales IMAP y explora las carpetas disponibles' },
+          { en: 'Live sync status — see when each mailbox last synced and catch errors instantly', es: 'Estado de sincronización en vivo — ve cuándo se sincronizó cada buzón por última vez y detecta errores al instante' },
+        ],
+      },
+      {
+        title: { en: 'Workspace Settings', es: 'Configuración del Workspace' },
+        features: [
+          { en: 'Redesigned workspace settings — color palette moved to sidebar, cleaner layout', es: 'Configuración del workspace rediseñada — paleta de colores movida al sidebar, diseño más limpio' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.9.0',
     date: '2026-05-25',
     categories: [
