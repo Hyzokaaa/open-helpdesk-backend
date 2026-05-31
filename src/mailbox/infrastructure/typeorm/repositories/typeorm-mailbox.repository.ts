@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Mailbox } from '../../../domain/entities/mailbox';
 import { MailboxRepository } from '../../../domain/repositories/mailbox.repository';
+import { MailboxType } from '../../../domain/enums/mailbox-type.enum';
 import { MailboxModel } from '../models/mailbox.model';
 
 @Injectable()
@@ -17,6 +18,11 @@ export class TypeOrmMailboxRepository implements MailboxRepository {
     await this.repository.save(model);
   }
 
+  async findById(id: string): Promise<Mailbox | null> {
+    const model = await this.repository.findOneBy({ id });
+    return model ? this.toDomain(model) : null;
+  }
+
   async findByAddress(address: string): Promise<Mailbox | null> {
     const model = await this.repository.findOneBy({ address });
     return model ? this.toDomain(model) : null;
@@ -27,12 +33,43 @@ export class TypeOrmMailboxRepository implements MailboxRepository {
     return model ? this.toDomain(model) : null;
   }
 
+  async findAllByWorkspaceId(workspaceId: string): Promise<Mailbox[]> {
+    const models = await this.repository.findBy({ workspaceId });
+    return models.map((m) => this.toDomain(m));
+  }
+
+  async findAllByType(type: MailboxType): Promise<Mailbox[]> {
+    const models = await this.repository.find({
+      where: { type, isActive: true },
+    });
+    return models.map((m) => this.toDomain(m));
+  }
+
+  async update(mailbox: Mailbox): Promise<void> {
+    const model = this.toModel(mailbox);
+    await this.repository.save(model);
+  }
+
+  async delete(id: string): Promise<void> {
+    await this.repository.delete(id);
+  }
+
   private toDomain(model: MailboxModel): Mailbox {
     return new Mailbox({
       id: model.id,
       address: model.address,
       workspaceId: model.workspaceId,
       isActive: model.isActive,
+      type: model.type as MailboxType,
+      imapHost: model.imapHost,
+      imapPort: model.imapPort,
+      imapUser: model.imapUser,
+      imapPass: model.imapPass,
+      imapTls: model.imapTls,
+      imapFolder: model.imapFolder,
+      pollInterval: model.pollInterval,
+      lastSyncAt: model.lastSyncAt,
+      lastError: model.lastError,
     });
   }
 
@@ -42,6 +79,16 @@ export class TypeOrmMailboxRepository implements MailboxRepository {
     model.address = mailbox.address;
     model.workspaceId = mailbox.workspaceId;
     model.isActive = mailbox.isActive;
+    model.type = mailbox.type;
+    model.imapHost = mailbox.imapHost;
+    model.imapPort = mailbox.imapPort;
+    model.imapUser = mailbox.imapUser;
+    model.imapPass = mailbox.imapPass;
+    model.imapTls = mailbox.imapTls;
+    model.imapFolder = mailbox.imapFolder;
+    model.pollInterval = mailbox.pollInterval;
+    model.lastSyncAt = mailbox.lastSyncAt;
+    model.lastError = mailbox.lastError;
     return model;
   }
 }

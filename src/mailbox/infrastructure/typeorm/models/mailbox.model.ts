@@ -24,6 +24,36 @@ export class MailboxModel {
   @Column({ default: true })
   isActive!: boolean;
 
+  @Column({ default: 'webhook' })
+  type!: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  imapHost!: string | null;
+
+  @Column({ type: 'int', nullable: true })
+  imapPort!: number | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  imapUser!: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  imapPass!: string | null;
+
+  @Column({ type: 'boolean', nullable: true })
+  imapTls!: boolean | null;
+
+  @Column({ type: 'varchar', nullable: true, default: 'INBOX' })
+  imapFolder!: string | null;
+
+  @Column({ type: 'int', nullable: true, default: 30 })
+  pollInterval!: number | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  lastSyncAt!: Date | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  lastError!: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 }
