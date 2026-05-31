@@ -19,6 +19,7 @@ import { RouteInboundEmail } from '../../../domain/services/route-inbound-email'
 import { ProcessInboundEmailCommand } from '../../../application/commands/process-inbound-email.command';
 import { MtaHookAuthGuard } from '../guards/mta-hook-auth.guard';
 import { MtaHookPayload } from '../dto/mta-hook-payload.dto';
+import { ProcessedEmailRepository } from '../../typeorm/repositories/processed-email.repository';
 import { ConfigService } from '@nestjs/config';
 
 @Public()
@@ -39,6 +40,7 @@ export class InboundEmailController {
     @Inject() private readonly idGenerator: UlidGenerator,
     @Inject() private readonly passwordHasher: BcryptPasswordHasher,
     @Inject() private readonly eventPublisher: NestEventPublisher,
+    @Inject() private readonly processedEmailRepository: ProcessedEmailRepository,
     @Inject() private readonly config: ConfigService,
   ) {
     this.emailDomain = config.get<string>('EMAIL_DOMAIN');
@@ -52,6 +54,16 @@ export class InboundEmailController {
     }
 
     try {
+      // Idempotency: check Message-ID to avoid duplicates across drivers (MTA Hook + IMAP)
+      const messageIdHeader = payload.message?.headers?.find(
+        ([name]) => name.toLowerCase() === 'message-id',
+      );
+      const messageId = messageIdHeader?.[1]?.trim();
+      if (messageId) {
+        const alreadyProcessed = await this.processedEmailRepository.exists(messageId);
+        if (alreadyProcessed) return { action: 'accept' };
+      }
+
       const parser = new ParseInboundEmail(this.emailDomain);
       const createUser = new CreateUser(this.idGenerator, this.userRepository, this.passwordHasher);
       const addMember = new AddWorkspaceMember(this.idGenerator, this.memberRepository);
@@ -73,6 +85,10 @@ export class InboundEmailController {
 
       const command = new ProcessInboundEmailCommand(parser, router);
       await command.execute({ payload });
+
+      if (messageId) {
+        await this.processedEmailRepository.markProcessed(messageId);
+      }
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Failed to process inbound email: ${msg}`);
