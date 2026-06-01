@@ -14,6 +14,9 @@ import { CreateUser } from '../../../../user/domain/services/user-create';
 import { AddWorkspaceMember } from '../../../../workspace/domain/services/workspace-add-member';
 import { CreateTicket } from '../../../../ticket/domain/services/ticket-create';
 import { CreateComment } from '../../../../comment/domain/services/comment-create';
+import { CreateAttachment } from '../../../../attachment/domain/services/attachment-create';
+import { TypeOrmAttachmentRepository } from '../../../../attachment/infrastructure/typeorm/repositories/typeorm-attachment.repository';
+import { S3StorageService } from '../../../../shared/infrastructure/s3-storage.service';
 import { ParseInboundEmail } from '../../../domain/services/parse-inbound-email';
 import { RouteInboundEmail } from '../../../domain/services/route-inbound-email';
 import { ProcessInboundEmailCommand } from '../../../application/commands/process-inbound-email.command';
@@ -41,6 +44,8 @@ export class InboundEmailController {
     @Inject() private readonly passwordHasher: BcryptPasswordHasher,
     @Inject() private readonly eventPublisher: NestEventPublisher,
     @Inject() private readonly processedEmailRepository: ProcessedEmailRepository,
+    @Inject() private readonly attachmentRepository: TypeOrmAttachmentRepository,
+    @Inject() private readonly storageService: S3StorageService,
     @Inject() private readonly config: ConfigService,
   ) {
     this.emailDomain = config.get<string>('EMAIL_DOMAIN');
@@ -69,6 +74,7 @@ export class InboundEmailController {
       const addMember = new AddWorkspaceMember(this.idGenerator, this.memberRepository);
       const createTicket = new CreateTicket(this.idGenerator, this.ticketRepository);
       const createComment = new CreateComment(this.idGenerator, this.commentRepository);
+      const createAttachment = new CreateAttachment(this.idGenerator, this.attachmentRepository, this.storageService);
 
       const router = new RouteInboundEmail(
         this.mailboxRepository,
@@ -81,6 +87,7 @@ export class InboundEmailController {
         createTicket,
         createComment,
         this.eventPublisher,
+        createAttachment,
       );
 
       const command = new ProcessInboundEmailCommand(parser, router);

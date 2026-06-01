@@ -1,17 +1,25 @@
 import { MtaHookPayload } from '../../infrastructure/nest/dto/mta-hook-payload.dto';
 
+export interface ParsedAttachment {
+  filename: string;
+  mimeType: string;
+  size: number;
+  content: Buffer;
+}
+
 export interface ParsedInboundEmail {
   fromAddress: string;
   toAddresses: string[];
   subject: string;
   body: string;
   inReplyToTicketId: string | null;
+  attachments: ParsedAttachment[];
 }
 
 export class ParseInboundEmail {
   constructor(private readonly emailDomain: string) {}
 
-  execute(payload: MtaHookPayload): ParsedInboundEmail {
+  async execute(payload: MtaHookPayload): Promise<ParsedInboundEmail> {
     const fromAddress = payload.envelope.from.address.toLowerCase();
     const envelopeTo = payload.envelope.to.map((t) => t.address.toLowerCase());
     const headerTo = this.parseAddressesFromHeader(
@@ -31,7 +39,7 @@ export class ParseInboundEmail {
       }
     }
 
-    const body = this.extractBody(payload.message.contents);
+    const { body, attachments } = await this.parseContents(payload.message.contents);
 
     return {
       fromAddress,
@@ -39,7 +47,28 @@ export class ParseInboundEmail {
       subject,
       body: body || '(No content)',
       inReplyToTicketId,
+      attachments,
     };
+  }
+
+  private async parseContents(contents: string): Promise<{ body: string; attachments: ParsedAttachment[] }> {
+    try {
+      const { simpleParser } = require('mailparser');
+      const parsed = await simpleParser(contents);
+
+      const body = this.extractBody(parsed.text || parsed.html || contents);
+      const attachments: ParsedAttachment[] = (parsed.attachments ?? []).map((att: any) => ({
+        filename: att.filename || 'attachment',
+        mimeType: att.contentType || 'application/octet-stream',
+        size: att.size || att.content?.length || 0,
+        content: att.content,
+      }));
+
+      return { body, attachments };
+    } catch {
+      // Fallback if mailparser is not installed
+      return { body: this.extractBody(contents), attachments: [] };
+    }
   }
 
   private parseAddressesFromHeader(header: string | null): string[] {

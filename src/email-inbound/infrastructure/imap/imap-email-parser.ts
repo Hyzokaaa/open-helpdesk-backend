@@ -1,4 +1,4 @@
-import { ParsedInboundEmail } from '../../domain/services/parse-inbound-email';
+import { ParsedInboundEmail, ParsedAttachment } from '../../domain/services/parse-inbound-email';
 
 const TICKET_ID_REGEX_TEMPLATE = '<ticket-([a-zA-Z0-9]+)@EMAIL_DOMAIN>';
 
@@ -10,7 +10,7 @@ export class ImapEmailParser {
     this.ticketIdRegex = new RegExp(TICKET_ID_REGEX_TEMPLATE.replace('EMAIL_DOMAIN', escaped));
   }
 
-  parse(envelope: ImapEnvelope, bodyText: string): ParsedInboundEmail {
+  async parse(envelope: ImapEnvelope, rawMime: string): Promise<ParsedInboundEmail> {
     const fromAddress = (envelope.from ?? '').toLowerCase();
     const toAddresses = (envelope.to ?? []).map((a) => a.toLowerCase());
     const subject = envelope.subject || '(No subject)';
@@ -23,7 +23,7 @@ export class ImapEmailParser {
       }
     }
 
-    const body = this.cleanBody(bodyText);
+    const { body, attachments } = await this.parseRawMime(rawMime);
 
     return {
       fromAddress,
@@ -31,7 +31,27 @@ export class ImapEmailParser {
       subject,
       body: body || '(No content)',
       inReplyToTicketId,
+      attachments,
     };
+  }
+
+  private async parseRawMime(raw: string): Promise<{ body: string; attachments: ParsedAttachment[] }> {
+    try {
+      const { simpleParser } = require('mailparser');
+      const parsed = await simpleParser(raw);
+
+      const body = this.cleanBody(parsed.text || parsed.html || raw);
+      const attachments: ParsedAttachment[] = (parsed.attachments ?? []).map((att: any) => ({
+        filename: att.filename || 'attachment',
+        mimeType: att.contentType || 'application/octet-stream',
+        size: att.size || att.content?.length || 0,
+        content: att.content,
+      }));
+
+      return { body, attachments };
+    } catch {
+      return { body: this.cleanBody(raw), attachments: [] };
+    }
   }
 
   private cleanBody(text: string): string {

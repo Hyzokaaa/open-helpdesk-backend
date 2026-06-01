@@ -10,6 +10,7 @@ import { CreateUser } from '../../../user/domain/services/user-create';
 import { AddWorkspaceMember } from '../../../workspace/domain/services/workspace-add-member';
 import { CreateTicket } from '../../../ticket/domain/services/ticket-create';
 import { CreateComment } from '../../../comment/domain/services/comment-create';
+import { CreateAttachment } from '../../../attachment/domain/services/attachment-create';
 import { TicketPriority } from '../../../ticket/domain/enums/ticket-priority.enum';
 import { TicketCategory } from '../../../ticket/domain/enums/ticket-category.enum';
 import { WorkspaceRole } from '../../../workspace/domain/enums/workspace-role.enum';
@@ -36,6 +37,7 @@ export class RouteInboundEmail {
     private readonly createTicket: CreateTicket,
     private readonly createComment: CreateComment,
     private readonly eventPublisher: EventPublisher,
+    private readonly createAttachment?: CreateAttachment,
   ) {}
 
   async execute(parsed: ParsedInboundEmail): Promise<RouteInboundEmailResult> {
@@ -109,6 +111,7 @@ export class RouteInboundEmail {
           this.eventPublisher.emit('comment.created', event);
         }
 
+        await this.uploadAttachments(parsed, ticket.getId(), comment.getId(), user.getId());
         return { action: 'comment-added', ticketId: ticket.getId() };
       }
     }
@@ -142,6 +145,35 @@ export class RouteInboundEmail {
     };
     this.eventPublisher.emit('ticket.created', ticketEvent);
 
+    await this.uploadAttachments(parsed, ticket.getId(), null, user.getId());
+
     return { action: 'ticket-created', ticketId: ticket.getId() };
+  }
+
+  private async uploadAttachments(
+    parsed: ParsedInboundEmail,
+    ticketId: string,
+    commentId: string | null,
+    userId: string,
+  ): Promise<void> {
+    if (!this.createAttachment || parsed.attachments.length === 0) return;
+
+    for (const att of parsed.attachments) {
+      try {
+        await this.createAttachment.execute({
+          buffer: att.content,
+          originalName: att.filename,
+          mimeType: att.mimeType,
+          size: att.size,
+          ticketId,
+          commentId,
+          uploadedById: userId,
+        });
+        this.logger.log(`Attachment uploaded: ${att.filename} (${att.size} bytes)`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
+        this.logger.error(`Failed to upload attachment ${att.filename}: ${msg}`);
+      }
+    }
   }
 }

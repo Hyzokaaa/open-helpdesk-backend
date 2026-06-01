@@ -14,6 +14,9 @@ import { AddWorkspaceMember } from '../../../workspace/domain/services/workspace
 import { CreateTicket } from '../../../ticket/domain/services/ticket-create';
 import { CreateComment } from '../../../comment/domain/services/comment-create';
 import { RouteInboundEmail } from '../../domain/services/route-inbound-email';
+import { CreateAttachment } from '../../../attachment/domain/services/attachment-create';
+import { TypeOrmAttachmentRepository } from '../../../attachment/infrastructure/typeorm/repositories/typeorm-attachment.repository';
+import { S3StorageService } from '../../../shared/infrastructure/s3-storage.service';
 import { MailboxType } from '../../../mailbox/domain/enums/mailbox-type.enum';
 import { Mailbox } from '../../../mailbox/domain/entities/mailbox';
 import { ImapEmailParser, ImapEnvelope } from './imap-email-parser';
@@ -58,6 +61,8 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     @Inject() private readonly passwordHasher: BcryptPasswordHasher,
     @Inject() private readonly eventPublisher: NestEventPublisher,
     @Inject() private readonly processedEmailRepository: ProcessedEmailRepository,
+    @Inject() private readonly attachmentRepository: TypeOrmAttachmentRepository,
+    @Inject() private readonly storageService: S3StorageService,
     private readonly config: ConfigService,
   ) {
     this.emailDomain = config.get<string>('EMAIL_DOMAIN');
@@ -297,8 +302,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
         if (alreadyProcessed) return false;
       }
 
-      const textBody = this.extractTextFromMime(msg.body);
-      const parsed = parser.parse(msg.envelope, textBody);
+      const parsed = await parser.parse(msg.envelope, msg.body);
 
       this.logger.log(`IMAP: processing email from ${parsed.fromAddress} — subject: ${parsed.subject}`);
 
@@ -374,6 +378,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     const addMember = new AddWorkspaceMember(this.idGenerator, this.memberRepository);
     const createTicket = new CreateTicket(this.idGenerator, this.ticketRepository);
     const createComment = new CreateComment(this.idGenerator, this.commentRepository);
+    const createAttachment = new CreateAttachment(this.idGenerator, this.attachmentRepository, this.storageService);
 
     return new RouteInboundEmail(
       this.mailboxRepository,
@@ -386,6 +391,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       createTicket,
       createComment,
       this.eventPublisher,
+      createAttachment,
     );
   }
 }
