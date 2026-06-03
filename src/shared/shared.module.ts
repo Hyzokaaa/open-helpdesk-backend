@@ -21,7 +21,7 @@ import { AccountModel } from '../account/infrastructure/typeorm/models/account.m
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.get('JWT_SECRET', 'default-secret'),
+        secret: config.getOrThrow('JWT_SECRET'),
         signOptions: { expiresIn: config.get('JWT_EXPIRATION', '1d') },
       }),
     }),
