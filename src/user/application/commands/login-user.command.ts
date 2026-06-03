@@ -23,7 +23,7 @@ export class LoginUserCommand implements Command<Props, LoginUserResponse> {
       password: props.password,
     });
 
-    const payload = { sub: user.getId(), email: user.email, isSystemAdmin: user.isSystemAdmin };
+    const payload = { sub: user.getId(), email: user.email, isSystemAdmin: user.isSystemAdmin, isEmailVerified: user.isEmailVerified };
     const accessToken = this.tokenService.sign(payload);
 
     return { accessToken };

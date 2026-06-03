@@ -7,12 +7,14 @@ interface JwtPayload {
   sub: string;
   email: string;
   isSystemAdmin: boolean;
+  isEmailVerified: boolean;
 }
 
 export interface AuthUser {
   userId: string;
   email: string;
   isSystemAdmin: boolean;
+  isEmailVerified: boolean;
 }
 
 @Injectable()
@@ -21,11 +23,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: config.get('JWT_SECRET', 'default-secret'),
+      secretOrKey: config.getOrThrow('JWT_SECRET'),
     });
   }
 
   validate(payload: JwtPayload): AuthUser {
-    return { userId: payload.sub, email: payload.email, isSystemAdmin: payload.isSystemAdmin };
+    return { userId: payload.sub, email: payload.email, isSystemAdmin: payload.isSystemAdmin, isEmailVerified: payload.isEmailVerified };
   }
 }
