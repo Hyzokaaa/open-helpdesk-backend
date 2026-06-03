@@ -22,19 +22,25 @@ export class TypeOrmTicketRepository implements TicketRepository {
   ) {}
 
   async create(ticket: Ticket): Promise<void> {
-    const [{ max }] = await this.repository.query(
-      `SELECT COALESCE(MAX("ticketNumber"), 0) as max FROM tickets WHERE "workspaceId" = $1`,
-      [ticket.workspaceId],
-    );
-    ticket.ticketNumber = Number(max) + 1;
+    await this.repository.manager.transaction(async (manager) => {
+      await manager.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [
+        ticket.workspaceId,
+      ]);
 
-    const model = this.toModel(ticket);
-    model.tags = ticket.tagIds.map((id) => {
-      const tag = new TagModel();
-      tag.id = id;
-      return tag;
+      const [{ max }] = await manager.query(
+        `SELECT COALESCE(MAX("ticketNumber"), 0) as max FROM tickets WHERE "workspaceId" = $1`,
+        [ticket.workspaceId],
+      );
+      ticket.ticketNumber = Number(max) + 1;
+
+      const model = this.toModel(ticket);
+      model.tags = ticket.tagIds.map((id) => {
+        const tag = new TagModel();
+        tag.id = id;
+        return tag;
+      });
+      await manager.save(model);
     });
-    await this.repository.save(model);
   }
 
   async findById(id: string): Promise<Ticket | null> {
