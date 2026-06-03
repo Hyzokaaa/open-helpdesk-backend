@@ -199,7 +199,9 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
 
       // Mark error
       mailbox.lastError = errMsg;
-      try { await this.mailboxRepository.update(mailbox); } catch { /* ignore */ }
+      try { await this.mailboxRepository.update(mailbox); } catch (e) {
+        this.logger.warn(`Failed to persist mailbox error state for ${mailbox.address}: ${e instanceof Error ? e.message : e}`);
+      }
 
       state.timer = setTimeout(() => this.pollMailbox(mailbox, state), state.backoff);
       state.backoff = Math.min(state.backoff * 2, 60000);
@@ -262,7 +264,9 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       logger: false,
     });
 
-    client.on('error', () => {});
+    client.on('error', (err: Error) => {
+      this.logger.error(`IMAP client error for ${config.user}@${config.host}: ${err.message}`, err.stack);
+    });
 
     const results: FetchedMessage[] = [];
     const since = config.since ?? new Date();
@@ -289,7 +293,9 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
         lock.release();
       }
     } finally {
-      try { await client.logout(); } catch { /* already disconnected */ }
+      try { await client.logout(); } catch (e) {
+        this.logger.debug(`IMAP logout failed for ${config.user}@${config.host}: ${e instanceof Error ? e.message : e}`);
+      }
     }
 
     return results;
