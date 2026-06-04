@@ -99,6 +99,7 @@ export class TicketController {
       workspaceId: workspace.getId(),
       userId: user.userId,
       filters: {
+        search: filters.search,
         status: filters.status,
         excludeStatus: filters.excludeStatus,
         priority: filters.priority,

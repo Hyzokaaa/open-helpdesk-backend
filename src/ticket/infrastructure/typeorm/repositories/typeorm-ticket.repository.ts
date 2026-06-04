@@ -62,6 +62,17 @@ export class TypeOrmTicketRepository implements TicketRepository {
       .leftJoinAndSelect('ticket.tags', 'tag')
       .where('ticket.workspaceId = :workspaceId', { workspaceId });
 
+    if (filters.search) {
+      const isNumeric = /^\d+$/.test(filters.search.trim());
+      if (isNumeric) {
+        qb.andWhere('ticket.ticketNumber = :ticketNumber', { ticketNumber: Number(filters.search.trim()) });
+      } else {
+        qb.andWhere(
+          '(ticket.name ILIKE :search OR ticket.description ILIKE :search)',
+          { search: `%${filters.search}%` },
+        );
+      }
+    }
     if (filters.status) {
       qb.andWhere('ticket.status = :status', { status: filters.status });
     }

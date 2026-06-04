@@ -4,6 +4,7 @@ import { TicketPriority } from '../enums/ticket-priority.enum';
 import { TicketStatus } from '../enums/ticket-status.enum';
 
 export interface TicketFilters {
+  search?: string;
   status?: TicketStatus;
   excludeStatus?: string;
   priority?: TicketPriority;

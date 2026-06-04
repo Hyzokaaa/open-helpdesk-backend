@@ -5,6 +5,10 @@ import { TicketPriority } from '../../../domain/enums/ticket-priority.enum';
 import { TicketStatus } from '../../../domain/enums/ticket-status.enum';
 
 export class TicketFilterDto extends PaginationDto {
+  @IsString()
+  @IsOptional()
+  search?: string;
+
   @IsEnum(TicketStatus)
   @IsOptional()
   status?: TicketStatus;
