@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   S3Client,
@@ -33,14 +33,18 @@ export class S3StorageService implements StorageService {
     key: string,
     mimeType: string,
   ): Promise<void> {
-    await this.client.send(
-      new PutObjectCommand({
-        Bucket: this.bucket,
-        Key: key,
-        Body: buffer,
-        ContentType: mimeType,
-      }),
-    );
+    try {
+      await this.client.send(
+        new PutObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+          Body: buffer,
+          ContentType: mimeType,
+        }),
+      );
+    } catch (error) {
+      throw this.handleConnectionError(error);
+    }
   }
 
   async getPresignedUrl(key: string, expiresIn = 3600): Promise<string> {
@@ -48,15 +52,36 @@ export class S3StorageService implements StorageService {
       Bucket: this.bucket,
       Key: key,
     });
-    return getSignedUrl(this.client, command, { expiresIn });
+    try {
+      return await getSignedUrl(this.client, command, { expiresIn });
+    } catch (error) {
+      throw this.handleConnectionError(error);
+    }
   }
 
   async delete(key: string): Promise<void> {
-    await this.client.send(
-      new DeleteObjectCommand({
-        Bucket: this.bucket,
-        Key: key,
-      }),
-    );
+    try {
+      await this.client.send(
+        new DeleteObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+        }),
+      );
+    } catch (error) {
+      throw this.handleConnectionError(error);
+    }
+  }
+
+  private handleConnectionError(error: unknown): Error {
+    if (
+      error instanceof AggregateError ||
+      (error instanceof Error && ('code' in error) &&
+        (error as any).code === 'ECONNREFUSED')
+    ) {
+      return new ServiceUnavailableException(
+        'File storage service is unavailable',
+      );
+    }
+    return error instanceof Error ? error : new Error(String(error));
   }
 }
