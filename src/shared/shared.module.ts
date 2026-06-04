@@ -9,6 +9,7 @@ import { S3StorageService } from './infrastructure/s3-storage.service';
 import { NestEventPublisher } from './infrastructure/nest-event-publisher';
 import { JwtTokenService } from './infrastructure/jwt-token-service';
 import { SeederService } from './infrastructure/seeder.service';
+import { EventsGateway } from './infrastructure/ws/events.gateway';
 import { JwtStrategy } from './nest/strategies/jwt.strategy';
 import { UserModel } from '../user/infrastructure/typeorm/models/user.model';
 import { AccountModel } from '../account/infrastructure/typeorm/models/account.model';
@@ -26,7 +27,7 @@ import { AccountModel } from '../account/infrastructure/typeorm/models/account.m
       }),
     }),
   ],
-  providers: [UlidGenerator, BcryptPasswordHasher, S3StorageService, NestEventPublisher, JwtTokenService, SeederService, JwtStrategy],
+  providers: [UlidGenerator, BcryptPasswordHasher, S3StorageService, NestEventPublisher, JwtTokenService, SeederService, JwtStrategy, EventsGateway],
   exports: [UlidGenerator, BcryptPasswordHasher, S3StorageService, NestEventPublisher, JwtTokenService, JwtModule, PassportModule],
 })
 export class SharedModule {}
