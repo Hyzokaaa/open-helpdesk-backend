@@ -20,7 +20,7 @@ describe('DeleteAttachment', () => {
     repository.seed(new Attachment({
       id: 'att-1', fileName: 'file.png', originalName: 'file.png',
       mimeType: 'image/png', size: 1, s3Key: 'attachments/att-1/file.png',
-      ticketId: 'ticket-1', commentId: null,
+      ticketId: 'ticket-1', commentId: null, uploadedById: null,
     }));
 
     await service.execute({ attachmentId: 'att-1' });

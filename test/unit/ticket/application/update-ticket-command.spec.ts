@@ -10,6 +10,9 @@ import { WorkspaceRole } from '../../../../src/workspace/domain/enums/workspace-
 import { MockTicketRepository } from '../../../mocks/mock-ticket.repository';
 import { MockWorkspaceMemberRepository } from '../../../mocks/mock-workspace-member.repository';
 import { AccessDeniedError } from '../../../../src/shared/domain/errors';
+import { CreateAuditLogEntry } from '../../../../src/audit-log/domain/services/audit-log-create';
+import { ValidateCustomFieldValues } from '../../../../src/custom-field/domain/services/custom-field-validate-values';
+import { FakeIdGenerator } from '../../../mocks/fake-id-generator';
 
 describe('UpdateTicketCommand', () => {
   let command: UpdateTicketCommand;
@@ -31,6 +34,9 @@ describe('UpdateTicketCommand', () => {
       createdAt: new Date(),
       deletedAt: null,
       tagIds: [],
+      resolvedById: null,
+      customFields: {},
+      discardReason: null,
     });
     ticketRepository.create(ticket);
     return ticket;
@@ -41,7 +47,11 @@ describe('UpdateTicketCommand', () => {
     memberRepository = new MockWorkspaceMemberRepository();
     const updateService = new UpdateTicket(ticketRepository);
     const ensurePermission = new EnsureWorkspacePermission(memberRepository);
-    command = new UpdateTicketCommand(updateService, ticketRepository, ensurePermission);
+    const auditLogRepository = { create: async () => {}, findAll: async () => ({ data: [], total: 0, page: 1, limit: 10 }) };
+    const createAuditLog = new CreateAuditLogEntry(new FakeIdGenerator(), auditLogRepository as any);
+    const customFieldDefRepository = { findByWorkspaceId: async () => [] } as any;
+    const validateCustomFields = new ValidateCustomFieldValues(customFieldDefRepository);
+    command = new UpdateTicketCommand(updateService, ticketRepository, ensurePermission, createAuditLog, validateCustomFields);
   });
 
   it('should allow admin to update name', async () => {
@@ -59,14 +69,14 @@ describe('UpdateTicketCommand', () => {
     expect(result.name).toBe('Updated name');
   });
 
-  it('should ignore name update for reporter (no TICKET_EDIT_NAME permission)', async () => {
+  it('should ignore name update for agent (no TICKET_EDIT_NAME permission)', async () => {
     seedTicket();
-    memberRepository.seed(new WorkspaceMember({ id: 'm-2', workspaceId: 'ws-1', userId: 'creator-1', role: WorkspaceRole.REPORTER }));
+    memberRepository.seed(new WorkspaceMember({ id: 'm-2', workspaceId: 'ws-1', userId: 'agent-1', role: WorkspaceRole.AGENT }));
 
     const result = await command.execute({
       ticketId: 'ticket-1',
       workspaceId: 'ws-1',
-      userId: 'creator-1',
+      userId: 'agent-1',
       isSystemAdmin: false,
       name: 'Should be ignored',
       description: 'New desc',

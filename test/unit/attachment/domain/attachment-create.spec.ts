@@ -24,6 +24,7 @@ describe('CreateAttachment', () => {
       size: 12,
       ticketId: 'ticket-1',
       commentId: null,
+      uploadedById: null,
     });
 
     expect(attachment.originalName).toBe('photo.png');

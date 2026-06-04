@@ -25,6 +25,9 @@ describe('ChangeTicketStatus', () => {
       createdAt: new Date(),
       deletedAt: null,
       tagIds: [],
+      resolvedById: null,
+      customFields: {},
+      discardReason: null,
       ...overrides,
     });
 
@@ -36,7 +39,7 @@ describe('ChangeTicketStatus', () => {
   it('should change status from pending to in-progress', async () => {
     await repository.create(createTicket());
 
-    const result = await service.execute({ ticketId: 'ticket-1', status: TicketStatus.IN_PROGRESS });
+    const result = await service.execute({ ticketId: 'ticket-1', status: TicketStatus.IN_PROGRESS, userId: 'user-1' });
 
     expect(result.status).toBe(TicketStatus.IN_PROGRESS);
   });
@@ -44,7 +47,7 @@ describe('ChangeTicketStatus', () => {
   it('should set resolvedAt when transitioning to resolved', async () => {
     await repository.create(createTicket());
 
-    const result = await service.execute({ ticketId: 'ticket-1', status: TicketStatus.RESOLVED });
+    const result = await service.execute({ ticketId: 'ticket-1', status: TicketStatus.RESOLVED, userId: 'user-1' });
 
     expect(result.resolvedAt).toBeInstanceOf(Date);
   });
@@ -52,14 +55,14 @@ describe('ChangeTicketStatus', () => {
   it('should clear resolvedAt when moving back from resolved to in-progress', async () => {
     await repository.create(createTicket({ status: TicketStatus.RESOLVED, resolvedAt: new Date() }));
 
-    const result = await service.execute({ ticketId: 'ticket-1', status: TicketStatus.IN_PROGRESS });
+    const result = await service.execute({ ticketId: 'ticket-1', status: TicketStatus.IN_PROGRESS, userId: 'user-1' });
 
     expect(result.resolvedAt).toBeNull();
   });
 
   it('should throw EntityNotFoundError when ticket does not exist', async () => {
     await expect(
-      service.execute({ ticketId: 'nonexistent', status: TicketStatus.IN_PROGRESS }),
+      service.execute({ ticketId: 'nonexistent', status: TicketStatus.IN_PROGRESS, userId: 'user-1' }),
     ).rejects.toThrow(EntityNotFoundError);
   });
 });

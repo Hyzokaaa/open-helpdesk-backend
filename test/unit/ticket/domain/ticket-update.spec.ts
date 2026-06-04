@@ -25,6 +25,9 @@ describe('UpdateTicket', () => {
       createdAt: new Date(),
       deletedAt: null,
       tagIds: ['tag-1'],
+      resolvedById: null,
+      customFields: {},
+      discardReason: null,
     });
     repository.create(ticket);
   };

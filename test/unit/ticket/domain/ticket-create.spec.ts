@@ -16,7 +16,7 @@ describe('CreateTicket', () => {
     service = new CreateTicket(idGenerator, repository);
   });
 
-  it('should create a ticket with pending status', async () => {
+  it('should create a ticket with open status', async () => {
     const ticket = await service.execute({
       name: 'Test ticket',
       description: 'A description',
@@ -28,7 +28,7 @@ describe('CreateTicket', () => {
     });
 
     expect(ticket.name).toBe('Test ticket');
-    expect(ticket.status).toBe(TicketStatus.PENDING);
+    expect(ticket.status).toBe(TicketStatus.OPEN);
     expect(ticket.priority).toBe(TicketPriority.HIGH);
     expect(ticket.workspaceId).toBe('ws-1');
     expect(ticket.creatorId).toBe('user-1');
