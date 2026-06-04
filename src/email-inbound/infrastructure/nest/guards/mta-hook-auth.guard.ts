@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { timingSafeEqual } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 
 @Injectable()
 export class MtaHookAuthGuard implements CanActivate {
@@ -35,13 +35,9 @@ export class MtaHookAuthGuard implements CanActivate {
   }
 
   private constantTimeEqual(a: string, b: string): boolean {
-    const bufA = Buffer.from(a);
-    const bufB = Buffer.from(b);
-
-    if (bufA.length !== bufB.length) {
-      return false;
-    }
-
-    return timingSafeEqual(bufA, bufB);
+    const key = Buffer.from('mta-hook-compare');
+    const hmacA = createHmac('sha256', key).update(a).digest();
+    const hmacB = createHmac('sha256', key).update(b).digest();
+    return timingSafeEqual(hmacA, hmacB);
   }
 }
