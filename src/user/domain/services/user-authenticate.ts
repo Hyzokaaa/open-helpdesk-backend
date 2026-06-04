@@ -28,6 +28,10 @@ export class AuthenticateUser {
       throw new InvalidCredentialsError('Invalid credentials');
     }
 
+    if (!user.isActive) {
+      throw new InvalidCredentialsError('Invalid credentials');
+    }
+
     return user;
   }
 }

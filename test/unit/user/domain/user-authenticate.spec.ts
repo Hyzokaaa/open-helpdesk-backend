@@ -46,4 +46,25 @@ describe('AuthenticateUser', () => {
       service.execute({ email: 'john@example.com', password: 'wrong-password' }),
     ).rejects.toThrow(InvalidCredentialsError);
   });
+
+  it('should throw InvalidCredentialsError when user is deactivated', async () => {
+    repository.seed(
+      new User({
+        id: 'user-2',
+        email: 'inactive@example.com',
+        password: 'hashed:correct-password',
+        firstName: 'Jane',
+        lastName: 'Doe',
+        isActive: false,
+        isSystemAdmin: false,
+        isEmailVerified: true,
+        language: 'en',
+        theme: 'system',
+      }),
+    );
+
+    await expect(
+      service.execute({ email: 'inactive@example.com', password: 'correct-password' }),
+    ).rejects.toThrow(InvalidCredentialsError);
+  });
 });
