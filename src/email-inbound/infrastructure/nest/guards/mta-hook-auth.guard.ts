@@ -1,5 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { timingSafeEqual } from 'node:crypto';
 
 @Injectable()
 export class MtaHookAuthGuard implements CanActivate {
@@ -26,10 +27,21 @@ export class MtaHookAuthGuard implements CanActivate {
     const decoded = Buffer.from(authHeader.slice(6), 'base64').toString('utf-8');
     const [user, secret] = decoded.split(':');
 
-    if (user !== this.expectedUser || secret !== this.expectedSecret) {
+    if (!this.constantTimeEqual(user, this.expectedUser) || !this.constantTimeEqual(secret, this.expectedSecret)) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
     return true;
+  }
+
+  private constantTimeEqual(a: string, b: string): boolean {
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+
+    if (bufA.length !== bufB.length) {
+      return false;
+    }
+
+    return timingSafeEqual(bufA, bufB);
   }
 }
