@@ -25,7 +25,7 @@ async function bootstrap() {
 
   const frontendUrl = process.env.FRONTEND_URL;
   app.enableCors({
-    origin: frontendUrl || true,
+    origin: frontendUrl || 'http://localhost:5173',
     exposedHeaders: ['X-Unread-Count', 'Date'],
   });
 
