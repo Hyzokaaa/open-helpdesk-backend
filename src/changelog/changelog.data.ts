@@ -16,6 +16,22 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.11.0',
+    date: '2026-06-04',
+    categories: [
+      {
+        title: { en: 'Security & Reliability', es: 'Seguridad y Fiabilidad' },
+        features: [
+          { en: 'Deactivated users can no longer log in — accounts are blocked immediately', es: 'Los usuarios desactivados ya no pueden iniciar sesión — las cuentas se bloquean inmediatamente' },
+          { en: 'Ticket numbers are now guaranteed unique even under heavy load', es: 'Los números de ticket ahora están garantizados como únicos incluso bajo carga alta' },
+          { en: 'Clear error message when file storage is temporarily unavailable', es: 'Mensaje de error claro cuando el almacenamiento de archivos no está disponible temporalmente' },
+          { en: 'Dates displayed in your browser\'s language instead of always English', es: 'Fechas mostradas en el idioma de tu navegador en vez de siempre en inglés' },
+          { en: 'Dashboard and admin pages are now protected — unauthorized users are redirected to login', es: 'Las páginas de dashboard y administración ahora están protegidas — usuarios no autorizados son redirigidos al login' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.10.0',
     date: '2026-05-31',
     categories: [
