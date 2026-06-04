@@ -1,5 +1,5 @@
 import { Body, Controller, Inject, Logger, Post, UseGuards } from '@nestjs/common';
-import { SkipThrottle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import { Public } from '../../../../shared/nest/decorators/public.decorator';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
 import { NestEventPublisher } from '../../../../shared/infrastructure/nest-event-publisher';
@@ -26,7 +26,7 @@ import { ProcessedEmailRepository } from '../../typeorm/repositories/processed-e
 import { ConfigService } from '@nestjs/config';
 
 @Public()
-@SkipThrottle()
+@Throttle({ default: { ttl: 60000, limit: 300 } })
 @UseGuards(MtaHookAuthGuard)
 @Controller('inbound')
 export class InboundEmailController {

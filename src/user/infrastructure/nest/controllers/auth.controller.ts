@@ -48,7 +48,7 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ default: { ttl: 3600000, limit: 3 } })
+  @Throttle({ default: { ttl: 60000, limit: 3 } })
   @Post('forgot-password')
   async forgotPassword(@Body() body: { email: string }) {
     const service = new RequestPasswordReset(this.userRepository);

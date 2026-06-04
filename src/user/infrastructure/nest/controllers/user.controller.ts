@@ -8,6 +8,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { SkipEmailVerification } from '../../../../shared/nest/decorators/skip-email-verification.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
@@ -29,7 +30,7 @@ import { TypeOrmUserRepository } from '../../typeorm/repositories/typeorm-user.r
 import { TypeOrmAccountRepository } from '../../../../account/infrastructure/typeorm/repositories/typeorm-account.repository';
 import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
 import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit-log-create';
-import { Account } from '../../../../account/domain/entities/account';
+import { CreateAccountForUser } from '../../../../account/domain/services/account-create-for-user';
 import { RegisterUserRequest } from '../dto/register-user.request';
 import { SortDto } from '../../../../shared/nest/dto/sort.dto';
 
@@ -112,6 +113,7 @@ export class UserController {
     return query.execute({ sort });
   }
 
+  @Throttle({ default: { ttl: 60000, limit: 3 } })
   @Post()
   async create(
     @Body() body: RegisterUserRequest,
@@ -129,12 +131,8 @@ export class UserController {
       requestingUserIsAdmin: user.isSystemAdmin,
     });
 
-    const account = new Account({
-      id: this.idGenerator.create(),
-      ownerId: result.id,
-      name: `${body.firstName}'s Account`,
-    });
-    await this.accountRepository.create(account);
+    const createAccount = new CreateAccountForUser(this.idGenerator, this.accountRepository);
+    await createAccount.execute({ userId: result.id, firstName: body.firstName });
 
     return result;
   }
