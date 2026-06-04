@@ -28,6 +28,13 @@ export const coreChangelog: ChangelogVersion[] = [
         ],
       },
       {
+        title: { en: 'Attachments', es: 'Adjuntos' },
+        features: [
+          { en: 'Files are uploaded before creating the ticket — if something fails, no orphan tickets are created', es: 'Los archivos se suben antes de crear el ticket — si algo falla, no se crean tickets huérfanos' },
+          { en: 'Upload progress shown per file — retry failed uploads with one click', es: 'Progreso de subida por archivo — reintenta subidas fallidas con un click' },
+        ],
+      },
+      {
         title: { en: 'Security & Reliability', es: 'Seguridad y Fiabilidad' },
         features: [
           { en: 'Deactivated users can no longer log in — accounts are blocked immediately', es: 'Los usuarios desactivados ya no pueden iniciar sesión — las cuentas se bloquean inmediatamente' },
