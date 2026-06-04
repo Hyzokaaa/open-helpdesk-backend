@@ -51,4 +51,40 @@ describe('EnsureWorkspacePermission', () => {
 
     expect(result.role).toBe(WorkspaceRole.REPORTER);
   });
+
+  it('should pass anyOf check when user has at least one of the permissions', async () => {
+    repository.seed(new WorkspaceMember({ id: 'm-4', workspaceId: 'ws-1', userId: 'agent-1', role: WorkspaceRole.AGENT }));
+
+    const result = await service.execute({
+      workspaceId: 'ws-1',
+      userId: 'agent-1',
+      anyOf: [PERMISSIONS.WORKSPACE_SETTINGS_MANAGE, PERMISSIONS.TICKET_CREATE],
+    });
+
+    expect(result.role).toBe(WorkspaceRole.AGENT);
+  });
+
+  it('should throw AccessDeniedError when user has none of the anyOf permissions', async () => {
+    repository.seed(new WorkspaceMember({ id: 'm-5', workspaceId: 'ws-1', userId: 'reporter-2', role: WorkspaceRole.REPORTER }));
+
+    await expect(
+      service.execute({
+        workspaceId: 'ws-1',
+        userId: 'reporter-2',
+        anyOf: [PERMISSIONS.WORKSPACE_SETTINGS_MANAGE, PERMISSIONS.TICKET_DELETE],
+      }),
+    ).rejects.toThrow(AccessDeniedError);
+  });
+
+  it('should bypass all checks for system admin', async () => {
+    const result = await service.execute({
+      workspaceId: 'ws-1',
+      userId: 'admin-user',
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: true,
+    });
+
+    expect(result.userId).toBe('admin-user');
+    expect(result.role).toBe(WorkspaceRole.ADMIN);
+  });
 });

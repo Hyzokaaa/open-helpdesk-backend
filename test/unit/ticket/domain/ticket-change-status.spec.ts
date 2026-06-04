@@ -4,7 +4,8 @@ import { TicketStatus } from '../../../../src/ticket/domain/enums/ticket-status.
 import { TicketPriority } from '../../../../src/ticket/domain/enums/ticket-priority.enum';
 import { TicketCategory } from '../../../../src/ticket/domain/enums/ticket-category.enum';
 import { MockTicketRepository } from '../../../mocks/mock-ticket.repository';
-import { EntityNotFoundError } from '../../../../src/shared/domain/errors';
+import { TicketDiscardReason } from '../../../../src/ticket/domain/enums/ticket-discard-reason.enum';
+import { DomainValidationError, EntityNotFoundError } from '../../../../src/shared/domain/errors';
 
 describe('ChangeTicketStatus', () => {
   let service: ChangeTicketStatus;
@@ -64,5 +65,73 @@ describe('ChangeTicketStatus', () => {
     await expect(
       service.execute({ ticketId: 'nonexistent', status: TicketStatus.IN_PROGRESS, userId: 'user-1' }),
     ).rejects.toThrow(EntityNotFoundError);
+  });
+
+  it('should reject transition from non-open to open without canMoveToOpen', async () => {
+    await repository.create(createTicket({ status: TicketStatus.IN_PROGRESS }));
+
+    await expect(
+      service.execute({ ticketId: 'ticket-1', status: TicketStatus.OPEN, userId: 'user-1' }),
+    ).rejects.toThrow(DomainValidationError);
+  });
+
+  it('should allow transition to open when canMoveToOpen is true', async () => {
+    await repository.create(createTicket({ status: TicketStatus.IN_PROGRESS }));
+
+    const result = await service.execute({
+      ticketId: 'ticket-1',
+      status: TicketStatus.OPEN,
+      userId: 'user-1',
+      canMoveToOpen: true,
+    });
+
+    expect(result.status).toBe(TicketStatus.OPEN);
+    expect(result.assigneeId).toBeNull();
+  });
+
+  it('should auto-assign user when moving from open with no assignee', async () => {
+    await repository.create(createTicket({ status: TicketStatus.OPEN }));
+
+    const result = await service.execute({
+      ticketId: 'ticket-1',
+      status: TicketStatus.IN_PROGRESS,
+      userId: 'user-2',
+    });
+
+    expect(result.assigneeId).toBe('user-2');
+  });
+
+  it('should require discard reason when discarding', async () => {
+    await repository.create(createTicket());
+
+    await expect(
+      service.execute({ ticketId: 'ticket-1', status: TicketStatus.DISCARDED, userId: 'user-1' }),
+    ).rejects.toThrow(DomainValidationError);
+  });
+
+  it('should set discard reason when discarding with reason', async () => {
+    await repository.create(createTicket());
+
+    const result = await service.execute({
+      ticketId: 'ticket-1',
+      status: TicketStatus.DISCARDED,
+      userId: 'user-1',
+      discardReason: TicketDiscardReason.SPAM,
+    });
+
+    expect(result.status).toBe(TicketStatus.DISCARDED);
+    expect(result.discardReason).toBe(TicketDiscardReason.SPAM);
+  });
+
+  it('should set resolvedById when resolving', async () => {
+    await repository.create(createTicket());
+
+    const result = await service.execute({
+      ticketId: 'ticket-1',
+      status: TicketStatus.RESOLVED,
+      userId: 'user-2',
+    });
+
+    expect(result.resolvedById).toBe('user-2');
   });
 });
