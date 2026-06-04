@@ -44,7 +44,7 @@ export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
     });
 
     const ticket = await this.repository.findById(props.ticketId);
-    if (!ticket) {
+    if (!ticket || ticket.workspaceId !== props.workspaceId) {
       throw new EntityNotFoundError('Ticket not found');
     }
 

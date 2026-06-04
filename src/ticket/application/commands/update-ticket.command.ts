@@ -41,7 +41,7 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
 
   async execute(props: Props): Promise<UpdateTicketResponse> {
     const ticket = await this.ticketRepository.findById(props.ticketId);
-    if (!ticket) throw new EntityNotFoundError('Ticket not found');
+    if (!ticket || ticket.workspaceId !== props.workspaceId) throw new EntityNotFoundError('Ticket not found');
 
     const isTerminal = ticket.status === 'discarded' || ticket.status === 'resolved';
 

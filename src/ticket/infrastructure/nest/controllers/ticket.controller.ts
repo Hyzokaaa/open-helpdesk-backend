@@ -233,8 +233,9 @@ export class TicketController {
     const service = new AssignTicket(this.ticketRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     const ticket = await this.ticketRepository.findById(id);
+    if (!ticket || ticket.workspaceId !== workspace.getId()) throw new EntityNotFoundError('Ticket not found');
     const assignee = body.assigneeId ? await this.userRepository.findById(body.assigneeId) : null;
-    const prevAssignee = ticket?.assigneeId ? await this.userRepository.findById(ticket.assigneeId) : null;
+    const prevAssignee = ticket.assigneeId ? await this.userRepository.findById(ticket.assigneeId) : null;
     const command = new AssignTicketCommand(service, this.ticketRepository, ensurePermission, this.eventPublisher, auditLog);
     return command.execute({
       ticketId: id,

@@ -1,4 +1,5 @@
 import { Command } from '../../../shared/domain/command';
+import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { DeleteTicket } from '../../domain/services/ticket-delete';
 import { EnsureWorkspacePermission } from '../../../workspace/domain/services/workspace-ensure-permission';
 import { PERMISSIONS } from '../../../workspace/domain/permissions';
@@ -30,6 +31,7 @@ export class DeleteTicketCommand implements Command<Props, void> {
     });
 
     const ticket = await this.ticketRepository.findById(props.ticketId);
+    if (!ticket || ticket.workspaceId !== props.workspaceId) throw new EntityNotFoundError('Ticket not found');
     await this.deleteTicket.execute({ ticketId: props.ticketId });
 
     await this.createAuditLog.execute({

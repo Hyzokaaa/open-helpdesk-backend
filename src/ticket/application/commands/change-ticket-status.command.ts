@@ -40,7 +40,7 @@ export class ChangeTicketStatusCommand implements Command<Props, ChangeStatusRes
 
   async execute(props: Props): Promise<ChangeStatusResponse> {
     const ticket = await this.ticketRepository.findById(props.ticketId);
-    if (!ticket) throw new EntityNotFoundError('Ticket not found');
+    if (!ticket || ticket.workspaceId !== props.workspaceId) throw new EntityNotFoundError('Ticket not found');
 
     const permission = ticket.status === 'discarded'
       ? PERMISSIONS.TICKET_CHANGE_STATUS_DISCARDED
