@@ -23,7 +23,9 @@ async function bootstrap() {
 
   app.useGlobalFilters(new DomainExceptionFilter());
 
+  const frontendUrl = process.env.FRONTEND_URL;
   app.enableCors({
+    origin: frontendUrl || true,
     exposedHeaders: ['X-Unread-Count', 'Date'],
   });
 
