@@ -24,6 +24,7 @@ export interface TicketDetailResponse {
   creatorId: string;
   assigneeId: string | null;
   resolvedAt: Date | null;
+  ticketNumber: number;
   tagIds: string[];
   customFields: Record<string, unknown>;
   discardReason: string | null;
@@ -69,6 +70,7 @@ export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
       creatorId: ticket.creatorId,
       assigneeId: ticket.assigneeId,
       resolvedAt: ticket.resolvedAt,
+      ticketNumber: ticket.ticketNumber,
       tagIds: ticket.tagIds,
       customFields: ticket.customFields,
       discardReason: ticket.discardReason,
