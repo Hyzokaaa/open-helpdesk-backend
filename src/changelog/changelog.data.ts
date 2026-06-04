@@ -20,6 +20,14 @@ export const coreChangelog: ChangelogVersion[] = [
     date: '2026-06-04',
     categories: [
       {
+        title: { en: 'Search & Real-Time', es: 'Búsqueda y Tiempo Real' },
+        features: [
+          { en: 'Search tickets by name, description, or ticket number — results update as you type', es: 'Busca tickets por nombre, descripción o número de ticket — los resultados se actualizan mientras escribes' },
+          { en: 'Real-time updates — new tickets, status changes, and comments appear instantly without refreshing', es: 'Actualizaciones en tiempo real — nuevos tickets, cambios de estado y comentarios aparecen al instante sin recargar' },
+          { en: 'Ticket ID column in the table and visible in ticket detail view', es: 'Columna de ID de ticket en la tabla y visible en la vista de detalle' },
+        ],
+      },
+      {
         title: { en: 'Security & Reliability', es: 'Seguridad y Fiabilidad' },
         features: [
           { en: 'Deactivated users can no longer log in — accounts are blocked immediately', es: 'Los usuarios desactivados ya no pueden iniciar sesión — las cuentas se bloquean inmediatamente' },
