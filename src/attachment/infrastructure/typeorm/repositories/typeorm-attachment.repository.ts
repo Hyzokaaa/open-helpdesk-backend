@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, LessThan, In, Repository } from 'typeorm';
 import { Attachment } from '../../../domain/entities/attachment';
 import { AttachmentRepository } from '../../../domain/repositories/attachment.repository';
 import { AttachmentModel } from '../models/attachment.model';
@@ -36,6 +36,32 @@ export class TypeOrmAttachmentRepository implements AttachmentRepository {
     await this.repository.delete(id);
   }
 
+  async findByTokens(tokens: string[]): Promise<Attachment[]> {
+    if (tokens.length === 0) return [];
+    const models = await this.repository.findBy({ token: In(tokens) });
+    return models.map((m) => this.toDomain(m));
+  }
+
+  async claimStagedAttachments(tokens: string[], ticketId: string): Promise<void> {
+    if (tokens.length === 0) return;
+    await this.repository.update(
+      { token: In(tokens) },
+      { ticketId, token: null, stagedAt: null },
+    );
+  }
+
+  async findExpiredStaged(before: Date): Promise<Attachment[]> {
+    const models = await this.repository.find({
+      where: { stagedAt: LessThan(before), ticketId: IsNull() },
+    });
+    return models.map((m) => this.toDomain(m));
+  }
+
+  async deleteMany(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    await this.repository.delete(ids);
+  }
+
   private toDomain(model: AttachmentModel): Attachment {
     return new Attachment({
       id: model.id,
@@ -47,6 +73,8 @@ export class TypeOrmAttachmentRepository implements AttachmentRepository {
       ticketId: model.ticketId,
       commentId: model.commentId,
       uploadedById: model.uploadedById,
+      token: model.token,
+      stagedAt: model.stagedAt,
     });
   }
 
@@ -61,6 +89,8 @@ export class TypeOrmAttachmentRepository implements AttachmentRepository {
     model.ticketId = attachment.ticketId;
     model.commentId = attachment.commentId;
     model.uploadedById = attachment.uploadedById;
+    model.token = attachment.token;
+    model.stagedAt = attachment.stagedAt;
     return model;
   }
 }

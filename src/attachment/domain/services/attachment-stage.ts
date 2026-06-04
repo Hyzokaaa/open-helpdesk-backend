@@ -1,29 +1,27 @@
+import { randomUUID } from 'crypto';
 import { IdGenerator } from '../../../shared/domain/id-generator';
 import { StorageService } from '../../../shared/domain/storage-service';
 import { Attachment } from '../entities/attachment';
 import { AttachmentRepository } from '../repositories/attachment.repository';
 
-interface CreateAttachmentProps {
+interface StageAttachmentProps {
   buffer: Buffer;
   originalName: string;
   mimeType: string;
   size: number;
-  ticketId: string | null;
-  commentId: string | null;
-  uploadedById: string | null;
-  token?: string | null;
-  stagedAt?: Date | null;
+  uploadedById: string;
 }
 
-export class CreateAttachment {
+export class StageAttachment {
   constructor(
     private readonly idGenerator: IdGenerator,
     private readonly repository: AttachmentRepository,
     private readonly storage: StorageService,
   ) {}
 
-  async execute(props: CreateAttachmentProps): Promise<Attachment> {
+  async execute(props: StageAttachmentProps): Promise<Attachment> {
     const id = this.idGenerator.create();
+    const token = randomUUID();
     const s3Key = `attachments/${id}/${props.originalName}`;
 
     await this.storage.upload(props.buffer, s3Key, props.mimeType);
@@ -35,11 +33,11 @@ export class CreateAttachment {
       mimeType: props.mimeType,
       size: props.size,
       s3Key,
-      ticketId: props.ticketId,
-      commentId: props.commentId,
+      ticketId: null,
+      commentId: null,
       uploadedById: props.uploadedById,
-      token: props.token ?? null,
-      stagedAt: props.stagedAt ?? null,
+      token,
+      stagedAt: new Date(),
     });
 
     await this.repository.create(attachment);

@@ -16,8 +16,10 @@ import { S3StorageService } from '../../../../shared/infrastructure/s3-storage.s
 import { AccessDeniedError } from '../../../../shared/domain/errors';
 import { CreateAttachment } from '../../../domain/services/attachment-create';
 import { DeleteAttachment } from '../../../domain/services/attachment-delete';
+import { StageAttachment } from '../../../domain/services/attachment-stage';
 import { UploadAttachmentCommand } from '../../../application/commands/upload-attachment.command';
 import { DeleteAttachmentCommand } from '../../../application/commands/delete-attachment.command';
+import { StageUploadCommand } from '../../../application/commands/stage-upload.command';
 import { GetAttachmentQuery } from '../../../application/queries/get-attachment.query';
 import { ListTicketAttachmentsQuery } from '../../../application/queries/list-ticket-attachments.query';
 import { TypeOrmAttachmentRepository } from '../../typeorm/repositories/typeorm-attachment.repository';
@@ -29,6 +31,23 @@ export class AttachmentController {
     @Inject() private readonly idGenerator: UlidGenerator,
     @Inject() private readonly s3Storage: S3StorageService,
   ) {}
+
+  @Post('uploads')
+  @UseInterceptors(FileInterceptor('file'))
+  stageUpload(
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const service = new StageAttachment(this.idGenerator, this.attachmentRepository, this.s3Storage);
+    const command = new StageUploadCommand(service);
+    return command.execute({
+      buffer: file.buffer,
+      originalName: file.originalname,
+      mimeType: file.mimetype,
+      size: file.size,
+      uploadedById: user.userId,
+    });
+  }
 
   @Post('workspaces/:slug/tickets/:ticketId/attachments')
   @UseInterceptors(FileInterceptor('file'))

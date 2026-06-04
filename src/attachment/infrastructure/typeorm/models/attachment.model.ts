@@ -43,6 +43,12 @@ export class AttachmentModel {
   @Column({ type: 'varchar', nullable: true })
   uploadedById!: string | null;
 
+  @Column({ type: 'varchar', nullable: true })
+  token!: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  stagedAt!: Date | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 }

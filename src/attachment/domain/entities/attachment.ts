@@ -10,6 +10,8 @@ interface Props {
   ticketId: string | null;
   commentId: string | null;
   uploadedById: string | null;
+  token: string | null;
+  stagedAt: Date | null;
 }
 
 export class Attachment {
@@ -22,6 +24,8 @@ export class Attachment {
   ticketId: string | null;
   commentId: string | null;
   uploadedById: string | null;
+  token: string | null;
+  stagedAt: Date | null;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -33,6 +37,8 @@ export class Attachment {
     this.ticketId = props.ticketId;
     this.commentId = props.commentId;
     this.uploadedById = props.uploadedById;
+    this.token = props.token;
+    this.stagedAt = props.stagedAt;
   }
 
   getId(): string {
