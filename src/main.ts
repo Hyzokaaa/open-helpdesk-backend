@@ -9,7 +9,9 @@ async function bootstrap() {
   await ensureDatabase();
   const app = await NestFactory.create(AppModule);
 
-  // Higher body limit only for inbound email (MTA Hook sends full MIME with attachments)
+  // Register global JSON parser explicitly before the route-scoped one
+  // (NestJS skips its default parser if it detects any 'jsonParser' middleware)
+  (app as any).useBodyParser('json');
   app.use('/inbound/email', json({ limit: '25mb' }));
 
   app.useGlobalPipes(
