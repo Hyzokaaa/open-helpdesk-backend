@@ -14,6 +14,8 @@ import { CurrentUser } from '../../../../shared/nest/decorators/current-user.dec
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
 import { EntityNotFoundError } from '../../../../shared/domain/errors';
+import { ClaimStagedAttachments } from '../../../../attachment/domain/services/attachment-claim-staged';
+import { TypeOrmAttachmentRepository } from '../../../../attachment/infrastructure/typeorm/repositories/typeorm-attachment.repository';
 import { CreateTicket } from '../../../domain/services/ticket-create';
 import { UpdateTicket } from '../../../domain/services/ticket-update';
 import { ChangeTicketStatus } from '../../../domain/services/ticket-change-status';
@@ -56,6 +58,7 @@ export class TicketController {
     @Inject() private readonly eventPublisher: NestEventPublisher,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
     @Inject() private readonly customFieldDefinitionRepository: TypeOrmCustomFieldDefinitionRepository,
+    @Inject() private readonly attachmentRepository: TypeOrmAttachmentRepository,
   ) {}
 
   @Post()
@@ -69,7 +72,8 @@ export class TicketController {
     const service = new CreateTicket(this.idGenerator, this.ticketRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     const validateCustomFields = new ValidateCustomFieldValues(this.customFieldDefinitionRepository);
-    const command = new CreateTicketCommand(service, ensurePermission, this.userRepository, this.eventPublisher, auditLog, validateCustomFields);
+    const claimAttachments = new ClaimStagedAttachments(this.attachmentRepository);
+    const command = new CreateTicketCommand(service, ensurePermission, this.userRepository, this.eventPublisher, auditLog, validateCustomFields, claimAttachments);
     return command.execute({
       name: body.name,
       description: body.description,
@@ -82,6 +86,7 @@ export class TicketController {
       userEmail: user.email,
       tagIds: body.tagIds,
       customFields: body.customFields,
+      uploadTokens: body.uploadTokens,
       isSystemAdmin: user.isSystemAdmin,
     });
   }

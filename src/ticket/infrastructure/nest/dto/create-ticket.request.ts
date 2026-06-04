@@ -32,4 +32,9 @@ export class CreateTicketRequest {
   @IsObject()
   @IsOptional()
   customFields?: Record<string, unknown>;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  uploadTokens?: string[];
 }
