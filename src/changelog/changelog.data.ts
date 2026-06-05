@@ -26,6 +26,9 @@ export const coreChangelog: ChangelogVersion[] = [
           { en: 'Custom fields shown in the portal — required fields are validated before submission', es: 'Campos personalizados en el portal — los campos requeridos se validan antes de enviar' },
           { en: 'File attachments supported in portal submissions', es: 'Adjuntos de archivos soportados en envíos del portal' },
           { en: 'Portal respects your workspace branding and color palette', es: 'El portal respeta el branding y paleta de colores de tu workspace' },
+          { en: 'Track your ticket via magic link — no login needed, link sent by email', es: 'Sigue tu ticket con un enlace mágico — sin login, enlace enviado por email' },
+          { en: 'Add comments and view agent replies from the tracking page', es: 'Agrega comentarios y ve las respuestas del agente desde la página de seguimiento' },
+          { en: 'View attachments with full-screen image viewer and video player', es: 'Ve adjuntos con visor de imágenes a pantalla completa y reproductor de video' },
         ],
       },
       {
