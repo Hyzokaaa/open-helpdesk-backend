@@ -29,6 +29,7 @@ export const coreChangelog: ChangelogVersion[] = [
           { en: 'Track your ticket via magic link — no login needed, link sent by email', es: 'Sigue tu ticket con un enlace mágico — sin login, enlace enviado por email' },
           { en: 'Add comments and view agent replies from the tracking page', es: 'Agrega comentarios y ve las respuestas del agente desde la página de seguimiento' },
           { en: 'View attachments with full-screen image viewer and video player', es: 'Ve adjuntos con visor de imágenes a pantalla completa y reproductor de video' },
+          { en: 'Embeddable widget — add a support button to any website with a single script tag', es: 'Widget embebible — agrega un botón de soporte a cualquier sitio web con una sola línea de código' },
         ],
       },
       {
