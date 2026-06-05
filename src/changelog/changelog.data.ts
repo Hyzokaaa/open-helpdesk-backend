@@ -20,6 +20,15 @@ export const coreChangelog: ChangelogVersion[] = [
     date: '2026-06-04',
     categories: [
       {
+        title: { en: 'Customer Portal', es: 'Portal de Cliente' },
+        features: [
+          { en: 'Public ticket submission form — your customers can create tickets without logging in', es: 'Formulario público de tickets — tus clientes pueden crear tickets sin iniciar sesión' },
+          { en: 'Custom fields shown in the portal — required fields are validated before submission', es: 'Campos personalizados en el portal — los campos requeridos se validan antes de enviar' },
+          { en: 'File attachments supported in portal submissions', es: 'Adjuntos de archivos soportados en envíos del portal' },
+          { en: 'Portal respects your workspace branding and color palette', es: 'El portal respeta el branding y paleta de colores de tu workspace' },
+        ],
+      },
+      {
         title: { en: 'Search & Real-Time', es: 'Búsqueda y Tiempo Real' },
         features: [
           { en: 'Search tickets by name, description, or ticket number — results update as you type', es: 'Busca tickets por nombre, descripción o número de ticket — los resultados se actualizan mientras escribes' },
