@@ -26,8 +26,9 @@ import { EmailInboundModule } from "./email-inbound/email-inbound.module";
 import { HealthController } from "./health.controller";
 import { ChangelogController } from "./changelog/changelog.controller";
 import { AuditLogController } from "./audit-log/infrastructure/nest/controllers/audit-log.controller";
+import { WidgetController } from "./shared/infrastructure/nest/controllers/widget.controller";
 @Module({
-  controllers: [HealthController, ChangelogController, AuditLogController],
+  controllers: [HealthController, ChangelogController, AuditLogController, WidgetController],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
