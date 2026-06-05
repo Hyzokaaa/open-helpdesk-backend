@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
 import {
   Body,
   Controller,
@@ -20,6 +20,7 @@ import { NestEventPublisher } from '../../../../shared/infrastructure/nest-event
 import { CreateUser } from '../../../../user/domain/services/user-create';
 import { AddWorkspaceMember } from '../../../../workspace/domain/services/workspace-add-member';
 import { CreateTicket } from '../../../domain/services/ticket-create';
+import { CreateComment } from '../../../../comment/domain/services/comment-create';
 import { ClaimStagedAttachments } from '../../../../attachment/domain/services/attachment-claim-staged';
 import { StageAttachment } from '../../../../attachment/domain/services/attachment-stage';
 import { StageUploadCommand, StageUploadResponse } from '../../.././../attachment/application/commands/stage-upload.command';
@@ -31,10 +32,12 @@ import { TypeOrmWorkspaceRepository } from '../../../../workspace/infrastructure
 import { TypeOrmWorkspaceMemberRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
 import { TypeOrmUserRepository } from '../../../../user/infrastructure/typeorm/repositories/typeorm-user.repository';
 import { TypeOrmTicketRepository } from '../../typeorm/repositories/typeorm-ticket.repository';
+import { TypeOrmCommentRepository } from '../../../../comment/infrastructure/typeorm/repositories/typeorm-comment.repository';
 import { TypeOrmAttachmentRepository } from '../../../../attachment/infrastructure/typeorm/repositories/typeorm-attachment.repository';
 import { TypeOrmCustomFieldDefinitionRepository } from '../../../../custom-field/infrastructure/typeorm/repositories/typeorm-custom-field-definition.repository';
 import { ValidateCustomFieldValues } from '../../../../custom-field/domain/services/custom-field-validate-values';
 import { CreatePortalTicketRequest } from '../dto/create-portal-ticket.request';
+import { CreatePortalCommentRequest } from '../dto/create-portal-comment.request';
 
 @Public()
 @Controller('portal')
@@ -50,6 +53,7 @@ export class PortalController {
     @Inject() private readonly eventPublisher: NestEventPublisher,
     @Inject() private readonly s3Storage: S3StorageService,
     @Inject() private readonly customFieldDefinitionRepository: TypeOrmCustomFieldDefinitionRepository,
+    @Inject() private readonly commentRepository: TypeOrmCommentRepository,
   ) {}
 
   @Get(':slug')
@@ -125,6 +129,7 @@ export class PortalController {
     }
 
     // Create ticket
+    const portalToken = randomUUID();
     const createTicketService = new CreateTicket(this.idGenerator, this.ticketRepository);
     const ticket = await createTicketService.execute({
       name: body.subject,
@@ -135,6 +140,7 @@ export class PortalController {
       creatorId: user.getId(),
       tagIds: [],
       customFields: validatedCustomFields,
+      portalToken,
     });
 
     // Claim staged attachments
@@ -157,13 +163,88 @@ export class PortalController {
       workspaceId: workspace.getId(),
       workspaceName: workspace.name,
       workspaceSlug: workspace.slug,
+      portalToken,
     };
     this.eventPublisher.emit('ticket.created', event);
 
     return {
       ticketNumber: ticket.ticketNumber,
+      portalToken: ticket.portalToken,
       message: 'Ticket created',
     };
+  }
+
+  @Get('tickets/:portalToken')
+  async getPortalTicket(@Param('portalToken') portalToken: string) {
+    const ticket = await this.ticketRepository.findByPortalToken(portalToken);
+    if (!ticket) throw new EntityNotFoundError('Ticket not found');
+
+    const creator = await this.userRepository.findById(ticket.creatorId);
+    const workspace = await this.workspaceRepository.findById(ticket.workspaceId);
+
+    // Fetch comments with author names and dates
+    const comments = await this.commentRepository.findByTicketIdWithDates(ticket.getId());
+    const authorIds = [...new Set(comments.map((c) => c.authorId))];
+    const authors = new Map<string, string>();
+    for (const authorId of authorIds) {
+      const user = await this.userRepository.findById(authorId);
+      if (user) {
+        authors.set(authorId, `${user.firstName} ${user.lastName}`.trim());
+      }
+    }
+
+    // Fetch attachments with presigned URLs
+    const attachments = await this.attachmentRepository.findByTicketId(ticket.getId());
+    const attachmentList = await Promise.all(
+      attachments.map(async (a) => ({
+        id: a.getId(),
+        originalName: a.originalName,
+        mimeType: a.mimeType,
+        size: a.size,
+        downloadUrl: await this.s3Storage.getPresignedUrl(a.s3Key),
+      })),
+    );
+
+    return {
+      ticketNumber: ticket.ticketNumber,
+      name: ticket.name,
+      description: ticket.description,
+      status: ticket.status,
+      priority: ticket.priority,
+      category: ticket.category,
+      customFields: ticket.customFields,
+      createdAt: ticket.createdAt,
+      creatorName: creator ? `${creator.firstName} ${creator.lastName}`.trim() : '',
+      workspaceName: workspace?.name ?? '',
+      workspacePalette: workspace?.palette ?? null,
+      attachments: attachmentList,
+      comments: comments.map((c) => ({
+        id: c.id,
+        content: c.content,
+        authorName: authors.get(c.authorId) ?? '',
+        isCreator: c.authorId === ticket.creatorId,
+        createdAt: c.createdAt,
+      })),
+    };
+  }
+
+  @Post('tickets/:portalToken/comments')
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  async addPortalComment(
+    @Param('portalToken') portalToken: string,
+    @Body() body: CreatePortalCommentRequest,
+  ) {
+    const ticket = await this.ticketRepository.findByPortalToken(portalToken);
+    if (!ticket) throw new EntityNotFoundError('Ticket not found');
+
+    const createComment = new CreateComment(this.idGenerator, this.commentRepository);
+    await createComment.execute({
+      content: body.content,
+      ticketId: ticket.getId(),
+      authorId: ticket.creatorId,
+    });
+
+    return { message: 'Comment added' };
   }
 
   @Post(':slug/uploads')

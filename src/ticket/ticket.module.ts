@@ -7,14 +7,16 @@ import { AuditLogModule } from '../audit-log/audit-log.module';
 import { CustomFieldModule } from '../custom-field/custom-field.module';
 import { AttachmentModule } from '../attachment/attachment.module';
 import { TicketModel } from './infrastructure/typeorm/models/ticket.model';
+import { CommentModel } from '../comment/infrastructure/typeorm/models/comment.model';
 import { TypeOrmTicketRepository } from './infrastructure/typeorm/repositories/typeorm-ticket.repository';
+import { TypeOrmCommentRepository } from '../comment/infrastructure/typeorm/repositories/typeorm-comment.repository';
 import { TicketController } from './infrastructure/nest/controllers/ticket.controller';
 import { PortalController } from './infrastructure/nest/controllers/portal.controller';
 
 @Module({
-  imports: [SharedModule, UserModule, WorkspaceModule, AuditLogModule, CustomFieldModule, AttachmentModule, TypeOrmModule.forFeature([TicketModel])],
+  imports: [SharedModule, UserModule, WorkspaceModule, AuditLogModule, CustomFieldModule, AttachmentModule, TypeOrmModule.forFeature([TicketModel, CommentModel])],
   controllers: [TicketController, PortalController],
-  providers: [TypeOrmTicketRepository],
+  providers: [TypeOrmTicketRepository, TypeOrmCommentRepository],
   exports: [TypeOrmTicketRepository],
 })
 export class TicketModule {}

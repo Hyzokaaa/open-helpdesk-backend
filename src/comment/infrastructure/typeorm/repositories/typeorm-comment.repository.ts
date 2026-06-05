@@ -43,6 +43,19 @@ export class TypeOrmCommentRepository implements CommentRepository {
     };
   }
 
+  async findByTicketIdWithDates(ticketId: string): Promise<Array<{ id: string; content: string; authorId: string; createdAt: Date }>> {
+    const models = await this.repository.find({
+      where: { ticketId },
+      order: { createdAt: 'ASC' },
+    });
+    return models.map((m) => ({
+      id: m.id,
+      content: m.content,
+      authorId: m.authorId,
+      createdAt: m.createdAt,
+    }));
+  }
+
   private toDomain(model: CommentModel): Comment {
     return new Comment({
       id: model.id,
