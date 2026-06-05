@@ -28,4 +28,5 @@ export interface TicketRepository {
   update(ticket: Ticket): Promise<void>;
   softDelete(id: string): Promise<void>;
   countByWorkspaceIdSince(workspaceId: string, since: Date): Promise<number>;
+  findByPortalToken(portalToken: string): Promise<Ticket | null>;
 }

@@ -146,6 +146,14 @@ export class TypeOrmTicketRepository implements TicketRepository {
     await this.repository.softDelete(id);
   }
 
+  async findByPortalToken(portalToken: string): Promise<Ticket | null> {
+    const model = await this.repository.findOne({
+      where: { portalToken },
+      relations: ['tags'],
+    });
+    return model ? this.toDomain(model) : null;
+  }
+
   async countByWorkspaceIdSince(workspaceId: string, since: Date): Promise<number> {
     return this.repository.count({
       where: { workspaceId, createdAt: MoreThanOrEqual(since) },
@@ -182,6 +190,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
       tagIds: model.tags ? model.tags.map((t) => t.id) : [],
       customFields: model.customFields ?? {},
       discardReason: model.discardReason as TicketDiscardReason | null,
+      portalToken: model.portalToken ?? null,
     });
   }
 
@@ -201,6 +210,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
     model.ticketNumber = ticket.ticketNumber;
     model.customFields = ticket.customFields;
     model.discardReason = ticket.discardReason;
+    model.portalToken = ticket.portalToken;
     return model;
   }
 }

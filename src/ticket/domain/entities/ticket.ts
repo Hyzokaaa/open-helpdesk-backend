@@ -22,6 +22,7 @@ interface Props {
   tagIds: string[];
   customFields: Record<string, unknown>;
   discardReason: TicketDiscardReason | null;
+  portalToken?: string | null;
 }
 
 export class Ticket {
@@ -42,6 +43,7 @@ export class Ticket {
   tagIds: string[];
   customFields: Record<string, unknown>;
   discardReason: TicketDiscardReason | null;
+  portalToken: string | null;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -61,6 +63,7 @@ export class Ticket {
     this.tagIds = props.tagIds;
     this.customFields = props.customFields ?? {};
     this.discardReason = props.discardReason ?? null;
+    this.portalToken = props.portalToken ?? null;
   }
 
   getId(): string {

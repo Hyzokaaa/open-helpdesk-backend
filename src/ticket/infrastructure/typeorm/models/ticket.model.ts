@@ -66,6 +66,9 @@ export class TicketModel {
   @Column({ type: 'varchar', nullable: true })
   discardReason!: string | null;
 
+  @Column({ type: 'varchar', nullable: true, unique: true })
+  portalToken!: string | null;
+
   @ManyToMany(() => TagModel)
   @JoinTable({ name: 'ticket_tag' })
   tags!: TagModel[];

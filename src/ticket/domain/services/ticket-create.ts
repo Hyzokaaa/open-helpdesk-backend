@@ -14,6 +14,7 @@ interface CreateTicketProps {
   creatorId: string;
   tagIds: string[];
   customFields?: Record<string, unknown>;
+  portalToken?: string | null;
 }
 
 export class CreateTicket {
@@ -40,6 +41,7 @@ export class CreateTicket {
       tagIds: props.tagIds,
       customFields: props.customFields ?? {},
       discardReason: null,
+      portalToken: props.portalToken ?? null,
     });
 
     await this.repository.create(ticket);
