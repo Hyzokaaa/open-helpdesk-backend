@@ -8,6 +8,7 @@ export interface TicketCreatedEvent {
   workspaceId: string;
   workspaceName: string;
   workspaceSlug: string;
+  portalToken?: string | null;
 }
 
 export interface TicketAssignedEvent {

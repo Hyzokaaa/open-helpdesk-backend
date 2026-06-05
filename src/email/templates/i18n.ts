@@ -166,6 +166,36 @@ const translations: Translations = {
     es: 'Esta invitación expirará en 7 días.',
   },
 
+  // Ticket confirmation (creator)
+  'ticketConfirmation.subject': {
+    en: 'Your ticket has been created',
+    es: 'Tu ticket ha sido creado',
+  },
+  'ticketConfirmation.title': {
+    en: 'Your support request has been received',
+    es: 'Tu solicitud de soporte ha sido recibida',
+  },
+  'ticketConfirmation.body': {
+    en: 'We have received your support request and a ticket has been created.',
+    es: 'Hemos recibido tu solicitud de soporte y se ha creado un ticket.',
+  },
+  'ticketConfirmation.fieldTitle': {
+    en: 'Title',
+    es: 'Título',
+  },
+  'ticketConfirmation.trackInfo': {
+    en: 'You can track the status of your ticket and add comments using the link below.',
+    es: 'Puedes seguir el estado de tu ticket y agregar comentarios usando el enlace a continuación.',
+  },
+  'ticketConfirmation.button': {
+    en: 'Track Your Ticket',
+    es: 'Seguir Tu Ticket',
+  },
+  'ticketConfirmation.updates': {
+    en: 'You will also receive email updates when there are new responses.',
+    es: 'También recibirás actualizaciones por correo cuando haya nuevas respuestas.',
+  },
+
   // Priorities
   'priority.low': { en: 'Low', es: 'Baja' },
   'priority.medium': { en: 'Medium', es: 'Media' },

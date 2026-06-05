@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { EmailService } from '../domain/email.service';
 import { EMAIL_SERVICE } from '../email.constants';
 import { TicketCreatedTemplate } from '../templates/ticket-created.template';
+import { TicketConfirmationTemplate } from '../templates/ticket-confirmation.template';
 import { TicketCreatedEvent } from '../domain/events';
 import { TypeOrmWorkspaceMemberRepository } from '../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
 import { TypeOrmUserRepository } from '../../user/infrastructure/typeorm/repositories/typeorm-user.repository';
@@ -37,6 +38,11 @@ export class TicketCreatedHandler {
 
   @OnEvent('ticket.created')
   async handle(event: TicketCreatedEvent): Promise<void> {
+    await this.notifyAgents(event);
+    await this.sendCreatorConfirmation(event);
+  }
+
+  private async notifyAgents(event: TicketCreatedEvent): Promise<void> {
     const resolveRecipients = new ResolveNotificationRecipients(this.memberRepository, this.userRepository);
     const users = await resolveRecipients.execute({
       workspaceId: event.workspaceId,
@@ -70,5 +76,24 @@ export class TicketCreatedHandler {
         ...(mailbox && { replyTo: mailbox.address }),
       });
     }
+  }
+
+  private async sendCreatorConfirmation(event: TicketCreatedEvent): Promise<void> {
+    if (!event.portalToken) return;
+
+    const creator = await this.userRepository.findById(event.creatorId);
+    if (!creator) return;
+
+    const lang = creator.language || 'en';
+    const portalUrl = `${this.frontendUrl}/portal/tickets/${event.portalToken}`;
+    const template = new TicketConfirmationTemplate();
+    const mailbox = this.emailDomain ? await this.mailboxRepository.findByWorkspaceId(event.workspaceId) : null;
+
+    await this.emailService.send({
+      to: [creator.email],
+      subject: template.subject({ ticketName: event.ticketName, portalUrl, lang }),
+      html: template.html({ ticketName: event.ticketName, portalUrl, lang }),
+      ...(mailbox && { replyTo: mailbox.address }),
+    });
   }
 }

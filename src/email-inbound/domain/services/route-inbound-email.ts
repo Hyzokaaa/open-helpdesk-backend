@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
 import { Logger } from '@nestjs/common';
 import { EventPublisher } from '../../../shared/domain/event-publisher';
 import { MailboxRepository } from '../../../mailbox/domain/repositories/mailbox.repository';
@@ -130,6 +130,7 @@ export class RouteInboundEmail {
       workspaceId: mailbox.workspaceId,
       creatorId: user.getId(),
       tagIds: [],
+      portalToken: randomUUID(),
     });
 
     const ticketEvent: TicketCreatedEvent = {
@@ -142,6 +143,7 @@ export class RouteInboundEmail {
       workspaceId: workspace.getId(),
       workspaceName: workspace.name,
       workspaceSlug: workspace.slug,
+      portalToken: ticket.portalToken,
     };
     this.eventPublisher.emit('ticket.created', ticketEvent);
 
