@@ -52,6 +52,9 @@ export class TicketModel {
   assigneeId!: string | null;
 
   @Column({ type: 'timestamptz', nullable: true })
+  firstResponseAt!: Date | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
   resolvedAt!: Date | null;
 
   @Column({ type: 'varchar', nullable: true })
@@ -68,6 +71,12 @@ export class TicketModel {
 
   @Column({ type: 'varchar', nullable: true, unique: true })
   portalToken!: string | null;
+
+  @Column({ default: false })
+  firstResponseBreached!: boolean;
+
+  @Column({ default: false })
+  resolutionBreached!: boolean;
 
   @ManyToMany(() => TagModel)
   @JoinTable({ name: 'ticket_tag' })

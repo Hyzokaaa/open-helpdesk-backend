@@ -14,6 +14,7 @@ interface Props {
   workspaceId: string;
   creatorId: string;
   assigneeId: string | null;
+  firstResponseAt?: Date | null;
   resolvedAt: Date | null;
   resolvedById: string | null;
   createdAt: Date | null;
@@ -23,6 +24,8 @@ interface Props {
   customFields: Record<string, unknown>;
   discardReason: TicketDiscardReason | null;
   portalToken?: string | null;
+  firstResponseBreached?: boolean;
+  resolutionBreached?: boolean;
 }
 
 export class Ticket {
@@ -35,6 +38,7 @@ export class Ticket {
   workspaceId: string;
   creatorId: string;
   assigneeId: string | null;
+  firstResponseAt: Date | null;
   resolvedAt: Date | null;
   resolvedById: string | null;
   createdAt: Date | null;
@@ -44,6 +48,8 @@ export class Ticket {
   customFields: Record<string, unknown>;
   discardReason: TicketDiscardReason | null;
   portalToken: string | null;
+  firstResponseBreached: boolean;
+  resolutionBreached: boolean;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -55,6 +61,7 @@ export class Ticket {
     this.workspaceId = props.workspaceId;
     this.creatorId = props.creatorId;
     this.assigneeId = props.assigneeId;
+    this.firstResponseAt = props.firstResponseAt ?? null;
     this.resolvedAt = props.resolvedAt;
     this.resolvedById = props.resolvedById ?? null;
     this.createdAt = props.createdAt;
@@ -64,6 +71,8 @@ export class Ticket {
     this.customFields = props.customFields ?? {};
     this.discardReason = props.discardReason ?? null;
     this.portalToken = props.portalToken ?? null;
+    this.firstResponseBreached = props.firstResponseBreached ?? false;
+    this.resolutionBreached = props.resolutionBreached ?? false;
   }
 
   getId(): string {

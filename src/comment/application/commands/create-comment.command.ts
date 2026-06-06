@@ -44,6 +44,11 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
     const workspace = await this.workspaceRepository.findBySlug(props.workspaceSlug);
     const author = await this.userRepository.findById(props.authorId);
 
+    if (ticket && ticket.firstResponseAt === null && props.authorId !== ticket.creatorId) {
+      ticket.firstResponseAt = new Date();
+      await this.ticketRepository.update(ticket);
+    }
+
     if (ticket && workspace && author) {
       const extractMentions = new ExtractMentions();
       const mentionedUserIds = extractMentions.execute(props.content);

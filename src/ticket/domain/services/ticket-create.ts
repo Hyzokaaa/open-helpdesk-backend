@@ -34,6 +34,7 @@ export class CreateTicket {
       workspaceId: props.workspaceId,
       creatorId: props.creatorId,
       assigneeId: null,
+      firstResponseAt: null,
       resolvedAt: null,
       resolvedById: null,
       createdAt: null,

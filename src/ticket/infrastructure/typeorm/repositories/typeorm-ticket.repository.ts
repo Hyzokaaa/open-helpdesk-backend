@@ -182,6 +182,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
       workspaceId: model.workspaceId,
       creatorId: model.creatorId,
       assigneeId: model.assigneeId,
+      firstResponseAt: model.firstResponseAt,
       resolvedAt: model.resolvedAt,
       resolvedById: model.resolvedById,
       createdAt: model.createdAt,
@@ -191,6 +192,8 @@ export class TypeOrmTicketRepository implements TicketRepository {
       customFields: model.customFields ?? {},
       discardReason: model.discardReason as TicketDiscardReason | null,
       portalToken: model.portalToken ?? null,
+      firstResponseBreached: model.firstResponseBreached ?? false,
+      resolutionBreached: model.resolutionBreached ?? false,
     });
   }
 
@@ -205,12 +208,15 @@ export class TypeOrmTicketRepository implements TicketRepository {
     model.workspaceId = ticket.workspaceId;
     model.creatorId = ticket.creatorId;
     model.assigneeId = ticket.assigneeId;
+    model.firstResponseAt = ticket.firstResponseAt;
     model.resolvedAt = ticket.resolvedAt;
     model.resolvedById = ticket.resolvedById;
     model.ticketNumber = ticket.ticketNumber;
     model.customFields = ticket.customFields;
     model.discardReason = ticket.discardReason;
     model.portalToken = ticket.portalToken;
+    model.firstResponseBreached = ticket.firstResponseBreached;
+    model.resolutionBreached = ticket.resolutionBreached;
     return model;
   }
 }

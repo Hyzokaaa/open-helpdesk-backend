@@ -23,11 +23,15 @@ export interface TicketDetailResponse {
   workspaceId: string;
   creatorId: string;
   assigneeId: string | null;
+  firstResponseAt: Date | null;
   resolvedAt: Date | null;
   ticketNumber: number;
+  createdAt: Date | null;
   tagIds: string[];
   customFields: Record<string, unknown>;
   discardReason: string | null;
+  firstResponseBreached: boolean;
+  resolutionBreached: boolean;
 }
 
 export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
@@ -69,11 +73,15 @@ export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
       workspaceId: ticket.workspaceId,
       creatorId: ticket.creatorId,
       assigneeId: ticket.assigneeId,
+      firstResponseAt: ticket.firstResponseAt,
       resolvedAt: ticket.resolvedAt,
       ticketNumber: ticket.ticketNumber,
+      createdAt: ticket.createdAt,
       tagIds: ticket.tagIds,
       customFields: ticket.customFields,
       discardReason: ticket.discardReason,
+      firstResponseBreached: ticket.firstResponseBreached,
+      resolutionBreached: ticket.resolutionBreached,
     };
   }
 }
