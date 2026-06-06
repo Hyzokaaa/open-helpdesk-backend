@@ -33,6 +33,16 @@ export const coreChangelog: ChangelogVersion[] = [
         ],
       },
       {
+        title: { en: 'SLA Tracking', es: 'Seguimiento de SLA' },
+        features: [
+          { en: 'Set response and resolution time targets per priority — define your SLA policy per workspace', es: 'Define tiempos objetivo de respuesta y resolución por prioridad — configura tu política SLA por workspace' },
+          { en: 'Automatic breach detection — tickets exceeding SLA targets are flagged in real time', es: 'Detección automática de incumplimientos — los tickets que exceden los objetivos SLA se marcan en tiempo real' },
+          { en: 'First response time tracked per ticket — see how fast your team responds', es: 'Tiempo de primera respuesta por ticket — ve qué tan rápido responde tu equipo' },
+          { en: 'SLA compliance percentage shown in reports dashboard', es: 'Porcentaje de cumplimiento SLA en el panel de reportes' },
+          { en: 'SLA status visible in ticket detail — met, breached, or time remaining', es: 'Estado SLA visible en el detalle del ticket — cumplido, incumplido o tiempo restante' },
+        ],
+      },
+      {
         title: { en: 'Search & Real-Time', es: 'Búsqueda y Tiempo Real' },
         features: [
           { en: 'Search tickets by name, description, or ticket number — results update as you type', es: 'Busca tickets por nombre, descripción o número de ticket — los resultados se actualizan mientras escribes' },
