@@ -26,6 +26,9 @@ export class WorkspaceModel {
   @Column({ type: 'jsonb', nullable: true })
   metadata!: Record<string, unknown> | null;
 
+  @Column({ type: 'jsonb', nullable: true })
+  slaPolicy!: Record<string, unknown> | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 

@@ -1,5 +1,17 @@
 import { Id } from '../../../shared/domain/id';
 
+export interface SlaPriorityTargets {
+  critical: number | null;
+  high: number | null;
+  medium: number | null;
+  low: number | null;
+}
+
+export interface SlaPolicy {
+  firstResponse: SlaPriorityTargets;
+  resolution: SlaPriorityTargets;
+}
+
 interface Props {
   id: string;
   name: string;
@@ -7,6 +19,7 @@ interface Props {
   description: string;
   accountId?: string | null;
   palette?: string | null;
+  slaPolicy?: SlaPolicy | null;
 }
 
 export class Workspace {
@@ -16,6 +29,7 @@ export class Workspace {
   description: string;
   accountId: string | null;
   palette: string | null;
+  slaPolicy: SlaPolicy | null;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -24,6 +38,7 @@ export class Workspace {
     this.description = props.description;
     this.accountId = props.accountId ?? null;
     this.palette = props.palette ?? null;
+    this.slaPolicy = props.slaPolicy ?? null;
   }
 
   getId(): string {

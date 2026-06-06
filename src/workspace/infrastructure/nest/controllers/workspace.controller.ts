@@ -26,6 +26,8 @@ import { UpdateWorkspace } from '../../../domain/services/workspace-update';
 import { UpdateWorkspaceCommand } from '../../../application/commands/update-workspace.command';
 import { UpdateWorkspacePalette } from '../../../domain/services/workspace-update-palette';
 import { UpdateWorkspacePaletteCommand } from '../../../application/commands/update-workspace-palette.command';
+import { UpdateWorkspaceSlaPolicy } from '../../../domain/services/workspace-update-sla-policy';
+import { UpdateSlaPolicyCommand } from '../../../application/commands/update-sla-policy.command';
 import { PERMISSIONS } from '../../../domain/permissions';
 import { DeleteWorkspace } from '../../../domain/services/workspace-delete';
 import { DeleteWorkspaceCommand } from '../../../application/commands/delete-workspace.command';
@@ -215,6 +217,42 @@ export class WorkspaceController {
     const service = new UpdateWorkspacePalette(this.workspaceRepository);
     const command = new UpdateWorkspacePaletteCommand(service);
     return command.execute({ workspaceId, palette: body.palette });
+  }
+
+  @Get(':slug/sla')
+  async getSla(
+    @Param('slug') slug: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+    const workspace = await this.workspaceRepository.findById(workspaceId);
+    return { slaPolicy: workspace?.slaPolicy ?? null };
+  }
+
+  @Patch(':slug/sla')
+  async updateSla(
+    @Param('slug') slug: string,
+    @Body() body: { slaPolicy: any },
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+    const service = new UpdateWorkspaceSlaPolicy(this.workspaceRepository);
+    const command = new UpdateSlaPolicyCommand(service);
+    return command.execute({ workspaceId, slaPolicy: body.slaPolicy });
   }
 
   private async resolveWorkspaceId(slug: string): Promise<string> {

@@ -12,11 +12,12 @@ import { TypeOrmTicketRepository } from './infrastructure/typeorm/repositories/t
 import { TypeOrmCommentRepository } from '../comment/infrastructure/typeorm/repositories/typeorm-comment.repository';
 import { TicketController } from './infrastructure/nest/controllers/ticket.controller';
 import { PortalController } from './infrastructure/nest/controllers/portal.controller';
+import { SlaBreachCheckerService } from './infrastructure/nest/services/sla-breach-checker.service';
 
 @Module({
   imports: [SharedModule, UserModule, WorkspaceModule, AuditLogModule, CustomFieldModule, AttachmentModule, TypeOrmModule.forFeature([TicketModel, CommentModel])],
   controllers: [TicketController, PortalController],
-  providers: [TypeOrmTicketRepository, TypeOrmCommentRepository],
+  providers: [TypeOrmTicketRepository, TypeOrmCommentRepository, SlaBreachCheckerService],
   exports: [TypeOrmTicketRepository],
 })
 export class TicketModule {}

@@ -86,6 +86,7 @@ export class TypeOrmWorkspaceRepository implements WorkspaceRepository {
       description: model.description,
       accountId: model.accountId,
       palette: (model.metadata as any)?.palette ?? null,
+      slaPolicy: model.slaPolicy as any ?? null,
     });
   }
 
@@ -97,6 +98,7 @@ export class TypeOrmWorkspaceRepository implements WorkspaceRepository {
     model.description = workspace.description;
     model.accountId = workspace.accountId;
     model.metadata = { palette: workspace.palette };
+    model.slaPolicy = workspace.slaPolicy as any;
     return model;
   }
 }
