@@ -20,6 +20,13 @@ export const coreChangelog: ChangelogVersion[] = [
     date: '2026-06-04',
     categories: [
       {
+        title: { en: 'Sign in with Google & Microsoft', es: 'Iniciar sesión con Google y Microsoft' },
+        features: [
+          { en: 'Sign in or sign up with your Google or Microsoft account — one click, no password needed', es: 'Inicia sesión o regístrate con tu cuenta de Google o Microsoft — un click, sin contraseña' },
+          { en: 'New OAuth users are guided through onboarding automatically', es: 'Los nuevos usuarios OAuth son guiados por el onboarding automáticamente' },
+        ],
+      },
+      {
         title: { en: 'Customer Portal', es: 'Portal de Cliente' },
         features: [
           { en: 'Public ticket submission form — your customers can create tickets without logging in', es: 'Formulario público de tickets — tus clientes pueden crear tickets sin iniciar sesión' },
