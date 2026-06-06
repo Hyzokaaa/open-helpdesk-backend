@@ -12,6 +12,7 @@ interface Props {
   language: string;
   theme: string;
   autoCreated?: boolean;
+  authProvider?: string | null;
 }
 
 export class User {
@@ -26,6 +27,7 @@ export class User {
   language: string;
   theme: string;
   autoCreated: boolean;
+  authProvider: string | null;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -39,6 +41,7 @@ export class User {
     this.language = props.language;
     this.theme = props.theme;
     this.autoCreated = props.autoCreated ?? false;
+    this.authProvider = props.authProvider ?? null;
   }
 
   getId(): string {

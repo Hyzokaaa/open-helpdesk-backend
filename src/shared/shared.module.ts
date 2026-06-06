@@ -1,4 +1,7 @@
-import { Module } from '@nestjs/common';
+import { config } from 'dotenv';
+config();
+
+import { Module, type Provider } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -14,6 +17,24 @@ import { JwtStrategy } from './nest/strategies/jwt.strategy';
 import { UserModel } from '../user/infrastructure/typeorm/models/user.model';
 import { AccountModel } from '../account/infrastructure/typeorm/models/account.model';
 
+function buildOAuthProviders(): Provider[] {
+  const providers: Provider[] = [];
+
+  if (process.env.GOOGLE_CLIENT_ID) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { GoogleStrategy } = require('./nest/strategies/google.strategy');
+    providers.push(GoogleStrategy);
+  }
+
+  if (process.env.MICROSOFT_CLIENT_ID) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { MicrosoftStrategy } = require('./nest/strategies/microsoft.strategy');
+    providers.push(MicrosoftStrategy);
+  }
+
+  return providers;
+}
+
 @Module({
   imports: [
     PassportModule,
@@ -27,7 +48,7 @@ import { AccountModel } from '../account/infrastructure/typeorm/models/account.m
       }),
     }),
   ],
-  providers: [UlidGenerator, BcryptPasswordHasher, S3StorageService, NestEventPublisher, JwtTokenService, SeederService, JwtStrategy, EventsGateway],
+  providers: [UlidGenerator, BcryptPasswordHasher, S3StorageService, NestEventPublisher, JwtTokenService, SeederService, JwtStrategy, EventsGateway, ...buildOAuthProviders()],
   exports: [UlidGenerator, BcryptPasswordHasher, S3StorageService, NestEventPublisher, JwtTokenService, JwtModule, PassportModule],
 })
 export class SharedModule {}

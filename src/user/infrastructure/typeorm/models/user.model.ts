@@ -41,6 +41,9 @@ export class UserModel {
   @Column({ default: false })
   autoCreated!: boolean;
 
+  @Column({ type: 'varchar', nullable: true, default: null })
+  authProvider!: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
