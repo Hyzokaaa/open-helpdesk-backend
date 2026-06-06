@@ -29,6 +29,8 @@ export interface TicketListItem {
   createdAt: Date | null;
   tagIds: string[];
   customFields: Record<string, unknown>;
+  firstResponseBreached: boolean;
+  resolutionBreached: boolean;
 }
 
 export class ListTicketsQuery
@@ -76,6 +78,8 @@ export class ListTicketsQuery
         createdAt: ticket.createdAt,
         tagIds: ticket.tagIds,
         customFields: ticket.customFields,
+        firstResponseBreached: ticket.firstResponseBreached,
+        resolutionBreached: ticket.resolutionBreached,
       })),
       total: result.total,
       page: result.page,
