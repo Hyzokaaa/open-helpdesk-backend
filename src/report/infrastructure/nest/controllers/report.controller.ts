@@ -33,7 +33,7 @@ export class ReportController {
     if (!workspace) throw new EntityNotFoundError('Workspace not found');
 
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
-    const query = new GetWorkspaceReportQuery(this.dataSource, ensurePermission);
+    const query = new GetWorkspaceReportQuery(this.dataSource, ensurePermission, this.workspaceRepository);
     return query.execute({
       workspaceId: workspace.getId(),
       userId: user.userId,

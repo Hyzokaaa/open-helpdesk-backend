@@ -1,6 +1,7 @@
 import { DataSource } from 'typeorm';
 import { EnsureWorkspacePermission } from '../../../workspace/domain/services/workspace-ensure-permission';
 import { PERMISSIONS } from '../../../workspace/domain/permissions';
+import { WorkspaceRepository } from '../../../workspace/domain/repositories/workspace.repository';
 
 interface Props {
   workspaceId: string;
@@ -18,6 +19,8 @@ export interface ReportResult {
     avgFirstResponseTimeHours: number | null;
     csatScore: number | null;
     csatResponseCount: number;
+    slaFirstResponseMet: number | null;
+    slaResolutionMet: number | null;
   };
   ticketsOverTime: { date: string; created: number; resolved: number }[];
   ticketsByStatus: { status: string; count: number }[];
@@ -31,6 +34,7 @@ export class GetWorkspaceReportQuery {
   constructor(
     private readonly dataSource: DataSource,
     private readonly ensurePermission: EnsureWorkspacePermission,
+    private readonly workspaceRepository?: WorkspaceRepository,
   ) {}
 
   async execute(props: Props): Promise<ReportResult> {
@@ -49,6 +53,7 @@ export class GetWorkspaceReportQuery {
       ticketsByCategory,
       topAgents,
       csatData,
+      slaMetrics,
     ] = await Promise.all([
       this.getOverview(props),
       this.getTicketsOverTime(props),
@@ -57,10 +62,17 @@ export class GetWorkspaceReportQuery {
       this.getTicketsByField(props, 'category'),
       this.getTopAgents(props),
       this.getCsatData(props),
+      this.getSlaMetrics(props),
     ]);
 
     return {
-      overview: { ...overview, csatScore: csatData.score, csatResponseCount: csatData.total },
+      overview: {
+        ...overview,
+        csatScore: csatData.score,
+        csatResponseCount: csatData.total,
+        slaFirstResponseMet: slaMetrics.firstResponseMet,
+        slaResolutionMet: slaMetrics.resolutionMet,
+      },
       ticketsOverTime, ticketsByStatus, ticketsByPriority, ticketsByCategory, topAgents,
       csatBreakdown: csatData.breakdown,
     };
@@ -198,6 +210,48 @@ export class GetWorkspaceReportQuery {
       score: summary.score ? parseFloat(summary.score) : null,
       total: parseInt(summary.total, 10),
       breakdown: breakdownRows.map((r: any) => ({ rating: r.rating, count: parseInt(r.count, 10) })),
+    };
+  }
+
+  private async getSlaMetrics(props: Props): Promise<{ firstResponseMet: number | null; resolutionMet: number | null }> {
+    const workspace = this.workspaceRepository
+      ? await this.workspaceRepository.findById(props.workspaceId)
+      : null;
+
+    if (!workspace?.slaPolicy) {
+      return { firstResponseMet: null, resolutionMet: null };
+    }
+
+    // First response SLA: tickets with firstResponseAt that were NOT breached
+    const [frResult] = await this.dataSource.query(
+      `SELECT
+        COUNT(*) FILTER (WHERE "firstResponseAt" IS NOT NULL) as total,
+        COUNT(*) FILTER (WHERE "firstResponseAt" IS NOT NULL AND "firstResponseBreached" = false) as met
+       FROM tickets
+       WHERE "workspaceId" = $1 AND "createdAt" >= $2 AND "createdAt" < $3 AND "deletedAt" IS NULL
+         AND "discardReason" IS NULL`,
+      [props.workspaceId, props.dateFrom, props.dateTo],
+    );
+
+    // Resolution SLA: resolved tickets that were NOT breached
+    const [resResult] = await this.dataSource.query(
+      `SELECT
+        COUNT(*) FILTER (WHERE "resolvedAt" IS NOT NULL) as total,
+        COUNT(*) FILTER (WHERE "resolvedAt" IS NOT NULL AND "resolutionBreached" = false) as met
+       FROM tickets
+       WHERE "workspaceId" = $1 AND "createdAt" >= $2 AND "createdAt" < $3 AND "deletedAt" IS NULL
+         AND "discardReason" IS NULL`,
+      [props.workspaceId, props.dateFrom, props.dateTo],
+    );
+
+    const frTotal = parseInt(frResult.total, 10);
+    const frMet = parseInt(frResult.met, 10);
+    const resTotal = parseInt(resResult.total, 10);
+    const resMet = parseInt(resResult.met, 10);
+
+    return {
+      firstResponseMet: frTotal > 0 ? Math.round((frMet / frTotal) * 100) : null,
+      resolutionMet: resTotal > 0 ? Math.round((resMet / resTotal) * 100) : null,
     };
   }
 }
