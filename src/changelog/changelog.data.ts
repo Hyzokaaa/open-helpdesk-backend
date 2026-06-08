@@ -20,6 +20,21 @@ export const coreChangelog: ChangelogVersion[] = [
     date: '2026-06-04',
     categories: [
       {
+        title: { en: 'Bulk Member Import', es: 'Importación Masiva de Miembros' },
+        features: [
+          { en: 'Import members from a CSV file — upload, preview, edit inline, and confirm', es: 'Importa miembros desde un archivo CSV — sube, previsualiza, edita en línea y confirma' },
+          { en: 'Welcome emails with password setup link sent to new users automatically', es: 'Emails de bienvenida con enlace para crear contraseña enviados automáticamente' },
+          { en: 'Option to skip email verification for imported users', es: 'Opción de omitir la verificación de email para usuarios importados' },
+        ],
+      },
+      {
+        title: { en: 'Permissions & Visibility', es: 'Permisos y Visibilidad' },
+        features: [
+          { en: 'Sidebar items now show only what your role can access — cleaner navigation', es: 'Los elementos del sidebar ahora muestran solo lo que tu rol puede acceder — navegación más limpia' },
+          { en: 'Agents can view members but cannot invite or manage — read-only access', es: 'Los agentes pueden ver miembros pero no invitar ni gestionar — acceso de solo lectura' },
+        ],
+      },
+      {
         title: { en: 'Sign in with Google & Microsoft', es: 'Iniciar sesión con Google y Microsoft' },
         features: [
           { en: 'Sign in or sign up with your Google or Microsoft account — one click, no password needed', es: 'Inicia sesión o regístrate con tu cuenta de Google o Microsoft — un click, sin contraseña' },
