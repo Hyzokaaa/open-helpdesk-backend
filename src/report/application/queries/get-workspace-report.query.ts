@@ -41,7 +41,7 @@ export class GetWorkspaceReportQuery {
     await this.ensurePermission.execute({
       workspaceId: props.workspaceId,
       userId: props.userId,
-      permission: PERMISSIONS.AUDIT_LOG_VIEW,
+      permission: PERMISSIONS.REPORT_VIEW,
       isSystemAdmin: props.isSystemAdmin,
     });
 

@@ -16,6 +16,7 @@ import { EmailService } from '../../../../email/domain/email.service';
 import { EMAIL_SERVICE } from '../../../../email/email.constants';
 import { EntityNotFoundError } from '../../../../shared/domain/errors';
 import { EnsureWorkspacePermission } from '../../../domain/services/workspace-ensure-permission';
+import { PERMISSIONS } from '../../../domain/permissions';
 import { CreateInvitation } from '../../../domain/services/invitation-create';
 import { CancelInvitation } from '../../../domain/services/invitation-cancel';
 import { CreateInvitationCommand } from '../../../application/commands/create-invitation.command';
@@ -145,6 +146,13 @@ export class WorkspaceInvitationController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspace = await this.resolveWorkspace(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId: workspace.getId(),
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_INVITATIONS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
     const query = new ListInvitationsQuery(this.invitationRepository);
     return query.execute({ workspaceId: workspace.getId() });
   }

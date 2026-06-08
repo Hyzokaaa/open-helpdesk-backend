@@ -157,8 +157,18 @@ export class WorkspaceController {
   }
 
   @Get(':slug/members')
-  async listMembers(@Param('slug') slug: string) {
+  async listMembers(
+    @Param('slug') slug: string,
+    @CurrentUser() user: AuthUser,
+  ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_MEMBERS_VIEW,
+      isSystemAdmin: user.isSystemAdmin,
+    });
     const query = new ListWorkspaceMembersQuery(this.memberRepository, this.userRepository);
     return query.execute({ workspaceId });
   }
