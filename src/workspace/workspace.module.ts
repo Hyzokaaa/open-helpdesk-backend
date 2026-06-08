@@ -13,6 +13,7 @@ import { TypeOrmWorkspaceMemberRepository } from './infrastructure/typeorm/repos
 import { TypeOrmWorkspaceInvitationRepository } from './infrastructure/typeorm/repositories/typeorm-workspace-invitation.repository';
 import { WorkspaceController } from './infrastructure/nest/controllers/workspace.controller';
 import { WorkspaceInvitationController } from './infrastructure/nest/controllers/workspace-invitation.controller';
+import { WorkspaceImportController } from './infrastructure/nest/controllers/workspace-import.controller';
 import { InvitationPublicController } from './infrastructure/nest/controllers/invitation-public.controller';
 
 @Module({
@@ -24,7 +25,7 @@ import { InvitationPublicController } from './infrastructure/nest/controllers/in
     MailboxModule,
     TypeOrmModule.forFeature([WorkspaceModel, WorkspaceMemberModel, WorkspaceInvitationModel]),
   ],
-  controllers: [WorkspaceController, WorkspaceInvitationController, InvitationPublicController],
+  controllers: [WorkspaceController, WorkspaceInvitationController, WorkspaceImportController, InvitationPublicController],
   providers: [TypeOrmWorkspaceRepository, TypeOrmWorkspaceMemberRepository, TypeOrmWorkspaceInvitationRepository],
   exports: [TypeOrmWorkspaceRepository, TypeOrmWorkspaceMemberRepository, TypeOrmWorkspaceInvitationRepository],
 })

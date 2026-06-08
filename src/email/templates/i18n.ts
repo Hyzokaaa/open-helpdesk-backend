@@ -144,6 +144,28 @@ const translations: Translations = {
     es: 'Si no creaste una cuenta, puedes ignorar este correo.',
   },
 
+  // Import welcome
+  'importWelcome.subject': {
+    en: 'You\'ve been added to a workspace',
+    es: 'Has sido agregado a un espacio de trabajo',
+  },
+  'importWelcome.title': {
+    en: 'Welcome!',
+    es: 'Bienvenido!',
+  },
+  'importWelcome.body': {
+    en: 'Hi {firstName}, you\'ve been added to <strong>{workspaceName}</strong>. Set your password to get started.',
+    es: 'Hola {firstName}, has sido agregado a <strong>{workspaceName}</strong>. Establece tu contraseña para comenzar.',
+  },
+  'importWelcome.button': {
+    en: 'Set Password',
+    es: 'Establecer Contraseña',
+  },
+  'importWelcome.expiry': {
+    en: 'This link will expire in 1 hour.',
+    es: 'Este enlace expirará en 1 hora.',
+  },
+
   // Workspace invitation
   'invitation.subject': {
     en: 'You\'ve been invited to a workspace',
