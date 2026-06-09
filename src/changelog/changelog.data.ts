@@ -20,6 +20,15 @@ export const coreChangelog: ChangelogVersion[] = [
     date: '2026-06-04',
     categories: [
       {
+        title: { en: 'Personal Stats Dashboard', es: 'Dashboard de Estadísticas Personal' },
+        features: [
+          { en: 'My Stats page — see your personal performance metrics at a glance', es: 'Página Mis Estadísticas — ve tus métricas de rendimiento personal de un vistazo' },
+          { en: 'Agents see tickets resolved, response times, CSAT score, and resolution trends', es: 'Los agentes ven tickets resueltos, tiempos de respuesta, CSAT y tendencia de resoluciones' },
+          { en: 'Reporters see tickets created, resolution status, and how fast they get served', es: 'Los reporteros ven tickets creados, estado de resolución y qué tan rápido los atienden' },
+          { en: 'Admins and supervisors can view any team member\'s stats from the members page', es: 'Admins y supervisores pueden ver las estadísticas de cualquier miembro del equipo' },
+        ],
+      },
+      {
         title: { en: 'Bulk Member Import', es: 'Importación Masiva de Miembros' },
         features: [
           { en: 'Import members from a CSV file — upload, preview, edit inline, and confirm', es: 'Importa miembros desde un archivo CSV — sube, previsualiza, edita en línea y confirma' },
