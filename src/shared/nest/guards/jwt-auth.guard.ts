@@ -15,6 +15,15 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       context.getClass(),
     ]);
     if (isPublic) return true;
+
+    // If the token starts with ohd_, skip JWT validation — ApiKeyAuthGuard handles it
+    const request = context.switchToHttp().getRequest();
+    const authHeader = request.headers?.authorization;
+    if (authHeader) {
+      const token = authHeader.replace(/^Bearer\s+/i, '');
+      if (token.startsWith('ohd_')) return true;
+    }
+
     return super.canActivate(context);
   }
 }

@@ -15,6 +15,9 @@ export interface AuthUser {
   email: string;
   isSystemAdmin: boolean;
   isEmailVerified: boolean;
+  apiKeyId?: string;
+  workspaceId?: string;
+  apiKeyScopes?: string[];
 }
 
 @Injectable()

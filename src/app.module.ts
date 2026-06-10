@@ -5,6 +5,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { EventEmitterModule } from "@nestjs/event-emitter";
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 import { JwtAuthGuard } from "./shared/nest/guards/jwt-auth.guard";
+import { ApiKeyAuthGuard } from "./shared/nest/guards/api-key-auth.guard";
 import { EmailVerifiedGuard } from "./shared/nest/guards/email-verified.guard";
 import { SharedModule } from "./shared/shared.module";
 import { UserModule } from "./user/user.module";
@@ -23,6 +24,9 @@ import { ReportModule } from "./report/report.module";
 import { CsatModule } from "./csat/csat.module";
 import { MailboxModule } from "./mailbox/mailbox.module";
 import { EmailInboundModule } from "./email-inbound/email-inbound.module";
+import { ApiKeyModule } from "./api-key/api-key.module";
+import { WebhookModule } from "./webhook/webhook.module";
+import { ApiModule } from "./api/api.module";
 import { HealthController } from "./health.controller";
 import { ChangelogController } from "./changelog/changelog.controller";
 import { AuditLogController } from "./audit-log/infrastructure/nest/controllers/audit-log.controller";
@@ -32,6 +36,7 @@ import { WidgetController } from "./shared/infrastructure/nest/controllers/widge
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: ApiKeyAuthGuard },
     { provide: APP_GUARD, useClass: EmailVerifiedGuard },
   ],
   imports: [
@@ -70,6 +75,9 @@ import { WidgetController } from "./shared/infrastructure/nest/controllers/widge
     CsatModule,
     MailboxModule,
     EmailInboundModule,
+    ApiKeyModule,
+    WebhookModule,
+    ApiModule,
   ],
 })
 export class AppModule {}
