@@ -20,6 +20,16 @@ export const coreChangelog: ChangelogVersion[] = [
     date: '2026-06-04',
     categories: [
       {
+        title: { en: 'Public API & Webhooks', es: 'API Pública y Webhooks' },
+        features: [
+          { en: 'REST API for tickets, comments, and members — integrate Open Helpdesk with any tool', es: 'API REST para tickets, comentarios y miembros — integra Open Helpdesk con cualquier herramienta' },
+          { en: 'API keys with custom scopes — control exactly what each key can do', es: 'API keys con scopes personalizados — controla exactamente qué puede hacer cada key' },
+          { en: 'Key expiration — set 30, 60, 90 days, 1 year, or no expiration', es: 'Expiración de keys — configura 30, 60, 90 días, 1 año o sin expiración' },
+          { en: 'Webhooks — receive HTTP notifications when tickets or comments are created or updated', es: 'Webhooks — recibe notificaciones HTTP cuando se crean o actualizan tickets o comentarios' },
+          { en: 'Webhook signatures — verify authenticity with HMAC-SHA256', es: 'Firmas de webhooks — verifica autenticidad con HMAC-SHA256' },
+        ],
+      },
+      {
         title: { en: 'Personal Stats Dashboard', es: 'Dashboard de Estadísticas Personal' },
         features: [
           { en: 'My Stats page — see your personal performance metrics at a glance', es: 'Página Mis Estadísticas — ve tus métricas de rendimiento personal de un vistazo' },
