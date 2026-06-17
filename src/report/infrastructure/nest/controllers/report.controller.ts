@@ -14,6 +14,7 @@ import { TypeOrmWorkspaceMemberRepository } from '../../../../workspace/infrastr
 import { TypeOrmUserRepository } from '../../../../user/infrastructure/typeorm/repositories/typeorm-user.repository';
 import { EnsureWorkspacePermission } from '../../../../workspace/domain/services/workspace-ensure-permission';
 import { GetWorkspaceReportQuery } from '../../../application/queries/get-workspace-report.query';
+import { GetWorkspaceReportOverviewQuery } from '../../../application/queries/get-workspace-report-overview.query';
 import { GetUserStatsQuery } from '../../../application/queries/get-user-stats.query';
 import { ReportFilterDto } from '../dto/report-filter.dto';
 
@@ -25,6 +26,26 @@ export class ReportController {
     @Inject() private readonly userRepository: TypeOrmUserRepository,
     private readonly dataSource: DataSource,
   ) {}
+
+  @Get('reports/overview')
+  async getReportOverview(
+    @Param('slug') slug: string,
+    @Query() filters: ReportFilterDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspace = await this.workspaceRepository.findBySlug(slug);
+    if (!workspace) throw new EntityNotFoundError('Workspace not found');
+
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    const query = new GetWorkspaceReportOverviewQuery(this.dataSource, ensurePermission);
+    return query.execute({
+      workspaceId: workspace.getId(),
+      userId: user.userId,
+      isSystemAdmin: user.isSystemAdmin,
+      dateFrom: new Date(filters.dateFrom),
+      dateTo: new Date(filters.dateTo),
+    });
+  }
 
   @Get('reports')
   async getReport(
