@@ -15,9 +15,11 @@ import { CsatModule } from '../csat/csat.module';
 import { TicketModule } from '../ticket/ticket.module';
 import { MailboxModule } from '../mailbox/mailbox.module';
 import { EMAIL_SERVICE } from './email.constants';
+import { AdminEmailController } from './infrastructure/nest/controllers/admin-email.controller';
 @Global()
 @Module({
   imports: [UserModule, WorkspaceModule, NotificationModule, SharedModule, CsatModule, TicketModule, MailboxModule],
+  controllers: [AdminEmailController],
   providers: [
     {
       provide: EMAIL_SERVICE,
