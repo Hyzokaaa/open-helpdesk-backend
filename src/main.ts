@@ -1,9 +1,9 @@
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
-import { json } from 'body-parser';
-import { AppModule } from './app.module';
-import { ensureDatabase } from './shared/infrastructure/ensure-database';
-import { DomainExceptionFilter } from './shared/nest/filters/domain-exception.filter';
+import { NestFactory } from "@nestjs/core";
+import { ValidationPipe } from "@nestjs/common";
+import { json } from "body-parser";
+import { AppModule } from "./app.module";
+import { ensureDatabase } from "./shared/infrastructure/ensure-database";
+import { DomainExceptionFilter } from "./shared/nest/filters/domain-exception.filter";
 
 async function bootstrap() {
   await ensureDatabase();
@@ -11,8 +11,8 @@ async function bootstrap() {
 
   // Register global JSON parser explicitly before the route-scoped one
   // (NestJS skips its default parser if it detects any 'jsonParser' middleware)
-  (app as any).useBodyParser('json');
-  app.use('/inbound/email', json({ limit: '25mb' }));
+  (app as any).useBodyParser("json");
+  app.use("/inbound/email", json({ limit: "25mb" }));
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -24,9 +24,12 @@ async function bootstrap() {
   app.useGlobalFilters(new DomainExceptionFilter());
 
   const frontendUrl = process.env.FRONTEND_URL;
+  const origin = frontendUrl?.includes(",")
+    ? frontendUrl.split(",").map((u) => u.trim())
+    : frontendUrl || "http://localhost:5173";
   app.enableCors({
-    origin: frontendUrl || 'http://localhost:5173',
-    exposedHeaders: ['X-Unread-Count', 'Date'],
+    origin,
+    exposedHeaders: ["X-Unread-Count", "Date"],
   });
 
   await app.listen(process.env.PORT ?? 3000);
