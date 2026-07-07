@@ -5,15 +5,24 @@ import {
   Inject,
   ForbiddenException,
 } from '@nestjs/common';
+import { IsString, IsOptional } from 'class-validator';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { EmailService } from '../../../domain/email.service';
 import { EMAIL_SERVICE } from '../../../email.constants';
 
 class SendAdminEmailDto {
-  to: string;
-  subject: string;
-  body: string;
+  @IsString()
+  to!: string;
+
+  @IsString()
+  subject!: string;
+
+  @IsString()
+  body!: string;
+
+  @IsOptional()
+  @IsString()
   from?: string;
 }
 
