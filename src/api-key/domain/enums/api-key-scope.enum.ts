@@ -4,6 +4,7 @@ export enum ApiKeyScope {
   COMMENTS_READ = 'comments:read',
   COMMENTS_WRITE = 'comments:write',
   MEMBERS_READ = 'members:read',
+  AUTH_EXCHANGE = 'auth:exchange',
 }
 
 export const ALL_API_KEY_SCOPES = Object.values(ApiKeyScope);

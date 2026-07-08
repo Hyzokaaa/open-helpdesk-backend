@@ -47,6 +47,13 @@ import { TicketFilterDto } from '../../../../ticket/infrastructure/nest/dto/tick
 import { CreateApiTicketRequest } from '../dto/create-api-ticket.request';
 import { UpdateApiTicketRequest } from '../dto/update-api-ticket.request';
 import { CreateApiCommentRequest } from '../dto/create-api-comment.request';
+import { ExchangeTokenRequest } from '../dto/exchange-token.request';
+import { ExchangeToken } from '../../../../user/domain/services/user-exchange-token';
+import { ExchangeTokenCommand } from '../../../../user/application/commands/exchange-token.command';
+import { AddWorkspaceMember } from '../../../../workspace/domain/services/workspace-add-member';
+import { WorkspaceRole } from '../../../../workspace/domain/enums/workspace-role.enum';
+import { JwtTokenService } from '../../../../shared/infrastructure/jwt-token-service';
+import { BcryptPasswordHasher } from '../../../../shared/infrastructure/bcrypt-password-hasher';
 
 @Controller('api/v1')
 @Throttle({ default: { ttl: 60000, limit: 100 } })
@@ -61,6 +68,8 @@ export class ApiController {
     @Inject() private readonly eventPublisher: NestEventPublisher,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
     @Inject() private readonly customFieldDefinitionRepository: TypeOrmCustomFieldDefinitionRepository,
+    @Inject() private readonly tokenService: JwtTokenService,
+    @Inject() private readonly passwordHasher: BcryptPasswordHasher,
   ) {}
 
   // --- Tickets ---
@@ -309,6 +318,29 @@ export class ApiController {
       }
     }
     return result;
+  }
+
+  // --- Auth Exchange ---
+
+  @Post('auth/exchange')
+  async exchangeToken(
+    @Body() body: ExchangeTokenRequest,
+    @CurrentUser() user: AuthUser,
+  ) {
+    this.requireScope(user, ApiKeyScope.AUTH_EXCHANGE);
+    const workspaceId = this.resolveWorkspaceId(user);
+
+    const service = new ExchangeToken(this.idGenerator, this.userRepository, this.passwordHasher);
+    const addMember = new AddWorkspaceMember(this.idGenerator, this.memberRepository);
+    const command = new ExchangeTokenCommand(service, addMember, this.tokenService);
+
+    return command.execute({
+      email: body.email,
+      firstName: body.firstName,
+      lastName: body.lastName,
+      role: body.role ?? WorkspaceRole.AGENT,
+      workspaceId,
+    });
   }
 
   private resolveWorkspaceId(user: AuthUser): string {
