@@ -16,6 +16,25 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.12.0',
+    date: '2026-07-07',
+    categories: [
+      {
+        title: { en: 'Integrate with Your Product', es: 'Integra con tu Producto' },
+        features: [
+          { en: 'Connect your app to Open Helpdesk with one API call, your users access support without a separate login', es: 'Conecta tu app a Open Helpdesk con una llamada API, tus usuarios acceden al soporte sin un login separado' },
+          { en: 'Choose which API keys can create user sessions with the new "Token Exchange" permission', es: 'Elige qué API keys pueden crear sesiones de usuario con el nuevo permiso "Token Exchange"' },
+        ],
+      },
+      {
+        title: { en: 'Improvements', es: 'Mejoras' },
+        features: [
+          { en: 'Dragging tickets on the board is now smooth, no more page jumps', es: 'Arrastrar tickets en el tablero ahora es fluido, sin saltos de página' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.11.0',
     date: '2026-06-04',
     categories: [
