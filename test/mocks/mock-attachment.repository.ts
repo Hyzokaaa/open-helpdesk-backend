@@ -24,6 +24,27 @@ export class MockAttachmentRepository implements AttachmentRepository {
     this.attachments = this.attachments.filter((a) => a.getId() !== id);
   }
 
+  async findByTokens(tokens: string[]): Promise<Attachment[]> {
+    return this.attachments.filter((a) => tokens.includes((a as any).stagingToken));
+  }
+
+  async claimStagedAttachments(tokens: string[], ticketId: string): Promise<void> {
+    for (const a of this.attachments) {
+      if (tokens.includes((a as any).stagingToken)) {
+        (a as any).ticketId = ticketId;
+        (a as any).stagingToken = null;
+      }
+    }
+  }
+
+  async findExpiredStaged(before: Date): Promise<Attachment[]> {
+    return this.attachments.filter((a) => (a as any).stagingToken && (a as any).createdAt < before);
+  }
+
+  async deleteMany(ids: string[]): Promise<void> {
+    this.attachments = this.attachments.filter((a) => !ids.includes(a.getId()));
+  }
+
   seed(attachment: Attachment): void {
     this.attachments.push(attachment);
   }

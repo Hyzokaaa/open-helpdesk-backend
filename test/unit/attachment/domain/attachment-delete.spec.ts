@@ -21,6 +21,7 @@ describe('DeleteAttachment', () => {
       id: 'att-1', fileName: 'file.png', originalName: 'file.png',
       mimeType: 'image/png', size: 1, s3Key: 'attachments/att-1/file.png',
       ticketId: 'ticket-1', commentId: null, uploadedById: null,
+      token: null, stagedAt: null,
     }));
 
     await service.execute({ attachmentId: 'att-1' });
