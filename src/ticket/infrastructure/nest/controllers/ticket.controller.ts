@@ -38,6 +38,10 @@ import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit
 import { TypeOrmCustomFieldDefinitionRepository } from '../../../../custom-field/infrastructure/typeorm/repositories/typeorm-custom-field-definition.repository';
 import { ValidateCustomFieldValues } from '../../../../custom-field/domain/services/custom-field-validate-values';
 import { BulkChangeStatusCommand } from '../../../application/commands/bulk-change-status.command';
+import { AddTicketParticipant } from '../../../domain/services/ticket-add-participant';
+import { EnsureTicketAccess } from '../../../domain/services/ticket-ensure-access';
+import { TypeOrmTicketParticipantRepository } from '../../typeorm/repositories/typeorm-ticket-participant.repository';
+import { ParticipantRole } from '../../../domain/enums/participant-role.enum';
 import { BulkDeleteCommand } from '../../../application/commands/bulk-delete.command';
 import { CreateTicketRequest } from '../dto/create-ticket.request';
 import { UpdateTicketRequest } from '../dto/update-ticket.request';
@@ -59,6 +63,7 @@ export class TicketController {
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
     @Inject() private readonly customFieldDefinitionRepository: TypeOrmCustomFieldDefinitionRepository,
     @Inject() private readonly attachmentRepository: TypeOrmAttachmentRepository,
+    @Inject() private readonly participantRepository: TypeOrmTicketParticipantRepository,
   ) {}
 
   @Post()
@@ -171,8 +176,8 @@ export class TicketController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspace = await this.resolveWorkspace(slug);
-    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
-    const query = new GetTicketQuery(this.ticketRepository, ensurePermission);
+    const ensureAccess = this.createEnsureTicketAccess();
+    const query = new GetTicketQuery(this.ticketRepository, ensureAccess);
     return query.execute({ ticketId: id, workspaceId: workspace.getId(), userId: user.userId, isSystemAdmin: user.isSystemAdmin });
   }
 
@@ -184,6 +189,7 @@ export class TicketController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspace = await this.resolveWorkspace(slug);
+    await this.createEnsureTicketAccess().ensureFull({ ticketId: id, userId: user.userId, workspaceId: workspace.getId(), isSystemAdmin: user.isSystemAdmin });
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new UpdateTicket(this.ticketRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
@@ -211,6 +217,7 @@ export class TicketController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspace = await this.resolveWorkspace(slug);
+    await this.createEnsureTicketAccess().ensureFull({ ticketId: id, userId: user.userId, workspaceId: workspace.getId(), isSystemAdmin: user.isSystemAdmin });
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new ChangeTicketStatus(this.ticketRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
@@ -235,6 +242,7 @@ export class TicketController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspace = await this.resolveWorkspace(slug);
+    await this.createEnsureTicketAccess().ensureFull({ ticketId: id, userId: user.userId, workspaceId: workspace.getId(), isSystemAdmin: user.isSystemAdmin });
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new AssignTicket(this.ticketRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
@@ -263,11 +271,78 @@ export class TicketController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspace = await this.resolveWorkspace(slug);
+    await this.createEnsureTicketAccess().ensureFull({ ticketId: id, userId: user.userId, workspaceId: workspace.getId(), isSystemAdmin: user.isSystemAdmin });
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new DeleteTicket(this.ticketRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     const command = new DeleteTicketCommand(service, ensurePermission, this.ticketRepository, auditLog);
     return command.execute({ ticketId: id, workspaceId: workspace.getId(), userId: user.userId, isSystemAdmin: user.isSystemAdmin });
+  }
+
+  @Get(':id/participants')
+  async listParticipants(
+    @Param('slug') slug: string,
+    @Param('id') id: string,
+  ) {
+    const workspace = await this.resolveWorkspace(slug);
+    const ticket = await this.ticketRepository.findById(id);
+    if (!ticket || ticket.workspaceId !== workspace.getId()) throw new EntityNotFoundError('Ticket not found');
+
+    const participants = await this.participantRepository.findByTicketId(id);
+    const result = [];
+    for (const p of participants) {
+      const u = await this.userRepository.findById(p.userId);
+      if (u) {
+        result.push({
+          id: p.getId(),
+          userId: p.userId,
+          firstName: u.firstName,
+          lastName: u.lastName,
+          email: u.email,
+          role: p.role,
+        });
+      }
+    }
+    return result;
+  }
+
+  @Post(':id/participants')
+  async addParticipant(
+    @Param('slug') slug: string,
+    @Param('id') id: string,
+    @Body() body: { userId: string; role?: string },
+  ) {
+    const workspace = await this.resolveWorkspace(slug);
+    const ticket = await this.ticketRepository.findById(id);
+    if (!ticket || ticket.workspaceId !== workspace.getId()) throw new EntityNotFoundError('Ticket not found');
+
+    const service = new AddTicketParticipant(this.idGenerator, this.participantRepository);
+    const participant = await service.execute({
+      ticketId: id,
+      userId: body.userId,
+      role: (body.role as ParticipantRole) ?? ParticipantRole.FOLLOWER,
+    });
+
+    return participant ? { added: true } : { added: false, reason: 'already a participant' };
+  }
+
+  @Delete(':id/participants/:userId')
+  async removeParticipant(
+    @Param('slug') slug: string,
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+  ) {
+    const workspace = await this.resolveWorkspace(slug);
+    const ticket = await this.ticketRepository.findById(id);
+    if (!ticket || ticket.workspaceId !== workspace.getId()) throw new EntityNotFoundError('Ticket not found');
+
+    await this.participantRepository.remove(id, userId);
+    return { removed: true };
+  }
+
+  private createEnsureTicketAccess() {
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    return new EnsureTicketAccess(this.ticketRepository, ensurePermission, this.participantRepository);
   }
 
   private async resolveWorkspace(slug: string) {

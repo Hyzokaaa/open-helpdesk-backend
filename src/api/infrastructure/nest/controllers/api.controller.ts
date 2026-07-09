@@ -40,6 +40,8 @@ import { TypeOrmUserRepository } from '../../../../user/infrastructure/typeorm/r
 import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
 import { TypeOrmCustomFieldDefinitionRepository } from '../../../../custom-field/infrastructure/typeorm/repositories/typeorm-custom-field-definition.repository';
 import { EnsureWorkspacePermission } from '../../../../workspace/domain/services/workspace-ensure-permission';
+import { EnsureTicketAccess } from '../../../../ticket/domain/services/ticket-ensure-access';
+import { TypeOrmTicketParticipantRepository } from '../../../../ticket/infrastructure/typeorm/repositories/typeorm-ticket-participant.repository';
 import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit-log-create';
 import { ValidateCustomFieldValues } from '../../../../custom-field/domain/services/custom-field-validate-values';
 import { PaginationDto } from '../../../../shared/nest/dto/pagination.dto';
@@ -70,6 +72,7 @@ export class ApiController {
     @Inject() private readonly customFieldDefinitionRepository: TypeOrmCustomFieldDefinitionRepository,
     @Inject() private readonly tokenService: JwtTokenService,
     @Inject() private readonly passwordHasher: BcryptPasswordHasher,
+    @Inject() private readonly participantRepository: TypeOrmTicketParticipantRepository,
   ) {}
 
   // --- Tickets ---
@@ -111,7 +114,8 @@ export class ApiController {
     this.requireScope(user, ApiKeyScope.TICKETS_READ);
     const workspaceId = this.resolveWorkspaceId(user);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
-    const query = new GetTicketQuery(this.ticketRepository, ensurePermission);
+    const ensureAccess = new EnsureTicketAccess(this.ticketRepository, ensurePermission, this.participantRepository);
+    const query = new GetTicketQuery(this.ticketRepository, ensureAccess);
     return query.execute({
       ticketId: id,
       workspaceId,

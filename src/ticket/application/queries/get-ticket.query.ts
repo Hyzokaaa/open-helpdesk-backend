@@ -1,10 +1,7 @@
 import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { Query } from '../../../shared/domain/query';
-import { EnsureWorkspacePermission } from '../../../workspace/domain/services/workspace-ensure-permission';
-import { PERMISSIONS, hasPermission } from '../../../workspace/domain/permissions';
-import { WorkspaceRole } from '../../../workspace/domain/enums/workspace-role.enum';
-import { AccessDeniedError } from '../../../shared/domain/errors';
 import { TicketRepository } from '../../domain/repositories/ticket.repository';
+import { EnsureTicketAccess, TicketAccessLevel } from '../../domain/services/ticket-ensure-access';
 
 interface Props {
   ticketId: string;
@@ -32,35 +29,21 @@ export interface TicketDetailResponse {
   discardReason: string | null;
   firstResponseBreached: boolean;
   resolutionBreached: boolean;
+  accessLevel: TicketAccessLevel;
 }
 
 export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
   constructor(
     private readonly repository: TicketRepository,
-    private readonly ensurePermission: EnsureWorkspacePermission,
+    private readonly ensureTicketAccess: EnsureTicketAccess,
   ) {}
 
   async execute(props: Props): Promise<TicketDetailResponse> {
-    const ctx = await this.ensurePermission.execute({
-      workspaceId: props.workspaceId,
-      userId: props.userId,
-      anyOf: [PERMISSIONS.TICKET_VIEW, PERMISSIONS.TICKET_VIEW_OWN],
-      isSystemAdmin: props.isSystemAdmin,
-    });
+    const accessLevel = await this.ensureTicketAccess.execute(props);
 
     const ticket = await this.repository.findById(props.ticketId);
     if (!ticket || ticket.workspaceId !== props.workspaceId) {
       throw new EntityNotFoundError('Ticket not found');
-    }
-
-    if (!hasPermission(ctx.role, PERMISSIONS.TICKET_VIEW)) {
-      const isAgent = ctx.role === WorkspaceRole.AGENT;
-      const canSee = isAgent
-        ? (ticket.assigneeId === props.userId || ticket.status === 'open')
-        : ticket.creatorId === props.userId;
-      if (!canSee) {
-        throw new AccessDeniedError('You do not have access to this ticket');
-      }
     }
 
     return {
@@ -82,6 +65,7 @@ export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
       discardReason: ticket.discardReason,
       firstResponseBreached: ticket.firstResponseBreached,
       resolutionBreached: ticket.resolutionBreached,
+      accessLevel,
     };
   }
 }
