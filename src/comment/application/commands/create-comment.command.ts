@@ -37,10 +37,14 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
   ) {}
 
   async execute(props: Props): Promise<CreateCommentResponse> {
+    const extractMentions = new ExtractMentions();
+    const mentionedUserIds = extractMentions.execute(props.content);
+
     const comment = await this.createComment.execute({
       content: props.content,
       ticketId: props.ticketId,
       authorId: props.authorId,
+      mentionedUserIds,
     });
 
     const ticket = await this.ticketRepository.findById(props.ticketId);
@@ -53,8 +57,6 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
     }
 
     if (ticket && workspace && author) {
-      const extractMentions = new ExtractMentions();
-      const mentionedUserIds = extractMentions.execute(props.content);
 
       const event: NewCommentEvent = {
         ticketId: props.ticketId,

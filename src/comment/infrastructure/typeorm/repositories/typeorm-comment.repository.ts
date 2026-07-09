@@ -62,6 +62,7 @@ export class TypeOrmCommentRepository implements CommentRepository {
       content: model.content,
       ticketId: model.ticketId,
       authorId: model.authorId,
+      mentionedUserIds: model.mentionedUserIds?.filter(Boolean) ?? [],
     });
   }
 
@@ -71,6 +72,7 @@ export class TypeOrmCommentRepository implements CommentRepository {
     model.content = comment.content;
     model.ticketId = comment.ticketId;
     model.authorId = comment.authorId;
+    model.mentionedUserIds = comment.mentionedUserIds;
     return model;
   }
 }

@@ -29,6 +29,9 @@ export class CommentModel {
   @Column()
   authorId!: string;
 
+  @Column('simple-array', { default: '' })
+  mentionedUserIds!: string[];
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 

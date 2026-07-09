@@ -7,6 +7,7 @@ interface CreateCommentProps {
   content: string;
   ticketId: string;
   authorId: string;
+  mentionedUserIds?: string[];
 }
 
 export class CreateComment {
@@ -21,6 +22,7 @@ export class CreateComment {
       content: sanitizeHtml(props.content),
       ticketId: props.ticketId,
       authorId: props.authorId,
+      mentionedUserIds: props.mentionedUserIds,
     });
 
     await this.repository.create(comment);

@@ -12,6 +12,7 @@ export interface CommentListItem {
   id: string;
   content: string;
   authorId: string;
+  mentionedUserIds: string[];
 }
 
 export class ListTicketCommentsQuery
@@ -31,6 +32,7 @@ export class ListTicketCommentsQuery
         id: comment.getId(),
         content: comment.content,
         authorId: comment.authorId,
+        mentionedUserIds: comment.mentionedUserIds,
       })),
       total: result.total,
       page: result.page,
