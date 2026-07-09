@@ -8,6 +8,8 @@ import { UserRepository } from '../../../user/domain/repositories/user.repositor
 import { NewCommentEvent } from '../../../email/domain/events';
 import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
+import { AddTicketParticipant } from '../../../ticket/domain/services/ticket-add-participant';
+import { ParticipantRole } from '../../../ticket/domain/enums/participant-role.enum';
 
 interface Props {
   content: string;
@@ -31,6 +33,7 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
     private readonly userRepository: UserRepository,
     private readonly eventPublisher: EventPublisher,
     private readonly createAuditLog: CreateAuditLogEntry,
+    private readonly addParticipant?: AddTicketParticipant,
   ) {}
 
   async execute(props: Props): Promise<CreateCommentResponse> {
@@ -67,6 +70,16 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
         workspaceSlug: workspace.slug,
       };
       this.eventPublisher.emit('comment.created', event);
+
+      if (this.addParticipant && mentionedUserIds.length > 0) {
+        for (const userId of mentionedUserIds) {
+          await this.addParticipant.execute({
+            ticketId: props.ticketId,
+            userId,
+            role: ParticipantRole.FOLLOWER,
+          });
+        }
+      }
     }
 
     if (ticket && workspace) {

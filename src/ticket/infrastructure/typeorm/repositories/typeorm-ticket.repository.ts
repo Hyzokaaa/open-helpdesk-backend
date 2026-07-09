@@ -96,10 +96,11 @@ export class TypeOrmTicketRepository implements TicketRepository {
       });
     }
     if (filters.agentUserId) {
-      qb.andWhere('(ticket.assigneeId = :agentUserId OR ticket.status = :openStatus)', {
-        agentUserId: filters.agentUserId,
-        openStatus: 'open',
-      });
+      qb.andWhere(
+        '(ticket.assigneeId = :agentUserId OR ticket.status = :openStatus OR ticket.id IN ' +
+        '(SELECT tp."ticketId" FROM ticket_participants tp WHERE tp."userId" = :agentUserId))',
+        { agentUserId: filters.agentUserId, openStatus: 'open' },
+      );
     }
     if (filters.tagIds && filters.tagIds.length > 0) {
       qb.andWhere(
