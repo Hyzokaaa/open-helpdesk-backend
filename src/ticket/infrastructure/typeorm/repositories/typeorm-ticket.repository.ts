@@ -195,6 +195,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
       portalToken: model.portalToken ?? null,
       firstResponseBreached: model.firstResponseBreached ?? false,
       resolutionBreached: model.resolutionBreached ?? false,
+      aiCache: model.aiCache ?? {},
     });
   }
 
@@ -218,6 +219,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
     model.portalToken = ticket.portalToken;
     model.firstResponseBreached = ticket.firstResponseBreached;
     model.resolutionBreached = ticket.resolutionBreached;
+    model.aiCache = ticket.aiCache;
     return model;
   }
 }

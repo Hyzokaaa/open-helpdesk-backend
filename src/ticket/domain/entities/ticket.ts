@@ -26,6 +26,7 @@ interface Props {
   portalToken?: string | null;
   firstResponseBreached?: boolean;
   resolutionBreached?: boolean;
+  aiCache?: Record<string, { source: string; result: string }>;
 }
 
 export class Ticket {
@@ -50,6 +51,7 @@ export class Ticket {
   portalToken: string | null;
   firstResponseBreached: boolean;
   resolutionBreached: boolean;
+  aiCache: Record<string, { source: string; result: string }>;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -73,6 +75,7 @@ export class Ticket {
     this.portalToken = props.portalToken ?? null;
     this.firstResponseBreached = props.firstResponseBreached ?? false;
     this.resolutionBreached = props.resolutionBreached ?? false;
+    this.aiCache = props.aiCache ?? {};
   }
 
   getId(): string {

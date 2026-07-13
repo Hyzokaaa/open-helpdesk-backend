@@ -78,6 +78,9 @@ export class TicketModel {
   @Column({ default: false })
   resolutionBreached!: boolean;
 
+  @Column({ type: 'jsonb', default: {} })
+  aiCache!: Record<string, { source: string; result: string }>;
+
   @ManyToMany(() => TagModel)
   @JoinTable({ name: 'ticket_tag' })
   tags!: TagModel[];

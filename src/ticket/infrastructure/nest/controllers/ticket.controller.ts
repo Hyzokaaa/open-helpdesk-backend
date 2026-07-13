@@ -340,6 +340,28 @@ export class TicketController {
     return { removed: true };
   }
 
+  @Patch(':id/ai-cache')
+  async updateAiCache(
+    @Param('slug') slug: string,
+    @Param('id') id: string,
+    @Body() body: { key: string; source: string; result: string } | { key: string; clear: true },
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspace = await this.resolveWorkspace(slug);
+    const ticket = await this.ticketRepository.findById(id);
+    if (!ticket || ticket.workspaceId !== workspace.getId()) throw new EntityNotFoundError('Ticket not found');
+
+    const cache = { ...ticket.aiCache };
+    if ('clear' in body && body.clear) {
+      delete cache[body.key];
+    } else if ('result' in body) {
+      cache[body.key] = { source: body.source, result: body.result };
+    }
+    ticket.aiCache = cache;
+    await this.ticketRepository.update(ticket);
+    return { ok: true };
+  }
+
   private createEnsureTicketAccess() {
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     return new EnsureTicketAccess(this.ticketRepository, ensurePermission, this.participantRepository);
