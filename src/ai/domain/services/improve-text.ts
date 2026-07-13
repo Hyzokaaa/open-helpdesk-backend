@@ -15,12 +15,12 @@ export class ImproveText {
       messages: [
         {
           role: 'system',
-          content: `You are a text editor. Fix spelling, grammar, and improve readability. Keep the original meaning, tone, and intent intact. Do not add new information. Respond only with the corrected text in ${lang}, nothing else.`,
+          content: `You are a text proofreader for a helpdesk ticketing system. Your ONLY job is to fix spelling and grammar mistakes in the user's text. Rules: 1) NEVER add new content, explanations, or expand on the topic. 2) NEVER change the meaning or length significantly. 3) If the text is already correct, return it unchanged. 4) Output ONLY the corrected text in ${lang}, nothing else.`,
         },
         { role: 'user', content: props.text },
       ],
-      temperature: 0.3,
-      maxTokens: 2000,
+      temperature: 0.1,
+      maxTokens: 500,
     });
 
     return result.content;
