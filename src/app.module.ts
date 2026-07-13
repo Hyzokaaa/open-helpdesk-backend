@@ -27,6 +27,8 @@ import { EmailInboundModule } from "./email-inbound/email-inbound.module";
 import { ApiKeyModule } from "./api-key/api-key.module";
 import { WebhookModule } from "./webhook/webhook.module";
 import { ApiModule } from "./api/api.module";
+import { AIModule } from "./ai/ai.module";
+import { CoreConfigModule } from "./config/config.module";
 import { HealthController } from "./health.controller";
 import { ChangelogController } from "./changelog/changelog.controller";
 import { AuditLogController } from "./audit-log/infrastructure/nest/controllers/audit-log.controller";
@@ -78,6 +80,8 @@ import { WidgetController } from "./shared/infrastructure/nest/controllers/widge
     ApiKeyModule,
     WebhookModule,
     ApiModule,
+    AIModule,
+    CoreConfigModule,
   ],
 })
 export class AppModule {}
