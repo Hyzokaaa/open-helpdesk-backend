@@ -156,7 +156,7 @@ export class ImportWorkspace {
         await qr.query(`
           INSERT INTO comments (id, content, "ticketId", "authorId", "mentionedUserIds", "createdAt")
           VALUES ($1, $2, $3, $4, $5, $6)
-        `, [newId, c.content, newTicketId, userIdFor(c.authorEmail), c.mentionedUserIds?.join(',') ?? '', c.createdAt]);
+        `, [newId, c.content, newTicketId, userIdFor(c.authorEmail), Array.isArray(c.mentionedUserIds) ? c.mentionedUserIds.join(',') : (c.mentionedUserIds ?? ''), c.createdAt]);
         commentIdMap.set(c.id, newId);
         result.commentsImported++;
       }
