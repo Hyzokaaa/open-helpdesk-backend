@@ -8,7 +8,10 @@ import {
   Patch,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
+import { DataSource } from 'typeorm';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
@@ -47,6 +50,8 @@ import { CreateWorkspaceRequest } from '../dto/create-workspace.request';
 import { AddMemberRequest } from '../dto/add-member.request';
 import { SortDto } from '../../../../shared/nest/dto/sort.dto';
 import { ConfigService } from '@nestjs/config';
+import { ExportWorkspace } from '../../../domain/services/workspace-export';
+import { ImportWorkspace } from '../../../domain/services/workspace-import';
 
 @Controller('workspaces')
 export class WorkspaceController {
@@ -59,6 +64,7 @@ export class WorkspaceController {
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
     @Inject() private readonly mailboxRepository: TypeOrmMailboxRepository,
     @Inject() private readonly config: ConfigService,
+    private readonly dataSource: DataSource,
   ) {}
 
   @Post()
@@ -263,6 +269,54 @@ export class WorkspaceController {
     const service = new UpdateWorkspaceSlaPolicy(this.workspaceRepository);
     const command = new UpdateSlaPolicyCommand(service);
     return command.execute({ workspaceId, slaPolicy: body.slaPolicy });
+  }
+
+  @Get(':slug/export')
+  async exportWorkspace(
+    @Param('slug') slug: string,
+    @CurrentUser() user: AuthUser,
+    @Res() res: Response,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+    const service = new ExportWorkspace(this.dataSource);
+    const data = await service.execute(workspaceId);
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="${slug}-export.json"`);
+    res.send(JSON.stringify(data, null, 2));
+  }
+
+  @Post(':slug/import')
+  async importWorkspace(
+    @Param('slug') slug: string,
+    @Body() body: any,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+
+    // Support URL-based import: { url: "https://..." }
+    let data = body;
+    if (body.url && typeof body.url === 'string') {
+      const response = await fetch(body.url);
+      if (!response.ok) throw new Error(`Failed to fetch export from URL: ${response.status}`);
+      data = await response.json();
+    }
+
+    const service = new ImportWorkspace(this.dataSource);
+    return service.execute(workspaceId, data);
   }
 
   private async resolveWorkspaceId(slug: string): Promise<string> {
