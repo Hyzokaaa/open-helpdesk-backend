@@ -48,10 +48,6 @@ export class ChangeTicketStatus {
       );
     }
 
-    if (ticket.status === TicketStatus.OPEN && props.status !== TicketStatus.OPEN && !ticket.assigneeId) {
-      ticket.assigneeId = props.userId;
-    }
-
     if (props.status === TicketStatus.OPEN) {
       ticket.assigneeId = null;
     }

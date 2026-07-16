@@ -20,6 +20,8 @@ import { CreateTicket } from '../../../domain/services/ticket-create';
 import { UpdateTicket } from '../../../domain/services/ticket-update';
 import { ChangeTicketStatus } from '../../../domain/services/ticket-change-status';
 import { AssignTicket } from '../../../domain/services/ticket-assign';
+import { PickupTicket } from '../../../domain/services/ticket-pickup';
+import { TransferTicket } from '../../../domain/services/ticket-transfer';
 import { DeleteTicket } from '../../../domain/services/ticket-delete';
 import { CreateTicketCommand } from '../../../application/commands/create-ticket.command';
 import { UpdateTicketCommand } from '../../../application/commands/update-ticket.command';
@@ -34,6 +36,8 @@ import { TypeOrmWorkspaceMemberRepository } from '../../../../workspace/infrastr
 import { TypeOrmUserRepository } from '../../../../user/infrastructure/typeorm/repositories/typeorm-user.repository';
 import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
 import { EnsureWorkspacePermission } from '../../../../workspace/domain/services/workspace-ensure-permission';
+import { PERMISSIONS } from '../../../../workspace/domain/permissions';
+import { AuditAction } from '../../../../audit-log/domain/enums/audit-action.enum';
 import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit-log-create';
 import { TypeOrmCustomFieldDefinitionRepository } from '../../../../custom-field/infrastructure/typeorm/repositories/typeorm-custom-field-definition.repository';
 import { ValidateCustomFieldValues } from '../../../../custom-field/domain/services/custom-field-validate-values';
@@ -277,6 +281,69 @@ export class TicketController {
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     const command = new DeleteTicketCommand(service, ensurePermission, this.ticketRepository, auditLog);
     return command.execute({ ticketId: id, workspaceId: workspace.getId(), userId: user.userId, isSystemAdmin: user.isSystemAdmin });
+  }
+
+  @Post(':id/pickup')
+  async pickup(
+    @Param('slug') slug: string,
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspace = await this.resolveWorkspace(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId: workspace.getId(),
+      userId: user.userId,
+      permission: PERMISSIONS.TICKET_PICKUP,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+    const service = new PickupTicket(this.ticketRepository);
+    const ticket = await service.execute({ ticketId: id, userId: user.userId });
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.TICKET_PICKED_UP,
+      entityType: 'ticket',
+      entityId: id,
+      userId: user.userId,
+      workspaceId: workspace.getId(),
+      metadata: { ticketName: ticket.name },
+    });
+    return { id: ticket.getId(), status: ticket.status, assigneeId: ticket.assigneeId };
+  }
+
+  @Patch(':id/transfer')
+  async transfer(
+    @Param('slug') slug: string,
+    @Param('id') id: string,
+    @Body() body: { assigneeId: string },
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspace = await this.resolveWorkspace(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId: workspace.getId(),
+      userId: user.userId,
+      permission: PERMISSIONS.TICKET_TRANSFER,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+    const service = new TransferTicket(this.ticketRepository);
+    const ticket = await service.execute({ ticketId: id, fromUserId: user.userId, toUserId: body.assigneeId });
+    const toUser = await this.userRepository.findById(body.assigneeId);
+    const fromUser = await this.userRepository.findById(user.userId);
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.TICKET_TRANSFERRED,
+      entityType: 'ticket',
+      entityId: id,
+      userId: user.userId,
+      workspaceId: workspace.getId(),
+      metadata: {
+        ticketName: ticket.name,
+        from: fromUser ? `${fromUser.firstName} ${fromUser.lastName}` : user.userId,
+        to: toUser ? `${toUser.firstName} ${toUser.lastName}` : body.assigneeId,
+      },
+    });
+    return { id: ticket.getId(), assigneeId: ticket.assigneeId };
   }
 
   @Get(':id/participants')
