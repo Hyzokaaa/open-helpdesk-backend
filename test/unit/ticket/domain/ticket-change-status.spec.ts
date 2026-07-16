@@ -89,7 +89,7 @@ describe('ChangeTicketStatus', () => {
     expect(result.assigneeId).toBeNull();
   });
 
-  it('should auto-assign user when moving from open with no assignee', async () => {
+  it('should not auto-assign when moving from open (pickup is explicit)', async () => {
     await repository.create(createTicket({ status: TicketStatus.OPEN }));
 
     const result = await service.execute({
@@ -98,7 +98,7 @@ describe('ChangeTicketStatus', () => {
       userId: 'user-2',
     });
 
-    expect(result.assigneeId).toBe('user-2');
+    expect(result.assigneeId).toBeNull();
   });
 
   it('should require discard reason when discarding', async () => {
