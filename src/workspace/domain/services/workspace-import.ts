@@ -37,23 +37,42 @@ export class ImportWorkspace {
     };
 
     try {
-      // 1. Map emails → user IDs. Create missing users.
-      const emailToUserId = new Map<string, string>();
-      const allEmails = data.users.map((u) => u.email);
-      const existingUsers = await qr.query(
-        `SELECT id, email FROM users WHERE email = ANY($1)`, [allEmails],
-      );
-      for (const u of existingUsers) emailToUserId.set(u.email, u.id);
+      // 1. Collect ALL referenced emails across the entire export
+      const allEmailsSet = new Set<string>();
+      for (const u of data.users) allEmailsSet.add(u.email);
+      for (const t of data.tickets) {
+        allEmailsSet.add(t.creatorEmail);
+        if (t.assigneeEmail) allEmailsSet.add(t.assigneeEmail);
+        if (t.resolvedByEmail) allEmailsSet.add(t.resolvedByEmail);
+      }
+      for (const c of data.comments) allEmailsSet.add(c.authorEmail);
+      for (const a of data.attachments) { if (a.uploadedByEmail) allEmailsSet.add(a.uploadedByEmail); }
+      for (const p of data.participants) allEmailsSet.add(p.userEmail);
+      for (const a of data.auditLog) allEmailsSet.add(a.userEmail);
 
+      const allEmails = [...allEmailsSet];
+
+      // Map existing users by email
+      const emailToUserId = new Map<string, string>();
+      if (allEmails.length) {
+        const existingUsers = await qr.query(
+          `SELECT id, email FROM users WHERE email = ANY($1)`, [allEmails],
+        );
+        for (const u of existingUsers) emailToUserId.set(u.email, u.id);
+      }
+
+      // Create missing users — use member data if available, else minimal record
       const hashedPassword = await bcrypt.hash(DEFAULT_PASSWORD, 10);
-      for (const u of data.users) {
-        if (!emailToUserId.has(u.email)) {
+      const memberMap = new Map(data.users.map((u) => [u.email, u]));
+      for (const email of allEmails) {
+        if (!emailToUserId.has(email)) {
           const id = ulid();
+          const member = memberMap.get(email);
           await qr.query(`
             INSERT INTO users (id, email, password, "firstName", "lastName", "isActive", "isSystemAdmin", "isEmailVerified")
             VALUES ($1, $2, $3, $4, $5, true, false, true)
-          `, [id, u.email, hashedPassword, u.firstName, u.lastName]);
-          emailToUserId.set(u.email, id);
+          `, [id, email, hashedPassword, member?.firstName ?? email.split('@')[0], member?.lastName ?? '']);
+          emailToUserId.set(email, id);
           result.usersCreated++;
         }
       }
