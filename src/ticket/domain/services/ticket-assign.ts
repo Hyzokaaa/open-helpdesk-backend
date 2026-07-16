@@ -1,5 +1,6 @@
 import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { Ticket } from '../entities/ticket';
+import { TicketStatus } from '../enums/ticket-status.enum';
 import { TicketRepository } from '../repositories/ticket.repository';
 
 interface AssignTicketProps {
@@ -17,6 +18,10 @@ export class AssignTicket {
     }
 
     ticket.assigneeId = props.assigneeId;
+
+    if (props.assigneeId && ticket.status === TicketStatus.OPEN) {
+      ticket.status = TicketStatus.PENDING;
+    }
 
     await this.repository.update(ticket);
     return ticket;

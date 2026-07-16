@@ -3,6 +3,8 @@ export enum AuditAction {
   TICKET_UPDATED = 'ticket-updated',
   TICKET_STATUS_CHANGED = 'ticket-status-changed',
   TICKET_ASSIGNED = 'ticket-assigned',
+  TICKET_PICKED_UP = 'ticket-picked-up',
+  TICKET_TRANSFERRED = 'ticket-transferred',
   TICKET_DELETED = 'ticket-deleted',
   COMMENT_CREATED = 'comment-created',
   WORKSPACE_CREATED = 'workspace-created',
