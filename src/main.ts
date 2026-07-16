@@ -11,7 +11,7 @@ async function bootstrap() {
 
   // Register global JSON parser explicitly before the route-scoped one
   // (NestJS skips its default parser if it detects any 'jsonParser' middleware)
-  (app as any).useBodyParser("json");
+  (app as any).useBodyParser("json", { limit: "50mb" });
   app.use("/inbound/email", json({ limit: "25mb" }));
 
   app.useGlobalPipes(
