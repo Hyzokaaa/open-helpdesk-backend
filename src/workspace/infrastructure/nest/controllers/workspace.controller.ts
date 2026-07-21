@@ -52,6 +52,8 @@ import { SortDto } from '../../../../shared/nest/dto/sort.dto';
 import { ConfigService } from '@nestjs/config';
 import { ExportWorkspace } from '../../../domain/services/workspace-export';
 import { ImportWorkspace } from '../../../domain/services/workspace-import';
+import { createExportToken, validateExportToken } from '../../../domain/services/workspace-export-token';
+import { Public } from '../../../../shared/nest/decorators/public.decorator';
 
 @Controller('workspaces')
 export class WorkspaceController {
@@ -317,6 +319,50 @@ export class WorkspaceController {
 
     const service = new ImportWorkspace(this.dataSource);
     return service.execute(workspaceId, data);
+  }
+
+  @Post(':slug/export/token')
+  async createExportTokenEndpoint(
+    @Param('slug') slug: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+    const { token, expiresAt } = createExportToken(workspaceId);
+    const baseUrl = process.env.API_URL || process.env.BACKEND_URL || '';
+    return {
+      url: `${baseUrl}/workspaces/${slug}/export/${token}`,
+      expiresAt,
+    };
+  }
+
+  @Public()
+  @Get(':slug/export/:token')
+  async exportByToken(
+    @Param('slug') slug: string,
+    @Param('token') token: string,
+    @Res() res: Response,
+  ) {
+    const workspaceId = validateExportToken(token);
+    if (!workspaceId) {
+      res.status(401).json({ message: 'Invalid or expired export token' });
+      return;
+    }
+    const workspace = await this.workspaceRepository.findBySlug(slug);
+    if (!workspace || workspace.getId() !== workspaceId) {
+      res.status(404).json({ message: 'Workspace not found' });
+      return;
+    }
+    const service = new ExportWorkspace(this.dataSource);
+    const data = await service.execute(workspaceId);
+    res.setHeader('Content-Type', 'application/json');
+    res.send(JSON.stringify(data));
   }
 
   private async resolveWorkspaceId(slug: string): Promise<string> {
