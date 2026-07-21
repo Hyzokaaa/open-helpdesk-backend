@@ -95,26 +95,50 @@ export class ImportWorkspace {
         }
       }
 
-      // 3. Tags — map old ID → new ID
+      // 3. Tags — map old ID → new ID, reuse existing by name
       const tagIdMap = new Map<string, string>();
+      const existingTags = await qr.query(
+        `SELECT id, name FROM tags WHERE "workspaceId" = $1`, [targetWorkspaceId],
+      );
+      const existingTagsByName = new Map<string, string>();
+      for (const t of existingTags) existingTagsByName.set(t.name, t.id);
+
       for (const tag of data.tags) {
-        const newId = ulid();
-        await qr.query(`
-          INSERT INTO tags (id, name, color, "workspaceId", "createdAt")
-          VALUES ($1, $2, $3, $4, $5)
-        `, [newId, tag.name, tag.color, targetWorkspaceId, tag.createdAt]);
-        tagIdMap.set(tag.id, newId);
-        result.tagsImported++;
+        const existingId = existingTagsByName.get(tag.name);
+        if (existingId) {
+          tagIdMap.set(tag.id, existingId);
+        } else {
+          const newId = ulid();
+          await qr.query(`
+            INSERT INTO tags (id, name, color, "workspaceId", "createdAt")
+            VALUES ($1, $2, $3, $4, $5)
+          `, [newId, tag.name, tag.color, targetWorkspaceId, tag.createdAt]);
+          tagIdMap.set(tag.id, newId);
+          existingTagsByName.set(tag.name, newId);
+          result.tagsImported++;
+        }
       }
 
-      // 4. Tickets — map old ID → new ID, find max ticketNumber
+      // 4. Tickets — map old ID → new ID, skip duplicates
       const ticketIdMap = new Map<string, string>();
       const maxNumResult = await qr.query(
         `SELECT COALESCE(MAX("ticketNumber"), 0) as max FROM tickets WHERE "workspaceId" = $1`, [targetWorkspaceId],
       );
       let ticketNumber = Number(maxNumResult[0].max);
 
+      // Build set of existing tickets to detect duplicates
+      const existingTickets = await qr.query(
+        `SELECT name, "creatorId", "createdAt" FROM tickets WHERE "workspaceId" = $1 AND "deletedAt" IS NULL`, [targetWorkspaceId],
+      );
+      const existingTicketKeys = new Set(
+        existingTickets.map((t: any) => `${t.name}|${t.creatorId}|${new Date(t.createdAt).toISOString().slice(0, 19)}`),
+      );
+
       for (const t of data.tickets) {
+        const creatorId = userIdFor(t.creatorEmail);
+        const ticketKey = `${t.name}|${creatorId}|${t.createdAt ? new Date(t.createdAt).toISOString().slice(0, 19) : ''}`;
+        if (existingTicketKeys.has(ticketKey)) continue;
+
         const newId = ulid();
         ticketNumber++;
         await qr.query(`
