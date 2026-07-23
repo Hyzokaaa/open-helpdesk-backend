@@ -3,4 +3,5 @@ export enum NotificationType {
   TICKET_ASSIGNED = 'ticket-assigned',
   STATUS_CHANGED = 'status-changed',
   COMMENT_CREATED = 'comment-created',
+  TRANSFER_REQUEST = 'transfer-request',
 }

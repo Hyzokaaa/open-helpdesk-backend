@@ -8,6 +8,7 @@ import { TicketAssignedHandler } from './handlers/ticket-assigned.handler';
 import { NewCommentHandler } from './handlers/new-comment.handler';
 import { StatusChangedHandler } from './handlers/status-changed.handler';
 import { CsatSurveyHandler } from './handlers/csat-survey.handler';
+import { TransferRequestHandler } from './handlers/transfer-request.handler';
 import { UserModule } from '../user/user.module';
 import { WorkspaceModule } from '../workspace/workspace.module';
 import { NotificationModule } from '../notification/notification.module';
@@ -41,6 +42,7 @@ import { AdminEmailController } from './infrastructure/nest/controllers/admin-em
     NewCommentHandler,
     StatusChangedHandler,
     CsatSurveyHandler,
+    TransferRequestHandler,
   ],
   exports: [EMAIL_SERVICE],
 })

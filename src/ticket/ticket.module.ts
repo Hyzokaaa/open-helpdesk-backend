@@ -8,18 +8,21 @@ import { CustomFieldModule } from '../custom-field/custom-field.module';
 import { AttachmentModule } from '../attachment/attachment.module';
 import { TicketModel } from './infrastructure/typeorm/models/ticket.model';
 import { TicketParticipantModel } from './infrastructure/typeorm/models/ticket-participant.model';
+import { TransferRequestModel } from './infrastructure/typeorm/models/transfer-request.model';
 import { CommentModel } from '../comment/infrastructure/typeorm/models/comment.model';
 import { TypeOrmTicketRepository } from './infrastructure/typeorm/repositories/typeorm-ticket.repository';
 import { TypeOrmTicketParticipantRepository } from './infrastructure/typeorm/repositories/typeorm-ticket-participant.repository';
+import { TypeOrmTransferRequestRepository } from './infrastructure/typeorm/repositories/typeorm-transfer-request.repository';
 import { TypeOrmCommentRepository } from '../comment/infrastructure/typeorm/repositories/typeorm-comment.repository';
 import { TicketController } from './infrastructure/nest/controllers/ticket.controller';
 import { PortalController } from './infrastructure/nest/controllers/portal.controller';
 import { SlaBreachCheckerService } from './infrastructure/nest/services/sla-breach-checker.service';
+import { TransferRequestExpiryService } from './infrastructure/nest/services/transfer-request-expiry.service';
 
 @Module({
-  imports: [SharedModule, UserModule, WorkspaceModule, AuditLogModule, CustomFieldModule, AttachmentModule, TypeOrmModule.forFeature([TicketModel, TicketParticipantModel, CommentModel])],
+  imports: [SharedModule, UserModule, WorkspaceModule, AuditLogModule, CustomFieldModule, AttachmentModule, TypeOrmModule.forFeature([TicketModel, TicketParticipantModel, TransferRequestModel, CommentModel])],
   controllers: [TicketController, PortalController],
-  providers: [TypeOrmTicketRepository, TypeOrmTicketParticipantRepository, TypeOrmCommentRepository, SlaBreachCheckerService],
-  exports: [TypeOrmTicketRepository, TypeOrmTicketParticipantRepository],
+  providers: [TypeOrmTicketRepository, TypeOrmTicketParticipantRepository, TypeOrmTransferRequestRepository, TypeOrmCommentRepository, SlaBreachCheckerService, TransferRequestExpiryService],
+  exports: [TypeOrmTicketRepository, TypeOrmTicketParticipantRepository, TypeOrmTransferRequestRepository],
 })
 export class TicketModule {}

@@ -21,7 +21,12 @@ import { UpdateTicket } from '../../../domain/services/ticket-update';
 import { ChangeTicketStatus } from '../../../domain/services/ticket-change-status';
 import { AssignTicket } from '../../../domain/services/ticket-assign';
 import { PickupTicket } from '../../../domain/services/ticket-pickup';
-import { TransferTicket } from '../../../domain/services/ticket-transfer';
+import { CreateTransferRequest } from '../../../domain/services/transfer-request-create';
+import { AcceptTransferRequest } from '../../../domain/services/transfer-request-accept';
+import { RejectTransferRequest } from '../../../domain/services/transfer-request-reject';
+import { CancelTransferRequest } from '../../../domain/services/transfer-request-cancel';
+import { TypeOrmTransferRequestRepository } from '../../typeorm/repositories/typeorm-transfer-request.repository';
+import { TransferRequestCreatedEvent, TransferRequestResolvedEvent } from '../../../../email/domain/events';
 import { DeleteTicket } from '../../../domain/services/ticket-delete';
 import { CreateTicketCommand } from '../../../application/commands/create-ticket.command';
 import { UpdateTicketCommand } from '../../../application/commands/update-ticket.command';
@@ -68,6 +73,7 @@ export class TicketController {
     @Inject() private readonly customFieldDefinitionRepository: TypeOrmCustomFieldDefinitionRepository,
     @Inject() private readonly attachmentRepository: TypeOrmAttachmentRepository,
     @Inject() private readonly participantRepository: TypeOrmTicketParticipantRepository,
+    @Inject() private readonly transferRequestRepository: TypeOrmTransferRequestRepository,
   ) {}
 
   @Post()
@@ -326,24 +332,209 @@ export class TicketController {
       permission: PERMISSIONS.TICKET_TRANSFER,
       isSystemAdmin: user.isSystemAdmin,
     });
-    const service = new TransferTicket(this.ticketRepository);
-    const ticket = await service.execute({ ticketId: id, fromUserId: user.userId, toUserId: body.assigneeId });
-    const toUser = await this.userRepository.findById(body.assigneeId);
+
+    const service = new CreateTransferRequest(this.idGenerator, this.ticketRepository, this.transferRequestRepository);
+    const request = await service.execute({ ticketId: id, requesterId: user.userId, targetUserId: body.assigneeId });
+
+    const ticket = await this.ticketRepository.findById(id);
     const fromUser = await this.userRepository.findById(user.userId);
+    const toUser = await this.userRepository.findById(body.assigneeId);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({
-      action: AuditAction.TICKET_TRANSFERRED,
+      action: AuditAction.TRANSFER_REQUEST_CREATED,
       entityType: 'ticket',
       entityId: id,
       userId: user.userId,
       workspaceId: workspace.getId(),
       metadata: {
-        ticketName: ticket.name,
+        ticketName: ticket?.name,
+        requestId: request.getId(),
         from: fromUser ? `${fromUser.firstName} ${fromUser.lastName}` : user.userId,
         to: toUser ? `${toUser.firstName} ${toUser.lastName}` : body.assigneeId,
       },
     });
-    return { id: ticket.getId(), assigneeId: ticket.assigneeId };
+
+    const event: TransferRequestCreatedEvent = {
+      requestId: request.getId(),
+      ticketId: id,
+      ticketName: ticket?.name ?? '',
+      requesterId: user.userId,
+      requesterName: fromUser ? `${fromUser.firstName} ${fromUser.lastName}` : user.userId,
+      targetUserId: body.assigneeId,
+      workspaceId: workspace.getId(),
+      workspaceName: workspace.name,
+      workspaceSlug: workspace.slug,
+      expiresAt: request.expiresAt,
+    };
+    this.eventPublisher.emit('transfer-request.created', event);
+
+    // Add target as follower so they can access the ticket
+    const addParticipant = new AddTicketParticipant(this.idGenerator, this.participantRepository);
+    await addParticipant.execute({ ticketId: id, userId: body.assigneeId, role: ParticipantRole.FOLLOWER }).catch(() => {});
+
+    return { id, transferRequestId: request.getId(), status: 'pending', expiresAt: request.expiresAt };
+  }
+
+  @Get(':id/transfer-requests/pending')
+  async getPendingTransfer(
+    @Param('slug') slug: string,
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspace = await this.resolveWorkspace(slug);
+    const ticket = await this.ticketRepository.findById(id);
+    if (!ticket || ticket.workspaceId !== workspace.getId()) throw new EntityNotFoundError('Ticket not found');
+
+    const request = await this.transferRequestRepository.findPendingByTicketId(id);
+    if (!request) return null;
+
+    const requester = await this.userRepository.findById(request.requesterId);
+    const target = await this.userRepository.findById(request.targetUserId);
+    return {
+      id: request.getId(),
+      requesterId: request.requesterId,
+      requesterName: requester ? `${requester.firstName} ${requester.lastName}` : request.requesterId,
+      targetUserId: request.targetUserId,
+      targetName: target ? `${target.firstName} ${target.lastName}` : request.targetUserId,
+      expiresAt: request.expiresAt,
+    };
+  }
+
+  @Post(':id/transfer-requests/:requestId/accept')
+  async acceptTransfer(
+    @Param('slug') slug: string,
+    @Param('id') id: string,
+    @Param('requestId') requestId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspace = await this.resolveWorkspace(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId: workspace.getId(),
+      userId: user.userId,
+      permission: PERMISSIONS.TRANSFER_REQUEST_RESPOND,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+
+    const service = new AcceptTransferRequest(this.transferRequestRepository, this.ticketRepository);
+    const { request, ticket } = await service.execute({ requestId, userId: user.userId });
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.TRANSFER_REQUEST_ACCEPTED,
+      entityType: 'ticket',
+      entityId: id,
+      userId: user.userId,
+      workspaceId: workspace.getId(),
+      metadata: { ticketName: ticket.name, requestId },
+    });
+
+    const event: TransferRequestResolvedEvent = {
+      requestId,
+      ticketId: id,
+      ticketName: ticket.name,
+      requesterId: request.requesterId,
+      targetUserId: request.targetUserId,
+      resolution: 'accepted',
+      workspaceId: workspace.getId(),
+      workspaceName: workspace.name,
+      workspaceSlug: workspace.slug,
+    };
+    this.eventPublisher.emit('transfer-request.resolved', event);
+
+    return { id: ticket.getId(), assigneeId: ticket.assigneeId, status: 'accepted' };
+  }
+
+  @Post(':id/transfer-requests/:requestId/reject')
+  async rejectTransfer(
+    @Param('slug') slug: string,
+    @Param('id') id: string,
+    @Param('requestId') requestId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspace = await this.resolveWorkspace(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId: workspace.getId(),
+      userId: user.userId,
+      permission: PERMISSIONS.TRANSFER_REQUEST_RESPOND,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+
+    const service = new RejectTransferRequest(this.transferRequestRepository);
+    const request = await service.execute({ requestId, userId: user.userId });
+
+    const ticket = await this.ticketRepository.findById(id);
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.TRANSFER_REQUEST_REJECTED,
+      entityType: 'ticket',
+      entityId: id,
+      userId: user.userId,
+      workspaceId: workspace.getId(),
+      metadata: { ticketName: ticket?.name, requestId },
+    });
+
+    const event: TransferRequestResolvedEvent = {
+      requestId,
+      ticketId: id,
+      ticketName: ticket?.name ?? '',
+      requesterId: request.requesterId,
+      targetUserId: request.targetUserId,
+      resolution: 'rejected',
+      workspaceId: workspace.getId(),
+      workspaceName: workspace.name,
+      workspaceSlug: workspace.slug,
+    };
+    this.eventPublisher.emit('transfer-request.resolved', event);
+
+    return { id, status: 'rejected' };
+  }
+
+  @Post(':id/transfer-requests/:requestId/cancel')
+  async cancelTransfer(
+    @Param('slug') slug: string,
+    @Param('id') id: string,
+    @Param('requestId') requestId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspace = await this.resolveWorkspace(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId: workspace.getId(),
+      userId: user.userId,
+      permission: PERMISSIONS.TICKET_TRANSFER,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+
+    const service = new CancelTransferRequest(this.transferRequestRepository);
+    const request = await service.execute({ requestId, userId: user.userId });
+
+    const ticket = await this.ticketRepository.findById(id);
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.TRANSFER_REQUEST_CANCELLED,
+      entityType: 'ticket',
+      entityId: id,
+      userId: user.userId,
+      workspaceId: workspace.getId(),
+      metadata: { ticketName: ticket?.name, requestId },
+    });
+
+    const event: TransferRequestResolvedEvent = {
+      requestId,
+      ticketId: id,
+      ticketName: ticket?.name ?? '',
+      requesterId: request.requesterId,
+      targetUserId: request.targetUserId,
+      resolution: 'cancelled',
+      workspaceId: workspace.getId(),
+      workspaceName: workspace.name,
+      workspaceSlug: workspace.slug,
+    };
+    this.eventPublisher.emit('transfer-request.resolved', event);
+
+    return { id, status: 'cancelled' };
   }
 
   @Get(':id/participants')

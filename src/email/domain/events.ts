@@ -45,3 +45,28 @@ export interface StatusChangedEvent {
   workspaceName: string;
   workspaceSlug: string;
 }
+
+export interface TransferRequestCreatedEvent {
+  requestId: string;
+  ticketId: string;
+  ticketName: string;
+  requesterId: string;
+  requesterName: string;
+  targetUserId: string;
+  workspaceId: string;
+  workspaceName: string;
+  workspaceSlug: string;
+  expiresAt: Date;
+}
+
+export interface TransferRequestResolvedEvent {
+  requestId: string;
+  ticketId: string;
+  ticketName: string;
+  requesterId: string;
+  targetUserId: string;
+  resolution: 'accepted' | 'rejected' | 'cancelled';
+  workspaceId: string;
+  workspaceName: string;
+  workspaceSlug: string;
+}

@@ -218,6 +218,56 @@ const translations: Translations = {
     es: 'También recibirás actualizaciones por correo cuando haya nuevas respuestas.',
   },
 
+  // Transfer request
+  'transferRequest.subject': {
+    en: 'Transfer request',
+    es: 'Solicitud de transferencia',
+  },
+  'transferRequest.title': {
+    en: 'Transfer Request',
+    es: 'Solicitud de Transferencia',
+  },
+  'transferRequest.body': {
+    en: '{requesterName} wants to transfer a ticket to you in {workspaceName}.',
+    es: '{requesterName} quiere transferirte un ticket en {workspaceName}.',
+  },
+  'transferResolved.subject.accepted': {
+    en: 'Transfer accepted',
+    es: 'Transferencia aceptada',
+  },
+  'transferResolved.title.accepted': {
+    en: 'Transfer Accepted',
+    es: 'Transferencia Aceptada',
+  },
+  'transferResolved.body.accepted': {
+    en: 'Your transfer request for {ticketName} in {workspaceName} has been accepted.',
+    es: 'Tu solicitud de transferencia de {ticketName} en {workspaceName} ha sido aceptada.',
+  },
+  'transferResolved.subject.rejected': {
+    en: 'Transfer rejected',
+    es: 'Transferencia rechazada',
+  },
+  'transferResolved.title.rejected': {
+    en: 'Transfer Rejected',
+    es: 'Transferencia Rechazada',
+  },
+  'transferResolved.body.rejected': {
+    en: 'Your transfer request for {ticketName} in {workspaceName} has been rejected.',
+    es: 'Tu solicitud de transferencia de {ticketName} en {workspaceName} ha sido rechazada.',
+  },
+  'transferResolved.subject.cancelled': {
+    en: 'Transfer cancelled',
+    es: 'Transferencia cancelada',
+  },
+  'transferResolved.title.cancelled': {
+    en: 'Transfer Cancelled',
+    es: 'Transferencia Cancelada',
+  },
+  'transferResolved.body.cancelled': {
+    en: 'The transfer request for {ticketName} in {workspaceName} has been cancelled.',
+    es: 'La solicitud de transferencia de {ticketName} en {workspaceName} ha sido cancelada.',
+  },
+
   // Priorities
   'priority.low': { en: 'Low', es: 'Baja' },
   'priority.medium': { en: 'Medium', es: 'Media' },
