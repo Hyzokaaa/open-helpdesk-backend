@@ -6,6 +6,7 @@ interface Props {
   ticketId: string;
   authorId: string;
   mentionedUserIds?: string[];
+  createdAt?: Date | null;
 }
 
 export class Comment {
@@ -14,6 +15,7 @@ export class Comment {
   ticketId: string;
   authorId: string;
   mentionedUserIds: string[];
+  createdAt: Date | null;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -21,6 +23,7 @@ export class Comment {
     this.ticketId = props.ticketId;
     this.authorId = props.authorId;
     this.mentionedUserIds = props.mentionedUserIds ?? [];
+    this.createdAt = props.createdAt ?? null;
   }
 
   getId(): string {

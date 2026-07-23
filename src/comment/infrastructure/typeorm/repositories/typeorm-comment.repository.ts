@@ -63,6 +63,7 @@ export class TypeOrmCommentRepository implements CommentRepository {
       ticketId: model.ticketId,
       authorId: model.authorId,
       mentionedUserIds: model.mentionedUserIds?.filter(Boolean) ?? [],
+      createdAt: model.createdAt,
     });
   }
 
