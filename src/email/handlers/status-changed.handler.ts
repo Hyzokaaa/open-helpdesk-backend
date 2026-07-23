@@ -5,13 +5,14 @@ import { EmailService } from '../domain/email.service';
 import { EMAIL_SERVICE } from '../email.constants';
 import { StatusChangedTemplate } from '../templates/status-changed.template';
 import { StatusChangedEvent } from '../domain/events';
-import { TypeOrmWorkspaceMemberRepository } from '../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
 import { TypeOrmUserRepository } from '../../user/infrastructure/typeorm/repositories/typeorm-user.repository';
 import { TypeOrmNotificationRepository } from '../../notification/infrastructure/typeorm/repositories/typeorm-notification.repository';
 import { TypeOrmNotificationPreferenceRepository } from '../../notification/infrastructure/typeorm/repositories/typeorm-notification-preference.repository';
 import { UlidGenerator } from '../../shared/infrastructure/ulid-generator';
 import { TypeOrmMailboxRepository } from '../../mailbox/infrastructure/typeorm/repositories/typeorm-mailbox.repository';
-import { ResolveNotificationRecipients } from '../../notification/domain/services/notification-resolve-recipients';
+import { TypeOrmTicketRepository } from '../../ticket/infrastructure/typeorm/repositories/typeorm-ticket.repository';
+import { TypeOrmTicketParticipantRepository } from '../../ticket/infrastructure/typeorm/repositories/typeorm-ticket-participant.repository';
+import { ResolveTicketStakeholders } from '../../notification/domain/services/notification-resolve-ticket-stakeholders';
 import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
 
@@ -23,12 +24,13 @@ export class StatusChangedHandler {
 
   constructor(
     @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
-    private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
     private readonly userRepository: TypeOrmUserRepository,
     private readonly notificationRepository: TypeOrmNotificationRepository,
     private readonly preferenceRepository: TypeOrmNotificationPreferenceRepository,
     private readonly idGenerator: UlidGenerator,
     private readonly mailboxRepository: TypeOrmMailboxRepository,
+    private readonly ticketRepository: TypeOrmTicketRepository,
+    private readonly participantRepository: TypeOrmTicketParticipantRepository,
     private readonly config: ConfigService,
   ) {
     this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
@@ -37,9 +39,9 @@ export class StatusChangedHandler {
 
   @OnEvent('ticket.statusChanged')
   async handle(event: StatusChangedEvent): Promise<void> {
-    const resolveRecipients = new ResolveNotificationRecipients(this.memberRepository, this.userRepository);
-    const users = await resolveRecipients.execute({
-      workspaceId: event.workspaceId,
+    const resolveStakeholders = new ResolveTicketStakeholders(this.ticketRepository, this.participantRepository, this.userRepository);
+    const users = await resolveStakeholders.execute({
+      ticketId: event.ticketId,
       excludeUserId: event.changedById,
     });
     if (users.length === 0) return;

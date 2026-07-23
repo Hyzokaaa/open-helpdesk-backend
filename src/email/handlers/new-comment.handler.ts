@@ -10,6 +10,9 @@ import { TypeOrmNotificationRepository } from '../../notification/infrastructure
 import { TypeOrmNotificationPreferenceRepository } from '../../notification/infrastructure/typeorm/repositories/typeorm-notification-preference.repository';
 import { UlidGenerator } from '../../shared/infrastructure/ulid-generator';
 import { TypeOrmMailboxRepository } from '../../mailbox/infrastructure/typeorm/repositories/typeorm-mailbox.repository';
+import { TypeOrmTicketRepository } from '../../ticket/infrastructure/typeorm/repositories/typeorm-ticket.repository';
+import { TypeOrmTicketParticipantRepository } from '../../ticket/infrastructure/typeorm/repositories/typeorm-ticket-participant.repository';
+import { ResolveTicketStakeholders } from '../../notification/domain/services/notification-resolve-ticket-stakeholders';
 import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
 
@@ -26,6 +29,8 @@ export class NewCommentHandler {
     private readonly preferenceRepository: TypeOrmNotificationPreferenceRepository,
     private readonly idGenerator: UlidGenerator,
     private readonly mailboxRepository: TypeOrmMailboxRepository,
+    private readonly ticketRepository: TypeOrmTicketRepository,
+    private readonly participantRepository: TypeOrmTicketParticipantRepository,
     private readonly config: ConfigService,
   ) {
     this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
@@ -34,16 +39,18 @@ export class NewCommentHandler {
 
   @OnEvent('comment.created')
   async handle(event: NewCommentEvent): Promise<void> {
-    const recipientIds = new Set<string>();
-    if (event.assigneeId && event.assigneeId !== event.authorId) {
-      recipientIds.add(event.assigneeId);
-    }
-    for (const userId of event.mentionedUserIds) {
-      if (userId !== event.authorId) recipientIds.add(userId);
-    }
-    if (recipientIds.size === 0) return;
+    const resolveStakeholders = new ResolveTicketStakeholders(this.ticketRepository, this.participantRepository, this.userRepository);
+    const stakeholders = await resolveStakeholders.execute({
+      ticketId: event.ticketId,
+      excludeUserId: event.authorId,
+    });
 
-    const users = await this.userRepository.findByIds([...recipientIds]);
+    // Add mentioned users who may not be stakeholders yet
+    const stakeholderIds = new Set(stakeholders.map((u) => u.getId()));
+    const extraMentionIds = event.mentionedUserIds.filter((id) => id !== event.authorId && !stakeholderIds.has(id));
+    const extraMentioned = extraMentionIds.length > 0 ? await this.userRepository.findByIds(extraMentionIds) : [];
+    const users = [...stakeholders, ...extraMentioned];
+
     if (users.length === 0) return;
 
     const cleanContent = event.commentContent.replace(/@\[([^\]]+)\]\([^)]+\)/g, '@$1');

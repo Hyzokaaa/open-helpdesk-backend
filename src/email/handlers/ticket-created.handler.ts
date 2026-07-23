@@ -6,13 +6,14 @@ import { EMAIL_SERVICE } from '../email.constants';
 import { TicketCreatedTemplate } from '../templates/ticket-created.template';
 import { TicketConfirmationTemplate } from '../templates/ticket-confirmation.template';
 import { TicketCreatedEvent } from '../domain/events';
-import { TypeOrmWorkspaceMemberRepository } from '../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
 import { TypeOrmUserRepository } from '../../user/infrastructure/typeorm/repositories/typeorm-user.repository';
 import { TypeOrmNotificationRepository } from '../../notification/infrastructure/typeorm/repositories/typeorm-notification.repository';
 import { TypeOrmNotificationPreferenceRepository } from '../../notification/infrastructure/typeorm/repositories/typeorm-notification-preference.repository';
 import { UlidGenerator } from '../../shared/infrastructure/ulid-generator';
 import { TypeOrmMailboxRepository } from '../../mailbox/infrastructure/typeorm/repositories/typeorm-mailbox.repository';
-import { ResolveNotificationRecipients } from '../../notification/domain/services/notification-resolve-recipients';
+import { TypeOrmTicketRepository } from '../../ticket/infrastructure/typeorm/repositories/typeorm-ticket.repository';
+import { TypeOrmTicketParticipantRepository } from '../../ticket/infrastructure/typeorm/repositories/typeorm-ticket-participant.repository';
+import { ResolveTicketStakeholders } from '../../notification/domain/services/notification-resolve-ticket-stakeholders';
 import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
 
@@ -24,12 +25,13 @@ export class TicketCreatedHandler {
 
   constructor(
     @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
-    private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
     private readonly userRepository: TypeOrmUserRepository,
     private readonly notificationRepository: TypeOrmNotificationRepository,
     private readonly preferenceRepository: TypeOrmNotificationPreferenceRepository,
     private readonly idGenerator: UlidGenerator,
     private readonly mailboxRepository: TypeOrmMailboxRepository,
+    private readonly ticketRepository: TypeOrmTicketRepository,
+    private readonly participantRepository: TypeOrmTicketParticipantRepository,
     private readonly config: ConfigService,
   ) {
     this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
@@ -38,14 +40,14 @@ export class TicketCreatedHandler {
 
   @OnEvent('ticket.created')
   async handle(event: TicketCreatedEvent): Promise<void> {
-    await this.notifyAgents(event);
+    await this.notifyStakeholders(event);
     await this.sendCreatorConfirmation(event);
   }
 
-  private async notifyAgents(event: TicketCreatedEvent): Promise<void> {
-    const resolveRecipients = new ResolveNotificationRecipients(this.memberRepository, this.userRepository);
-    const users = await resolveRecipients.execute({
-      workspaceId: event.workspaceId,
+  private async notifyStakeholders(event: TicketCreatedEvent): Promise<void> {
+    const resolveStakeholders = new ResolveTicketStakeholders(this.ticketRepository, this.participantRepository, this.userRepository);
+    const users = await resolveStakeholders.execute({
+      ticketId: event.ticketId,
       excludeUserId: event.creatorId,
     });
     if (users.length === 0) return;
