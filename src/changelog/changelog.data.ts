@@ -16,6 +16,61 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.13.0',
+    date: '2026-07-23',
+    categories: [
+      {
+        title: { en: 'AI Writing Assistant', es: 'Asistente de Escritura IA' },
+        features: [
+          { en: 'Improve ticket descriptions with AI — rewrite for clarity in one click', es: 'Mejora descripciones de tickets con IA — reescribe con claridad en un click' },
+          { en: 'Translate ticket descriptions between English and Spanish automatically', es: 'Traduce descripciones de tickets entre inglés y español automáticamente' },
+          { en: 'AI remembers previous results — no need to reprocess the same description twice', es: 'La IA recuerda resultados anteriores — no necesitas reprocesar la misma descripción dos veces' },
+        ],
+      },
+      {
+        title: { en: 'Ticket Followers & Collaborators', es: 'Seguidores y Colaboradores de Tickets' },
+        features: [
+          { en: 'Follow tickets to stay updated — followers receive notifications on changes', es: 'Sigue tickets para mantenerte al día — los seguidores reciben notificaciones de cambios' },
+          { en: '@mentioning someone in a comment automatically adds them as a follower', es: 'Mencionar a alguien con @ en un comentario lo agrega automáticamente como seguidor' },
+          { en: 'Followers get read-only access to the ticket — see everything, no accidental edits', es: 'Los seguidores tienen acceso de solo lectura al ticket — ven todo sin ediciones accidentales' },
+        ],
+      },
+      {
+        title: { en: 'Ticket Pickup & Transfer', es: 'Tomar y Transferir Tickets' },
+        features: [
+          { en: 'Pick up open tickets from the shared pool — assigns the ticket to you instantly', es: 'Toma tickets abiertos del pool compartido — se te asigna el ticket al instante' },
+          { en: 'Transfer tickets to another agent — the recipient must accept before the transfer completes', es: 'Transfiere tickets a otro agente — el destinatario debe aceptar antes de que se complete' },
+          { en: 'Accept or reject transfer requests directly from the ticket detail view', es: 'Acepta o rechaza solicitudes de transferencia directamente desde la vista de detalle del ticket' },
+          { en: 'Transfer requests expire automatically after 48 hours if not responded', es: 'Las solicitudes de transferencia expiran automáticamente después de 48 horas si no se responden' },
+        ],
+      },
+      {
+        title: { en: 'Smarter Notifications', es: 'Notificaciones Inteligentes' },
+        features: [
+          { en: 'Notifications now reach only people involved in the ticket — no more noise for the whole team', es: 'Las notificaciones ahora llegan solo a los involucrados en el ticket — sin más ruido para todo el equipo' },
+          { en: 'Click any notification to jump directly to the ticket', es: 'Haz click en cualquier notificación para ir directamente al ticket' },
+          { en: 'Notification type labels — instantly see if it\'s a new ticket, comment, status change, or transfer', es: 'Etiquetas de tipo en notificaciones — ve al instante si es un ticket nuevo, comentario, cambio de estado o transferencia' },
+        ],
+      },
+      {
+        title: { en: 'Data Migration', es: 'Migración de Datos' },
+        features: [
+          { en: 'Export all your workspace data — tickets, comments, tags, members, and more', es: 'Exporta todos los datos de tu workspace — tickets, comentarios, etiquetas, miembros y más' },
+          { en: 'Import data from another workspace — upload an export file or paste a link', es: 'Importa datos desde otro workspace — sube un archivo de exportación o pega un enlace' },
+          { en: 'Generate a shareable export link — valid for 24 hours, single use', es: 'Genera un enlace de exportación compartible — válido por 24 horas, un solo uso' },
+          { en: 'Safe to re-import — duplicate tickets and tags are detected and skipped', es: 'Seguro para reimportar — los tickets y etiquetas duplicados se detectan y se omiten' },
+        ],
+      },
+      {
+        title: { en: 'Improvements', es: 'Mejoras' },
+        features: [
+          { en: 'All dropdown selectors now support type-to-search when there are more than 5 options', es: 'Todos los selectores desplegables ahora permiten buscar escribiendo cuando hay más de 5 opciones' },
+          { en: 'Comment timestamps — see the date and time of each comment', es: 'Fecha y hora en comentarios — ve cuándo se publicó cada comentario' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.12.0',
     date: '2026-07-07',
     categories: [
