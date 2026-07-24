@@ -54,6 +54,9 @@ import { ExportWorkspace } from '../../../domain/services/workspace-export';
 import { ImportWorkspace } from '../../../domain/services/workspace-import';
 import { createExportToken, validateExportToken } from '../../../domain/services/workspace-export-token';
 import { Public } from '../../../../shared/nest/decorators/public.decorator';
+import { TypeOrmWorkspaceEmailSenderRepository } from '../../typeorm/repositories/typeorm-workspace-email-sender.repository';
+import { WorkspaceEmailSender } from '../../../domain/entities/workspace-email-sender';
+import * as nodemailer from 'nodemailer';
 
 @Controller('workspaces')
 export class WorkspaceController {
@@ -66,6 +69,7 @@ export class WorkspaceController {
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
     @Inject() private readonly mailboxRepository: TypeOrmMailboxRepository,
     @Inject() private readonly config: ConfigService,
+    @Inject() private readonly emailSenderRepository: TypeOrmWorkspaceEmailSenderRepository,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -363,6 +367,116 @@ export class WorkspaceController {
     const data = await service.execute(workspaceId);
     res.setHeader('Content-Type', 'application/json');
     res.send(JSON.stringify(data));
+  }
+
+  @Get(':slug/email-sender')
+  async getEmailSender(
+    @Param('slug') slug: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId, userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+    const sender = await this.emailSenderRepository.findByWorkspaceId(workspaceId);
+    if (!sender) return null;
+    return {
+      id: sender.getId(),
+      smtpHost: sender.smtpHost,
+      smtpPort: sender.smtpPort,
+      smtpUser: sender.smtpUser,
+      hasPassword: true,
+      smtpFrom: sender.smtpFrom,
+    };
+  }
+
+  @Post(':slug/email-sender')
+  async createEmailSender(
+    @Param('slug') slug: string,
+    @Body() body: { smtpHost: string; smtpPort: number; smtpUser: string; smtpPass: string; smtpFrom: string },
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId, userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+
+    const existing = await this.emailSenderRepository.findByWorkspaceId(workspaceId);
+    if (existing) {
+      existing.smtpHost = body.smtpHost;
+      existing.smtpPort = body.smtpPort;
+      existing.smtpUser = body.smtpUser;
+      if (body.smtpPass) existing.smtpPass = body.smtpPass;
+      existing.smtpFrom = body.smtpFrom;
+      await this.emailSenderRepository.update(existing);
+      return { id: existing.getId() };
+    }
+
+    const sender = new WorkspaceEmailSender({
+      id: this.idGenerator.create(),
+      workspaceId,
+      smtpHost: body.smtpHost,
+      smtpPort: body.smtpPort,
+      smtpUser: body.smtpUser,
+      smtpPass: body.smtpPass,
+      smtpFrom: body.smtpFrom,
+    });
+    await this.emailSenderRepository.create(sender);
+    return { id: sender.getId() };
+  }
+
+  @Delete(':slug/email-sender')
+  async deleteEmailSender(
+    @Param('slug') slug: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId, userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+    await this.emailSenderRepository.delete(workspaceId);
+  }
+
+  @Post(':slug/email-sender/test')
+  async testEmailSender(
+    @Param('slug') slug: string,
+    @Body() body: { smtpHost: string; smtpPort: number; smtpUser: string; smtpPass: string },
+    @CurrentUser() user: AuthUser,
+  ) {
+    await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId: await this.resolveWorkspaceId(slug),
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+
+    try {
+      const transporter = nodemailer.createTransport({
+        host: body.smtpHost,
+        port: body.smtpPort,
+        secure: body.smtpPort === 465,
+        auth: { user: body.smtpUser, pass: body.smtpPass },
+        tls: { rejectUnauthorized: true },
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+      } as any);
+      await transporter.verify();
+      return { success: true };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Connection failed';
+      return { success: false, error: msg };
+    }
   }
 
   private async resolveWorkspaceId(slug: string): Promise<string> {

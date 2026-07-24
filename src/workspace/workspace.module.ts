@@ -11,6 +11,8 @@ import { WorkspaceInvitationModel } from './infrastructure/typeorm/models/worksp
 import { TypeOrmWorkspaceRepository } from './infrastructure/typeorm/repositories/typeorm-workspace.repository';
 import { TypeOrmWorkspaceMemberRepository } from './infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
 import { TypeOrmWorkspaceInvitationRepository } from './infrastructure/typeorm/repositories/typeorm-workspace-invitation.repository';
+import { WorkspaceEmailSenderModel } from './infrastructure/typeorm/models/workspace-email-sender.model';
+import { TypeOrmWorkspaceEmailSenderRepository } from './infrastructure/typeorm/repositories/typeorm-workspace-email-sender.repository';
 import { WorkspaceController } from './infrastructure/nest/controllers/workspace.controller';
 import { WorkspaceInvitationController } from './infrastructure/nest/controllers/workspace-invitation.controller';
 import { WorkspaceImportController } from './infrastructure/nest/controllers/workspace-import.controller';
@@ -23,10 +25,10 @@ import { InvitationPublicController } from './infrastructure/nest/controllers/in
     AccountModule,
     AuditLogModule,
     MailboxModule,
-    TypeOrmModule.forFeature([WorkspaceModel, WorkspaceMemberModel, WorkspaceInvitationModel]),
+    TypeOrmModule.forFeature([WorkspaceModel, WorkspaceMemberModel, WorkspaceInvitationModel, WorkspaceEmailSenderModel]),
   ],
   controllers: [WorkspaceController, WorkspaceInvitationController, WorkspaceImportController, InvitationPublicController],
-  providers: [TypeOrmWorkspaceRepository, TypeOrmWorkspaceMemberRepository, TypeOrmWorkspaceInvitationRepository],
-  exports: [TypeOrmWorkspaceRepository, TypeOrmWorkspaceMemberRepository, TypeOrmWorkspaceInvitationRepository],
+  providers: [TypeOrmWorkspaceRepository, TypeOrmWorkspaceMemberRepository, TypeOrmWorkspaceInvitationRepository, TypeOrmWorkspaceEmailSenderRepository],
+  exports: [TypeOrmWorkspaceRepository, TypeOrmWorkspaceMemberRepository, TypeOrmWorkspaceInvitationRepository, TypeOrmWorkspaceEmailSenderRepository],
 })
 export class WorkspaceModule {}

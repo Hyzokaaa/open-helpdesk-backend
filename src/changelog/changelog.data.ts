@@ -62,6 +62,15 @@ export const coreChangelog: ChangelogVersion[] = [
         ],
       },
       {
+        title: { en: 'Custom Email Sender', es: 'Remitente de Email Personalizado' },
+        features: [
+          { en: 'Send notifications from your own email address — your customers see your brand, not ours', es: 'Envía notificaciones desde tu propia dirección de email — tus clientes ven tu marca, no la nuestra' },
+          { en: 'Just enter your email and password — SMTP settings are auto-detected for Gmail, Outlook, and more', es: 'Solo ingresa tu email y contraseña — la configuración SMTP se auto-detecta para Gmail, Outlook y más' },
+          { en: 'Advanced settings available for self-hosted mail servers', es: 'Configuración avanzada disponible para servidores de correo propios' },
+          { en: 'Test your connection before saving to make sure everything works', es: 'Prueba tu conexión antes de guardar para asegurarte de que todo funciona' },
+        ],
+      },
+      {
         title: { en: 'Improvements', es: 'Mejoras' },
         features: [
           { en: 'All dropdown selectors now support type-to-search when there are more than 5 options', es: 'Todos los selectores desplegables ahora permiten buscar escribiendo cuando hay más de 5 opciones' },
