@@ -11,6 +11,7 @@ export class CoreConfigController {
     return {
       saasMode: false,
       aiEnabled: !!process.env.AI_API_KEY,
+      emailConfigured: !!(process.env.SMTP_HOST || process.env.EMAIL_API_KEY),
     };
   }
 }
