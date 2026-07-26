@@ -30,6 +30,7 @@ import { MicrosoftAuthGuard } from '../../../../shared/nest/guards/microsoft-aut
 @Controller('auth')
 export class AuthController {
   private readonly frontendUrl: string;
+  private readonly allowedFrontendUrls: string[];
   private readonly googleEnabled: boolean;
   private readonly microsoftEnabled: boolean;
 
@@ -41,7 +42,9 @@ export class AuthController {
     @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
     private readonly config: ConfigService,
   ) {
-    this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
+    const rawFrontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
+    this.allowedFrontendUrls = rawFrontendUrl.split(',').map((u: string) => u.trim());
+    this.frontendUrl = this.allowedFrontendUrls[0];
     this.googleEnabled = !!config.get('GOOGLE_CLIENT_ID');
     this.microsoftEnabled = !!config.get('MICROSOFT_CLIENT_ID');
   }
@@ -138,6 +141,7 @@ export class AuthController {
 
   private async handleOAuthCallback(req: Request, res: Response) {
     const oauthUser = req.user as { email: string; firstName: string; lastName: string; authProvider: string };
+    const redirectUrl = this.resolveRedirectUrl(req.query?.state as string);
 
     try {
       const service = new AuthenticateOAuth(this.idGenerator, this.userRepository, this.passwordHasher);
@@ -149,9 +153,16 @@ export class AuthController {
         authProvider: oauthUser.authProvider,
       });
 
-      return res.redirect(`${this.frontendUrl}/auth/callback?token=${result.accessToken}`);
+      return res.redirect(`${redirectUrl}/auth/callback?token=${result.accessToken}`);
     } catch {
-      return res.redirect(`${this.frontendUrl}/login?error=oauth_failed`);
+      return res.redirect(`${redirectUrl}/login?error=oauth_failed`);
     }
+  }
+
+  private resolveRedirectUrl(state?: string): string {
+    if (state && this.allowedFrontendUrls.includes(state)) {
+      return state;
+    }
+    return this.frontendUrl;
   }
 }
