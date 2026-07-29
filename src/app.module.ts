@@ -28,6 +28,7 @@ import { ApiKeyModule } from "./api-key/api-key.module";
 import { WebhookModule } from "./webhook/webhook.module";
 import { ApiModule } from "./api/api.module";
 import { AIModule } from "./ai/ai.module";
+import { KnowledgeBaseModule } from "./knowledge-base/knowledge-base.module";
 import { CoreConfigModule } from "./config/config.module";
 import { HealthController } from "./health.controller";
 import { ChangelogController } from "./changelog/changelog.controller";
@@ -81,6 +82,7 @@ import { WidgetController } from "./shared/infrastructure/nest/controllers/widge
     WebhookModule,
     ApiModule,
     AIModule,
+    KnowledgeBaseModule,
     CoreConfigModule,
   ],
 })
