@@ -37,7 +37,7 @@ export class TicketCreatedHandler {
     private readonly emailSenderRepository: TypeOrmWorkspaceEmailSenderRepository,
     private readonly config: ConfigService,
   ) {
-    this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
+    this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173').split(',')[0].trim();
     this.emailDomain = config.get<string>('EMAIL_DOMAIN');
   }
 
