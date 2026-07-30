@@ -76,11 +76,6 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit() {
-    if (!this.emailDomain) {
-      this.logger.log('EMAIL_DOMAIN not set — IMAP polling disabled');
-      return;
-    }
-
     await this.refreshPollers();
     this.refreshTimer = setInterval(() => this.refreshPollers(), REFRESH_INTERVAL);
   }
@@ -127,7 +122,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     }
 
     // Fallback: env var config if no DB mailboxes
-    if (dbMailboxes.length === 0 && this.envHost && this.envUser && this.envPass) {
+    if (dbMailboxes.length === 0 && this.envHost && this.envUser && this.envPass && this.emailDomain) {
       const envId = '__env__';
       if (!this.pollers.has(envId)) {
         const state: PollerState = {

@@ -129,11 +129,25 @@ export class MailboxController {
       imapUser: string;
       imapPass: string;
       imapTls?: boolean;
+      mailboxId?: string;
     },
     @CurrentUser() user: AuthUser,
   ) {
-    await this.resolveWorkspaceId(slug);
-    await this.ensurePermission(await this.resolveWorkspaceId(slug), user);
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    await this.ensurePermission(workspaceId, user);
+
+    // If password is empty and mailboxId provided, use the stored password
+    let password = body.imapPass;
+    if (!password && body.mailboxId) {
+      const existing = await this.mailboxRepository.findById(body.mailboxId);
+      if (existing && existing.workspaceId === workspaceId && existing.imapPass) {
+        password = existing.imapPass;
+      }
+    }
+
+    if (!password) {
+      return { success: false, error: 'Password is required', folders: [] };
+    }
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -143,7 +157,7 @@ export class MailboxController {
         host: body.imapHost,
         port: body.imapPort,
         secure: body.imapTls ?? true,
-        auth: { user: body.imapUser, pass: body.imapPass },
+        auth: { user: body.imapUser, pass: password },
         logger: false,
       });
 
