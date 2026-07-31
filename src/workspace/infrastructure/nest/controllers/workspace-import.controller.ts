@@ -5,6 +5,7 @@ import {
   Inject,
   Param,
   Post,
+  Req,
   Res,
   UploadedFile,
   UseInterceptors,
@@ -12,7 +13,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
@@ -31,10 +32,12 @@ import { TypeOrmWorkspaceRepository } from '../../typeorm/repositories/typeorm-w
 import { TypeOrmWorkspaceMemberRepository } from '../../typeorm/repositories/typeorm-workspace-member.repository';
 import { TypeOrmUserRepository } from '../../../../user/infrastructure/typeorm/repositories/typeorm-user.repository';
 import { importWelcomeEmail } from '../../../../email/templates/import-welcome.template';
+import { resolveFrontendUrl } from '../../../../shared/infrastructure/resolve-frontend-url';
 
 @Controller('workspaces')
 export class WorkspaceImportController {
   private readonly frontendUrl: string;
+  private readonly allowedFrontendUrls: string[];
 
   constructor(
     @Inject() private readonly workspaceRepository: TypeOrmWorkspaceRepository,
@@ -46,7 +49,9 @@ export class WorkspaceImportController {
     @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
     private readonly config: ConfigService,
   ) {
-    this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173').split(',')[0].trim();
+    const rawFrontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
+    this.allowedFrontendUrls = rawFrontendUrl.split(',').map((u: string) => u.trim());
+    this.frontendUrl = this.allowedFrontendUrls[0];
   }
 
   @Get(':slug/members/import/template')
@@ -105,7 +110,9 @@ export class WorkspaceImportController {
     @Param('slug') slug: string,
     @Body() body: { rows: Array<{ email: string; firstName: string; lastName: string; role: string }>; skipVerification?: boolean },
     @CurrentUser() user: AuthUser,
+    @Req() req: Request,
   ) {
+    const frontendUrl = resolveFrontendUrl(req, this.allowedFrontendUrls, this.frontendUrl);
     const workspace = await this.resolveWorkspace(slug);
 
     const confirmService = new ConfirmImportMembers(
@@ -130,7 +137,7 @@ export class WorkspaceImportController {
         { sub: created.userId, type: 'password-reset' },
         { expiresIn: '24h' },
       );
-      const resetUrl = `${this.frontendUrl}/reset-password?token=${token}`;
+      const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
       try {
         await this.emailService.send(importWelcomeEmail({
           to: created.email,

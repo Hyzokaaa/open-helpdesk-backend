@@ -36,6 +36,7 @@ import { TypeOrmAccountRepository } from '../../../../account/infrastructure/typ
 import { TypeOrmWorkspaceInvitationRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-invitation.repository';
 import { TypeOrmWorkspaceMemberRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
 import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
+import { resolveFrontendUrl } from '../../../../shared/infrastructure/resolve-frontend-url';
 
 @Controller('auth')
 export class AuthController {
@@ -108,10 +109,11 @@ export class AuthController {
   @Public()
   @Throttle({ default: { ttl: 60000, limit: 3 } })
   @Post('forgot-password')
-  async forgotPassword(@Body() body: { email: string }) {
+  async forgotPassword(@Body() body: { email: string }, @Req() req: Request) {
+    const frontendUrl = resolveFrontendUrl(req, this.allowedFrontendUrls, this.frontendUrl);
     const service = new RequestPasswordReset(this.userRepository);
     const command = new RequestPasswordResetCommand(service, this.tokenService, this.emailService);
-    await command.execute({ email: body.email, frontendUrl: this.frontendUrl });
+    await command.execute({ email: body.email, frontendUrl });
     return { message: 'If the email exists, a reset link has been sent' };
   }
 
@@ -136,13 +138,14 @@ export class AuthController {
   @SkipEmailVerification()
   @Throttle({ default: { ttl: 3600000, limit: 3 } })
   @Post('resend-verification')
-  async resendVerification(@CurrentUser() user: AuthUser) {
+  async resendVerification(@CurrentUser() user: AuthUser, @Req() req: Request) {
+    const frontendUrl = resolveFrontendUrl(req, this.allowedFrontendUrls, this.frontendUrl);
     const command = new ResendVerificationCommand(
       this.userRepository,
       this.tokenService,
       this.emailService,
     );
-    await command.execute({ userId: user.userId, frontendUrl: this.frontendUrl });
+    await command.execute({ userId: user.userId, frontendUrl });
     return { message: 'Verification email sent' };
   }
 

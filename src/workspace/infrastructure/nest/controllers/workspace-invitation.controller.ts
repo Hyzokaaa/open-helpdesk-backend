@@ -6,8 +6,10 @@ import {
   Inject,
   Param,
   Post,
+  Req,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Request } from 'express';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
@@ -32,10 +34,12 @@ import { BatchInvitationRequest } from '../dto/batch-invitation.request';
 import { BatchInvitationCommand } from '../../../application/commands/batch-invitation.command';
 import { invitationEmail } from '../../../../email/templates/workspace-invitation.template';
 import { sendWorkspaceEmail } from '../../../../email/domain/resolve-email-sender';
+import { resolveFrontendUrl } from '../../../../shared/infrastructure/resolve-frontend-url';
 
 @Controller('workspaces')
 export class WorkspaceInvitationController {
   private readonly frontendUrl: string;
+  private readonly allowedFrontendUrls: string[];
 
   constructor(
     @Inject() private readonly workspaceRepository: TypeOrmWorkspaceRepository,
@@ -48,7 +52,9 @@ export class WorkspaceInvitationController {
     @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
     private readonly config: ConfigService,
   ) {
-    this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173').split(',')[0].trim();
+    const rawFrontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
+    this.allowedFrontendUrls = rawFrontendUrl.split(',').map((u: string) => u.trim());
+    this.frontendUrl = this.allowedFrontendUrls[0];
   }
 
   @Post(':slug/invitations')
@@ -56,7 +62,9 @@ export class WorkspaceInvitationController {
     @Param('slug') slug: string,
     @Body() body: CreateInvitationRequest,
     @CurrentUser() user: AuthUser,
+    @Req() req: Request,
   ) {
+    const frontendUrl = resolveFrontendUrl(req, this.allowedFrontendUrls, this.frontendUrl);
     const workspace = await this.resolveWorkspace(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new CreateInvitation(
@@ -77,7 +85,7 @@ export class WorkspaceInvitationController {
 
     const inviter = await this.userRepository.findById(user.userId);
     const inviterName = inviter ? `${inviter.firstName} ${inviter.lastName}` : '';
-    const invitationUrl = `${this.frontendUrl}/invite/${result.token}`;
+    const invitationUrl = `${frontendUrl}/invite/${result.token}`;
 
     const sender = await this.emailSenderRepository.findByWorkspaceId(workspace.getId());
     try {
@@ -100,7 +108,9 @@ export class WorkspaceInvitationController {
     @Param('slug') slug: string,
     @Body() body: BatchInvitationRequest,
     @CurrentUser() user: AuthUser,
+    @Req() req: Request,
   ) {
+    const frontendUrl = resolveFrontendUrl(req, this.allowedFrontendUrls, this.frontendUrl);
     const workspace = await this.resolveWorkspace(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new CreateInvitation(
@@ -126,7 +136,7 @@ export class WorkspaceInvitationController {
       if (result.status === 'sent') {
         const invitation = await this.invitationRepository.findPendingByWorkspaceAndEmail(workspace.getId(), result.email);
         if (invitation) {
-          const invitationUrl = `${this.frontendUrl}/invite/${invitation.token}`;
+          const invitationUrl = `${frontendUrl}/invite/${invitation.token}`;
           try {
             await sendWorkspaceEmail(this.emailService, sender, invitationEmail({
               to: result.email,
