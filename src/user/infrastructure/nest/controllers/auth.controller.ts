@@ -24,8 +24,18 @@ import { VerifyEmailCommand } from '../../../application/commands/verify-email.c
 import { ResendVerificationCommand } from '../../../application/commands/resend-verification.command';
 import { TypeOrmUserRepository } from '../../typeorm/repositories/typeorm-user.repository';
 import { LoginUserRequest } from '../dto/login-user.request';
+import { SignupUserRequest } from '../dto/signup-user.request';
 import { GoogleAuthGuard } from '../../../../shared/nest/guards/google-auth.guard';
 import { MicrosoftAuthGuard } from '../../../../shared/nest/guards/microsoft-auth.guard';
+import { CreateUser } from '../../../domain/services/user-create';
+import { CreateAccountForUser } from '../../../../account/domain/services/account-create-for-user';
+import { AcceptInvitation } from '../../../../workspace/domain/services/invitation-accept';
+import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit-log-create';
+import { SignupUserCommand } from '../../../application/commands/signup-user.command';
+import { TypeOrmAccountRepository } from '../../../../account/infrastructure/typeorm/repositories/typeorm-account.repository';
+import { TypeOrmWorkspaceInvitationRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-invitation.repository';
+import { TypeOrmWorkspaceMemberRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
+import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
 
 @Controller('auth')
 export class AuthController {
@@ -40,6 +50,10 @@ export class AuthController {
     @Inject() private readonly tokenService: JwtTokenService,
     @Inject() private readonly idGenerator: UlidGenerator,
     @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
+    @Inject() private readonly accountRepository: TypeOrmAccountRepository,
+    @Inject() private readonly invitationRepository: TypeOrmWorkspaceInvitationRepository,
+    @Inject() private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
+    @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
     private readonly config: ConfigService,
   ) {
     const rawFrontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
@@ -67,6 +81,27 @@ export class AuthController {
     return command.execute({
       email: body.email,
       password: body.password,
+    });
+  }
+
+  @Public()
+  @Throttle({ default: { ttl: 3600000, limit: 5 } })
+  @Post('signup')
+  signup(@Body() body: SignupUserRequest) {
+    const createUser = new CreateUser(this.idGenerator, this.userRepository, this.passwordHasher);
+    const createAccount = new CreateAccountForUser(this.idGenerator, this.accountRepository);
+    const acceptInvitation = new AcceptInvitation(this.idGenerator, this.invitationRepository, this.memberRepository);
+    const createAuditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    const command = new SignupUserCommand(
+      createUser, createAccount, acceptInvitation,
+      this.invitationRepository, this.tokenService, createAuditLog,
+    );
+    return command.execute({
+      email: body.email,
+      password: body.password,
+      firstName: body.firstName,
+      lastName: body.lastName,
+      invitationToken: body.invitationToken,
     });
   }
 

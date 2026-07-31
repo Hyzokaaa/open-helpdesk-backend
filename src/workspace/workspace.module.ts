@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SharedModule } from '../shared/shared.module';
 import { UserModule } from '../user/user.module';
+// Note: circular dependency with UserModule — both use forwardRef
 import { AccountModule } from '../account/account.module';
 import { AuditLogModule } from '../audit-log/audit-log.module';
 import { MailboxModule } from '../mailbox/mailbox.module';
@@ -21,7 +22,7 @@ import { InvitationPublicController } from './infrastructure/nest/controllers/in
 @Module({
   imports: [
     SharedModule,
-    UserModule,
+    forwardRef(() => UserModule),
     AccountModule,
     AuditLogModule,
     MailboxModule,

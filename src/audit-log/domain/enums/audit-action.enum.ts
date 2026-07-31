@@ -20,4 +20,5 @@ export enum AuditAction {
   USER_ACTIVATED = 'user-activated',
   USER_DEACTIVATED = 'user-deactivated',
   USER_ADMIN_TOGGLED = 'user-admin-toggled',
+  USER_SIGNED_UP = 'user-signed-up',
 }
