@@ -6,14 +6,22 @@ import {
   SendEmailParams,
   SendEmailResult,
 } from '../domain/email.service';
+import { SystemEmailSettingsRepository } from '../../config/domain/repositories/system-email-settings.repository';
 
 export class SmtpEmailService implements EmailService {
   private readonly logger = new Logger(SmtpEmailService.name);
-  private readonly transporter: nodemailer.Transporter | null;
+  private readonly envTransporter: nodemailer.Transporter | null;
   private readonly defaultFrom: string;
   private readonly maxRetries = 3;
 
-  constructor(private readonly config: ConfigService) {
+  private dbTransporter: nodemailer.Transporter | null = null;
+  private dbFrom: string | null = null;
+  private dbConfigHash: string | null = null;
+
+  constructor(
+    private readonly config: ConfigService,
+    private readonly systemEmailRepo?: SystemEmailSettingsRepository,
+  ) {
     const host = config.get<string>('SMTP_HOST');
     const port = config.get<number>('SMTP_PORT', 465);
     const user = config.get<string>('SMTP_USER');
@@ -23,7 +31,7 @@ export class SmtpEmailService implements EmailService {
 
     if (host && user && password) {
       const rejectUnauthorized = config.get<string>('SMTP_TLS_REJECT_UNAUTHORIZED', 'true') !== 'false';
-      this.transporter = nodemailer.createTransport({
+      this.envTransporter = nodemailer.createTransport({
         host,
         port,
         secure: port === 465,
@@ -33,20 +41,49 @@ export class SmtpEmailService implements EmailService {
       } as any);
       this.logger.log(`SMTP email service initialized (${host}:${port})`);
     } else {
-      this.transporter = null;
+      this.envTransporter = null;
       this.logger.warn(
-        'SMTP_HOST/SMTP_USER/SMTP_PASSWORD not set, emails will be logged only',
+        'SMTP_HOST/SMTP_USER/SMTP_PASSWORD not set, emails will be logged only (unless configured via Admin UI)',
       );
     }
+  }
+
+  private async resolveTransporter(): Promise<{ transporter: nodemailer.Transporter | null; from: string }> {
+    if (this.systemEmailRepo) {
+      try {
+        const dbSettings = await this.systemEmailRepo.find();
+        if (dbSettings) {
+          const hash = `${dbSettings.smtpHost}:${dbSettings.smtpPort}:${dbSettings.smtpUser}:${dbSettings.smtpPass}`;
+          if (hash !== this.dbConfigHash) {
+            this.dbTransporter = nodemailer.createTransport({
+              host: dbSettings.smtpHost,
+              port: dbSettings.smtpPort,
+              secure: dbSettings.smtpPort === 465,
+              auth: { user: dbSettings.smtpUser, pass: dbSettings.smtpPass },
+              family: 4,
+            } as any);
+            this.dbFrom = dbSettings.smtpFrom;
+            this.dbConfigHash = hash;
+            this.logger.log(`SMTP transporter updated from DB config (${dbSettings.smtpHost}:${dbSettings.smtpPort})`);
+          }
+          return { transporter: this.dbTransporter, from: this.dbFrom! };
+        }
+      } catch {
+        // DB not available, fall through to env
+      }
+    }
+    return { transporter: this.envTransporter, from: this.defaultFrom };
   }
 
   async send(params: SendEmailParams): Promise<SendEmailResult> {
     const recipient = Array.isArray(params.to)
       ? params.to.join(', ')
       : params.to;
-    const sender = params.from || this.defaultFrom;
 
-    if (!this.transporter) {
+    const { transporter, from } = await this.resolveTransporter();
+    const sender = params.from || from;
+
+    if (!transporter) {
       this.logger.log(
         `[EMAIL MOCK] To: ${recipient} | Subject: ${params.subject}`,
       );
@@ -55,7 +92,7 @@ export class SmtpEmailService implements EmailService {
 
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
-        await this.transporter.sendMail({
+        await transporter.sendMail({
           from: sender,
           to: recipient,
           subject: params.subject,

@@ -18,14 +18,16 @@ import { TicketModule } from '../ticket/ticket.module';
 import { MailboxModule } from '../mailbox/mailbox.module';
 import { EMAIL_SERVICE } from './email.constants';
 import { AdminEmailController } from './infrastructure/nest/controllers/admin-email.controller';
+import { CoreConfigModule } from '../config/config.module';
+import { TypeOrmSystemEmailSettingsRepository } from '../config/infrastructure/typeorm/repositories/typeorm-system-email-settings.repository';
 @Global()
 @Module({
-  imports: [UserModule, WorkspaceModule, NotificationModule, SharedModule, CsatModule, TicketModule, MailboxModule],
+  imports: [UserModule, WorkspaceModule, NotificationModule, SharedModule, CsatModule, TicketModule, MailboxModule, CoreConfigModule],
   controllers: [AdminEmailController],
   providers: [
     {
       provide: EMAIL_SERVICE,
-      useFactory: (config: ConfigService) => {
+      useFactory: (config: ConfigService, systemEmailRepo: TypeOrmSystemEmailSettingsRepository) => {
         const provider = config.get<string>('EMAIL_PROVIDER', 'smtp');
         if (provider === 'resend') {
           return new ResendEmailService(config);
@@ -33,9 +35,9 @@ import { AdminEmailController } from './infrastructure/nest/controllers/admin-em
         if (provider === 'postmark') {
           return new PostmarkEmailService(config);
         }
-        return new SmtpEmailService(config);
+        return new SmtpEmailService(config, systemEmailRepo);
       },
-      inject: [ConfigService],
+      inject: [ConfigService, TypeOrmSystemEmailSettingsRepository],
     },
     TicketCreatedHandler,
     TicketAssignedHandler,
