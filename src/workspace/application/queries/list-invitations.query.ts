@@ -10,6 +10,7 @@ export interface InvitationListItem {
   email: string;
   role: string;
   status: string;
+  token: string;
   expiresAt: Date;
   createdAt: Date;
 }
@@ -24,6 +25,7 @@ export class ListInvitationsQuery implements Query<Props, InvitationListItem[]> 
       email: inv.email,
       role: inv.role,
       status: inv.status,
+      token: inv.token,
       expiresAt: inv.expiresAt,
       createdAt: inv.createdAt,
     }));

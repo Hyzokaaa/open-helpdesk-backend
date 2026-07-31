@@ -25,11 +25,13 @@ import { ListInvitationsQuery } from '../../../application/queries/list-invitati
 import { TypeOrmWorkspaceRepository } from '../../typeorm/repositories/typeorm-workspace.repository';
 import { TypeOrmWorkspaceMemberRepository } from '../../typeorm/repositories/typeorm-workspace-member.repository';
 import { TypeOrmWorkspaceInvitationRepository } from '../../typeorm/repositories/typeorm-workspace-invitation.repository';
+import { TypeOrmWorkspaceEmailSenderRepository } from '../../typeorm/repositories/typeorm-workspace-email-sender.repository';
 import { TypeOrmUserRepository } from '../../../../user/infrastructure/typeorm/repositories/typeorm-user.repository';
 import { CreateInvitationRequest } from '../dto/create-invitation.request';
 import { BatchInvitationRequest } from '../dto/batch-invitation.request';
 import { BatchInvitationCommand } from '../../../application/commands/batch-invitation.command';
 import { invitationEmail } from '../../../../email/templates/workspace-invitation.template';
+import { sendWorkspaceEmail } from '../../../../email/domain/resolve-email-sender';
 
 @Controller('workspaces')
 export class WorkspaceInvitationController {
@@ -39,6 +41,7 @@ export class WorkspaceInvitationController {
     @Inject() private readonly workspaceRepository: TypeOrmWorkspaceRepository,
     @Inject() private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
     @Inject() private readonly invitationRepository: TypeOrmWorkspaceInvitationRepository,
+    @Inject() private readonly emailSenderRepository: TypeOrmWorkspaceEmailSenderRepository,
     @Inject() private readonly userRepository: TypeOrmUserRepository,
     @Inject() private readonly idGenerator: UlidGenerator,
     @Inject() private readonly tokenService: JwtTokenService,
@@ -76,8 +79,9 @@ export class WorkspaceInvitationController {
     const inviterName = inviter ? `${inviter.firstName} ${inviter.lastName}` : '';
     const invitationUrl = `${this.frontendUrl}/invite/${result.token}`;
 
+    const sender = await this.emailSenderRepository.findByWorkspaceId(workspace.getId());
     try {
-      await this.emailService.send(invitationEmail({
+      await sendWorkspaceEmail(this.emailService, sender, invitationEmail({
         to: body.email,
         workspaceName: workspace.name,
         inviterName,
@@ -116,6 +120,7 @@ export class WorkspaceInvitationController {
 
     const inviter = await this.userRepository.findById(user.userId);
     const inviterName = inviter ? `${inviter.firstName} ${inviter.lastName}` : '';
+    const sender = await this.emailSenderRepository.findByWorkspaceId(workspace.getId());
 
     for (const result of results) {
       if (result.status === 'sent') {
@@ -123,7 +128,7 @@ export class WorkspaceInvitationController {
         if (invitation) {
           const invitationUrl = `${this.frontendUrl}/invite/${invitation.token}`;
           try {
-            await this.emailService.send(invitationEmail({
+            await sendWorkspaceEmail(this.emailService, sender, invitationEmail({
               to: result.email,
               workspaceName: workspace.name,
               inviterName,
