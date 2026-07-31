@@ -16,6 +16,34 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.14.0',
+    date: '2026-07-31',
+    categories: [
+      {
+        title: { en: 'System Email Configuration', es: 'Configuración de Correo del Sistema' },
+        features: [
+          { en: 'Configure SMTP settings from the Admin UI — no more editing environment variables', es: 'Configura SMTP desde la UI de administración — sin editar variables de entorno' },
+          { en: 'System email is used for password reset, email verification, and workspace notifications', es: 'El correo del sistema se usa para recuperación de contraseña, verificación y notificaciones del workspace' },
+        ],
+      },
+      {
+        title: { en: 'Invitations & Signup', es: 'Invitaciones y Registro' },
+        features: [
+          { en: 'Invite team members by email — invitations now use the workspace custom sender when configured', es: 'Invita miembros por correo — las invitaciones ahora usan el sender personalizado del workspace cuando está configurado' },
+          { en: 'Copy invitation link directly from the pending invitations list', es: 'Copia el enlace de invitación directamente desde la lista de invitaciones pendientes' },
+          { en: 'New users can sign up via invitation link and are automatically added to the workspace', es: 'Nuevos usuarios pueden registrarse via enlace de invitación y se agregan automáticamente al workspace' },
+          { en: 'Clear warning when no email service is configured — with link to settings', es: 'Aviso claro cuando no hay servicio de correo configurado — con enlace a la configuración' },
+        ],
+      },
+      {
+        title: { en: 'Multi-Frontend Support', es: 'Soporte Multi-Frontend' },
+        features: [
+          { en: 'Email links (password reset, invitations) now point to the correct frontend when multiple domains are configured', es: 'Los enlaces en correos (recuperación, invitaciones) ahora apuntan al frontend correcto cuando hay múltiples dominios configurados' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.13.0',
     date: '2026-07-23',
     categories: [
