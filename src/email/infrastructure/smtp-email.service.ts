@@ -17,6 +17,8 @@ export class SmtpEmailService implements EmailService {
   private dbTransporter: nodemailer.Transporter | null = null;
   private dbFrom: string | null = null;
   private dbConfigHash: string | null = null;
+  private lastDbCheck = 0;
+  private readonly dbCacheTtl = 60000;
 
   constructor(
     private readonly config: ConfigService,
@@ -50,26 +52,39 @@ export class SmtpEmailService implements EmailService {
 
   private async resolveTransporter(): Promise<{ transporter: nodemailer.Transporter | null; from: string }> {
     if (this.systemEmailRepo) {
-      try {
-        const dbSettings = await this.systemEmailRepo.find();
-        if (dbSettings) {
-          const hash = `${dbSettings.smtpHost}:${dbSettings.smtpPort}:${dbSettings.smtpUser}:${dbSettings.smtpPass}`;
-          if (hash !== this.dbConfigHash) {
-            this.dbTransporter = nodemailer.createTransport({
-              host: dbSettings.smtpHost,
-              port: dbSettings.smtpPort,
-              secure: dbSettings.smtpPort === 465,
-              auth: { user: dbSettings.smtpUser, pass: dbSettings.smtpPass },
-              family: 4,
-            } as any);
-            this.dbFrom = dbSettings.smtpFrom;
-            this.dbConfigHash = hash;
-            this.logger.log(`SMTP transporter updated from DB config (${dbSettings.smtpHost}:${dbSettings.smtpPort})`);
+      if (Date.now() - this.lastDbCheck > this.dbCacheTtl) {
+        this.lastDbCheck = Date.now();
+        try {
+          const dbSettings = await this.systemEmailRepo.find();
+          if (dbSettings) {
+            const hash = `${dbSettings.smtpHost}:${dbSettings.smtpPort}:${dbSettings.smtpUser}:${dbSettings.smtpPass}`;
+            if (hash !== this.dbConfigHash) {
+              try { this.dbTransporter?.close(); } catch {}
+              this.dbTransporter = nodemailer.createTransport({
+                host: dbSettings.smtpHost,
+                port: dbSettings.smtpPort,
+                secure: dbSettings.smtpPort === 465,
+                auth: { user: dbSettings.smtpUser, pass: dbSettings.smtpPass },
+                family: 4,
+              } as any);
+              this.dbFrom = dbSettings.smtpFrom;
+              this.dbConfigHash = hash;
+              this.logger.log(`SMTP transporter updated from DB config (${dbSettings.smtpHost}:${dbSettings.smtpPort})`);
+            }
+          } else {
+            if (this.dbTransporter) {
+              try { this.dbTransporter.close(); } catch {}
+              this.dbTransporter = null;
+              this.dbFrom = null;
+              this.dbConfigHash = null;
+            }
           }
-          return { transporter: this.dbTransporter, from: this.dbFrom! };
+        } catch {
+          // DB not available, fall through to env
         }
-      } catch {
-        // DB not available, fall through to env
+      }
+      if (this.dbTransporter) {
+        return { transporter: this.dbTransporter, from: this.dbFrom! };
       }
     }
     return { transporter: this.envTransporter, from: this.defaultFrom };

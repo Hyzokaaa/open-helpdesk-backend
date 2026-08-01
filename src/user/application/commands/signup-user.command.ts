@@ -1,6 +1,6 @@
 import { Command } from '../../../shared/domain/command';
 import { TokenService } from '../../../shared/domain/token-service';
-import { DomainValidationError } from '../../../shared/domain/errors';
+import { DomainValidationError, ConflictError } from '../../../shared/domain/errors';
 import { CreateUser } from '../../domain/services/user-create';
 import { CreateAccountForUser } from '../../../account/domain/services/account-create-for-user';
 import { AcceptInvitation } from '../../../workspace/domain/services/invitation-accept';
@@ -50,13 +50,19 @@ export class SignupUserCommand implements Command<Props, SignupResponse> {
       throw new DomainValidationError('Invitation has expired');
     }
 
-    const user = await this.createUser.execute({
-      email: props.email,
-      password: props.password,
-      firstName: props.firstName,
-      lastName: props.lastName,
-      isEmailVerified: true,
-    });
+    let user;
+    try {
+      user = await this.createUser.execute({
+        email: props.email,
+        password: props.password,
+        firstName: props.firstName,
+        lastName: props.lastName,
+        isEmailVerified: true,
+      });
+    } catch (err) {
+      if (err instanceof ConflictError) throw new ConflictError('Email already registered');
+      throw err;
+    }
 
     await this.createAccount.execute({
       userId: user.getId(),
