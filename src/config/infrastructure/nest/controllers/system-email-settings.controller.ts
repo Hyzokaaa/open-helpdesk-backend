@@ -5,6 +5,8 @@ import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator'
 import { AccessDeniedError } from '../../../../shared/domain/errors';
 import { SystemEmailSettings } from '../../../domain/entities/system-email-settings';
 import { TypeOrmSystemEmailSettingsRepository } from '../../typeorm/repositories/typeorm-system-email-settings.repository';
+import { SaveSystemEmailRequest } from '../dto/save-system-email.request';
+import { TestSystemEmailRequest } from '../dto/test-system-email.request';
 
 @Controller('system')
 export class SystemEmailSettingsController {
@@ -36,7 +38,7 @@ export class SystemEmailSettingsController {
 
   @Post('email-settings')
   async save(
-    @Body() body: { smtpHost: string; smtpPort: number; smtpUser: string; smtpPass: string; smtpFrom: string },
+    @Body() body: SaveSystemEmailRequest,
     @CurrentUser() user: AuthUser,
   ) {
     this.ensureAdmin(user);
@@ -46,7 +48,7 @@ export class SystemEmailSettingsController {
       smtpHost: body.smtpHost,
       smtpPort: body.smtpPort,
       smtpUser: body.smtpUser,
-      smtpPass: body.smtpPass || (existing?.smtpPass ?? ''),
+      smtpPass: (!body.smtpPass || body.smtpPass === '__keep__') ? (existing?.smtpPass ?? '') : body.smtpPass,
       smtpFrom: body.smtpFrom,
     });
     await this.repository.save(settings);
@@ -62,7 +64,7 @@ export class SystemEmailSettingsController {
 
   @Post('email-settings/test')
   async test(
-    @Body() body: { smtpHost: string; smtpPort: number; smtpUser: string; smtpPass: string },
+    @Body() body: TestSystemEmailRequest,
     @CurrentUser() user: AuthUser,
   ) {
     this.ensureAdmin(user);
@@ -77,23 +79,26 @@ export class SystemEmailSettingsController {
       return { success: false, error: 'Password is required' };
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const nodemailer = require('nodemailer');
+    const transporter = nodemailer.createTransport({
+      host: body.smtpHost,
+      port: body.smtpPort,
+      secure: body.smtpPort === 465,
+      auth: { user: body.smtpUser, pass: password },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      logger: false,
+    });
+
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const nodemailer = require('nodemailer');
-      const transporter = nodemailer.createTransport({
-        host: body.smtpHost,
-        port: body.smtpPort,
-        secure: body.smtpPort === 465,
-        auth: { user: body.smtpUser, pass: password },
-        connectionTimeout: 10000,
-        greetingTimeout: 10000,
-        logger: false,
-      });
       await transporter.verify();
       return { success: true };
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Unknown error';
       return { success: false, error: msg };
+    } finally {
+      transporter.close();
     }
   }
 }
