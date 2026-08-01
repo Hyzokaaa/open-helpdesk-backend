@@ -172,6 +172,29 @@ export class WorkspaceInvitationController {
     return query.execute({ workspaceId: workspace.getId() });
   }
 
+  @Get(':slug/invitations/:id/link')
+  async getLink(
+    @Param('slug') slug: string,
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+    @Req() req: Request,
+  ) {
+    const workspace = await this.resolveWorkspace(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId: workspace.getId(),
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_INVITATIONS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+    const invitation = await this.invitationRepository.findById(id);
+    if (!invitation || invitation.workspaceId !== workspace.getId()) {
+      throw new EntityNotFoundError('Invitation not found');
+    }
+    const frontendUrl = resolveFrontendUrl(req, this.allowedFrontendUrls, this.frontendUrl);
+    return { link: `${frontendUrl}/invite/${invitation.token}` };
+  }
+
   @Delete(':slug/invitations/:id')
   async cancel(
     @Param('slug') slug: string,
