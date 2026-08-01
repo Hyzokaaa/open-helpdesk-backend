@@ -174,7 +174,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
         let count = 0;
 
         for (const msg of fetched) {
-          const wasProcessed = await this.processMessage(msg, parser, router);
+          const wasProcessed = await this.processMessage(msg, parser, router, mailbox.getId());
           if (wasProcessed) count++;
         }
 
@@ -296,7 +296,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     return results;
   }
 
-  private async processMessage(msg: FetchedMessage, parser: ImapEmailParser, router: RouteInboundEmail): Promise<boolean> {
+  private async processMessage(msg: FetchedMessage, parser: ImapEmailParser, router: RouteInboundEmail, mailboxId?: string): Promise<boolean> {
     try {
       if (msg.envelope.messageId) {
         const alreadyProcessed = await this.processedEmailRepository.exists(msg.envelope.messageId);
@@ -304,6 +304,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       }
 
       const parsed = await parser.parse(msg.envelope, msg.body);
+      if (mailboxId) parsed.mailboxId = mailboxId;
 
       this.logger.log(`IMAP: processing email from ${parsed.fromAddress} — subject: ${parsed.subject}`);
 

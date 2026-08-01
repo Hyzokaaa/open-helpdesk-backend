@@ -41,12 +41,17 @@ export class RouteInboundEmail {
   ) {}
 
   async execute(parsed: ParsedInboundEmail): Promise<RouteInboundEmailResult> {
-    // 1. Find mailbox
+    // 1. Find mailbox — use pre-resolved mailboxId from IMAP poller, or search by toAddresses (MTA hook)
     let mailbox = null;
-    for (const addr of parsed.toAddresses) {
-      mailbox = await this.mailboxRepository.findByAddress(addr);
-      if (mailbox && mailbox.isActive) break;
-      mailbox = null;
+    if (parsed.mailboxId) {
+      mailbox = await this.mailboxRepository.findById(parsed.mailboxId);
+      if (mailbox && !mailbox.isActive) mailbox = null;
+    } else {
+      for (const addr of parsed.toAddresses) {
+        mailbox = await this.mailboxRepository.findByAddress(addr);
+        if (mailbox && mailbox.isActive) break;
+        mailbox = null;
+      }
     }
 
     if (!mailbox) {

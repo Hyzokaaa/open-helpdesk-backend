@@ -14,6 +14,7 @@ export interface ParsedInboundEmail {
   body: string;
   inReplyToTicketId: string | null;
   attachments: ParsedAttachment[];
+  mailboxId?: string;
 }
 
 export class ParseInboundEmail {
