@@ -51,6 +51,9 @@ export class MailboxModel {
   @Column({ type: 'timestamptz', nullable: true })
   lastSyncAt!: Date | null;
 
+  @Column({ type: 'int', nullable: true })
+  lastSyncDuration!: number | null;
+
   @Column({ type: 'varchar', nullable: true })
   lastError!: string | null;
 

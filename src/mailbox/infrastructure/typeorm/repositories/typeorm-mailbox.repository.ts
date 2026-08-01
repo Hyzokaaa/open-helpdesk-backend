@@ -69,6 +69,7 @@ export class TypeOrmMailboxRepository implements MailboxRepository {
       imapFolder: model.imapFolder,
       pollInterval: model.pollInterval,
       lastSyncAt: model.lastSyncAt,
+      lastSyncDuration: model.lastSyncDuration,
       lastError: model.lastError,
     });
   }
@@ -88,6 +89,7 @@ export class TypeOrmMailboxRepository implements MailboxRepository {
     model.imapFolder = mailbox.imapFolder;
     model.pollInterval = mailbox.pollInterval;
     model.lastSyncAt = mailbox.lastSyncAt;
+    model.lastSyncDuration = mailbox.lastSyncDuration;
     model.lastError = mailbox.lastError;
     return model;
   }

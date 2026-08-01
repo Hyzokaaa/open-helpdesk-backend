@@ -15,6 +15,7 @@ interface Props {
   imapFolder?: string | null;
   pollInterval?: number | null;
   lastSyncAt?: Date | null;
+  lastSyncDuration?: number | null;
   lastError?: string | null;
 }
 
@@ -32,6 +33,7 @@ export class Mailbox {
   imapFolder: string | null;
   pollInterval: number | null;
   lastSyncAt: Date | null;
+  lastSyncDuration: number | null;
   lastError: string | null;
 
   constructor(props: Props) {
@@ -48,6 +50,7 @@ export class Mailbox {
     this.imapFolder = props.imapFolder ?? null;
     this.pollInterval = props.pollInterval ?? null;
     this.lastSyncAt = props.lastSyncAt ?? null;
+    this.lastSyncDuration = props.lastSyncDuration ?? null;
     this.lastError = props.lastError ?? null;
   }
 

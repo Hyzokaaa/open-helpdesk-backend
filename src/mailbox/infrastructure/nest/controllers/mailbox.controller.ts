@@ -41,6 +41,7 @@ export class MailboxController {
       imapFolder: m.imapFolder,
       pollInterval: m.pollInterval,
       lastSyncAt: m.lastSyncAt,
+      lastSyncDuration: m.lastSyncDuration,
       lastError: m.lastError,
     }));
   }
@@ -136,9 +137,9 @@ export class MailboxController {
     const workspaceId = await this.resolveWorkspaceId(slug);
     await this.ensurePermission(workspaceId, user);
 
-    // If password is empty and mailboxId provided, use the stored password
+    // If password is empty or __keep__ and mailboxId provided, use the stored password
     let password = body.imapPass;
-    if (!password && body.mailboxId) {
+    if ((!password || password === '__keep__') && body.mailboxId) {
       const existing = await this.mailboxRepository.findById(body.mailboxId);
       if (existing && existing.workspaceId === workspaceId && existing.imapPass) {
         password = existing.imapPass;

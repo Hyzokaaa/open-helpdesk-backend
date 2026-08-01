@@ -80,6 +80,40 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     this.refreshTimer = setInterval(() => this.refreshPollers(), REFRESH_INTERVAL);
   }
 
+  async importMailbox(mailboxId: string, since: Date | null): Promise<{ processed: number; total: number }> {
+    const mailbox = await this.mailboxRepository.findById(mailboxId);
+    if (!mailbox || !mailbox.imapHost || !mailbox.imapUser || !mailbox.imapPass) {
+      throw new Error('Mailbox not found or IMAP not configured');
+    }
+
+    const fetched = await this.fetchMessages({
+      host: mailbox.imapHost,
+      port: mailbox.imapPort ?? 993,
+      user: mailbox.imapUser,
+      pass: mailbox.imapPass,
+      tls: mailbox.imapTls ?? true,
+      folder: mailbox.imapFolder ?? 'INBOX',
+      since,
+    });
+
+    const domain = mailbox.address.split('@')[1] || this.emailDomain || 'localhost';
+    const parser = new ImapEmailParser(domain);
+    const router = this.createRouter();
+    let processed = 0;
+
+    for (const msg of fetched) {
+      const wasProcessed = await this.processMessage(msg, parser, router, mailbox.getId());
+      if (wasProcessed) processed++;
+    }
+
+    this.logger.log(`IMAP import [${mailbox.address}]: processed ${processed}/${fetched.length} email(s)`);
+    return { processed, total: fetched.length };
+  }
+
+  async refreshNow(): Promise<void> {
+    await this.refreshPollers();
+  }
+
   onModuleDestroy() {
     this.stopping = true;
     if (this.refreshTimer) clearInterval(this.refreshTimer);
@@ -153,6 +187,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
   private async pollMailbox(mailbox: Mailbox, state: PollerState) {
     if (this.stopping || state.processing) return;
     state.processing = true;
+    const pollStart = Date.now();
 
     try {
       const fetched = await this.fetchMessages({
@@ -183,6 +218,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
 
       // Mark success
       mailbox.lastSyncAt = new Date();
+      mailbox.lastSyncDuration = Date.now() - pollStart;
       mailbox.lastError = null;
       await this.mailboxRepository.update(mailbox);
 
@@ -264,14 +300,14 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     });
 
     const results: FetchedMessage[] = [];
-    const since = config.since ?? new Date();
 
     try {
       await client.connect();
 
       const lock = await client.getMailboxLock(config.folder);
       try {
-        const messages = client.fetch({ since }, {
+        const query = config.since ? { since: config.since } : { all: true };
+        const messages = client.fetch(query, {
           envelope: true,
           source: true,
           uid: true,

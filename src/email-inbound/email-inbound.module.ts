@@ -8,6 +8,7 @@ import { TicketModule } from '../ticket/ticket.module';
 import { CommentModule } from '../comment/comment.module';
 import { AttachmentModule } from '../attachment/attachment.module';
 import { InboundEmailController } from './infrastructure/nest/controllers/inbound-email.controller';
+import { MailboxImportController } from './infrastructure/nest/controllers/mailbox-import.controller';
 import { MtaHookAuthGuard } from './infrastructure/nest/guards/mta-hook-auth.guard';
 import { ImapPollingService } from './infrastructure/imap/imap-polling.service';
 import { ProcessedEmailModel } from './infrastructure/typeorm/models/processed-email.model';
@@ -15,7 +16,7 @@ import { ProcessedEmailRepository } from './infrastructure/typeorm/repositories/
 
 @Module({
   imports: [SharedModule, MailboxModule, UserModule, WorkspaceModule, TicketModule, CommentModule, AttachmentModule, TypeOrmModule.forFeature([ProcessedEmailModel])],
-  controllers: [InboundEmailController],
+  controllers: [InboundEmailController, MailboxImportController],
   providers: [MtaHookAuthGuard, ImapPollingService, ProcessedEmailRepository],
 })
 export class EmailInboundModule {}
