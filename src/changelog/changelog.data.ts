@@ -36,6 +36,16 @@ export const coreChangelog: ChangelogVersion[] = [
         ],
       },
       {
+        title: { en: 'Mailbox Controls', es: 'Controles de Buzón' },
+        features: [
+          { en: 'Import all emails from a mailbox — process your entire inbox backlog with one click', es: 'Importa todos los emails de un buzón — procesa todo tu inbox acumulado con un click' },
+          { en: 'Poll Now — trigger an immediate check for new emails without waiting for the next interval', es: 'Consultar Ahora — lanza una verificación inmediata de nuevos emails sin esperar al próximo intervalo' },
+          { en: 'Pause and Resume polling — stop email processing temporarily and restart when ready', es: 'Pausar y Reanudar polling — detén el procesamiento de emails temporalmente y reinicia cuando estés listo' },
+          { en: 'Live countdown showing last poll time, duration, and next poll — auto-refreshes every 5 seconds', es: 'Contador en vivo mostrando último poll, duración y próximo poll — se actualiza cada 5 segundos' },
+          { en: 'All emails in the mailbox are now processed regardless of the To: address', es: 'Todos los emails del buzón se procesan ahora sin importar la dirección To:' },
+        ],
+      },
+      {
         title: { en: 'Multi-Frontend Support', es: 'Soporte Multi-Frontend' },
         features: [
           { en: 'Email links (password reset, invitations) now point to the correct frontend when multiple domains are configured', es: 'Los enlaces en correos (recuperación, invitaciones) ahora apuntan al frontend correcto cuando hay múltiples dominios configurados' },
