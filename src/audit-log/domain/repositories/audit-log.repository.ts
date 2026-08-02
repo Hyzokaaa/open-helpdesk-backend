@@ -6,6 +6,9 @@ export interface AuditLogFilters {
   action?: string;
   entityType?: string;
   entityId?: string;
+  category?: string;
+  level?: string;
+  source?: string;
   dateFrom?: Date;
   dateTo?: Date;
   sortOrder?: 'ASC' | 'DESC';
@@ -15,6 +18,11 @@ export interface AuditLogRepository {
   create(entry: AuditLogEntry): Promise<void>;
   findAll(
     workspaceId: string | null,
+    filters: AuditLogFilters,
+    page: number,
+    limit: number,
+  ): Promise<PaginatedResult<AuditLogEntry>>;
+  findAllUnscoped(
     filters: AuditLogFilters,
     page: number,
     limit: number,

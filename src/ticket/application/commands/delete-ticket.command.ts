@@ -5,6 +5,8 @@ import { EnsureWorkspacePermission } from '../../../workspace/domain/services/wo
 import { PERMISSIONS } from '../../../workspace/domain/permissions';
 import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 import { TicketRepository } from '../../domain/repositories/ticket.repository';
 
 interface Props {
@@ -36,6 +38,9 @@ export class DeleteTicketCommand implements Command<Props, void> {
 
     await this.createAuditLog.execute({
       action: AuditAction.TICKET_DELETED,
+      category: AuditCategory.TICKET,
+      level: AuditLevel.INFO,
+      source: 'ui',
       entityType: 'ticket',
       entityId: props.ticketId,
       userId: props.userId,

@@ -3,6 +3,8 @@ import { AccessDeniedError } from '../../../shared/domain/errors';
 import { ToggleUserActive } from '../../domain/services/user-toggle-active';
 import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 
 interface Props {
   targetUserId: string;
@@ -34,6 +36,9 @@ export class ToggleUserActiveCommand implements Command<Props, ToggleUserActiveR
 
     await this.createAuditLog.execute({
       action: props.isActive ? AuditAction.USER_ACTIVATED : AuditAction.USER_DEACTIVATED,
+      category: AuditCategory.USER,
+      level: AuditLevel.INFO,
+      source: 'ui',
       entityType: 'user',
       entityId: props.targetUserId,
       userId: props.requestingUserId,

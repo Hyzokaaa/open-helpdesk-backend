@@ -4,6 +4,8 @@ import { AddWorkspaceMember } from '../../domain/services/workspace-add-member';
 import { WorkspaceRole } from '../../domain/enums/workspace-role.enum';
 import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 import { CreateMailbox } from '../../../mailbox/domain/services/mailbox-create';
 
 interface Props {
@@ -59,6 +61,9 @@ export class CreateWorkspaceCommand implements Command<Props, CreateWorkspaceRes
       userId: props.creatorUserId,
       workspaceId: workspace.getId(),
       metadata: { name: workspace.name, slug: workspace.slug },
+      category: AuditCategory.WORKSPACE,
+      level: AuditLevel.INFO,
+      source: 'ui',
     });
 
     return { id: workspace.getId(), name: workspace.name, slug: workspace.slug, supportEmail };

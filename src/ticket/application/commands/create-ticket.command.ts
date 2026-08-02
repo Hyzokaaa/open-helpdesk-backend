@@ -9,6 +9,8 @@ import { PERMISSIONS } from '../../../workspace/domain/permissions';
 import { TicketCreatedEvent } from '../../../email/domain/events';
 import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 import { ValidateCustomFieldValues } from '../../../custom-field/domain/services/custom-field-validate-values';
 import { ClaimStagedAttachments } from '../../../attachment/domain/services/attachment-claim-staged';
 
@@ -93,6 +95,9 @@ export class CreateTicketCommand implements Command<Props, CreateTicketResponse>
 
     await this.createAuditLog.execute({
       action: AuditAction.TICKET_CREATED,
+      category: AuditCategory.TICKET,
+      level: AuditLevel.INFO,
+      source: 'ui',
       entityType: 'ticket',
       entityId: ticket.getId(),
       userId: props.userId,

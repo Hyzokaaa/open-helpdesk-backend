@@ -8,6 +8,11 @@ import { PERMISSIONS } from '../../../../workspace/domain/permissions';
 import { TypeOrmWorkspaceRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository';
 import { TypeOrmWorkspaceMemberRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
 import { TypeOrmMailboxRepository } from '../../typeorm/repositories/typeorm-mailbox.repository';
+import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
+import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit-log-create';
+import { AuditAction } from '../../../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
 import { CreateImapMailbox } from '../../../domain/services/mailbox-create-imap';
 import { UpdateMailbox } from '../../../domain/services/mailbox-update';
 import { DeleteMailbox } from '../../../domain/services/mailbox-delete';
@@ -20,6 +25,7 @@ export class MailboxController {
     @Inject() private readonly workspaceRepository: TypeOrmWorkspaceRepository,
     @Inject() private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
     @Inject() private readonly idGenerator: UlidGenerator,
+    @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
   ) {}
 
   @Get()
@@ -77,6 +83,19 @@ export class MailboxController {
       pollInterval: body.pollInterval,
     });
 
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.MAILBOX_CREATED,
+      entityType: 'mailbox',
+      entityId: mailbox.getId(),
+      userId: user.userId,
+      workspaceId: workspaceId,
+      metadata: { address: mailbox.address, type: mailbox.type },
+      category: AuditCategory.CONFIG,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
     return {
       id: mailbox.getId(),
       address: mailbox.address,
@@ -112,6 +131,19 @@ export class MailboxController {
 
     const service = new UpdateMailbox(this.mailboxRepository);
     const mailbox = await service.execute({ id: mailboxId, ...body });
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.MAILBOX_UPDATED,
+      entityType: 'mailbox',
+      entityId: mailbox.getId(),
+      userId: user.userId,
+      workspaceId: workspaceId,
+      metadata: { address: mailbox.address },
+      category: AuditCategory.CONFIG,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
 
     return {
       id: mailbox.getId(),
@@ -174,9 +206,36 @@ export class MailboxController {
 
       try { await client.logout(); } catch { /* ignore */ }
 
+      const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+      await auditLog.execute({
+        action: AuditAction.MAILBOX_TEST_CONNECTION,
+        entityType: 'mailbox',
+        entityId: body.mailboxId ?? workspaceId,
+        userId: user.userId,
+        workspaceId,
+        metadata: { host: body.imapHost, port: body.imapPort, success: true },
+        category: AuditCategory.CONFIG,
+        level: AuditLevel.INFO,
+        source: 'ui',
+      });
+
       return { success: true, folders };
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Connection failed';
+
+      const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+      await auditLog.execute({
+        action: AuditAction.MAILBOX_TEST_CONNECTION,
+        entityType: 'mailbox',
+        entityId: body.mailboxId ?? workspaceId,
+        userId: user.userId,
+        workspaceId,
+        metadata: { host: body.imapHost, port: body.imapPort, success: false, error: msg },
+        category: AuditCategory.CONFIG,
+        level: AuditLevel.WARNING,
+        source: 'ui',
+      });
+
       return { success: false, error: msg, folders: [] };
     }
   }
@@ -197,6 +256,19 @@ export class MailboxController {
 
     const service = new DeleteMailbox(this.mailboxRepository);
     await service.execute(mailboxId);
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.MAILBOX_DELETED,
+      entityType: 'mailbox',
+      entityId: mailboxId,
+      userId: user.userId,
+      workspaceId: workspaceId,
+      metadata: { address: existing.address },
+      category: AuditCategory.CONFIG,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
   }
 
   private async resolveWorkspaceId(slug: string): Promise<string> {

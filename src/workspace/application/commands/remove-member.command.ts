@@ -4,6 +4,8 @@ import { EnsureWorkspacePermission } from '../../domain/services/workspace-ensur
 import { PERMISSIONS } from '../../domain/permissions';
 import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 
 interface Props {
   workspaceId: string;
@@ -40,6 +42,9 @@ export class RemoveMemberCommand implements Command<Props, void> {
       userId: props.requestingUserId,
       workspaceId: props.workspaceId,
       metadata: { target: props.targetLabel },
+      category: AuditCategory.WORKSPACE,
+      level: AuditLevel.INFO,
+      source: 'ui',
     });
   }
 }

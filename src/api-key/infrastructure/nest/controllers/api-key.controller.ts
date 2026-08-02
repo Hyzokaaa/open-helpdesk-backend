@@ -11,6 +11,11 @@ import { CurrentUser } from '../../../../shared/nest/decorators/current-user.dec
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
 import { EntityNotFoundError } from '../../../../shared/domain/errors';
+import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
+import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit-log-create';
+import { AuditAction } from '../../../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
 import { CreateApiKey } from '../../../domain/services/api-key-create';
 import { DeleteApiKey } from '../../../domain/services/api-key-delete';
 import { CreateApiKeyCommand } from '../../../application/commands/create-api-key.command';
@@ -29,6 +34,7 @@ export class ApiKeyController {
     @Inject() private readonly workspaceRepository: TypeOrmWorkspaceRepository,
     @Inject() private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
     @Inject() private readonly idGenerator: UlidGenerator,
+    @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
   ) {}
 
   @Post()
@@ -41,7 +47,7 @@ export class ApiKeyController {
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new CreateApiKey(this.idGenerator, this.apiKeyRepository);
     const command = new CreateApiKeyCommand(service, ensurePermission);
-    return command.execute({
+    const result = await command.execute({
       workspaceId: workspace.getId(),
       name: body.name,
       scopes: body.scopes,
@@ -49,6 +55,21 @@ export class ApiKeyController {
       userId: user.userId,
       isSystemAdmin: user.isSystemAdmin,
     });
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.API_KEY_CREATED,
+      entityType: 'api-key',
+      entityId: result.id,
+      userId: user.userId,
+      workspaceId: workspace.getId(),
+      metadata: { name: body.name },
+      category: AuditCategory.CONFIG,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
+    return result;
   }
 
   @Get()
@@ -74,14 +95,30 @@ export class ApiKeyController {
   ) {
     const workspace = await this.resolveWorkspace(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    const existing = await this.apiKeyRepository.findById(id);
     const service = new DeleteApiKey(this.apiKeyRepository);
     const command = new DeleteApiKeyCommand(service, ensurePermission);
-    return command.execute({
+    const result = await command.execute({
       id,
       workspaceId: workspace.getId(),
       userId: user.userId,
       isSystemAdmin: user.isSystemAdmin,
     });
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.API_KEY_DELETED,
+      entityType: 'api-key',
+      entityId: id,
+      userId: user.userId,
+      workspaceId: workspace.getId(),
+      metadata: { name: existing?.name },
+      category: AuditCategory.CONFIG,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
+    return result;
   }
 
   private async resolveWorkspace(slug: string) {

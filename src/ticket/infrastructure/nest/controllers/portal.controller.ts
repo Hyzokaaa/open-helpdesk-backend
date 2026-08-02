@@ -36,6 +36,11 @@ import { TypeOrmCommentRepository } from '../../../../comment/infrastructure/typ
 import { TypeOrmAttachmentRepository } from '../../../../attachment/infrastructure/typeorm/repositories/typeorm-attachment.repository';
 import { TypeOrmCustomFieldDefinitionRepository } from '../../../../custom-field/infrastructure/typeorm/repositories/typeorm-custom-field-definition.repository';
 import { ValidateCustomFieldValues } from '../../../../custom-field/domain/services/custom-field-validate-values';
+import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
+import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit-log-create';
+import { AuditAction } from '../../../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
 import { CreatePortalTicketRequest } from '../dto/create-portal-ticket.request';
 import { CreatePortalCommentRequest } from '../dto/create-portal-comment.request';
 
@@ -54,6 +59,7 @@ export class PortalController {
     @Inject() private readonly s3Storage: S3StorageService,
     @Inject() private readonly customFieldDefinitionRepository: TypeOrmCustomFieldDefinitionRepository,
     @Inject() private readonly commentRepository: TypeOrmCommentRepository,
+    @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
   ) {}
 
   @Get(':slug')
@@ -167,6 +173,19 @@ export class PortalController {
     };
     this.eventPublisher.emit('ticket.created', event);
 
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.PORTAL_TICKET_CREATED,
+      entityType: 'ticket',
+      entityId: ticket.getId(),
+      userId: user.getId(),
+      workspaceId: workspace.getId(),
+      metadata: { ticketNumber: ticket.ticketNumber, email: body.email },
+      category: AuditCategory.TICKET,
+      level: AuditLevel.INFO,
+      source: 'portal',
+    });
+
     return {
       ticketNumber: ticket.ticketNumber,
       portalToken: ticket.portalToken,
@@ -238,10 +257,23 @@ export class PortalController {
     if (!ticket) throw new EntityNotFoundError('Ticket not found');
 
     const createComment = new CreateComment(this.idGenerator, this.commentRepository);
-    await createComment.execute({
+    const comment = await createComment.execute({
       content: body.content,
       ticketId: ticket.getId(),
       authorId: ticket.creatorId,
+    });
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.PORTAL_COMMENT_CREATED,
+      category: AuditCategory.TICKET,
+      level: AuditLevel.INFO,
+      source: 'portal',
+      entityType: 'comment',
+      entityId: comment.getId(),
+      userId: ticket.creatorId,
+      workspaceId: ticket.workspaceId,
+      metadata: { ticketId: ticket.getId() },
     });
 
     return { message: 'Comment added' };

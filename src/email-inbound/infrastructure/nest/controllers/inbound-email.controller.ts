@@ -24,6 +24,11 @@ import { MtaHookAuthGuard } from '../guards/mta-hook-auth.guard';
 import { MtaHookPayload } from '../dto/mta-hook-payload.dto';
 import { ProcessedEmailRepository } from '../../typeorm/repositories/processed-email.repository';
 import { ConfigService } from '@nestjs/config';
+import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
+import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit-log-create';
+import { AuditAction } from '../../../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
 
 @Public()
 @Throttle({ default: { ttl: 60000, limit: 300 } })
@@ -47,6 +52,7 @@ export class InboundEmailController {
     @Inject() private readonly attachmentRepository: TypeOrmAttachmentRepository,
     @Inject() private readonly storageService: S3StorageService,
     @Inject() private readonly config: ConfigService,
+    @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
   ) {
     this.emailDomain = config.get<string>('EMAIL_DOMAIN');
   }
@@ -96,6 +102,19 @@ export class InboundEmailController {
       if (messageId) {
         await this.processedEmailRepository.markProcessed(messageId);
       }
+
+      const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+      await auditLog.execute({
+        action: AuditAction.INBOUND_EMAIL_PROCESSED,
+        entityType: 'email',
+        entityId: messageId ?? 'unknown',
+        userId: null,
+        workspaceId: null,
+        metadata: { messageId },
+        category: AuditCategory.EMAIL,
+        level: AuditLevel.INFO,
+        source: 'system',
+      }).catch(() => {});
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Failed to process inbound email: ${msg}`);

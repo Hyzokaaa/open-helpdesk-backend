@@ -9,6 +9,11 @@ import { TypeOrmWorkspaceMemberRepository } from '../../../workspace/infrastruct
 import { TypeOrmWorkspaceRepository } from '../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository';
 import { TypeOrmTicketRepository } from '../../../ticket/infrastructure/typeorm/repositories/typeorm-ticket.repository';
 import { TypeOrmCommentRepository } from '../../../comment/infrastructure/typeorm/repositories/typeorm-comment.repository';
+import { TypeOrmAuditLogRepository } from '../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
+import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
+import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 import { CreateUser } from '../../../user/domain/services/user-create';
 import { AddWorkspaceMember } from '../../../workspace/domain/services/workspace-add-member';
 import { CreateTicket } from '../../../ticket/domain/services/ticket-create';
@@ -63,6 +68,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     @Inject() private readonly processedEmailRepository: ProcessedEmailRepository,
     @Inject() private readonly attachmentRepository: TypeOrmAttachmentRepository,
     @Inject() private readonly storageService: S3StorageService,
+    @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
     private readonly config: ConfigService,
   ) {
     this.emailDomain = config.get<string>('EMAIL_DOMAIN');
@@ -190,6 +196,8 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     const pollStart = Date.now();
 
     try {
+      this.emitAudit(AuditAction.IMAP_POLL_STARTED, mailbox.getId(), mailbox.workspaceId, { address: mailbox.address }).catch(() => {});
+
       const fetched = await this.fetchMessages({
         host: mailbox.imapHost!,
         port: mailbox.imapPort!,
@@ -209,7 +217,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
         let count = 0;
 
         for (const msg of fetched) {
-          const wasProcessed = await this.processMessage(msg, parser, router, mailbox.getId());
+          const wasProcessed = await this.processMessage(msg, parser, router, mailbox.getId(), mailbox.workspaceId);
           if (wasProcessed) count++;
         }
 
@@ -222,11 +230,15 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       mailbox.lastError = null;
       await this.mailboxRepository.update(mailbox);
 
+      this.emitAudit(AuditAction.IMAP_POLL_COMPLETED, mailbox.getId(), mailbox.workspaceId, { address: mailbox.address, fetched: fetched.length, duration: Date.now() - pollStart }).catch(() => {});
+
       state.backoff = 1000;
       state.timer = setTimeout(() => this.pollMailbox(mailbox, state), (mailbox.pollInterval ?? 30) * 1000);
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : 'Unknown error';
       this.logger.error(`IMAP [${mailbox.address}] poll failed: ${errMsg}`);
+
+      this.emitAudit(AuditAction.IMAP_POLL_FAILED, mailbox.getId(), mailbox.workspaceId, { address: mailbox.address, error: errMsg }, AuditLevel.ERROR).catch(() => {});
 
       // Mark error
       mailbox.lastError = errMsg;
@@ -332,7 +344,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     return results;
   }
 
-  private async processMessage(msg: FetchedMessage, parser: ImapEmailParser, router: RouteInboundEmail, mailboxId?: string): Promise<boolean> {
+  private async processMessage(msg: FetchedMessage, parser: ImapEmailParser, router: RouteInboundEmail, mailboxId?: string, workspaceId?: string): Promise<boolean> {
     try {
       if (msg.envelope.messageId) {
         const alreadyProcessed = await this.processedEmailRepository.exists(msg.envelope.messageId);
@@ -349,6 +361,10 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
 
       if (msg.envelope.messageId) {
         await this.processedEmailRepository.markProcessed(msg.envelope.messageId);
+      }
+
+      if (mailboxId) {
+        this.emitAudit(AuditAction.EMAIL_RECEIVED, mailboxId, workspaceId ?? null, { from: parsed.fromAddress, subject: parsed.subject, action: result.action, ticketId: result.ticketId ?? null }).catch(() => {});
       }
 
       return true;
@@ -409,6 +425,25 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     return text
       .replace(/=\r?\n/g, '')
       .replace(/=([0-9A-Fa-f]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+  }
+
+  private async emitAudit(action: AuditAction, mailboxId: string, workspaceId: string | null, metadata: Record<string, unknown>, level: AuditLevel = AuditLevel.INFO): Promise<void> {
+    try {
+      const service = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+      await service.execute({
+        action,
+        entityType: 'mailbox',
+        entityId: mailboxId,
+        userId: null,
+        workspaceId: workspaceId ?? null,
+        metadata,
+        category: AuditCategory.EMAIL,
+        level,
+        source: 'system',
+      });
+    } catch {
+      // fire-and-forget: never break polling loop
+    }
   }
 
   private createRouter(): RouteInboundEmail {

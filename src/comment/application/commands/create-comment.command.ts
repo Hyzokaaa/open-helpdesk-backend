@@ -8,6 +8,8 @@ import { UserRepository } from '../../../user/domain/repositories/user.repositor
 import { NewCommentEvent } from '../../../email/domain/events';
 import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 import { AddTicketParticipant } from '../../../ticket/domain/services/ticket-add-participant';
 import { ParticipantRole } from '../../../ticket/domain/enums/participant-role.enum';
 
@@ -87,6 +89,9 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
     if (ticket && workspace) {
       await this.createAuditLog.execute({
         action: AuditAction.COMMENT_CREATED,
+        category: AuditCategory.TICKET,
+        level: AuditLevel.INFO,
+        source: 'ui',
         entityType: 'ticket',
         entityId: props.ticketId,
         userId: props.authorId,

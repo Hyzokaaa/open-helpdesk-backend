@@ -46,6 +46,64 @@ export class TypeOrmAuditLogRepository implements AuditLogRepository {
     if (filters.entityId) {
       qb.andWhere('audit.entityId = :entityId', { entityId: filters.entityId });
     }
+    if (filters.category) {
+      qb.andWhere('audit.category = :category', { category: filters.category });
+    }
+    if (filters.level) {
+      qb.andWhere('audit.level = :level', { level: filters.level });
+    }
+    if (filters.source) {
+      qb.andWhere('audit.source = :source', { source: filters.source });
+    }
+    if (filters.dateFrom) {
+      qb.andWhere('audit.createdAt >= :dateFrom', { dateFrom: filters.dateFrom });
+    }
+    if (filters.dateTo) {
+      qb.andWhere('audit.createdAt <= :dateTo', { dateTo: filters.dateTo });
+    }
+
+    const sortOrder = filters.sortOrder === 'ASC' ? 'ASC' : 'DESC';
+    qb.orderBy('audit.createdAt', sortOrder);
+    qb.skip((page - 1) * limit).take(limit);
+
+    const [models, total] = await qb.getManyAndCount();
+
+    return {
+      items: models.map((m) => this.toDomain(m)),
+      total,
+      page,
+      limit,
+    };
+  }
+
+  async findAllUnscoped(
+    filters: AuditLogFilters,
+    page: number,
+    limit: number,
+  ): Promise<PaginatedResult<AuditLogEntry>> {
+    const qb = this.repository.createQueryBuilder('audit');
+
+    if (filters.userId) {
+      qb.andWhere('audit.userId = :userId', { userId: filters.userId });
+    }
+    if (filters.action) {
+      qb.andWhere('audit.action = :action', { action: filters.action });
+    }
+    if (filters.entityType) {
+      qb.andWhere('audit.entityType = :entityType', { entityType: filters.entityType });
+    }
+    if (filters.entityId) {
+      qb.andWhere('audit.entityId = :entityId', { entityId: filters.entityId });
+    }
+    if (filters.category) {
+      qb.andWhere('audit.category = :category', { category: filters.category });
+    }
+    if (filters.level) {
+      qb.andWhere('audit.level = :level', { level: filters.level });
+    }
+    if (filters.source) {
+      qb.andWhere('audit.source = :source', { source: filters.source });
+    }
     if (filters.dateFrom) {
       qb.andWhere('audit.createdAt >= :dateFrom', { dateFrom: filters.dateFrom });
     }
@@ -76,6 +134,9 @@ export class TypeOrmAuditLogRepository implements AuditLogRepository {
       userId: model.userId,
       workspaceId: model.workspaceId,
       metadata: model.metadata,
+      category: model.category,
+      level: model.level,
+      source: model.source,
       createdAt: model.createdAt,
     });
   }
@@ -89,6 +150,9 @@ export class TypeOrmAuditLogRepository implements AuditLogRepository {
     model.userId = entry.userId;
     model.workspaceId = entry.workspaceId;
     model.metadata = entry.metadata;
+    model.category = entry.category;
+    model.level = entry.level;
+    model.source = entry.source;
     return model;
   }
 }

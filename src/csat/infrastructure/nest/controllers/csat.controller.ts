@@ -9,6 +9,12 @@ import { Response } from 'express';
 import { Public } from '../../../../shared/nest/decorators/public.decorator';
 import { CsatRating } from '../../../domain/enums/csat-rating.enum';
 import { TypeOrmCsatResponseRepository } from '../../typeorm/repositories/typeorm-csat-response.repository';
+import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
+import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
+import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit-log-create';
+import { AuditAction } from '../../../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
 
 const VALID_RATINGS = Object.values(CsatRating);
 
@@ -41,6 +47,8 @@ function thankYouHtml(alreadyResponded: boolean, lang: string): string {
 export class CsatController {
   constructor(
     @Inject() private readonly csatRepository: TypeOrmCsatResponseRepository,
+    @Inject() private readonly idGenerator: UlidGenerator,
+    @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
   ) {}
 
   @Public()
@@ -66,6 +74,19 @@ export class CsatController {
     csatResponse.rating = rating as CsatRating;
     csatResponse.respondedAt = new Date();
     await this.csatRepository.update(csatResponse);
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.CSAT_RATING_SUBMITTED,
+      entityType: 'csat',
+      entityId: csatResponse.getId(),
+      userId: null,
+      workspaceId: null,
+      metadata: { rating, token },
+      category: AuditCategory.TICKET,
+      level: AuditLevel.INFO,
+      source: 'portal',
+    });
 
     return res.send(thankYouHtml(false, 'en'));
   }

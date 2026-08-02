@@ -8,6 +8,8 @@ import { PERMISSIONS } from '../../../workspace/domain/permissions';
 import { TicketAssignedEvent } from '../../../email/domain/events';
 import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 
 interface Props {
   ticketId: string;
@@ -66,6 +68,9 @@ export class AssignTicketCommand implements Command<Props, AssignTicketResponse>
 
     await this.createAuditLog.execute({
       action: AuditAction.TICKET_ASSIGNED,
+      category: AuditCategory.TICKET,
+      level: AuditLevel.INFO,
+      source: 'ui',
       entityType: 'ticket',
       entityId: props.ticketId,
       userId: props.userId,
