@@ -147,6 +147,41 @@ export class UserController {
     return result;
   }
 
+  @SkipEmailVerification()
+  @Patch('me/date-format')
+  async updateDateFormat(
+    @Body() body: { dateFormat: string },
+    @CurrentUser() authUser: AuthUser,
+  ) {
+    const validFormats = ['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'];
+    if (!validFormats.includes(body.dateFormat)) {
+      throw new Error('Invalid date format');
+    }
+
+    const existing = await this.userRepository.findById(authUser.userId);
+    const service = new UpdateUserProfile(this.userRepository);
+    const command = new UpdateUserProfileCommand(service);
+    const result = await command.execute({
+      userId: authUser.userId,
+      dateFormat: body.dateFormat,
+    });
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.USER_DATE_FORMAT_CHANGED,
+      entityType: 'user',
+      entityId: authUser.userId,
+      userId: authUser.userId,
+      workspaceId: null,
+      metadata: { before: existing?.dateFormat, after: body.dateFormat },
+      category: AuditCategory.USER,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
+    return result;
+  }
+
   @Patch('me/password')
   async changePassword(
     @Body() body: { currentPassword: string; newPassword: string },

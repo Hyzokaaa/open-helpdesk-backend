@@ -36,6 +36,7 @@ export enum AuditAction {
   // Invitations
   INVITATION_CREATED = 'invitation-created',
   INVITATION_BATCH_CREATED = 'invitation-batch-created',
+  INVITATION_RESENT = 'invitation-resent',
   INVITATION_CANCELLED = 'invitation-cancelled',
   INVITATION_ACCEPTED = 'invitation-accepted',
   INVITATION_REJECTED = 'invitation-rejected',
@@ -49,6 +50,7 @@ export enum AuditAction {
   USER_NAME_UPDATED = 'user-name-updated',
   USER_LANGUAGE_CHANGED = 'user-language-changed',
   USER_THEME_CHANGED = 'user-theme-changed',
+  USER_DATE_FORMAT_CHANGED = 'user-date-format-changed',
   USER_PASSWORD_CHANGED = 'user-password-changed',
 
   // Auth

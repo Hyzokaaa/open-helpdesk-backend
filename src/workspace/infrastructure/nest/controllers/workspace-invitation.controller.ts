@@ -21,6 +21,7 @@ import { EnsureWorkspacePermission } from '../../../domain/services/workspace-en
 import { PERMISSIONS } from '../../../domain/permissions';
 import { CreateInvitation } from '../../../domain/services/invitation-create';
 import { CancelInvitation } from '../../../domain/services/invitation-cancel';
+import { ResendInvitation } from '../../../domain/services/invitation-resend';
 import { CreateInvitationCommand } from '../../../application/commands/create-invitation.command';
 import { CancelInvitationCommand } from '../../../application/commands/cancel-invitation.command';
 import { ListInvitationsQuery } from '../../../application/queries/list-invitations.query';
@@ -225,6 +226,59 @@ export class WorkspaceInvitationController {
     }
     const frontendUrl = resolveFrontendUrl(req, this.allowedFrontendUrls, this.frontendUrl);
     return { link: `${frontendUrl}/invite/${invitation.token}` };
+  }
+
+  @Post(':slug/invitations/:id/resend')
+  async resend(
+    @Param('slug') slug: string,
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+    @Req() req: Request,
+  ) {
+    const frontendUrl = resolveFrontendUrl(req, this.allowedFrontendUrls, this.frontendUrl);
+    const workspace = await this.resolveWorkspace(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId: workspace.getId(),
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_INVITATIONS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+
+    const service = new ResendInvitation(this.invitationRepository);
+    const invitation = await service.execute({ invitationId: id });
+
+    const inviter = await this.userRepository.findById(user.userId);
+    const inviterName = inviter ? `${inviter.firstName} ${inviter.lastName}` : '';
+    const invitationUrl = `${frontendUrl}/invite/${invitation.token}`;
+
+    const sender = await this.emailSenderRepository.findByWorkspaceId(workspace.getId());
+    try {
+      await sendWorkspaceEmail(this.emailService, sender, invitationEmail({
+        to: invitation.email,
+        workspaceName: workspace.name,
+        inviterName,
+        invitationUrl,
+        lang: 'en',
+      }));
+    } catch {
+      // Email failure should not fail the resend
+    }
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.INVITATION_RESENT,
+      entityType: 'invitation',
+      entityId: id,
+      userId: user.userId,
+      workspaceId: workspace.getId(),
+      metadata: { email: invitation.email },
+      category: AuditCategory.WORKSPACE,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
+    return { id: invitation.getId(), email: invitation.email, expiresAt: invitation.expiresAt };
   }
 
   @Delete(':slug/invitations/:id')

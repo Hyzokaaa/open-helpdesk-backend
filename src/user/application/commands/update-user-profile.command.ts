@@ -7,6 +7,7 @@ interface Props {
   lastName?: string;
   language?: string;
   theme?: string;
+  dateFormat?: string;
 }
 
 export interface UpdateUserProfileResponse {
@@ -14,6 +15,7 @@ export interface UpdateUserProfileResponse {
   lastName: string;
   language: string;
   theme: string;
+  dateFormat: string;
 }
 
 export class UpdateUserProfileCommand implements Command<Props, UpdateUserProfileResponse> {
@@ -26,6 +28,7 @@ export class UpdateUserProfileCommand implements Command<Props, UpdateUserProfil
       lastName: props.lastName,
       language: props.language,
       theme: props.theme,
+      dateFormat: props.dateFormat,
     });
 
     return {
@@ -33,6 +36,7 @@ export class UpdateUserProfileCommand implements Command<Props, UpdateUserProfil
       lastName: user.lastName,
       language: user.language,
       theme: user.theme,
+      dateFormat: user.dateFormat,
     };
   }
 }
