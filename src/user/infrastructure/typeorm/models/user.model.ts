@@ -41,6 +41,9 @@ export class UserModel {
   @Column({ default: 'DD/MM/YYYY' })
   dateFormat!: string;
 
+  @Column({ default: 'auto' })
+  timezone!: string;
+
   @Column({ default: false })
   autoCreated!: boolean;
 

@@ -8,6 +8,7 @@ interface Props {
   language?: string;
   theme?: string;
   dateFormat?: string;
+  timezone?: string;
 }
 
 export interface UpdateUserProfileResponse {
@@ -16,6 +17,7 @@ export interface UpdateUserProfileResponse {
   language: string;
   theme: string;
   dateFormat: string;
+  timezone: string;
 }
 
 export class UpdateUserProfileCommand implements Command<Props, UpdateUserProfileResponse> {
@@ -29,6 +31,7 @@ export class UpdateUserProfileCommand implements Command<Props, UpdateUserProfil
       language: props.language,
       theme: props.theme,
       dateFormat: props.dateFormat,
+      timezone: props.timezone,
     });
 
     return {
@@ -37,6 +40,7 @@ export class UpdateUserProfileCommand implements Command<Props, UpdateUserProfil
       language: user.language,
       theme: user.theme,
       dateFormat: user.dateFormat,
+      timezone: user.timezone,
     };
   }
 }

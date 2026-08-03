@@ -12,6 +12,7 @@ interface Props {
   language: string;
   theme: string;
   dateFormat?: string;
+  timezone?: string;
   autoCreated?: boolean;
   authProvider?: string | null;
 }
@@ -28,6 +29,7 @@ export class User {
   language: string;
   theme: string;
   dateFormat: string;
+  timezone: string;
   autoCreated: boolean;
   authProvider: string | null;
 
@@ -43,6 +45,7 @@ export class User {
     this.language = props.language;
     this.theme = props.theme;
     this.dateFormat = props.dateFormat ?? 'DD/MM/YYYY';
+    this.timezone = props.timezone ?? 'auto';
     this.autoCreated = props.autoCreated ?? false;
     this.authProvider = props.authProvider ?? null;
   }

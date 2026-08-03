@@ -51,6 +51,7 @@ export enum AuditAction {
   USER_LANGUAGE_CHANGED = 'user-language-changed',
   USER_THEME_CHANGED = 'user-theme-changed',
   USER_DATE_FORMAT_CHANGED = 'user-date-format-changed',
+  USER_TIMEZONE_CHANGED = 'user-timezone-changed',
   USER_PASSWORD_CHANGED = 'user-password-changed',
 
   // Auth

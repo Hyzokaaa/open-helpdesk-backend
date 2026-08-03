@@ -182,6 +182,36 @@ export class UserController {
     return result;
   }
 
+  @SkipEmailVerification()
+  @Patch('me/timezone')
+  async updateTimezone(
+    @Body() body: { timezone: string },
+    @CurrentUser() authUser: AuthUser,
+  ) {
+    const existing = await this.userRepository.findById(authUser.userId);
+    const service = new UpdateUserProfile(this.userRepository);
+    const command = new UpdateUserProfileCommand(service);
+    const result = await command.execute({
+      userId: authUser.userId,
+      timezone: body.timezone,
+    });
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.USER_TIMEZONE_CHANGED,
+      entityType: 'user',
+      entityId: authUser.userId,
+      userId: authUser.userId,
+      workspaceId: null,
+      metadata: { before: existing?.timezone, after: body.timezone },
+      category: AuditCategory.USER,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
+    return result;
+  }
+
   @Patch('me/password')
   async changePassword(
     @Body() body: { currentPassword: string; newPassword: string },
