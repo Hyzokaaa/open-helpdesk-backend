@@ -44,11 +44,15 @@ export class MailboxController {
       imapUser: m.imapUser,
       hasPassword: !!m.imapPass,
       imapTls: m.imapTls,
+      encryption: m.encryption,
       imapFolder: m.imapFolder,
       pollInterval: m.pollInterval,
       lastSyncAt: m.lastSyncAt,
       lastSyncDuration: m.lastSyncDuration,
       lastError: m.lastError,
+      addressMode: m.addressMode,
+      acceptedAddresses: m.acceptedAddresses,
+      autoReply: m.autoReply,
     }));
   }
 
@@ -62,8 +66,12 @@ export class MailboxController {
       imapUser: string;
       imapPass: string;
       imapTls?: boolean;
+      encryption?: string;
       imapFolder?: string;
       pollInterval?: number;
+      addressMode?: string;
+      acceptedAddresses?: string[];
+      autoReply?: boolean;
     },
     @CurrentUser() user: AuthUser,
   ) {
@@ -79,8 +87,12 @@ export class MailboxController {
       imapUser: body.imapUser,
       imapPass: body.imapPass,
       imapTls: body.imapTls,
+      encryption: body.encryption,
       imapFolder: body.imapFolder,
       pollInterval: body.pollInterval,
+      addressMode: body.addressMode,
+      acceptedAddresses: body.acceptedAddresses,
+      autoReply: body.autoReply,
     });
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
@@ -90,7 +102,15 @@ export class MailboxController {
       entityId: mailbox.getId(),
       userId: user.userId,
       workspaceId: workspaceId,
-      metadata: { address: mailbox.address, type: mailbox.type },
+      metadata: {
+        address: mailbox.address,
+        type: mailbox.type,
+        imapHost: mailbox.imapHost,
+        imapFolder: mailbox.imapFolder,
+        pollInterval: mailbox.pollInterval,
+        addressMode: mailbox.addressMode,
+        acceptedAddresses: mailbox.acceptedAddresses,
+      },
       category: AuditCategory.CONFIG,
       level: AuditLevel.INFO,
       source: 'ui',
@@ -116,8 +136,12 @@ export class MailboxController {
       imapUser?: string | null;
       imapPass?: string | null;
       imapTls?: boolean | null;
+      encryption?: string;
       imapFolder?: string | null;
       pollInterval?: number | null;
+      addressMode?: string;
+      acceptedAddresses?: string[];
+      autoReply?: boolean;
     },
     @CurrentUser() user: AuthUser,
   ) {
@@ -139,7 +163,25 @@ export class MailboxController {
       entityId: mailbox.getId(),
       userId: user.userId,
       workspaceId: workspaceId,
-      metadata: { address: mailbox.address },
+      metadata: {
+        address: mailbox.address,
+        before: {
+          imapHost: existing.imapHost,
+          imapFolder: existing.imapFolder,
+          pollInterval: existing.pollInterval,
+          addressMode: existing.addressMode,
+          acceptedAddresses: existing.acceptedAddresses,
+          isActive: existing.isActive,
+        },
+        after: {
+          imapHost: mailbox.imapHost,
+          imapFolder: mailbox.imapFolder,
+          pollInterval: mailbox.pollInterval,
+          addressMode: mailbox.addressMode,
+          acceptedAddresses: mailbox.acceptedAddresses,
+          isActive: mailbox.isActive,
+        },
+      },
       category: AuditCategory.CONFIG,
       level: AuditLevel.INFO,
       source: 'ui',
@@ -162,6 +204,7 @@ export class MailboxController {
       imapUser: string;
       imapPass: string;
       imapTls?: boolean;
+      encryption?: string;
       mailboxId?: string;
     },
     @CurrentUser() user: AuthUser,
@@ -186,10 +229,15 @@ export class MailboxController {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { ImapFlow } = require('imapflow');
 
+      const encryption = body.encryption ?? (body.imapTls === false ? 'none' : 'tls');
+      const secure = encryption === 'tls' || encryption === 'tls-insecure';
+      const tlsOptions = encryption === 'tls-insecure' ? { rejectUnauthorized: false } : undefined;
+
       const client = new ImapFlow({
         host: body.imapHost,
         port: body.imapPort,
-        secure: body.imapTls ?? true,
+        secure,
+        ...(tlsOptions && { tls: tlsOptions }),
         auth: { user: body.imapUser, pass: password },
         logger: false,
       });

@@ -149,6 +149,8 @@ export class RouteInboundEmail {
       workspaceName: workspace.name,
       workspaceSlug: workspace.slug,
       portalToken: ticket.portalToken,
+      source: 'email',
+      mailboxId: mailbox.getId(),
     };
     this.eventPublisher.emit('ticket.created', ticketEvent);
 

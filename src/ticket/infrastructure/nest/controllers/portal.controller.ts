@@ -170,6 +170,7 @@ export class PortalController {
       workspaceName: workspace.name,
       workspaceSlug: workspace.slug,
       portalToken,
+      source: 'portal',
     };
     this.eventPublisher.emit('ticket.created', event);
 

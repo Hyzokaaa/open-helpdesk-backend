@@ -90,6 +90,7 @@ export class CreateTicketCommand implements Command<Props, CreateTicketResponse>
       workspaceId: props.workspaceId,
       workspaceName: props.workspaceName,
       workspaceSlug: props.workspaceSlug,
+      source: 'ui',
     };
     this.eventPublisher.emit('ticket.created', event);
 

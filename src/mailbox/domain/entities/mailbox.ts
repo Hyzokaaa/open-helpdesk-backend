@@ -12,11 +12,15 @@ interface Props {
   imapUser?: string | null;
   imapPass?: string | null;
   imapTls?: boolean | null;
+  encryption?: string;
   imapFolder?: string | null;
   pollInterval?: number | null;
   lastSyncAt?: Date | null;
   lastSyncDuration?: number | null;
   lastError?: string | null;
+  addressMode?: string;
+  acceptedAddresses?: string[];
+  autoReply?: boolean;
 }
 
 export class Mailbox {
@@ -30,11 +34,15 @@ export class Mailbox {
   imapUser: string | null;
   imapPass: string | null;
   imapTls: boolean | null;
+  encryption: string;
   imapFolder: string | null;
   pollInterval: number | null;
   lastSyncAt: Date | null;
   lastSyncDuration: number | null;
   lastError: string | null;
+  addressMode: string;
+  acceptedAddresses: string[];
+  autoReply: boolean;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -47,11 +55,15 @@ export class Mailbox {
     this.imapUser = props.imapUser ?? null;
     this.imapPass = props.imapPass ?? null;
     this.imapTls = props.imapTls ?? null;
+    this.encryption = props.encryption ?? 'tls';
     this.imapFolder = props.imapFolder ?? null;
     this.pollInterval = props.pollInterval ?? null;
     this.lastSyncAt = props.lastSyncAt ?? null;
     this.lastSyncDuration = props.lastSyncDuration ?? null;
     this.lastError = props.lastError ?? null;
+    this.addressMode = props.addressMode ?? 'address';
+    this.acceptedAddresses = props.acceptedAddresses ?? [];
+    this.autoReply = props.autoReply ?? true;
   }
 
   getId(): string {

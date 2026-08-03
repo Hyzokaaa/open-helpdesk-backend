@@ -12,7 +12,10 @@ export class ImapEmailParser {
 
   async parse(envelope: ImapEnvelope, rawMime: string): Promise<ParsedInboundEmail> {
     const fromAddress = (envelope.from ?? '').toLowerCase();
-    const toAddresses = (envelope.to ?? []).map((a) => a.toLowerCase());
+    const toAddresses = [
+      ...(envelope.to ?? []),
+      ...(envelope.cc ?? []),
+    ].map((a) => a.toLowerCase());
     const subject = envelope.subject || '(No subject)';
 
     let inReplyToTicketId: string | null = null;
@@ -104,6 +107,7 @@ export class ImapEmailParser {
 export interface ImapEnvelope {
   from: string;
   to: string[];
+  cc: string[];
   subject: string;
   messageId: string;
   inReplyTo?: string;

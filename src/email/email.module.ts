@@ -16,13 +16,14 @@ import { SharedModule } from '../shared/shared.module';
 import { CsatModule } from '../csat/csat.module';
 import { TicketModule } from '../ticket/ticket.module';
 import { MailboxModule } from '../mailbox/mailbox.module';
+import { AuditLogModule } from '../audit-log/audit-log.module';
 import { EMAIL_SERVICE } from './email.constants';
 import { AdminEmailController } from './infrastructure/nest/controllers/admin-email.controller';
 import { CoreConfigModule } from '../config/config.module';
 import { TypeOrmSystemEmailSettingsRepository } from '../config/infrastructure/typeorm/repositories/typeorm-system-email-settings.repository';
 @Global()
 @Module({
-  imports: [UserModule, WorkspaceModule, NotificationModule, SharedModule, CsatModule, TicketModule, MailboxModule, CoreConfigModule],
+  imports: [UserModule, WorkspaceModule, NotificationModule, SharedModule, CsatModule, TicketModule, MailboxModule, AuditLogModule, CoreConfigModule],
   controllers: [AdminEmailController],
   providers: [
     {

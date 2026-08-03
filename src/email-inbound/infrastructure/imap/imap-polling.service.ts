@@ -98,6 +98,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       user: mailbox.imapUser,
       pass: mailbox.imapPass,
       tls: mailbox.imapTls ?? true,
+      encryption: mailbox.encryption,
       folder: mailbox.imapFolder ?? 'INBOX',
       since,
     });
@@ -108,7 +109,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     let processed = 0;
 
     for (const msg of fetched) {
-      const wasProcessed = await this.processMessage(msg, parser, router, mailbox.getId());
+      const wasProcessed = await this.processMessage(msg, parser, router, mailbox.getId(), mailbox.workspaceId, mailbox);
       if (wasProcessed) processed++;
     }
 
@@ -204,6 +205,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
         user: mailbox.imapUser!,
         pass: mailbox.imapPass!,
         tls: mailbox.imapTls ?? true,
+        encryption: mailbox.encryption,
         folder: mailbox.imapFolder ?? 'INBOX',
         since: state.lastPollTime,
       });
@@ -217,7 +219,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
         let count = 0;
 
         for (const msg of fetched) {
-          const wasProcessed = await this.processMessage(msg, parser, router, mailbox.getId(), mailbox.workspaceId);
+          const wasProcessed = await this.processMessage(msg, parser, router, mailbox.getId(), mailbox.workspaceId, mailbox);
           if (wasProcessed) count++;
         }
 
@@ -299,10 +301,15 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { ImapFlow } = require('imapflow');
 
+    const encryption = config.encryption ?? (config.tls ? 'tls' : 'none');
+    const secure = encryption === 'tls' || encryption === 'tls-insecure';
+    const tlsOptions = encryption === 'tls-insecure' ? { rejectUnauthorized: false } : undefined;
+
     const client = new ImapFlow({
       host: config.host,
       port: config.port,
-      secure: config.tls,
+      secure,
+      ...(tlsOptions && { tls: tlsOptions }),
       auth: { user: config.user, pass: config.pass },
       logger: false,
     });
@@ -344,7 +351,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     return results;
   }
 
-  private async processMessage(msg: FetchedMessage, parser: ImapEmailParser, router: RouteInboundEmail, mailboxId?: string, workspaceId?: string): Promise<boolean> {
+  private async processMessage(msg: FetchedMessage, parser: ImapEmailParser, router: RouteInboundEmail, mailboxId?: string, workspaceId?: string, mailbox?: Mailbox): Promise<boolean> {
     try {
       if (msg.envelope.messageId) {
         const alreadyProcessed = await this.processedEmailRepository.exists(msg.envelope.messageId);
@@ -353,6 +360,28 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
 
       const parsed = await parser.parse(msg.envelope, msg.body);
       if (mailboxId) parsed.mailboxId = mailboxId;
+
+      // Address filtering based on mode
+      if (mailbox && mailbox.addressMode !== 'all') {
+        const recipients = parsed.toAddresses.map(a => a.toLowerCase());
+        let accepted: string[];
+
+        if (mailbox.addressMode === 'aliases') {
+          accepted = [mailbox.address.toLowerCase(), ...mailbox.acceptedAddresses.map(a => a.toLowerCase())];
+        } else {
+          // 'address' mode (default): only the main mailbox address
+          accepted = [mailbox.address.toLowerCase()];
+        }
+
+        const matches = recipients.some(r => accepted.includes(r));
+
+        if (!matches) {
+          if (msg.envelope.messageId) {
+            await this.processedEmailRepository.markProcessed(msg.envelope.messageId);
+          }
+          return false;
+        }
+      }
 
       this.logger.log(`IMAP: processing email from ${parsed.fromAddress} — subject: ${parsed.subject}`);
 
@@ -376,15 +405,17 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
   }
 
   private configHash(mailbox: Mailbox): string {
-    return `${mailbox.imapHost}:${mailbox.imapPort}:${mailbox.imapUser}:${mailbox.imapTls}:${mailbox.imapFolder}:${mailbox.pollInterval}:${mailbox.isActive}`;
+    return `${mailbox.imapHost}:${mailbox.imapPort}:${mailbox.imapUser}:${mailbox.imapTls}:${mailbox.encryption}:${mailbox.imapFolder}:${mailbox.pollInterval}:${mailbox.isActive}:${mailbox.addressMode}:${JSON.stringify(mailbox.acceptedAddresses)}`;
   }
 
   private mapEnvelope(envelope: any): ImapEnvelope {
     const from = envelope.from?.[0]?.address ?? '';
     const to = (envelope.to ?? []).map((a: any) => a.address ?? '');
+    const cc = (envelope.cc ?? []).map((a: any) => a.address ?? '');
     return {
       from,
       to,
+      cc,
       subject: envelope.subject ?? '',
       messageId: envelope.messageId ?? '',
       inReplyTo: envelope.inReplyTo ?? undefined,
@@ -475,6 +506,7 @@ interface ImapConfig {
   user: string;
   pass: string;
   tls: boolean;
+  encryption?: string;
   folder: string;
   since: Date | null;
 }
