@@ -35,6 +35,7 @@ export interface NewCommentEvent {
   workspaceId: string;
   workspaceName: string;
   workspaceSlug: string;
+  mailboxId?: string | null;
 }
 
 export interface StatusChangedEvent {

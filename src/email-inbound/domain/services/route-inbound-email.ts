@@ -112,6 +112,7 @@ export class RouteInboundEmail {
             workspaceId: workspace.getId(),
             workspaceName: workspace.name,
             workspaceSlug: workspace.slug,
+            mailboxId: mailbox.getId(),
           };
           this.eventPublisher.emit('comment.created', event);
         }
@@ -136,6 +137,7 @@ export class RouteInboundEmail {
       creatorId: user.getId(),
       tagIds: [],
       portalToken: randomUUID(),
+      mailboxId: mailbox.getId(),
     });
 
     const ticketEvent: TicketCreatedEvent = {

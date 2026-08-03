@@ -72,6 +72,7 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
         workspaceId: workspace.getId(),
         workspaceName: workspace.name,
         workspaceSlug: workspace.slug,
+        mailboxId: ticket.mailboxId,
       };
       this.eventPublisher.emit('comment.created', event);
 

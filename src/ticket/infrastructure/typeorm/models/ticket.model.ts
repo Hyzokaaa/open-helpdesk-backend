@@ -81,6 +81,9 @@ export class TicketModel {
   @Column({ type: 'jsonb', default: {} })
   aiCache!: Record<string, { source: string; result: string }>;
 
+  @Column({ type: 'varchar', nullable: true })
+  mailboxId!: string | null;
+
   @ManyToMany(() => TagModel)
   @JoinTable({ name: 'ticket_tag' })
   tags!: TagModel[];

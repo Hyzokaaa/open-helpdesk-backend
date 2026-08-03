@@ -80,7 +80,9 @@ export class NewCommentHandler {
 
     const template = new NewCommentTemplate();
     const ticketUrl = `${this.frontendUrl}/dashboard/workspaces/${event.workspaceSlug}/tickets/${event.ticketId}`;
-    const mailbox = this.emailDomain ? await this.mailboxRepository.findByWorkspaceId(event.workspaceId) : null;
+    const mailbox = event.mailboxId
+      ? await this.mailboxRepository.findById(event.mailboxId)
+      : null;
     const sender = await this.emailSenderRepository.findByWorkspaceId(event.workspaceId);
 
     for (const [lang, emails] of emailRecipients) {
