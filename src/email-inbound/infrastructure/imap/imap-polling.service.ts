@@ -241,6 +241,11 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
 
       const lock = await client.getMailboxLock(config.folder);
       try {
+        const status = await client.status(config.folder, { messages: true });
+        if (status.messages === 0) {
+          return results;
+        }
+
         const query = config.since ? { since: config.since } : { all: true };
         const messages = client.fetch(query, {
           envelope: true,

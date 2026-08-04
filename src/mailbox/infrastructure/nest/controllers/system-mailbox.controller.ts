@@ -290,6 +290,56 @@ export class SystemMailboxController {
     }
   }
 
+  @Post('pause')
+  async pause(@CurrentUser() user: AuthUser) {
+    this.ensureAdmin(user);
+    const existing = await this.mailboxRepository.findSystemMailbox();
+    if (!existing) throw new EntityNotFoundError('System mailbox not found');
+
+    existing.isActive = false;
+    await this.mailboxRepository.update(existing);
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.MAILBOX_PAUSED,
+      entityType: 'mailbox',
+      entityId: existing.getId(),
+      userId: user.userId,
+      workspaceId: null,
+      metadata: { address: existing.address },
+      category: AuditCategory.SYSTEM,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
+    return { isActive: false };
+  }
+
+  @Post('resume')
+  async resume(@CurrentUser() user: AuthUser) {
+    this.ensureAdmin(user);
+    const existing = await this.mailboxRepository.findSystemMailbox();
+    if (!existing) throw new EntityNotFoundError('System mailbox not found');
+
+    existing.isActive = true;
+    await this.mailboxRepository.update(existing);
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.MAILBOX_RESUMED,
+      entityType: 'mailbox',
+      entityId: existing.getId(),
+      userId: user.userId,
+      workspaceId: null,
+      metadata: { address: existing.address },
+      category: AuditCategory.SYSTEM,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
+    return { isActive: true };
+  }
+
   private ensureAdmin(user: AuthUser): void {
     if (!user.isSystemAdmin) {
       throw new ForbiddenException('System admin access required');
