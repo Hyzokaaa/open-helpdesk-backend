@@ -27,6 +27,7 @@ export enum AuditAction {
   WORKSPACE_IMPORT_STARTED = 'workspace-import-started',
   WORKSPACE_MEMBERS_IMPORTED = 'workspace-members-imported',
   WORKSPACE_EXPORT_CREATED = 'workspace-export-created',
+  WORKSPACE_SYSTEM_MAILBOX_TOGGLED = 'workspace-system-mailbox-toggled',
 
   // Members
   MEMBER_ADDED = 'member-added',
@@ -124,6 +125,9 @@ export enum AuditAction {
   SYSTEM_EMAIL_SETTINGS_CONFIGURED = 'system-email-settings-configured',
   SYSTEM_EMAIL_SETTINGS_DELETED = 'system-email-settings-deleted',
   SYSTEM_EMAIL_TEST_CONNECTION = 'system-email-test-connection',
+  SYSTEM_MAILBOX_CONFIGURED = 'system-mailbox-configured',
+  SYSTEM_MAILBOX_DELETED = 'system-mailbox-deleted',
+  SYSTEM_MAILBOX_TEST_CONNECTION = 'system-mailbox-test-connection',
 
   // Notifications
   NOTIFICATION_PREFERENCES_UPDATED = 'notification-preferences-updated',

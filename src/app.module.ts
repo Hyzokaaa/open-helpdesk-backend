@@ -35,8 +35,9 @@ import { ChangelogController } from "./changelog/changelog.controller";
 import { AuditLogController } from "./audit-log/infrastructure/nest/controllers/audit-log.controller";
 import { AdminAuditLogController } from "./audit-log/infrastructure/nest/controllers/admin-audit-log.controller";
 import { WidgetController } from "./shared/infrastructure/nest/controllers/widget.controller";
+import { SystemMailboxController } from "./mailbox/infrastructure/nest/controllers/system-mailbox.controller";
 @Module({
-  controllers: [HealthController, ChangelogController, AuditLogController, AdminAuditLogController, WidgetController],
+  controllers: [HealthController, ChangelogController, AuditLogController, AdminAuditLogController, WidgetController, SystemMailboxController],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },

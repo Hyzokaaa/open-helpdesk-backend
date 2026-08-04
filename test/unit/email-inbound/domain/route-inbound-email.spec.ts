@@ -1,5 +1,5 @@
 import { RouteInboundEmail } from '../../../../src/email-inbound/domain/services/route-inbound-email';
-import { ParsedInboundEmail } from '../../../../src/email-inbound/domain/services/parse-inbound-email';
+import { ParsedInboundEmail } from '../../../../src/email-inbound/infrastructure/imap/imap-email-parser';
 import { CreateUser } from '../../../../src/user/domain/services/user-create';
 import { AddWorkspaceMember } from '../../../../src/workspace/domain/services/workspace-add-member';
 import { CreateTicket } from '../../../../src/ticket/domain/services/ticket-create';
@@ -35,6 +35,7 @@ class MockMailboxRepository implements MailboxRepository {
   async findAllByType(type: MailboxType): Promise<Mailbox[]> { return this.mailboxes.filter((m) => m.type === type); }
   async update(mailbox: Mailbox): Promise<void> { const i = this.mailboxes.findIndex((m) => m.getId() === mailbox.getId()); if (i >= 0) this.mailboxes[i] = mailbox; }
   async delete(id: string): Promise<void> { this.mailboxes = this.mailboxes.filter((m) => m.getId() !== id); }
+  async findSystemMailbox(): Promise<Mailbox | null> { return this.mailboxes.find((m) => m.workspaceId === null) ?? null; }
 
   seed(mailbox: Mailbox): void { this.mailboxes.push(mailbox); }
 }

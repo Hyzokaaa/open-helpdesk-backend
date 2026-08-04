@@ -5,7 +5,7 @@ import { MailboxRepository } from '../repositories/mailbox.repository';
 import { MailboxType } from '../enums/mailbox-type.enum';
 
 interface CreateImapMailboxProps {
-  workspaceId: string;
+  workspaceId: string | null;
   address: string;
   imapHost: string;
   imapPort: number;

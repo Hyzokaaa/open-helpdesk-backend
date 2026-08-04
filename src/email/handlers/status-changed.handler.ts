@@ -22,7 +22,6 @@ import { NotificationType } from '../../notification/domain/enums/notification-t
 export class StatusChangedHandler {
   private readonly logger = new Logger(StatusChangedHandler.name);
   private readonly frontendUrl: string;
-  private readonly emailDomain?: string;
 
   constructor(
     @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
@@ -37,7 +36,6 @@ export class StatusChangedHandler {
     private readonly config: ConfigService,
   ) {
     this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173').split(',')[0].trim();
-    this.emailDomain = config.get<string>('EMAIL_DOMAIN');
   }
 
   @OnEvent('ticket.statusChanged')
@@ -64,7 +62,11 @@ export class StatusChangedHandler {
 
     const template = new StatusChangedTemplate();
     const ticketUrl = `${this.frontendUrl}/dashboard/workspaces/${event.workspaceSlug}/tickets/${event.ticketId}`;
-    const mailbox = this.emailDomain ? await this.mailboxRepository.findByWorkspaceId(event.workspaceId) : null;
+    const ticket = await this.ticketRepository.findById(event.ticketId);
+    const mailbox = ticket?.mailboxId
+      ? await this.mailboxRepository.findById(ticket.mailboxId)
+      : null;
+    const emailDomain = mailbox ? mailbox.address.split('@')[1] : null;
     const sender = await this.emailSenderRepository.findByWorkspaceId(event.workspaceId);
 
     for (const [lang, emails] of emailRecipients) {
@@ -72,10 +74,10 @@ export class StatusChangedHandler {
         to: emails,
         subject: template.subject({ ticketName: event.ticketName, ticketUrl, oldStatus: event.oldStatus, newStatus: event.newStatus, workspaceName: event.workspaceName, lang }),
         html: template.html({ ticketName: event.ticketName, ticketUrl, oldStatus: event.oldStatus, newStatus: event.newStatus, workspaceName: event.workspaceName, lang }),
-        ...(this.emailDomain && {
-          messageId: `<status-${event.ticketId}-${Date.now()}@${this.emailDomain}>`,
-          inReplyTo: `<ticket-${event.ticketId}@${this.emailDomain}>`,
-          references: `<ticket-${event.ticketId}@${this.emailDomain}>`,
+        ...(emailDomain && {
+          messageId: `<status-${event.ticketId}-${Date.now()}@${emailDomain}>`,
+          inReplyTo: `<ticket-${event.ticketId}@${emailDomain}>`,
+          references: `<ticket-${event.ticketId}@${emailDomain}>`,
         }),
         ...(mailbox && { replyTo: mailbox.address }),
       });

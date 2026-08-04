@@ -28,7 +28,6 @@ import { NotificationType } from '../../notification/domain/enums/notification-t
 export class TicketCreatedHandler {
   private readonly logger = new Logger(TicketCreatedHandler.name);
   private readonly frontendUrl: string;
-  private readonly emailDomain?: string;
 
   constructor(
     @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
@@ -44,7 +43,6 @@ export class TicketCreatedHandler {
     private readonly config: ConfigService,
   ) {
     this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173').split(',')[0].trim();
-    this.emailDomain = config.get<string>('EMAIL_DOMAIN');
   }
 
   @OnEvent('ticket.created')
@@ -79,6 +77,7 @@ export class TicketCreatedHandler {
     const mailbox = event.mailboxId
       ? await this.mailboxRepository.findById(event.mailboxId)
       : null;
+    const emailDomain = mailbox ? mailbox.address.split('@')[1] : null;
     const sender = await this.emailSenderRepository.findByWorkspaceId(event.workspaceId);
 
     for (const [lang, emails] of emailRecipients) {
@@ -86,7 +85,7 @@ export class TicketCreatedHandler {
         to: emails,
         subject: template.subject({ ticketName: event.ticketName, ticketUrl, creatorName: event.creatorName, priority: event.priority, category: event.category, workspaceName: event.workspaceName, lang }),
         html: template.html({ ticketName: event.ticketName, ticketUrl, creatorName: event.creatorName, priority: event.priority, category: event.category, workspaceName: event.workspaceName, lang }),
-        ...(this.emailDomain && { messageId: `<ticket-${event.ticketId}@${this.emailDomain}>` }),
+        ...(emailDomain && { messageId: `<ticket-${event.ticketId}@${emailDomain}>` }),
         ...(mailbox && { replyTo: mailbox.address }),
       });
       if (!result.success) {

@@ -27,7 +27,6 @@ import { NotificationType } from '../../notification/domain/enums/notification-t
 export class NewCommentHandler {
   private readonly logger = new Logger(NewCommentHandler.name);
   private readonly frontendUrl: string;
-  private readonly emailDomain?: string;
 
   constructor(
     @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
@@ -43,7 +42,6 @@ export class NewCommentHandler {
     private readonly config: ConfigService,
   ) {
     this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173').split(',')[0].trim();
-    this.emailDomain = config.get<string>('EMAIL_DOMAIN');
   }
 
   @OnEvent('comment.created')
@@ -83,6 +81,7 @@ export class NewCommentHandler {
     const mailbox = event.mailboxId
       ? await this.mailboxRepository.findById(event.mailboxId)
       : null;
+    const emailDomain = mailbox ? mailbox.address.split('@')[1] : null;
     const sender = await this.emailSenderRepository.findByWorkspaceId(event.workspaceId);
 
     for (const [lang, emails] of emailRecipients) {
@@ -90,10 +89,10 @@ export class NewCommentHandler {
         to: emails,
         subject: template.subject({ ticketName: event.ticketName, ticketUrl, authorName: event.authorName, commentPreview: preview, workspaceName: event.workspaceName, lang }),
         html: template.html({ ticketName: event.ticketName, ticketUrl, authorName: event.authorName, commentPreview: preview, workspaceName: event.workspaceName, lang }),
-        ...(this.emailDomain && {
-          messageId: `<comment-${event.commentId}@${this.emailDomain}>`,
-          inReplyTo: `<ticket-${event.ticketId}@${this.emailDomain}>`,
-          references: `<ticket-${event.ticketId}@${this.emailDomain}>`,
+        ...(emailDomain && {
+          messageId: `<comment-${event.commentId}@${emailDomain}>`,
+          inReplyTo: `<ticket-${event.ticketId}@${emailDomain}>`,
+          references: `<ticket-${event.ticketId}@${emailDomain}>`,
         }),
         ...(mailbox && { replyTo: mailbox.address }),
       });

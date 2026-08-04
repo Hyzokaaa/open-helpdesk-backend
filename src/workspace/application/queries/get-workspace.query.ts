@@ -14,6 +14,7 @@ export interface WorkspaceResponse {
   description: string;
   palette: string | null;
   supportEmail: string | null;
+  systemMailboxEnabled: boolean;
 }
 
 export class GetWorkspaceQuery implements Query<Props, WorkspaceResponse> {
@@ -39,6 +40,7 @@ export class GetWorkspaceQuery implements Query<Props, WorkspaceResponse> {
       description: workspace.description,
       palette: workspace.palette,
       supportEmail: mailbox?.address ?? null,
+      systemMailboxEnabled: workspace.systemMailboxEnabled,
     };
   }
 }

@@ -10,4 +10,5 @@ export interface MailboxRepository {
   findAllByType(type: MailboxType): Promise<Mailbox[]>;
   update(mailbox: Mailbox): Promise<void>;
   delete(id: string): Promise<void>;
+  findSystemMailbox(): Promise<Mailbox | null>;
 }

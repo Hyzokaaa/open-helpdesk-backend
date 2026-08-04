@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { Mailbox } from '../../../domain/entities/mailbox';
 import { MailboxRepository } from '../../../domain/repositories/mailbox.repository';
 import { MailboxType } from '../../../domain/enums/mailbox-type.enum';
@@ -48,6 +48,11 @@ export class TypeOrmMailboxRepository implements MailboxRepository {
   async update(mailbox: Mailbox): Promise<void> {
     const model = this.toModel(mailbox);
     await this.repository.save(model);
+  }
+
+  async findSystemMailbox(): Promise<Mailbox | null> {
+    const model = await this.repository.findOne({ where: { workspaceId: IsNull() } });
+    return model ? this.toDomain(model) : null;
   }
 
   async delete(id: string): Promise<void> {

@@ -15,11 +15,11 @@ export class MailboxModel {
   @Column({ unique: true })
   address!: string;
 
-  @ManyToOne(() => WorkspaceModel, { onDelete: 'CASCADE' })
-  workspace!: WorkspaceModel;
+  @ManyToOne(() => WorkspaceModel, { onDelete: 'CASCADE', nullable: true })
+  workspace!: WorkspaceModel | null;
 
-  @Column()
-  workspaceId!: string;
+  @Column({ nullable: true })
+  workspaceId!: string | null;
 
   @Column({ default: true })
   isActive!: boolean;

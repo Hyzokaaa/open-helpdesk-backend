@@ -4,7 +4,7 @@ import { MailboxType } from '../enums/mailbox-type.enum';
 interface Props {
   id: string;
   address: string;
-  workspaceId: string;
+  workspaceId: string | null;
   isActive: boolean;
   type?: MailboxType;
   imapHost?: string | null;
@@ -26,7 +26,7 @@ interface Props {
 export class Mailbox {
   readonly id: Id;
   address: string;
-  workspaceId: string;
+  workspaceId: string | null;
   isActive: boolean;
   type: MailboxType;
   imapHost: string | null;

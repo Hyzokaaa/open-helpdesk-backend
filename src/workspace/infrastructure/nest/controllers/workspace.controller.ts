@@ -82,7 +82,10 @@ export class WorkspaceController {
     const createService = new CreateWorkspace(this.idGenerator, this.workspaceRepository);
     const addMemberService = new AddWorkspaceMember(this.idGenerator, this.memberRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-    const supportEmailDomain = this.config.get<string>('SUPPORT_EMAIL_DOMAIN');
+    const systemMailbox = await this.mailboxRepository.findSystemMailbox();
+    const supportEmailDomain = systemMailbox
+      ? systemMailbox.address.split('@')[1]
+      : this.config.get<string>('SUPPORT_EMAIL_DOMAIN');
     const createMailbox = supportEmailDomain
       ? new CreateMailbox(this.idGenerator, this.mailboxRepository)
       : undefined;
@@ -308,6 +311,43 @@ export class WorkspaceController {
     });
 
     return result;
+  }
+
+  @Patch(':slug/system-mailbox')
+  async toggleSystemMailbox(
+    @Param('slug') slug: string,
+    @Body() body: { enabled: boolean },
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+
+    const workspace = await this.workspaceRepository.findById(workspaceId);
+    if (!workspace) throw new EntityNotFoundError('Workspace not found');
+
+    workspace.systemMailboxEnabled = body.enabled;
+    await this.workspaceRepository.update(workspace);
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.WORKSPACE_SYSTEM_MAILBOX_TOGGLED,
+      entityType: 'workspace',
+      entityId: workspaceId,
+      userId: user.userId,
+      workspaceId,
+      metadata: { systemMailboxEnabled: body.enabled },
+      category: AuditCategory.WORKSPACE,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
+    return { systemMailboxEnabled: workspace.systemMailboxEnabled };
   }
 
   @Get(':slug/export')

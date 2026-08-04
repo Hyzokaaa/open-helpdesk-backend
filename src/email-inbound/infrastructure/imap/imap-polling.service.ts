@@ -1,5 +1,4 @@
 import { Inject, Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { UlidGenerator } from '../../../shared/infrastructure/ulid-generator';
 import { NestEventPublisher } from '../../../shared/infrastructure/nest-event-publisher';
 import { BcryptPasswordHasher } from '../../../shared/infrastructure/bcrypt-password-hasher';
@@ -44,16 +43,6 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
   private pollers = new Map<string, PollerState>();
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
   private stopping = false;
-  private readonly emailDomain?: string;
-
-  // Fallback env var config
-  private readonly envHost?: string;
-  private readonly envPort: number;
-  private readonly envUser?: string;
-  private readonly envPass?: string;
-  private readonly envTls: boolean;
-  private readonly envFolder: string;
-  private readonly envPollInterval: number;
 
   constructor(
     @Inject() private readonly mailboxRepository: TypeOrmMailboxRepository,
@@ -69,17 +58,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     @Inject() private readonly attachmentRepository: TypeOrmAttachmentRepository,
     @Inject() private readonly storageService: S3StorageService,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
-    private readonly config: ConfigService,
-  ) {
-    this.emailDomain = config.get<string>('EMAIL_DOMAIN');
-    this.envHost = config.get<string>('IMAP_HOST');
-    this.envPort = config.get<number>('IMAP_PORT', 993);
-    this.envUser = config.get<string>('IMAP_USER');
-    this.envPass = config.get<string>('IMAP_PASS');
-    this.envTls = config.get<string>('IMAP_TLS', 'true') === 'true';
-    this.envFolder = config.get<string>('IMAP_FOLDER', 'INBOX');
-    this.envPollInterval = config.get<number>('IMAP_POLL_INTERVAL', 30);
-  }
+  ) {}
 
   async onModuleInit() {
     await this.refreshPollers();
@@ -103,8 +82,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       since,
     });
 
-    const domain = mailbox.address.split('@')[1] || this.emailDomain || 'localhost';
-    const parser = new ImapEmailParser(domain);
+    const parser = new ImapEmailParser();
     const router = this.createRouter();
     let processed = 0;
 
@@ -162,25 +140,6 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       this.pollMailbox(mailbox, state);
     }
 
-    // Fallback: env var config if no DB mailboxes
-    if (dbMailboxes.length === 0 && this.envHost && this.envUser && this.envPass && this.emailDomain) {
-      const envId = '__env__';
-      if (!this.pollers.has(envId)) {
-        const state: PollerState = {
-          mailboxId: envId,
-          configHash: 'env',
-          timer: null,
-          processing: false,
-          backoff: 1000,
-          lastPollTime: null,
-        };
-        this.pollers.set(envId, state);
-        this.logger.log(`IMAP poller started (env vars): ${this.envUser}@${this.envHost}`);
-        this.pollEnv(state);
-      }
-      activeIds.add(envId);
-    }
-
     // Stop pollers for removed mailboxes
     for (const [id, state] of this.pollers) {
       if (!activeIds.has(id)) {
@@ -213,8 +172,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       state.lastPollTime = new Date();
 
       if (fetched.length > 0) {
-        const domain = mailbox.address.split('@')[1] || this.emailDomain!;
-        const parser = new ImapEmailParser(domain);
+        const parser = new ImapEmailParser();
         const router = this.createRouter();
         let count = 0;
 
@@ -249,48 +207,6 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       }
 
       state.timer = setTimeout(() => this.pollMailbox(mailbox, state), state.backoff);
-      state.backoff = Math.min(state.backoff * 2, 60000);
-    } finally {
-      state.processing = false;
-    }
-  }
-
-  private async pollEnv(state: PollerState) {
-    if (this.stopping || state.processing) return;
-    state.processing = true;
-
-    try {
-      const fetched = await this.fetchMessages({
-        host: this.envHost!,
-        port: this.envPort,
-        user: this.envUser!,
-        pass: this.envPass!,
-        tls: this.envTls,
-        folder: this.envFolder,
-        since: state.lastPollTime,
-      });
-
-      state.lastPollTime = new Date();
-
-      if (fetched.length > 0) {
-        const parser = new ImapEmailParser(this.emailDomain!);
-        const router = this.createRouter();
-        let count = 0;
-
-        for (const msg of fetched) {
-          const wasProcessed = await this.processMessage(msg, parser, router);
-          if (wasProcessed) count++;
-        }
-
-        if (count > 0) this.logger.log(`IMAP [env]: processed ${count} email(s)`);
-      }
-
-      state.backoff = 1000;
-      state.timer = setTimeout(() => this.pollEnv(state), this.envPollInterval * 1000);
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : 'Unknown error';
-      this.logger.error(`IMAP [env] poll failed: ${errMsg}`);
-      state.timer = setTimeout(() => this.pollEnv(state), state.backoff);
       state.backoff = Math.min(state.backoff * 2, 60000);
     } finally {
       state.processing = false;
@@ -351,7 +267,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     return results;
   }
 
-  private async processMessage(msg: FetchedMessage, parser: ImapEmailParser, router: RouteInboundEmail, mailboxId?: string, workspaceId?: string, mailbox?: Mailbox): Promise<boolean> {
+  private async processMessage(msg: FetchedMessage, parser: ImapEmailParser, router: RouteInboundEmail, mailboxId?: string, workspaceId?: string | null, mailbox?: Mailbox): Promise<boolean> {
     try {
       if (msg.envelope.messageId) {
         const alreadyProcessed = await this.processedEmailRepository.exists(msg.envelope.messageId);
