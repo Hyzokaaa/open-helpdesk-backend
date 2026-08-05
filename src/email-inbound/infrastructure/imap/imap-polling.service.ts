@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { UlidGenerator } from '../../../shared/infrastructure/ulid-generator';
 import { NestEventPublisher } from '../../../shared/infrastructure/nest-event-publisher';
 import { BcryptPasswordHasher } from '../../../shared/infrastructure/bcrypt-password-hasher';
@@ -106,6 +107,11 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       this.pollers.delete(mailboxId);
       this.logger.log(`IMAP poller stopped immediately: ${mailboxId}`);
     }
+  }
+
+  @OnEvent('mailbox.deleted')
+  handleMailboxDeleted(event: { mailboxId: string }): void {
+    this.stopPoller(event.mailboxId);
   }
 
   onModuleDestroy() {
