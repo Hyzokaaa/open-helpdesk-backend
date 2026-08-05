@@ -22,7 +22,7 @@ import { AuditAction } from '../../../../audit-log/domain/enums/audit-action.enu
 import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
 import { EntityNotFoundError } from '../../../../shared/domain/errors';
-import { ImapPollingService } from '../../../../email-inbound/infrastructure/imap/imap-polling.service';
+import { NestEventPublisher } from '../../../../shared/infrastructure/nest-event-publisher';
 
 @Controller('admin/platform-mailbox')
 export class SystemMailboxController {
@@ -30,7 +30,7 @@ export class SystemMailboxController {
     @Inject() private readonly mailboxRepository: TypeOrmMailboxRepository,
     @Inject() private readonly idGenerator: UlidGenerator,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
-    @Inject() private readonly imapPollingService: ImapPollingService,
+    @Inject() private readonly eventPublisher: NestEventPublisher,
   ) {}
 
   @Get()
@@ -187,7 +187,7 @@ export class SystemMailboxController {
 
     const service = new DeleteMailbox(this.mailboxRepository);
     await service.execute(existing.getId());
-    this.imapPollingService.stopPoller(existing.getId());
+    this.eventPublisher.emit('mailbox.deleted', { mailboxId: existing.getId() });
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({

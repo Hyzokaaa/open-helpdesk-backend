@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SharedModule } from '../shared/shared.module';
 import { AuditLogModule } from '../audit-log/audit-log.module';
@@ -14,9 +14,8 @@ import { ProcessedEmailModel } from './infrastructure/typeorm/models/processed-e
 import { ProcessedEmailRepository } from './infrastructure/typeorm/repositories/processed-email.repository';
 
 @Module({
-  imports: [SharedModule, AuditLogModule, forwardRef(() => MailboxModule), UserModule, WorkspaceModule, TicketModule, CommentModule, AttachmentModule, TypeOrmModule.forFeature([ProcessedEmailModel])],
+  imports: [SharedModule, AuditLogModule, MailboxModule, UserModule, WorkspaceModule, TicketModule, CommentModule, AttachmentModule, TypeOrmModule.forFeature([ProcessedEmailModel])],
   controllers: [MailboxImportController],
   providers: [ImapPollingService, ProcessedEmailRepository],
-  exports: [ImapPollingService],
 })
 export class EmailInboundModule {}
