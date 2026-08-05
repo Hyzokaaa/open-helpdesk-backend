@@ -151,7 +151,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async pollMailbox(mailbox: Mailbox, state: PollerState) {
-    if (this.stopping || state.processing) return;
+    if (this.stopping || state.processing || !this.pollers.has(mailbox.getId())) return;
     state.processing = true;
     const pollStart = Date.now();
 
@@ -193,7 +193,9 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       this.emitAudit(AuditAction.IMAP_POLL_COMPLETED, mailbox.getId(), mailbox.workspaceId, { address: mailbox.address, fetched: fetched.length, duration: Date.now() - pollStart }).catch(() => {});
 
       state.backoff = 1000;
-      state.timer = setTimeout(() => this.pollMailbox(mailbox, state), (mailbox.pollInterval ?? 30) * 1000);
+      if (this.pollers.has(mailbox.getId())) {
+        state.timer = setTimeout(() => this.pollMailbox(mailbox, state), (mailbox.pollInterval ?? 30) * 1000);
+      }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : 'Unknown error';
       this.logger.error(`IMAP [${mailbox.address}] poll failed: ${errMsg}`);
@@ -206,8 +208,10 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
         this.logger.warn(`Failed to persist mailbox error state for ${mailbox.address}: ${e instanceof Error ? e.message : e}`);
       }
 
-      state.timer = setTimeout(() => this.pollMailbox(mailbox, state), state.backoff);
-      state.backoff = Math.min(state.backoff * 2, 60000);
+      if (this.pollers.has(mailbox.getId())) {
+        state.timer = setTimeout(() => this.pollMailbox(mailbox, state), state.backoff);
+        state.backoff = Math.min(state.backoff * 2, 60000);
+      }
     } finally {
       state.processing = false;
     }
