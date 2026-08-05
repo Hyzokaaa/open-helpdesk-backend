@@ -99,6 +99,15 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     await this.refreshPollers();
   }
 
+  stopPoller(mailboxId: string): void {
+    const state = this.pollers.get(mailboxId);
+    if (state) {
+      if (state.timer) clearTimeout(state.timer);
+      this.pollers.delete(mailboxId);
+      this.logger.log(`IMAP poller stopped immediately: ${mailboxId}`);
+    }
+  }
+
   onModuleDestroy() {
     this.stopping = true;
     if (this.refreshTimer) clearInterval(this.refreshTimer);
