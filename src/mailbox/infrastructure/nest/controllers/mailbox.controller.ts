@@ -17,6 +17,7 @@ import { CreateImapMailbox } from '../../../domain/services/mailbox-create-imap'
 import { UpdateMailbox } from '../../../domain/services/mailbox-update';
 import { DeleteMailbox } from '../../../domain/services/mailbox-delete';
 import { MailboxType } from '../../../domain/enums/mailbox-type.enum';
+import { ImapPollingService } from '../../../../email-inbound/infrastructure/imap/imap-polling.service';
 
 @Controller('workspaces/:slug/mailboxes')
 export class MailboxController {
@@ -26,6 +27,7 @@ export class MailboxController {
     @Inject() private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
     @Inject() private readonly idGenerator: UlidGenerator,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
+    @Inject() private readonly imapPollingService: ImapPollingService,
   ) {}
 
   @Get()
@@ -304,6 +306,7 @@ export class MailboxController {
 
     const service = new DeleteMailbox(this.mailboxRepository);
     await service.execute(mailboxId);
+    this.imapPollingService.stopPoller(mailboxId);
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({
