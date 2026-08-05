@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { Mailbox } from '../../../domain/entities/mailbox';
 import { MailboxRepository } from '../../../domain/repositories/mailbox.repository';
 import { MailboxType } from '../../../domain/enums/mailbox-type.enum';
@@ -50,6 +50,11 @@ export class TypeOrmMailboxRepository implements MailboxRepository {
     await this.repository.save(model);
   }
 
+  async findSystemMailbox(): Promise<Mailbox | null> {
+    const model = await this.repository.findOne({ where: { workspaceId: IsNull() } });
+    return model ? this.toDomain(model) : null;
+  }
+
   async delete(id: string): Promise<void> {
     await this.repository.delete(id);
   }
@@ -66,11 +71,15 @@ export class TypeOrmMailboxRepository implements MailboxRepository {
       imapUser: model.imapUser,
       imapPass: model.imapPass,
       imapTls: model.imapTls,
+      encryption: model.encryption,
       imapFolder: model.imapFolder,
       pollInterval: model.pollInterval,
       lastSyncAt: model.lastSyncAt,
       lastSyncDuration: model.lastSyncDuration,
       lastError: model.lastError,
+      addressMode: model.addressMode,
+      acceptedAddresses: model.acceptedAddresses,
+      autoReply: model.autoReply,
     });
   }
 
@@ -86,11 +95,15 @@ export class TypeOrmMailboxRepository implements MailboxRepository {
     model.imapUser = mailbox.imapUser;
     model.imapPass = mailbox.imapPass;
     model.imapTls = mailbox.imapTls;
+    model.encryption = mailbox.encryption;
     model.imapFolder = mailbox.imapFolder;
     model.pollInterval = mailbox.pollInterval;
     model.lastSyncAt = mailbox.lastSyncAt;
     model.lastSyncDuration = mailbox.lastSyncDuration;
     model.lastError = mailbox.lastError;
+    model.addressMode = mailbox.addressMode;
+    model.acceptedAddresses = mailbox.acceptedAddresses;
+    model.autoReply = mailbox.autoReply;
     return model;
   }
 }

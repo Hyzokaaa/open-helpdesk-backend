@@ -15,11 +15,11 @@ export class MailboxModel {
   @Column({ unique: true })
   address!: string;
 
-  @ManyToOne(() => WorkspaceModel, { onDelete: 'CASCADE' })
-  workspace!: WorkspaceModel;
+  @ManyToOne(() => WorkspaceModel, { onDelete: 'CASCADE', nullable: true })
+  workspace!: WorkspaceModel | null;
 
-  @Column()
-  workspaceId!: string;
+  @Column({ nullable: true })
+  workspaceId!: string | null;
 
   @Column({ default: true })
   isActive!: boolean;
@@ -42,6 +42,9 @@ export class MailboxModel {
   @Column({ type: 'boolean', nullable: true })
   imapTls!: boolean | null;
 
+  @Column({ type: 'varchar', default: 'tls' })
+  encryption!: string;
+
   @Column({ type: 'varchar', nullable: true, default: 'INBOX' })
   imapFolder!: string | null;
 
@@ -56,6 +59,15 @@ export class MailboxModel {
 
   @Column({ type: 'varchar', nullable: true })
   lastError!: string | null;
+
+  @Column({ type: 'varchar', default: 'address' })
+  addressMode!: string;
+
+  @Column({ type: 'jsonb', default: '[]' })
+  acceptedAddresses!: string[];
+
+  @Column({ type: 'boolean', default: true })
+  autoReply!: boolean;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;

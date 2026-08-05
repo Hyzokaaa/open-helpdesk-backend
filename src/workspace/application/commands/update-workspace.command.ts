@@ -2,6 +2,8 @@ import { Command } from '../../../shared/domain/command';
 import { UpdateWorkspace } from '../../domain/services/workspace-update';
 import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 
 interface Props {
   workspaceId: string;
@@ -34,6 +36,9 @@ export class UpdateWorkspaceCommand implements Command<Props, UpdateWorkspaceRes
       userId: props.userId,
       workspaceId: workspace.getId(),
       metadata: { name: props.name, description: props.description },
+      category: AuditCategory.WORKSPACE,
+      level: AuditLevel.INFO,
+      source: 'ui',
     });
 
     return {

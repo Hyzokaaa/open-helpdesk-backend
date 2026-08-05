@@ -8,6 +8,8 @@ import { PERMISSIONS, hasPermission } from '../../../workspace/domain/permission
 import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 import { ValidateCustomFieldValues } from '../../../custom-field/domain/services/custom-field-validate-values';
 
 interface Props {
@@ -89,6 +91,9 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
     const after = { name: updated.name, priority: updated.priority, category: updated.category };
     await this.createAuditLog.execute({
       action: AuditAction.TICKET_UPDATED,
+      category: AuditCategory.TICKET,
+      level: AuditLevel.INFO,
+      source: 'ui',
       entityType: 'ticket',
       entityId: updated.getId(),
       userId: props.userId,

@@ -43,6 +43,8 @@ import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/
 import { EnsureWorkspacePermission } from '../../../../workspace/domain/services/workspace-ensure-permission';
 import { PERMISSIONS } from '../../../../workspace/domain/permissions';
 import { AuditAction } from '../../../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
 import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit-log-create';
 import { TypeOrmCustomFieldDefinitionRepository } from '../../../../custom-field/infrastructure/typeorm/repositories/typeorm-custom-field-definition.repository';
 import { ValidateCustomFieldValues } from '../../../../custom-field/domain/services/custom-field-validate-values';
@@ -308,6 +310,9 @@ export class TicketController {
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({
       action: AuditAction.TICKET_PICKED_UP,
+      category: AuditCategory.TICKET,
+      level: AuditLevel.INFO,
+      source: 'ui',
       entityType: 'ticket',
       entityId: id,
       userId: user.userId,
@@ -342,6 +347,9 @@ export class TicketController {
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({
       action: AuditAction.TRANSFER_REQUEST_CREATED,
+      category: AuditCategory.TICKET,
+      level: AuditLevel.INFO,
+      source: 'ui',
       entityType: 'ticket',
       entityId: id,
       userId: user.userId,
@@ -422,6 +430,9 @@ export class TicketController {
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({
       action: AuditAction.TRANSFER_REQUEST_ACCEPTED,
+      category: AuditCategory.TICKET,
+      level: AuditLevel.INFO,
+      source: 'ui',
       entityType: 'ticket',
       entityId: id,
       userId: user.userId,
@@ -468,6 +479,9 @@ export class TicketController {
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({
       action: AuditAction.TRANSFER_REQUEST_REJECTED,
+      category: AuditCategory.TICKET,
+      level: AuditLevel.INFO,
+      source: 'ui',
       entityType: 'ticket',
       entityId: id,
       userId: user.userId,
@@ -514,6 +528,9 @@ export class TicketController {
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({
       action: AuditAction.TRANSFER_REQUEST_CANCELLED,
+      category: AuditCategory.TICKET,
+      level: AuditLevel.INFO,
+      source: 'ui',
       entityType: 'ticket',
       entityId: id,
       userId: user.userId,
@@ -569,16 +586,31 @@ export class TicketController {
     @Param('slug') slug: string,
     @Param('id') id: string,
     @Body() body: { userId: string; role?: string },
+    @CurrentUser() user: AuthUser,
   ) {
     const workspace = await this.resolveWorkspace(slug);
     const ticket = await this.ticketRepository.findById(id);
     if (!ticket || ticket.workspaceId !== workspace.getId()) throw new EntityNotFoundError('Ticket not found');
 
     const service = new AddTicketParticipant(this.idGenerator, this.participantRepository);
+    const role = (body.role as ParticipantRole) ?? ParticipantRole.FOLLOWER;
     const participant = await service.execute({
       ticketId: id,
       userId: body.userId,
-      role: (body.role as ParticipantRole) ?? ParticipantRole.FOLLOWER,
+      role,
+    });
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.PARTICIPANT_ADDED,
+      category: AuditCategory.TICKET,
+      level: AuditLevel.INFO,
+      source: 'ui',
+      entityType: 'ticket',
+      entityId: id,
+      userId: user.userId,
+      workspaceId: workspace.getId(),
+      metadata: { participantUserId: body.userId, role },
     });
 
     return participant ? { added: true } : { added: false, reason: 'already a participant' };
@@ -589,12 +621,27 @@ export class TicketController {
     @Param('slug') slug: string,
     @Param('id') id: string,
     @Param('userId') userId: string,
+    @CurrentUser() user: AuthUser,
   ) {
     const workspace = await this.resolveWorkspace(slug);
     const ticket = await this.ticketRepository.findById(id);
     if (!ticket || ticket.workspaceId !== workspace.getId()) throw new EntityNotFoundError('Ticket not found');
 
     await this.participantRepository.remove(id, userId);
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.PARTICIPANT_REMOVED,
+      category: AuditCategory.TICKET,
+      level: AuditLevel.INFO,
+      source: 'ui',
+      entityType: 'ticket',
+      entityId: id,
+      userId: user.userId,
+      workspaceId: workspace.getId(),
+      metadata: { participantUserId: userId },
+    });
+
     return { removed: true };
   }
 

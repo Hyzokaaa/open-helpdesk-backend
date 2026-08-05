@@ -18,9 +18,12 @@ export interface AuditLogItem {
   action: string;
   entityType: string;
   entityId: string;
-  userId: string;
+  userId: string | null;
   workspaceId: string | null;
   metadata: Record<string, unknown> | null;
+  category: string;
+  level: string;
+  source: string | null;
   createdAt?: Date;
 }
 
@@ -54,6 +57,9 @@ export class ListAuditLogQuery implements Query<Props, PaginatedResult<AuditLogI
         userId: entry.userId,
         workspaceId: entry.workspaceId,
         metadata: entry.metadata,
+        category: entry.category,
+        level: entry.level,
+        source: entry.source,
         createdAt: entry.createdAt,
       })),
       total: result.total,

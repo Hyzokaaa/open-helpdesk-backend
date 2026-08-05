@@ -1,18 +1,31 @@
-import { ParsedInboundEmail, ParsedAttachment } from '../../domain/services/parse-inbound-email';
+export interface ParsedInboundEmail {
+  fromAddress: string;
+  toAddresses: string[];
+  subject: string;
+  body: string;
+  inReplyToTicketId: string | null;
+  attachments: ParsedAttachment[];
+  mailboxId?: string;
+}
 
-const TICKET_ID_REGEX_TEMPLATE = '<ticket-([a-zA-Z0-9]+)@EMAIL_DOMAIN>';
+export interface ParsedAttachment {
+  filename: string;
+  mimeType: string;
+  size: number;
+  content: Buffer;
+}
+
+const TICKET_ID_REGEX = /<ticket-([a-zA-Z0-9]+)@[^>]+>/;
 
 export class ImapEmailParser {
-  private readonly ticketIdRegex: RegExp;
-
-  constructor(private readonly emailDomain: string) {
-    const escaped = emailDomain.replace(/\./g, '\\.');
-    this.ticketIdRegex = new RegExp(TICKET_ID_REGEX_TEMPLATE.replace('EMAIL_DOMAIN', escaped));
-  }
+  private readonly ticketIdRegex = TICKET_ID_REGEX;
 
   async parse(envelope: ImapEnvelope, rawMime: string): Promise<ParsedInboundEmail> {
     const fromAddress = (envelope.from ?? '').toLowerCase();
-    const toAddresses = (envelope.to ?? []).map((a) => a.toLowerCase());
+    const toAddresses = [
+      ...(envelope.to ?? []),
+      ...(envelope.cc ?? []),
+    ].map((a) => a.toLowerCase());
     const subject = envelope.subject || '(No subject)';
 
     let inReplyToTicketId: string | null = null;
@@ -104,6 +117,7 @@ export class ImapEmailParser {
 export interface ImapEnvelope {
   from: string;
   to: string[];
+  cc: string[];
   subject: string;
   messageId: string;
   inReplyTo?: string;

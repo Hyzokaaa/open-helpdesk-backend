@@ -8,6 +8,8 @@ interface UpdateProfileProps {
   lastName?: string;
   language?: string;
   theme?: string;
+  dateFormat?: string;
+  timezone?: string;
 }
 
 export class UpdateUserProfile {
@@ -21,6 +23,8 @@ export class UpdateUserProfile {
     if (props.lastName !== undefined) user.lastName = props.lastName;
     if (props.language !== undefined) user.language = props.language;
     if (props.theme !== undefined) user.theme = props.theme;
+    if (props.dateFormat !== undefined) user.dateFormat = props.dateFormat;
+    if (props.timezone !== undefined) user.timezone = props.timezone;
 
     await this.repository.update(user);
     return user;

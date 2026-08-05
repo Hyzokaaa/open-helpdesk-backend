@@ -14,6 +14,11 @@ import { TypeOrmWorkspaceEmailSenderRepository } from '../../workspace/infrastru
 import { sendWorkspaceEmail } from '../domain/resolve-email-sender';
 import { TypeOrmTicketRepository } from '../../ticket/infrastructure/typeorm/repositories/typeorm-ticket.repository';
 import { TypeOrmTicketParticipantRepository } from '../../ticket/infrastructure/typeorm/repositories/typeorm-ticket-participant.repository';
+import { TypeOrmAuditLogRepository } from '../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
+import { CreateAuditLogEntry } from '../../audit-log/domain/services/audit-log-create';
+import { AuditAction } from '../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../audit-log/domain/enums/audit-level.enum';
 import { ResolveTicketStakeholders } from '../../notification/domain/services/notification-resolve-ticket-stakeholders';
 import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
@@ -22,7 +27,6 @@ import { NotificationType } from '../../notification/domain/enums/notification-t
 export class NewCommentHandler {
   private readonly logger = new Logger(NewCommentHandler.name);
   private readonly frontendUrl: string;
-  private readonly emailDomain?: string;
 
   constructor(
     @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
@@ -34,10 +38,10 @@ export class NewCommentHandler {
     private readonly ticketRepository: TypeOrmTicketRepository,
     private readonly participantRepository: TypeOrmTicketParticipantRepository,
     private readonly emailSenderRepository: TypeOrmWorkspaceEmailSenderRepository,
+    private readonly auditLogRepository: TypeOrmAuditLogRepository,
     private readonly config: ConfigService,
   ) {
     this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173').split(',')[0].trim();
-    this.emailDomain = config.get<string>('EMAIL_DOMAIN');
   }
 
   @OnEvent('comment.created')
@@ -74,21 +78,38 @@ export class NewCommentHandler {
 
     const template = new NewCommentTemplate();
     const ticketUrl = `${this.frontendUrl}/dashboard/workspaces/${event.workspaceSlug}/tickets/${event.ticketId}`;
-    const mailbox = this.emailDomain ? await this.mailboxRepository.findByWorkspaceId(event.workspaceId) : null;
+    const mailbox = event.mailboxId
+      ? await this.mailboxRepository.findById(event.mailboxId)
+      : null;
+    const emailDomain = mailbox ? mailbox.address.split('@')[1] : null;
     const sender = await this.emailSenderRepository.findByWorkspaceId(event.workspaceId);
 
     for (const [lang, emails] of emailRecipients) {
-      await sendWorkspaceEmail(this.emailService, sender, {
+      const result = await sendWorkspaceEmail(this.emailService, sender, {
         to: emails,
         subject: template.subject({ ticketName: event.ticketName, ticketUrl, authorName: event.authorName, commentPreview: preview, workspaceName: event.workspaceName, lang }),
         html: template.html({ ticketName: event.ticketName, ticketUrl, authorName: event.authorName, commentPreview: preview, workspaceName: event.workspaceName, lang }),
-        ...(this.emailDomain && {
-          messageId: `<comment-${event.commentId}@${this.emailDomain}>`,
-          inReplyTo: `<ticket-${event.ticketId}@${this.emailDomain}>`,
-          references: `<ticket-${event.ticketId}@${this.emailDomain}>`,
+        ...(emailDomain && {
+          messageId: `<comment-${event.commentId}@${emailDomain}>`,
+          inReplyTo: `<ticket-${event.ticketId}@${emailDomain}>`,
+          references: `<ticket-${event.ticketId}@${emailDomain}>`,
         }),
         ...(mailbox && { replyTo: mailbox.address }),
       });
+      if (!result.success) {
+        const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+        await auditLog.execute({
+          action: AuditAction.EMAIL_SEND_FAILED,
+          entityType: 'email',
+          entityId: event.ticketId,
+          userId: null,
+          workspaceId: event.workspaceId,
+          metadata: { reason: 'notification', to: emails, ticketId: event.ticketId },
+          category: AuditCategory.EMAIL,
+          level: AuditLevel.ERROR,
+          source: 'system',
+        }).catch(() => {});
+      }
     }
   }
 }

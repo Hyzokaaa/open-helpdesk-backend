@@ -17,6 +17,11 @@ import { CreateKbArticle } from '../../../domain/services/kb-article-create';
 import { UpdateKbArticle } from '../../../domain/services/kb-article-update';
 import { DeleteKbArticle } from '../../../domain/services/kb-article-delete';
 import { ReorderKbArticles } from '../../../domain/services/kb-article-reorder';
+import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
+import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit-log-create';
+import { AuditAction } from '../../../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
 
 @Controller('workspaces/:slug/kb')
 export class KbController {
@@ -26,6 +31,7 @@ export class KbController {
     @Inject() private readonly categoryRepository: TypeOrmKbCategoryRepository,
     @Inject() private readonly articleRepository: TypeOrmKbArticleRepository,
     @Inject() private readonly idGenerator: UlidGenerator,
+    @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
   ) {}
 
   // --- Categories ---
@@ -48,6 +54,18 @@ export class KbController {
     await this.ensurePermission(workspaceId, user, PERMISSIONS.KB_CATEGORY_MANAGE);
     const service = new CreateKbCategory(this.idGenerator, this.categoryRepository);
     const category = await service.execute({ name: body.name, icon: body.icon, workspaceId });
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.KB_CATEGORY_CREATED,
+      entityType: 'kb-category',
+      entityId: category.getId(),
+      userId: user.userId,
+      workspaceId,
+      metadata: { name: body.name },
+      category: AuditCategory.KNOWLEDGE_BASE,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
     return { id: category.getId(), name: category.name, slug: category.slug };
   }
 
@@ -58,10 +76,22 @@ export class KbController {
     @Body() body: { name?: string; icon?: string | null },
     @CurrentUser() user: AuthUser,
   ) {
-    await this.resolveWorkspaceId(slug);
-    await this.ensurePermission(await this.resolveWorkspaceId(slug), user, PERMISSIONS.KB_CATEGORY_MANAGE);
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    await this.ensurePermission(workspaceId, user, PERMISSIONS.KB_CATEGORY_MANAGE);
     const service = new UpdateKbCategory(this.categoryRepository);
     const category = await service.execute({ id, name: body.name, icon: body.icon });
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.KB_CATEGORY_UPDATED,
+      entityType: 'kb-category',
+      entityId: id,
+      userId: user.userId,
+      workspaceId,
+      metadata: { name: body.name, icon: body.icon },
+      category: AuditCategory.KNOWLEDGE_BASE,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
     return { id: category.getId(), name: category.name, slug: category.slug };
   }
 
@@ -71,10 +101,23 @@ export class KbController {
     @Param('id') id: string,
     @CurrentUser() user: AuthUser,
   ) {
-    await this.resolveWorkspaceId(slug);
-    await this.ensurePermission(await this.resolveWorkspaceId(slug), user, PERMISSIONS.KB_CATEGORY_MANAGE);
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    await this.ensurePermission(workspaceId, user, PERMISSIONS.KB_CATEGORY_MANAGE);
+    const existingCategory = await this.categoryRepository.findById(id);
     const service = new DeleteKbCategory(this.categoryRepository);
     await service.execute(id);
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.KB_CATEGORY_DELETED,
+      entityType: 'kb-category',
+      entityId: id,
+      userId: user.userId,
+      workspaceId,
+      metadata: { name: existingCategory?.name },
+      category: AuditCategory.KNOWLEDGE_BASE,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
   }
 
   @Put('categories/reorder')
@@ -83,10 +126,22 @@ export class KbController {
     @Body() body: { ids: string[] },
     @CurrentUser() user: AuthUser,
   ) {
-    await this.resolveWorkspaceId(slug);
-    await this.ensurePermission(await this.resolveWorkspaceId(slug), user, PERMISSIONS.KB_CATEGORY_MANAGE);
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    await this.ensurePermission(workspaceId, user, PERMISSIONS.KB_CATEGORY_MANAGE);
     const service = new ReorderKbCategories(this.categoryRepository);
     await service.execute(body.ids);
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.KB_CATEGORY_REORDERED,
+      entityType: 'kb-category',
+      entityId: body.ids[0],
+      userId: user.userId,
+      workspaceId,
+      metadata: { ids: body.ids },
+      category: AuditCategory.KNOWLEDGE_BASE,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
   }
 
   // --- Articles ---
@@ -147,6 +202,18 @@ export class KbController {
       title: body.title, content: body.content, categoryId: body.categoryId,
       workspaceId, createdById: user.userId, status: body.status as any,
     });
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.KB_ARTICLE_CREATED,
+      entityType: 'kb-article',
+      entityId: article.getId(),
+      userId: user.userId,
+      workspaceId,
+      metadata: { title: body.title },
+      category: AuditCategory.KNOWLEDGE_BASE,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
     return { id: article.getId(), title: article.title, slug: article.slug, status: article.status };
   }
 
@@ -157,10 +224,22 @@ export class KbController {
     @Body() body: { title?: string; content?: string; status?: string; categoryId?: string },
     @CurrentUser() user: AuthUser,
   ) {
-    await this.resolveWorkspaceId(slug);
-    await this.ensurePermission(await this.resolveWorkspaceId(slug), user, PERMISSIONS.KB_ARTICLE_EDIT);
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    await this.ensurePermission(workspaceId, user, PERMISSIONS.KB_ARTICLE_EDIT);
     const service = new UpdateKbArticle(this.articleRepository);
     const article = await service.execute({ id, title: body.title, content: body.content, status: body.status as any, categoryId: body.categoryId });
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.KB_ARTICLE_UPDATED,
+      entityType: 'kb-article',
+      entityId: id,
+      userId: user.userId,
+      workspaceId,
+      metadata: { title: body.title, status: body.status },
+      category: AuditCategory.KNOWLEDGE_BASE,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
     return { id: article.getId(), title: article.title, slug: article.slug, status: article.status };
   }
 
@@ -170,10 +249,23 @@ export class KbController {
     @Param('id') id: string,
     @CurrentUser() user: AuthUser,
   ) {
-    await this.resolveWorkspaceId(slug);
-    await this.ensurePermission(await this.resolveWorkspaceId(slug), user, PERMISSIONS.KB_ARTICLE_DELETE);
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    await this.ensurePermission(workspaceId, user, PERMISSIONS.KB_ARTICLE_DELETE);
+    const existingArticle = await this.articleRepository.findById(id);
     const service = new DeleteKbArticle(this.articleRepository);
     await service.execute(id);
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.KB_ARTICLE_DELETED,
+      entityType: 'kb-article',
+      entityId: id,
+      userId: user.userId,
+      workspaceId,
+      metadata: { title: existingArticle?.title },
+      category: AuditCategory.KNOWLEDGE_BASE,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
   }
 
   @Put('articles/reorder')
@@ -182,10 +274,22 @@ export class KbController {
     @Body() body: { ids: string[] },
     @CurrentUser() user: AuthUser,
   ) {
-    await this.resolveWorkspaceId(slug);
-    await this.ensurePermission(await this.resolveWorkspaceId(slug), user, PERMISSIONS.KB_ARTICLE_EDIT);
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    await this.ensurePermission(workspaceId, user, PERMISSIONS.KB_ARTICLE_EDIT);
     const service = new ReorderKbArticles(this.articleRepository);
     await service.execute(body.ids);
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.KB_ARTICLE_REORDERED,
+      entityType: 'kb-article',
+      entityId: body.ids[0],
+      userId: user.userId,
+      workspaceId,
+      metadata: { ids: body.ids },
+      category: AuditCategory.KNOWLEDGE_BASE,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
   }
 
   private async resolveWorkspaceId(slug: string): Promise<string> {

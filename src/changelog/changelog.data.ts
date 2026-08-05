@@ -16,6 +16,59 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.15.0',
+    date: '2026-08-04',
+    categories: [
+      {
+        title: { en: 'Universal System Logs', es: 'Registros Universales del Sistema' },
+        features: [
+          { en: 'Full activity logging across the platform — track every action performed by users and the system', es: 'Registro completo de actividad en toda la plataforma — rastrea cada acción realizada por usuarios y el sistema' },
+          { en: 'Filter logs by category, level, source, and date range', es: 'Filtra registros por categoría, nivel, fuente y rango de fechas' },
+          { en: 'Dedicated logs view for system administrators', es: 'Vista dedicada de registros para administradores del sistema' },
+        ],
+      },
+      {
+        title: { en: 'Platform Mailbox', es: 'Buzón de Plataforma' },
+        features: [
+          { en: 'Configure a single IMAP mailbox in Admin Settings to receive emails across all workspaces', es: 'Configura un único buzón IMAP en Configuración de Admin para recibir emails en todos los workspaces' },
+          { en: 'Emails are automatically routed to the correct workspace based on address', es: 'Los emails se enrutan automáticamente al workspace correcto según la dirección' },
+        ],
+      },
+      {
+        title: { en: 'Mailbox Address Filtering', es: 'Filtrado de Direcciones del Buzón' },
+        features: [
+          { en: 'Choose which emails to process: only the mailbox address, specific aliases, or all emails (catch-all)', es: 'Elige qué emails procesar: solo la dirección del buzón, alias específicos, o todos los emails (catch-all)' },
+        ],
+      },
+      {
+        title: { en: 'Email Encryption Options', es: 'Opciones de Cifrado de Email' },
+        features: [
+          { en: 'Configure TLS, TLS with self-signed certificates, or no encryption for IMAP connections', es: 'Configura TLS, TLS con certificados autofirmados, o sin cifrado para conexiones IMAP' },
+        ],
+      },
+      {
+        title: { en: 'Auto-Reply Control', es: 'Control de Respuesta Automática' },
+        features: [
+          { en: 'Toggle automatic confirmation emails when tickets are created from inbound email, per mailbox', es: 'Activa o desactiva los emails de confirmación automática cuando se crean tickets desde email entrante, por buzón' },
+        ],
+      },
+      {
+        title: { en: 'Date Format & Timezone', es: 'Formato de Fecha y Zona Horaria' },
+        features: [
+          { en: 'Choose your preferred date format (DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD) in user preferences', es: 'Elige tu formato de fecha preferido (DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD) en preferencias de usuario' },
+          { en: 'Set your timezone so dates and times are displayed in your local time', es: 'Configura tu zona horaria para que las fechas y horas se muestren en tu hora local' },
+        ],
+      },
+      {
+        title: { en: 'Improvements', es: 'Mejoras' },
+        features: [
+          { en: 'Resend pending workspace invitations with one click', es: 'Reenvía invitaciones pendientes del workspace con un click' },
+          { en: 'Upgraded to PostgreSQL 18 for improved performance', es: 'Actualización a PostgreSQL 18 para mejor rendimiento' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.14.0',
     date: '2026-07-31',
     categories: [

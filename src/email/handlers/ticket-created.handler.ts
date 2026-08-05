@@ -15,6 +15,11 @@ import { TypeOrmWorkspaceEmailSenderRepository } from '../../workspace/infrastru
 import { sendWorkspaceEmail } from '../domain/resolve-email-sender';
 import { TypeOrmTicketRepository } from '../../ticket/infrastructure/typeorm/repositories/typeorm-ticket.repository';
 import { TypeOrmTicketParticipantRepository } from '../../ticket/infrastructure/typeorm/repositories/typeorm-ticket-participant.repository';
+import { TypeOrmAuditLogRepository } from '../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
+import { CreateAuditLogEntry } from '../../audit-log/domain/services/audit-log-create';
+import { AuditAction } from '../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../audit-log/domain/enums/audit-level.enum';
 import { ResolveTicketStakeholders } from '../../notification/domain/services/notification-resolve-ticket-stakeholders';
 import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
@@ -23,7 +28,6 @@ import { NotificationType } from '../../notification/domain/enums/notification-t
 export class TicketCreatedHandler {
   private readonly logger = new Logger(TicketCreatedHandler.name);
   private readonly frontendUrl: string;
-  private readonly emailDomain?: string;
 
   constructor(
     @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
@@ -35,10 +39,10 @@ export class TicketCreatedHandler {
     private readonly ticketRepository: TypeOrmTicketRepository,
     private readonly participantRepository: TypeOrmTicketParticipantRepository,
     private readonly emailSenderRepository: TypeOrmWorkspaceEmailSenderRepository,
+    private readonly auditLogRepository: TypeOrmAuditLogRepository,
     private readonly config: ConfigService,
   ) {
     this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173').split(',')[0].trim();
-    this.emailDomain = config.get<string>('EMAIL_DOMAIN');
   }
 
   @OnEvent('ticket.created')
@@ -70,22 +74,44 @@ export class TicketCreatedHandler {
 
     const template = new TicketCreatedTemplate();
     const ticketUrl = `${this.frontendUrl}/dashboard/workspaces/${event.workspaceSlug}/tickets/${event.ticketId}`;
-    const mailbox = this.emailDomain ? await this.mailboxRepository.findByWorkspaceId(event.workspaceId) : null;
+    const mailbox = event.mailboxId
+      ? await this.mailboxRepository.findById(event.mailboxId)
+      : null;
+    const emailDomain = mailbox ? mailbox.address.split('@')[1] : null;
     const sender = await this.emailSenderRepository.findByWorkspaceId(event.workspaceId);
 
     for (const [lang, emails] of emailRecipients) {
-      await sendWorkspaceEmail(this.emailService, sender, {
+      const result = await sendWorkspaceEmail(this.emailService, sender, {
         to: emails,
         subject: template.subject({ ticketName: event.ticketName, ticketUrl, creatorName: event.creatorName, priority: event.priority, category: event.category, workspaceName: event.workspaceName, lang }),
         html: template.html({ ticketName: event.ticketName, ticketUrl, creatorName: event.creatorName, priority: event.priority, category: event.category, workspaceName: event.workspaceName, lang }),
-        ...(this.emailDomain && { messageId: `<ticket-${event.ticketId}@${this.emailDomain}>` }),
+        ...(emailDomain && { messageId: `<ticket-${event.ticketId}@${emailDomain}>` }),
         ...(mailbox && { replyTo: mailbox.address }),
       });
+      if (!result.success) {
+        const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+        await auditLog.execute({
+          action: AuditAction.EMAIL_SEND_FAILED,
+          entityType: 'email',
+          entityId: event.ticketId,
+          userId: null,
+          workspaceId: event.workspaceId,
+          metadata: { reason: 'notification', to: emails, ticketId: event.ticketId },
+          category: AuditCategory.EMAIL,
+          level: AuditLevel.ERROR,
+          source: 'system',
+        }).catch(() => {});
+      }
     }
   }
 
   private async sendCreatorConfirmation(event: TicketCreatedEvent): Promise<void> {
     if (!event.portalToken) return;
+
+    if (event.source === 'email' && event.mailboxId) {
+      const sourceMailbox = await this.mailboxRepository.findById(event.mailboxId);
+      if (sourceMailbox && sourceMailbox.autoReply === false) return;
+    }
 
     const creator = await this.userRepository.findById(event.creatorId);
     if (!creator) return;
@@ -93,14 +119,30 @@ export class TicketCreatedHandler {
     const lang = creator.language || 'en';
     const portalUrl = `${this.frontendUrl}/portal/tickets/${event.portalToken}`;
     const template = new TicketConfirmationTemplate();
-    const mailbox = this.emailDomain ? await this.mailboxRepository.findByWorkspaceId(event.workspaceId) : null;
+    const mailbox = event.mailboxId
+      ? await this.mailboxRepository.findById(event.mailboxId)
+      : null;
     const sender = await this.emailSenderRepository.findByWorkspaceId(event.workspaceId);
 
-    await sendWorkspaceEmail(this.emailService, sender, {
+    const result = await sendWorkspaceEmail(this.emailService, sender, {
       to: [creator.email],
       subject: template.subject({ ticketName: event.ticketName, portalUrl, lang }),
       html: template.html({ ticketName: event.ticketName, portalUrl, lang }),
       ...(mailbox && { replyTo: mailbox.address }),
     });
+    if (!result.success) {
+      const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+      await auditLog.execute({
+        action: AuditAction.EMAIL_SEND_FAILED,
+        entityType: 'email',
+        entityId: event.ticketId,
+        userId: null,
+        workspaceId: event.workspaceId,
+        metadata: { reason: 'notification', to: creator.email, ticketId: event.ticketId },
+        category: AuditCategory.EMAIL,
+        level: AuditLevel.ERROR,
+        source: 'system',
+      }).catch(() => {});
+    }
   }
 }

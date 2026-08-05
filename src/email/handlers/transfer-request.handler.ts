@@ -11,6 +11,7 @@ import { TypeOrmNotificationPreferenceRepository } from '../../notification/infr
 import { UlidGenerator } from '../../shared/infrastructure/ulid-generator';
 import { TypeOrmMailboxRepository } from '../../mailbox/infrastructure/typeorm/repositories/typeorm-mailbox.repository';
 import { TypeOrmWorkspaceEmailSenderRepository } from '../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-email-sender.repository';
+import { TypeOrmTicketRepository } from '../../ticket/infrastructure/typeorm/repositories/typeorm-ticket.repository';
 import { sendWorkspaceEmail } from '../domain/resolve-email-sender';
 import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
@@ -19,7 +20,6 @@ import { NotificationType } from '../../notification/domain/enums/notification-t
 export class TransferRequestHandler {
   private readonly logger = new Logger(TransferRequestHandler.name);
   private readonly frontendUrl: string;
-  private readonly emailDomain?: string;
 
   constructor(
     @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
@@ -28,11 +28,11 @@ export class TransferRequestHandler {
     private readonly preferenceRepository: TypeOrmNotificationPreferenceRepository,
     private readonly idGenerator: UlidGenerator,
     private readonly mailboxRepository: TypeOrmMailboxRepository,
+    private readonly ticketRepository: TypeOrmTicketRepository,
     private readonly emailSenderRepository: TypeOrmWorkspaceEmailSenderRepository,
     private readonly config: ConfigService,
   ) {
     this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173').split(',')[0].trim();
-    this.emailDomain = config.get<string>('EMAIL_DOMAIN');
   }
 
   @OnEvent('transfer-request.created')
@@ -55,7 +55,11 @@ export class TransferRequestHandler {
 
     const template = new TransferRequestTemplate();
     const ticketUrl = `${this.frontendUrl}/dashboard/workspaces/${event.workspaceSlug}/tickets/${event.ticketId}`;
-    const mailbox = this.emailDomain ? await this.mailboxRepository.findByWorkspaceId(event.workspaceId) : null;
+    const ticket = await this.ticketRepository.findById(event.ticketId);
+    const mailbox = ticket?.mailboxId
+      ? await this.mailboxRepository.findById(ticket.mailboxId)
+      : null;
+    const emailDomain = mailbox ? mailbox.address.split('@')[1] : null;
     const sender = await this.emailSenderRepository.findByWorkspaceId(event.workspaceId);
 
     for (const [lang, emails] of emailRecipients) {
@@ -63,10 +67,10 @@ export class TransferRequestHandler {
         to: emails,
         subject: template.createdSubject({ ticketName: event.ticketName, ticketUrl, requesterName: event.requesterName, workspaceName: event.workspaceName, lang }),
         html: template.createdHtml({ ticketName: event.ticketName, ticketUrl, requesterName: event.requesterName, workspaceName: event.workspaceName, lang }),
-        ...(this.emailDomain && {
-          messageId: `<transfer-${event.requestId}@${this.emailDomain}>`,
-          inReplyTo: `<ticket-${event.ticketId}@${this.emailDomain}>`,
-          references: `<ticket-${event.ticketId}@${this.emailDomain}>`,
+        ...(emailDomain && {
+          messageId: `<transfer-${event.requestId}@${emailDomain}>`,
+          inReplyTo: `<ticket-${event.ticketId}@${emailDomain}>`,
+          references: `<ticket-${event.ticketId}@${emailDomain}>`,
         }),
         ...(mailbox && { replyTo: mailbox.address }),
       });
@@ -95,7 +99,11 @@ export class TransferRequestHandler {
 
     const template = new TransferRequestTemplate();
     const ticketUrl = `${this.frontendUrl}/dashboard/workspaces/${event.workspaceSlug}/tickets/${event.ticketId}`;
-    const mailbox = this.emailDomain ? await this.mailboxRepository.findByWorkspaceId(event.workspaceId) : null;
+    const ticket = await this.ticketRepository.findById(event.ticketId);
+    const mailbox = ticket?.mailboxId
+      ? await this.mailboxRepository.findById(ticket.mailboxId)
+      : null;
+    const emailDomain = mailbox ? mailbox.address.split('@')[1] : null;
     const sender = await this.emailSenderRepository.findByWorkspaceId(event.workspaceId);
 
     for (const [lang, emails] of emailRecipients) {
@@ -103,9 +111,9 @@ export class TransferRequestHandler {
         to: emails,
         subject: template.resolvedSubject({ ticketName: event.ticketName, ticketUrl, resolution: event.resolution, workspaceName: event.workspaceName, lang }),
         html: template.resolvedHtml({ ticketName: event.ticketName, ticketUrl, resolution: event.resolution, workspaceName: event.workspaceName, lang }),
-        ...(this.emailDomain && {
-          inReplyTo: `<transfer-${event.requestId}@${this.emailDomain}>`,
-          references: `<ticket-${event.ticketId}@${this.emailDomain}>`,
+        ...(emailDomain && {
+          inReplyTo: `<transfer-${event.requestId}@${emailDomain}>`,
+          references: `<ticket-${event.ticketId}@${emailDomain}>`,
         }),
         ...(mailbox && { replyTo: mailbox.address }),
       });

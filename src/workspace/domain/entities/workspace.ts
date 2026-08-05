@@ -20,6 +20,7 @@ interface Props {
   accountId?: string | null;
   palette?: string | null;
   slaPolicy?: SlaPolicy | null;
+  systemMailboxEnabled?: boolean;
 }
 
 export class Workspace {
@@ -30,6 +31,7 @@ export class Workspace {
   accountId: string | null;
   palette: string | null;
   slaPolicy: SlaPolicy | null;
+  systemMailboxEnabled: boolean;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -39,6 +41,7 @@ export class Workspace {
     this.accountId = props.accountId ?? null;
     this.palette = props.palette ?? null;
     this.slaPolicy = props.slaPolicy ?? null;
+    this.systemMailboxEnabled = props.systemMailboxEnabled ?? true;
   }
 
   getId(): string {

@@ -25,6 +25,11 @@ import { TypeOrmCustomFieldDefinitionRepository } from '../../typeorm/repositori
 import { TypeOrmWorkspaceRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository';
 import { TypeOrmWorkspaceMemberRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
 import { EnsureWorkspacePermission } from '../../../../workspace/domain/services/workspace-ensure-permission';
+import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
+import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit-log-create';
+import { AuditAction } from '../../../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
 import { CreateCustomFieldDefinitionRequest } from '../dto/create-custom-field-definition.request';
 import { UpdateCustomFieldDefinitionRequest } from '../dto/update-custom-field-definition.request';
 import { ReorderCustomFieldDefinitionsRequest } from '../dto/reorder-custom-field-definitions.request';
@@ -36,6 +41,7 @@ export class CustomFieldDefinitionController {
     @Inject() private readonly workspaceRepository: TypeOrmWorkspaceRepository,
     @Inject() private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
     @Inject() private readonly idGenerator: UlidGenerator,
+    @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
   ) {}
 
   @Post()
@@ -48,7 +54,7 @@ export class CustomFieldDefinitionController {
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new CreateCustomFieldDefinition(this.idGenerator, this.definitionRepository);
     const command = new CreateCustomFieldDefinitionCommand(service, ensurePermission);
-    return command.execute({
+    const result = await command.execute({
       name: body.name,
       type: body.type,
       options: body.options ?? null,
@@ -57,6 +63,21 @@ export class CustomFieldDefinitionController {
       userId: user.userId,
       isSystemAdmin: user.isSystemAdmin,
     });
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.CUSTOM_FIELD_CREATED,
+      entityType: 'custom-field',
+      entityId: result.id,
+      userId: user.userId,
+      workspaceId: workspaceId,
+      metadata: { name: body.name, type: body.type },
+      category: AuditCategory.CONFIG,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
+    return result;
   }
 
   @Get()
@@ -80,12 +101,27 @@ export class CustomFieldDefinitionController {
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new ReorderCustomFieldDefinitions(this.definitionRepository);
     const command = new ReorderCustomFieldDefinitionsCommand(service, ensurePermission);
-    return command.execute({
+    const result = await command.execute({
       items: body.items,
       workspaceId,
       userId: user.userId,
       isSystemAdmin: user.isSystemAdmin,
     });
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.CUSTOM_FIELD_REORDERED,
+      entityType: 'custom-field',
+      entityId: workspaceId,
+      userId: user.userId,
+      workspaceId: workspaceId,
+      metadata: { items: body.items },
+      category: AuditCategory.CONFIG,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
+    return result;
   }
 
   @Put(':id')
@@ -99,7 +135,7 @@ export class CustomFieldDefinitionController {
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new UpdateCustomFieldDefinition(this.definitionRepository);
     const command = new UpdateCustomFieldDefinitionCommand(service, ensurePermission);
-    return command.execute({
+    const result = await command.execute({
       id,
       name: body.name,
       options: body.options,
@@ -108,6 +144,21 @@ export class CustomFieldDefinitionController {
       userId: user.userId,
       isSystemAdmin: user.isSystemAdmin,
     });
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.CUSTOM_FIELD_UPDATED,
+      entityType: 'custom-field',
+      entityId: id,
+      userId: user.userId,
+      workspaceId: workspaceId,
+      metadata: { name: body.name },
+      category: AuditCategory.CONFIG,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
+    return result;
   }
 
   @Delete(':id')
@@ -118,14 +169,30 @@ export class CustomFieldDefinitionController {
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    const existing = await this.definitionRepository.findById(id);
     const service = new DeleteCustomFieldDefinition(this.definitionRepository);
     const command = new DeleteCustomFieldDefinitionCommand(service, ensurePermission);
-    return command.execute({
+    const result = await command.execute({
       id,
       workspaceId,
       userId: user.userId,
       isSystemAdmin: user.isSystemAdmin,
     });
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.CUSTOM_FIELD_DELETED,
+      entityType: 'custom-field',
+      entityId: id,
+      userId: user.userId,
+      workspaceId: workspaceId,
+      metadata: { name: existing?.name, type: existing?.type },
+      category: AuditCategory.CONFIG,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
+    return result;
   }
 
   private async resolveWorkspaceId(slug: string): Promise<string> {

@@ -5,6 +5,8 @@ import { PERMISSIONS } from '../../domain/permissions';
 import { WorkspaceRole } from '../../domain/enums/workspace-role.enum';
 import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 
 interface Props {
   workspaceId: string;
@@ -50,6 +52,9 @@ export class AddMemberCommand implements Command<Props, AddMemberResponse> {
       userId: props.requestingUserId,
       workspaceId: props.workspaceId,
       metadata: { target: props.targetLabel, role: props.role },
+      category: AuditCategory.WORKSPACE,
+      level: AuditLevel.INFO,
+      source: 'ui',
     });
 
     return {

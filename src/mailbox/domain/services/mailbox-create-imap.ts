@@ -5,15 +5,19 @@ import { MailboxRepository } from '../repositories/mailbox.repository';
 import { MailboxType } from '../enums/mailbox-type.enum';
 
 interface CreateImapMailboxProps {
-  workspaceId: string;
+  workspaceId: string | null;
   address: string;
   imapHost: string;
   imapPort: number;
   imapUser: string;
   imapPass: string;
   imapTls?: boolean;
+  encryption?: string;
   imapFolder?: string;
   pollInterval?: number;
+  addressMode?: string;
+  acceptedAddresses?: string[];
+  autoReply?: boolean;
 }
 
 export class CreateImapMailbox {
@@ -39,8 +43,12 @@ export class CreateImapMailbox {
       imapUser: props.imapUser,
       imapPass: props.imapPass,
       imapTls: props.imapTls ?? true,
+      encryption: props.encryption ?? 'tls',
       imapFolder: props.imapFolder ?? 'INBOX',
       pollInterval: props.pollInterval ?? 30,
+      addressMode: props.addressMode ?? 'all',
+      acceptedAddresses: props.acceptedAddresses ?? [],
+      autoReply: props.autoReply,
     });
 
     await this.repository.create(mailbox);

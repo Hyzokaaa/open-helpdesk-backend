@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SharedModule } from '../shared/shared.module';
+import { AuditLogModule } from '../audit-log/audit-log.module';
 import { NotificationModel } from './infrastructure/typeorm/models/notification.model';
 import { NotificationPreferenceModel } from './infrastructure/typeorm/models/notification-preference.model';
 import { TypeOrmNotificationRepository } from './infrastructure/typeorm/repositories/typeorm-notification.repository';
@@ -10,6 +11,7 @@ import { NotificationController } from './infrastructure/nest/controllers/notifi
 @Module({
   imports: [
     SharedModule,
+    AuditLogModule,
     TypeOrmModule.forFeature([NotificationModel, NotificationPreferenceModel]),
   ],
   controllers: [NotificationController],

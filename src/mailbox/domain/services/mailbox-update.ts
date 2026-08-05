@@ -11,8 +11,12 @@ interface UpdateMailboxProps {
   imapUser?: string | null;
   imapPass?: string | null;
   imapTls?: boolean | null;
+  encryption?: string;
   imapFolder?: string | null;
   pollInterval?: number | null;
+  addressMode?: string;
+  acceptedAddresses?: string[];
+  autoReply?: boolean;
 }
 
 export class UpdateMailbox {
@@ -29,8 +33,12 @@ export class UpdateMailbox {
     if (props.imapUser !== undefined) mailbox.imapUser = props.imapUser;
     if (props.imapPass !== undefined) mailbox.imapPass = props.imapPass;
     if (props.imapTls !== undefined) mailbox.imapTls = props.imapTls;
+    if (props.encryption !== undefined) mailbox.encryption = props.encryption;
     if (props.imapFolder !== undefined) mailbox.imapFolder = props.imapFolder;
     if (props.pollInterval !== undefined) mailbox.pollInterval = props.pollInterval;
+    if (props.addressMode !== undefined) mailbox.addressMode = props.addressMode;
+    if (props.acceptedAddresses !== undefined) mailbox.acceptedAddresses = props.acceptedAddresses;
+    if (props.autoReply !== undefined) mailbox.autoReply = props.autoReply;
 
     await this.repository.update(mailbox);
     return mailbox;

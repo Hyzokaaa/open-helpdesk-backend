@@ -31,6 +31,11 @@ import { ImportMembersConfirmCommand } from '../../../application/commands/impor
 import { TypeOrmWorkspaceRepository } from '../../typeorm/repositories/typeorm-workspace.repository';
 import { TypeOrmWorkspaceMemberRepository } from '../../typeorm/repositories/typeorm-workspace-member.repository';
 import { TypeOrmUserRepository } from '../../../../user/infrastructure/typeorm/repositories/typeorm-user.repository';
+import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
+import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit-log-create';
+import { AuditAction } from '../../../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
 import { importWelcomeEmail } from '../../../../email/templates/import-welcome.template';
 import { resolveFrontendUrl } from '../../../../shared/infrastructure/resolve-frontend-url';
 
@@ -47,6 +52,7 @@ export class WorkspaceImportController {
     @Inject() private readonly passwordHasher: BcryptPasswordHasher,
     @Inject() private readonly tokenService: JwtTokenService,
     @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
+    @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
     private readonly config: ConfigService,
   ) {
     const rawFrontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
@@ -150,6 +156,19 @@ export class WorkspaceImportController {
         // Email failure should not fail the import
       }
     }
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.WORKSPACE_MEMBERS_IMPORTED,
+      entityType: 'workspace',
+      entityId: workspace.getId(),
+      userId: user.userId,
+      workspaceId: workspace.getId(),
+      metadata: { count: result.created + result.added },
+      category: AuditCategory.WORKSPACE,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
 
     return { created: result.created, added: result.added, skipped: result.skipped };
   }

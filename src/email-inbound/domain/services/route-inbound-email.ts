@@ -15,7 +15,7 @@ import { TicketPriority } from '../../../ticket/domain/enums/ticket-priority.enu
 import { TicketCategory } from '../../../ticket/domain/enums/ticket-category.enum';
 import { WorkspaceRole } from '../../../workspace/domain/enums/workspace-role.enum';
 import { TicketCreatedEvent, NewCommentEvent } from '../../../email/domain/events';
-import { ParsedInboundEmail } from './parse-inbound-email';
+import { ParsedInboundEmail } from '../../infrastructure/imap/imap-email-parser';
 
 export interface RouteInboundEmailResult {
   action: 'ticket-created' | 'comment-added' | 'rejected';
@@ -41,16 +41,30 @@ export class RouteInboundEmail {
   ) {}
 
   async execute(parsed: ParsedInboundEmail): Promise<RouteInboundEmailResult> {
-    // 1. Find mailbox — use pre-resolved mailboxId from IMAP poller, or search by toAddresses (MTA hook)
+    // 1. Find mailbox — try the poller's mailbox first, then search by To/CC addresses
     let mailbox = null;
+    let viaSystemMailbox = false;
     if (parsed.mailboxId) {
-      mailbox = await this.mailboxRepository.findById(parsed.mailboxId);
-      if (mailbox && !mailbox.isActive) mailbox = null;
-    } else {
+      const pollerMailbox = await this.mailboxRepository.findById(parsed.mailboxId);
+      if (pollerMailbox?.isActive) {
+        // Check if the email was actually sent TO this mailbox's address
+        const recipients = parsed.toAddresses.map(a => a.toLowerCase());
+        if (recipients.includes(pollerMailbox.address.toLowerCase())) {
+          mailbox = pollerMailbox;
+        } else if (pollerMailbox.workspaceId === null) {
+          viaSystemMailbox = true;
+        }
+      }
+    }
+
+    // If poller's mailbox didn't match (catch-all scenario), search by To/CC addresses
+    if (!mailbox) {
       for (const addr of parsed.toAddresses) {
-        mailbox = await this.mailboxRepository.findByAddress(addr);
-        if (mailbox && mailbox.isActive) break;
-        mailbox = null;
+        const found = await this.mailboxRepository.findByAddress(addr);
+        if (found && found.isActive) {
+          mailbox = found;
+          break;
+        }
       }
     }
 
@@ -58,6 +72,22 @@ export class RouteInboundEmail {
       this.logger.warn(`No active mailbox found for addresses: ${parsed.toAddresses.join(', ')}`);
       return { action: 'rejected', reason: 'unknown-mailbox' };
     }
+
+    // If routed via platform catch-all, check if workspace allows it
+    if (viaSystemMailbox && mailbox.workspaceId) {
+      const ws = await this.workspaceRepository.findById(mailbox.workspaceId);
+      if (ws && !ws.systemMailboxEnabled) {
+        this.logger.log(`Workspace ${mailbox.workspaceId} has system mailbox disabled — rejecting`);
+        return { action: 'rejected', reason: 'system-mailbox-disabled' };
+      }
+    }
+
+    if (!mailbox.workspaceId) {
+      this.logger.warn(`System mailbox ${mailbox.getId()} has no workspace — skipping routing`);
+      return { action: 'rejected', reason: 'system-mailbox-no-workspace' };
+    }
+
+    const workspaceId = mailbox.workspaceId;
 
     // 2. Find or create user
     let user = await this.userRepository.findByEmail(parsed.fromAddress);
@@ -76,29 +106,29 @@ export class RouteInboundEmail {
 
     // 3. Ensure workspace membership
     const existingMember = await this.memberRepository.findByWorkspaceAndUser(
-      mailbox.workspaceId,
+      workspaceId,
       user.getId(),
     );
     if (!existingMember) {
       await this.addMember.execute({
-        workspaceId: mailbox.workspaceId,
+        workspaceId: workspaceId,
         userId: user.getId(),
         role: WorkspaceRole.REPORTER,
       });
-      this.logger.log(`Added ${parsed.fromAddress} as REPORTER to workspace ${mailbox.workspaceId}`);
+      this.logger.log(`Added ${parsed.fromAddress} as REPORTER to workspace ${workspaceId}`);
     }
 
     // 4. Route: reply to existing ticket or create new
     if (parsed.inReplyToTicketId) {
       const ticket = await this.ticketRepository.findById(parsed.inReplyToTicketId);
-      if (ticket && ticket.workspaceId === mailbox.workspaceId) {
+      if (ticket && ticket.workspaceId === workspaceId) {
         const comment = await this.createComment.execute({
           content: parsed.body,
           ticketId: ticket.getId(),
           authorId: user.getId(),
         });
 
-        const workspace = await this.workspaceRepository.findById(mailbox.workspaceId);
+        const workspace = await this.workspaceRepository.findById(workspaceId);
         if (workspace) {
           const event: NewCommentEvent = {
             ticketId: ticket.getId(),
@@ -112,6 +142,7 @@ export class RouteInboundEmail {
             workspaceId: workspace.getId(),
             workspaceName: workspace.name,
             workspaceSlug: workspace.slug,
+            mailboxId: mailbox.getId(),
           };
           this.eventPublisher.emit('comment.created', event);
         }
@@ -122,7 +153,7 @@ export class RouteInboundEmail {
     }
 
     // 5. Create new ticket
-    const workspace = await this.workspaceRepository.findById(mailbox.workspaceId);
+    const workspace = await this.workspaceRepository.findById(workspaceId);
     if (!workspace) {
       return { action: 'rejected', reason: 'workspace-not-found' };
     }
@@ -132,10 +163,11 @@ export class RouteInboundEmail {
       description: parsed.body,
       priority: TicketPriority.MEDIUM,
       category: TicketCategory.ISSUE,
-      workspaceId: mailbox.workspaceId,
+      workspaceId: workspaceId,
       creatorId: user.getId(),
       tagIds: [],
       portalToken: randomUUID(),
+      mailboxId: mailbox.getId(),
     });
 
     const ticketEvent: TicketCreatedEvent = {
@@ -149,6 +181,8 @@ export class RouteInboundEmail {
       workspaceName: workspace.name,
       workspaceSlug: workspace.slug,
       portalToken: ticket.portalToken,
+      source: 'email',
+      mailboxId: mailbox.getId(),
     };
     this.eventPublisher.emit('ticket.created', ticketEvent);
 

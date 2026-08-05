@@ -31,6 +31,9 @@ import { CreateUser } from '../../../domain/services/user-create';
 import { CreateAccountForUser } from '../../../../account/domain/services/account-create-for-user';
 import { AcceptInvitation } from '../../../../workspace/domain/services/invitation-accept';
 import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit-log-create';
+import { AuditAction } from '../../../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
 import { SignupUserCommand } from '../../../application/commands/signup-user.command';
 import { TypeOrmAccountRepository } from '../../../../account/infrastructure/typeorm/repositories/typeorm-account.repository';
 import { TypeOrmWorkspaceInvitationRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-invitation.repository';
@@ -76,13 +79,31 @@ export class AuthController {
   @Public()
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @Post('login')
-  login(@Body() body: LoginUserRequest) {
+  async login(@Body() body: LoginUserRequest) {
     const service = new AuthenticateUser(this.userRepository, this.passwordHasher);
     const command = new LoginUserCommand(service, this.tokenService);
-    return command.execute({
+    const result = await command.execute({
       email: body.email,
       password: body.password,
     });
+
+    const user = await this.userRepository.findByEmail(body.email);
+    if (user) {
+      const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+      await auditLog.execute({
+        action: AuditAction.USER_LOGGED_IN,
+        entityType: 'user',
+        entityId: user.getId(),
+        userId: user.getId(),
+        workspaceId: null,
+        metadata: { email: user.email },
+        category: AuditCategory.USER,
+        level: AuditLevel.INFO,
+        source: 'ui',
+      });
+    }
+
+    return result;
   }
 
   @Public()
@@ -114,6 +135,23 @@ export class AuthController {
     const service = new RequestPasswordReset(this.userRepository);
     const command = new RequestPasswordResetCommand(service, this.tokenService, this.emailService);
     await command.execute({ email: body.email, frontendUrl });
+
+    const user = await this.userRepository.findByEmail(body.email);
+    if (user) {
+      const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+      await auditLog.execute({
+        action: AuditAction.USER_FORGOT_PASSWORD,
+        entityType: 'user',
+        entityId: user.getId(),
+        userId: user.getId(),
+        workspaceId: null,
+        metadata: { email: body.email },
+        category: AuditCategory.USER,
+        level: AuditLevel.INFO,
+        source: 'ui',
+      });
+    }
+
     return { message: 'If the email exists, a reset link has been sent' };
   }
 
@@ -123,6 +161,28 @@ export class AuthController {
     const service = new ResetPassword(this.userRepository, this.passwordHasher);
     const command = new ResetPasswordCommand(service, this.tokenService);
     await command.execute({ token: body.token, newPassword: body.newPassword });
+
+    let userId: string | null = null;
+    try {
+      const payload = this.tokenService.verify<{ sub: string }>(body.token);
+      userId = payload.sub;
+    } catch { /* token already consumed, best effort */ }
+
+    if (userId) {
+      const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+      await auditLog.execute({
+        action: AuditAction.USER_RESET_PASSWORD,
+        entityType: 'user',
+        entityId: userId,
+        userId,
+        workspaceId: null,
+        metadata: { userId },
+        category: AuditCategory.USER,
+        level: AuditLevel.INFO,
+        source: 'ui',
+      });
+    }
+
     return { message: 'Password has been reset' };
   }
 
@@ -132,6 +192,28 @@ export class AuthController {
     const service = new VerifyEmail(this.userRepository);
     const command = new VerifyEmailCommand(service, this.tokenService);
     await command.execute({ token: body.token });
+
+    let userId: string | null = null;
+    try {
+      const payload = this.tokenService.verify<{ sub: string }>(body.token);
+      userId = payload.sub;
+    } catch { /* token already consumed, best effort */ }
+
+    if (userId) {
+      const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+      await auditLog.execute({
+        action: AuditAction.USER_EMAIL_VERIFIED,
+        entityType: 'user',
+        entityId: userId,
+        userId,
+        workspaceId: null,
+        metadata: { userId },
+        category: AuditCategory.USER,
+        level: AuditLevel.INFO,
+        source: 'ui',
+      });
+    }
+
     return { message: 'Email verified' };
   }
 
@@ -146,6 +228,20 @@ export class AuthController {
       this.emailService,
     );
     await command.execute({ userId: user.userId, frontendUrl });
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.USER_RESEND_VERIFICATION,
+      entityType: 'user',
+      entityId: user.userId,
+      userId: user.userId,
+      workspaceId: null,
+      metadata: { email: user.email },
+      category: AuditCategory.USER,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
     return { message: 'Verification email sent' };
   }
 
@@ -190,6 +286,22 @@ export class AuthController {
         lastName: oauthUser.lastName,
         authProvider: oauthUser.authProvider,
       });
+
+      const user = await this.userRepository.findByEmail(oauthUser.email);
+      if (user) {
+        const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+        await auditLog.execute({
+          action: AuditAction.USER_OAUTH_LOGIN,
+          entityType: 'user',
+          entityId: user.getId(),
+          userId: user.getId(),
+          workspaceId: null,
+          metadata: { provider: oauthUser.authProvider, email: oauthUser.email },
+          category: AuditCategory.USER,
+          level: AuditLevel.INFO,
+          source: 'ui',
+        });
+      }
 
       return res.redirect(`${redirectUrl}/auth/callback?token=${result.accessToken}`);
     } catch {

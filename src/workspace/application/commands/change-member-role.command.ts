@@ -3,6 +3,8 @@ import { ChangeWorkspaceMemberRole } from '../../domain/services/workspace-chang
 import { WorkspaceRole } from '../../domain/enums/workspace-role.enum';
 import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 
 interface Props {
   workspaceId: string;
@@ -34,6 +36,9 @@ export class ChangeMemberRoleCommand implements Command<Props, ChangeMemberRoleR
       userId: props.requestingUserId,
       workspaceId: props.workspaceId,
       metadata: { target: props.targetLabel, after: { role: props.newRole } },
+      category: AuditCategory.WORKSPACE,
+      level: AuditLevel.INFO,
+      source: 'ui',
     });
 
     return { userId: member.userId, role: member.role };

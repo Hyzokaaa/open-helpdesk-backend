@@ -30,6 +30,9 @@ import { TypeOrmUserRepository } from '../../typeorm/repositories/typeorm-user.r
 import { TypeOrmAccountRepository } from '../../../../account/infrastructure/typeorm/repositories/typeorm-account.repository';
 import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
 import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit-log-create';
+import { AuditAction } from '../../../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
 import { CreateAccountForUser } from '../../../../account/domain/services/account-create-for-user';
 import { RegisterUserRequest } from '../dto/register-user.request';
 import { SortDto } from '../../../../shared/nest/dto/sort.dto';
@@ -52,59 +55,190 @@ export class UserController {
   }
 
   @Patch('me/name')
-  updateName(
+  async updateName(
     @Body() body: { firstName: string; lastName: string },
     @CurrentUser() authUser: AuthUser,
   ) {
+    const existing = await this.userRepository.findById(authUser.userId);
     const service = new UpdateUserProfile(this.userRepository);
     const command = new UpdateUserProfileCommand(service);
-    return command.execute({
+    const result = await command.execute({
       userId: authUser.userId,
       firstName: body.firstName,
       lastName: body.lastName,
     });
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.USER_NAME_UPDATED,
+      entityType: 'user',
+      entityId: authUser.userId,
+      userId: authUser.userId,
+      workspaceId: null,
+      metadata: {
+        before: { firstName: existing?.firstName, lastName: existing?.lastName },
+        after: { firstName: body.firstName, lastName: body.lastName },
+      },
+      category: AuditCategory.USER,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
+    return result;
   }
 
   @SkipEmailVerification()
   @Patch('me/language')
-  updateLanguage(
+  async updateLanguage(
     @Body() body: { language: string },
     @CurrentUser() authUser: AuthUser,
   ) {
+    const existing = await this.userRepository.findById(authUser.userId);
     const service = new UpdateUserProfile(this.userRepository);
     const command = new UpdateUserProfileCommand(service);
-    return command.execute({
+    const result = await command.execute({
       userId: authUser.userId,
       language: body.language,
     });
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.USER_LANGUAGE_CHANGED,
+      entityType: 'user',
+      entityId: authUser.userId,
+      userId: authUser.userId,
+      workspaceId: null,
+      metadata: { before: existing?.language, after: body.language },
+      category: AuditCategory.USER,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
+    return result;
   }
 
   @SkipEmailVerification()
   @Patch('me/theme')
-  updateTheme(
+  async updateTheme(
     @Body() body: { theme: string },
     @CurrentUser() authUser: AuthUser,
   ) {
+    const existing = await this.userRepository.findById(authUser.userId);
     const service = new UpdateUserProfile(this.userRepository);
     const command = new UpdateUserProfileCommand(service);
-    return command.execute({
+    const result = await command.execute({
       userId: authUser.userId,
       theme: body.theme,
     });
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.USER_THEME_CHANGED,
+      entityType: 'user',
+      entityId: authUser.userId,
+      userId: authUser.userId,
+      workspaceId: null,
+      metadata: { before: existing?.theme, after: body.theme },
+      category: AuditCategory.USER,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
+    return result;
+  }
+
+  @SkipEmailVerification()
+  @Patch('me/date-format')
+  async updateDateFormat(
+    @Body() body: { dateFormat: string },
+    @CurrentUser() authUser: AuthUser,
+  ) {
+    const validFormats = ['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'];
+    if (!validFormats.includes(body.dateFormat)) {
+      throw new Error('Invalid date format');
+    }
+
+    const existing = await this.userRepository.findById(authUser.userId);
+    const service = new UpdateUserProfile(this.userRepository);
+    const command = new UpdateUserProfileCommand(service);
+    const result = await command.execute({
+      userId: authUser.userId,
+      dateFormat: body.dateFormat,
+    });
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.USER_DATE_FORMAT_CHANGED,
+      entityType: 'user',
+      entityId: authUser.userId,
+      userId: authUser.userId,
+      workspaceId: null,
+      metadata: { before: existing?.dateFormat, after: body.dateFormat },
+      category: AuditCategory.USER,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
+    return result;
+  }
+
+  @SkipEmailVerification()
+  @Patch('me/timezone')
+  async updateTimezone(
+    @Body() body: { timezone: string },
+    @CurrentUser() authUser: AuthUser,
+  ) {
+    const existing = await this.userRepository.findById(authUser.userId);
+    const service = new UpdateUserProfile(this.userRepository);
+    const command = new UpdateUserProfileCommand(service);
+    const result = await command.execute({
+      userId: authUser.userId,
+      timezone: body.timezone,
+    });
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.USER_TIMEZONE_CHANGED,
+      entityType: 'user',
+      entityId: authUser.userId,
+      userId: authUser.userId,
+      workspaceId: null,
+      metadata: { before: existing?.timezone, after: body.timezone },
+      category: AuditCategory.USER,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
+    return result;
   }
 
   @Patch('me/password')
-  changePassword(
+  async changePassword(
     @Body() body: { currentPassword: string; newPassword: string },
     @CurrentUser() authUser: AuthUser,
   ) {
     const service = new ChangePassword(this.userRepository, this.passwordHasher);
     const command = new ChangePasswordCommand(service);
-    return command.execute({
+    const result = await command.execute({
       userId: authUser.userId,
       currentPassword: body.currentPassword,
       newPassword: body.newPassword,
     });
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.USER_PASSWORD_CHANGED,
+      entityType: 'user',
+      entityId: authUser.userId,
+      userId: authUser.userId,
+      workspaceId: null,
+      metadata: null,
+      category: AuditCategory.USER,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
+    return result;
   }
 
   @Get()
@@ -133,6 +267,19 @@ export class UserController {
 
     const createAccount = new CreateAccountForUser(this.idGenerator, this.accountRepository);
     await createAccount.execute({ userId: result.id, firstName: body.firstName });
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.USER_CREATED,
+      entityType: 'user',
+      entityId: result.id,
+      userId: user.userId,
+      workspaceId: null,
+      metadata: { email: body.email },
+      category: AuditCategory.USER,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
 
     return result;
   }

@@ -87,6 +87,7 @@ export class TypeOrmWorkspaceRepository implements WorkspaceRepository {
       accountId: model.accountId,
       palette: (model.metadata as any)?.palette ?? null,
       slaPolicy: model.slaPolicy as any ?? null,
+      systemMailboxEnabled: model.systemMailboxEnabled ?? true,
     });
   }
 
@@ -99,6 +100,7 @@ export class TypeOrmWorkspaceRepository implements WorkspaceRepository {
     model.accountId = workspace.accountId;
     model.metadata = { palette: workspace.palette };
     model.slaPolicy = workspace.slaPolicy as any;
+    model.systemMailboxEnabled = workspace.systemMailboxEnabled;
     return model;
   }
 }

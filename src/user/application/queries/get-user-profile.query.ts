@@ -16,6 +16,8 @@ export interface UserProfileResponse {
   isEmailVerified: boolean;
   language: string;
   theme: string;
+  dateFormat: string;
+  timezone: string;
 }
 
 export class GetUserProfileQuery implements Query<Props, UserProfileResponse> {
@@ -37,6 +39,8 @@ export class GetUserProfileQuery implements Query<Props, UserProfileResponse> {
       isEmailVerified: user.isEmailVerified,
       language: user.language,
       theme: user.theme,
+      dateFormat: user.dateFormat,
+      timezone: user.timezone,
     };
   }
 }

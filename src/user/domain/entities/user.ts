@@ -11,6 +11,8 @@ interface Props {
   isEmailVerified: boolean;
   language: string;
   theme: string;
+  dateFormat?: string;
+  timezone?: string;
   autoCreated?: boolean;
   authProvider?: string | null;
 }
@@ -26,6 +28,8 @@ export class User {
   isEmailVerified: boolean;
   language: string;
   theme: string;
+  dateFormat: string;
+  timezone: string;
   autoCreated: boolean;
   authProvider: string | null;
 
@@ -40,6 +44,8 @@ export class User {
     this.isEmailVerified = props.isEmailVerified;
     this.language = props.language;
     this.theme = props.theme;
+    this.dateFormat = props.dateFormat ?? 'DD/MM/YYYY';
+    this.timezone = props.timezone ?? 'auto';
     this.autoCreated = props.autoCreated ?? false;
     this.authProvider = props.authProvider ?? null;
   }

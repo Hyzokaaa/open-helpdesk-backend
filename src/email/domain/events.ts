@@ -9,6 +9,8 @@ export interface TicketCreatedEvent {
   workspaceName: string;
   workspaceSlug: string;
   portalToken?: string | null;
+  source?: 'ui' | 'email' | 'portal' | 'api';
+  mailboxId?: string;
 }
 
 export interface TicketAssignedEvent {
@@ -33,6 +35,7 @@ export interface NewCommentEvent {
   workspaceId: string;
   workspaceName: string;
   workspaceSlug: string;
+  mailboxId?: string | null;
 }
 
 export interface StatusChangedEvent {

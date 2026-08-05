@@ -5,9 +5,12 @@ interface Props {
   action: string;
   entityType: string;
   entityId: string;
-  userId: string;
+  userId: string | null;
   workspaceId: string | null;
   metadata: Record<string, unknown> | null;
+  category: string;
+  level: string;
+  source: string | null;
   createdAt?: Date;
 }
 
@@ -16,9 +19,12 @@ export class AuditLogEntry {
   action: string;
   entityType: string;
   entityId: string;
-  userId: string;
+  userId: string | null;
   workspaceId: string | null;
   metadata: Record<string, unknown> | null;
+  category: string;
+  level: string;
+  source: string | null;
   createdAt?: Date;
 
   constructor(props: Props) {
@@ -29,6 +35,9 @@ export class AuditLogEntry {
     this.userId = props.userId;
     this.workspaceId = props.workspaceId;
     this.metadata = props.metadata;
+    this.category = props.category;
+    this.level = props.level;
+    this.source = props.source;
     this.createdAt = props.createdAt;
   }
 

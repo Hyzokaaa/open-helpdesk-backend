@@ -1,14 +1,19 @@
 import { IdGenerator } from '../../../shared/domain/id-generator';
 import { AuditLogEntry } from '../entities/audit-log-entry';
+import { AuditCategory } from '../enums/audit-category.enum';
+import { AuditLevel } from '../enums/audit-level.enum';
 import { AuditLogRepository } from '../repositories/audit-log.repository';
 
 interface CreateAuditLogEntryProps {
   action: string;
   entityType: string;
   entityId: string;
-  userId: string;
+  userId: string | null;
   workspaceId: string | null;
   metadata: Record<string, unknown> | null;
+  category?: string;
+  level?: string;
+  source?: string | null;
 }
 
 export class CreateAuditLogEntry {
@@ -26,6 +31,9 @@ export class CreateAuditLogEntry {
       userId: props.userId,
       workspaceId: props.workspaceId,
       metadata: props.metadata,
+      category: props.category ?? AuditCategory.TICKET,
+      level: props.level ?? AuditLevel.INFO,
+      source: props.source ?? 'ui',
     });
     await this.repository.create(entry);
     return entry;

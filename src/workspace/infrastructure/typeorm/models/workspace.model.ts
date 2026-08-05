@@ -29,6 +29,9 @@ export class WorkspaceModel {
   @Column({ type: 'jsonb', nullable: true })
   slaPolicy!: Record<string, unknown> | null;
 
+  @Column({ type: 'boolean', default: true })
+  systemMailboxEnabled!: boolean;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 

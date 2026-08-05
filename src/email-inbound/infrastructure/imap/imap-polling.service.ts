@@ -1,5 +1,4 @@
 import { Inject, Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { UlidGenerator } from '../../../shared/infrastructure/ulid-generator';
 import { NestEventPublisher } from '../../../shared/infrastructure/nest-event-publisher';
 import { BcryptPasswordHasher } from '../../../shared/infrastructure/bcrypt-password-hasher';
@@ -9,6 +8,11 @@ import { TypeOrmWorkspaceMemberRepository } from '../../../workspace/infrastruct
 import { TypeOrmWorkspaceRepository } from '../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository';
 import { TypeOrmTicketRepository } from '../../../ticket/infrastructure/typeorm/repositories/typeorm-ticket.repository';
 import { TypeOrmCommentRepository } from '../../../comment/infrastructure/typeorm/repositories/typeorm-comment.repository';
+import { TypeOrmAuditLogRepository } from '../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
+import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
+import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 import { CreateUser } from '../../../user/domain/services/user-create';
 import { AddWorkspaceMember } from '../../../workspace/domain/services/workspace-add-member';
 import { CreateTicket } from '../../../ticket/domain/services/ticket-create';
@@ -39,16 +43,6 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
   private pollers = new Map<string, PollerState>();
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
   private stopping = false;
-  private readonly emailDomain?: string;
-
-  // Fallback env var config
-  private readonly envHost?: string;
-  private readonly envPort: number;
-  private readonly envUser?: string;
-  private readonly envPass?: string;
-  private readonly envTls: boolean;
-  private readonly envFolder: string;
-  private readonly envPollInterval: number;
 
   constructor(
     @Inject() private readonly mailboxRepository: TypeOrmMailboxRepository,
@@ -63,17 +57,8 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     @Inject() private readonly processedEmailRepository: ProcessedEmailRepository,
     @Inject() private readonly attachmentRepository: TypeOrmAttachmentRepository,
     @Inject() private readonly storageService: S3StorageService,
-    private readonly config: ConfigService,
-  ) {
-    this.emailDomain = config.get<string>('EMAIL_DOMAIN');
-    this.envHost = config.get<string>('IMAP_HOST');
-    this.envPort = config.get<number>('IMAP_PORT', 993);
-    this.envUser = config.get<string>('IMAP_USER');
-    this.envPass = config.get<string>('IMAP_PASS');
-    this.envTls = config.get<string>('IMAP_TLS', 'true') === 'true';
-    this.envFolder = config.get<string>('IMAP_FOLDER', 'INBOX');
-    this.envPollInterval = config.get<number>('IMAP_POLL_INTERVAL', 30);
-  }
+    @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
+  ) {}
 
   async onModuleInit() {
     await this.refreshPollers();
@@ -92,17 +77,17 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       user: mailbox.imapUser,
       pass: mailbox.imapPass,
       tls: mailbox.imapTls ?? true,
+      encryption: mailbox.encryption,
       folder: mailbox.imapFolder ?? 'INBOX',
       since,
     });
 
-    const domain = mailbox.address.split('@')[1] || this.emailDomain || 'localhost';
-    const parser = new ImapEmailParser(domain);
+    const parser = new ImapEmailParser();
     const router = this.createRouter();
     let processed = 0;
 
     for (const msg of fetched) {
-      const wasProcessed = await this.processMessage(msg, parser, router, mailbox.getId());
+      const wasProcessed = await this.processMessage(msg, parser, router, mailbox.getId(), mailbox.workspaceId, mailbox);
       if (wasProcessed) processed++;
     }
 
@@ -155,25 +140,6 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       this.pollMailbox(mailbox, state);
     }
 
-    // Fallback: env var config if no DB mailboxes
-    if (dbMailboxes.length === 0 && this.envHost && this.envUser && this.envPass && this.emailDomain) {
-      const envId = '__env__';
-      if (!this.pollers.has(envId)) {
-        const state: PollerState = {
-          mailboxId: envId,
-          configHash: 'env',
-          timer: null,
-          processing: false,
-          backoff: 1000,
-          lastPollTime: null,
-        };
-        this.pollers.set(envId, state);
-        this.logger.log(`IMAP poller started (env vars): ${this.envUser}@${this.envHost}`);
-        this.pollEnv(state);
-      }
-      activeIds.add(envId);
-    }
-
     // Stop pollers for removed mailboxes
     for (const [id, state] of this.pollers) {
       if (!activeIds.has(id)) {
@@ -190,12 +156,15 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     const pollStart = Date.now();
 
     try {
+      this.emitAudit(AuditAction.IMAP_POLL_STARTED, mailbox.getId(), mailbox.workspaceId, { address: mailbox.address }).catch(() => {});
+
       const fetched = await this.fetchMessages({
         host: mailbox.imapHost!,
         port: mailbox.imapPort!,
         user: mailbox.imapUser!,
         pass: mailbox.imapPass!,
         tls: mailbox.imapTls ?? true,
+        encryption: mailbox.encryption,
         folder: mailbox.imapFolder ?? 'INBOX',
         since: state.lastPollTime,
       });
@@ -203,13 +172,12 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       state.lastPollTime = new Date();
 
       if (fetched.length > 0) {
-        const domain = mailbox.address.split('@')[1] || this.emailDomain!;
-        const parser = new ImapEmailParser(domain);
+        const parser = new ImapEmailParser();
         const router = this.createRouter();
         let count = 0;
 
         for (const msg of fetched) {
-          const wasProcessed = await this.processMessage(msg, parser, router, mailbox.getId());
+          const wasProcessed = await this.processMessage(msg, parser, router, mailbox.getId(), mailbox.workspaceId, mailbox);
           if (wasProcessed) count++;
         }
 
@@ -222,11 +190,15 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       mailbox.lastError = null;
       await this.mailboxRepository.update(mailbox);
 
+      this.emitAudit(AuditAction.IMAP_POLL_COMPLETED, mailbox.getId(), mailbox.workspaceId, { address: mailbox.address, fetched: fetched.length, duration: Date.now() - pollStart }).catch(() => {});
+
       state.backoff = 1000;
       state.timer = setTimeout(() => this.pollMailbox(mailbox, state), (mailbox.pollInterval ?? 30) * 1000);
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : 'Unknown error';
       this.logger.error(`IMAP [${mailbox.address}] poll failed: ${errMsg}`);
+
+      this.emitAudit(AuditAction.IMAP_POLL_FAILED, mailbox.getId(), mailbox.workspaceId, { address: mailbox.address, error: errMsg }, AuditLevel.ERROR).catch(() => {});
 
       // Mark error
       mailbox.lastError = errMsg;
@@ -241,56 +213,19 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async pollEnv(state: PollerState) {
-    if (this.stopping || state.processing) return;
-    state.processing = true;
-
-    try {
-      const fetched = await this.fetchMessages({
-        host: this.envHost!,
-        port: this.envPort,
-        user: this.envUser!,
-        pass: this.envPass!,
-        tls: this.envTls,
-        folder: this.envFolder,
-        since: state.lastPollTime,
-      });
-
-      state.lastPollTime = new Date();
-
-      if (fetched.length > 0) {
-        const parser = new ImapEmailParser(this.emailDomain!);
-        const router = this.createRouter();
-        let count = 0;
-
-        for (const msg of fetched) {
-          const wasProcessed = await this.processMessage(msg, parser, router);
-          if (wasProcessed) count++;
-        }
-
-        if (count > 0) this.logger.log(`IMAP [env]: processed ${count} email(s)`);
-      }
-
-      state.backoff = 1000;
-      state.timer = setTimeout(() => this.pollEnv(state), this.envPollInterval * 1000);
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : 'Unknown error';
-      this.logger.error(`IMAP [env] poll failed: ${errMsg}`);
-      state.timer = setTimeout(() => this.pollEnv(state), state.backoff);
-      state.backoff = Math.min(state.backoff * 2, 60000);
-    } finally {
-      state.processing = false;
-    }
-  }
-
   private async fetchMessages(config: ImapConfig): Promise<FetchedMessage[]> {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { ImapFlow } = require('imapflow');
 
+    const encryption = config.encryption ?? (config.tls ? 'tls' : 'none');
+    const secure = encryption === 'tls' || encryption === 'tls-insecure';
+    const tlsOptions = encryption === 'tls-insecure' ? { rejectUnauthorized: false } : undefined;
+
     const client = new ImapFlow({
       host: config.host,
       port: config.port,
-      secure: config.tls,
+      secure,
+      ...(tlsOptions && { tls: tlsOptions }),
       auth: { user: config.user, pass: config.pass },
       logger: false,
     });
@@ -306,6 +241,11 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
 
       const lock = await client.getMailboxLock(config.folder);
       try {
+        const status = await client.status(config.folder, { messages: true });
+        if (status.messages === 0) {
+          return results;
+        }
+
         const query = config.since ? { since: config.since } : { all: true };
         const messages = client.fetch(query, {
           envelope: true,
@@ -332,7 +272,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     return results;
   }
 
-  private async processMessage(msg: FetchedMessage, parser: ImapEmailParser, router: RouteInboundEmail, mailboxId?: string): Promise<boolean> {
+  private async processMessage(msg: FetchedMessage, parser: ImapEmailParser, router: RouteInboundEmail, mailboxId?: string, workspaceId?: string | null, mailbox?: Mailbox): Promise<boolean> {
     try {
       if (msg.envelope.messageId) {
         const alreadyProcessed = await this.processedEmailRepository.exists(msg.envelope.messageId);
@@ -342,6 +282,28 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       const parsed = await parser.parse(msg.envelope, msg.body);
       if (mailboxId) parsed.mailboxId = mailboxId;
 
+      // Address filtering based on mode
+      if (mailbox && mailbox.addressMode !== 'all') {
+        const recipients = parsed.toAddresses.map(a => a.toLowerCase());
+        let accepted: string[];
+
+        if (mailbox.addressMode === 'aliases') {
+          accepted = [mailbox.address.toLowerCase(), ...mailbox.acceptedAddresses.map(a => a.toLowerCase())];
+        } else {
+          // 'address' mode (default): only the main mailbox address
+          accepted = [mailbox.address.toLowerCase()];
+        }
+
+        const matches = recipients.some(r => accepted.includes(r));
+
+        if (!matches) {
+          if (msg.envelope.messageId) {
+            await this.processedEmailRepository.markProcessed(msg.envelope.messageId);
+          }
+          return false;
+        }
+      }
+
       this.logger.log(`IMAP: processing email from ${parsed.fromAddress} — subject: ${parsed.subject}`);
 
       const result = await router.execute(parsed);
@@ -349,6 +311,10 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
 
       if (msg.envelope.messageId) {
         await this.processedEmailRepository.markProcessed(msg.envelope.messageId);
+      }
+
+      if (mailboxId) {
+        this.emitAudit(AuditAction.EMAIL_RECEIVED, mailboxId, workspaceId ?? null, { from: parsed.fromAddress, subject: parsed.subject, action: result.action, ticketId: result.ticketId ?? null }).catch(() => {});
       }
 
       return true;
@@ -360,15 +326,17 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
   }
 
   private configHash(mailbox: Mailbox): string {
-    return `${mailbox.imapHost}:${mailbox.imapPort}:${mailbox.imapUser}:${mailbox.imapTls}:${mailbox.imapFolder}:${mailbox.pollInterval}:${mailbox.isActive}`;
+    return `${mailbox.imapHost}:${mailbox.imapPort}:${mailbox.imapUser}:${mailbox.imapTls}:${mailbox.encryption}:${mailbox.imapFolder}:${mailbox.pollInterval}:${mailbox.isActive}:${mailbox.addressMode}:${JSON.stringify(mailbox.acceptedAddresses)}`;
   }
 
   private mapEnvelope(envelope: any): ImapEnvelope {
     const from = envelope.from?.[0]?.address ?? '';
     const to = (envelope.to ?? []).map((a: any) => a.address ?? '');
+    const cc = (envelope.cc ?? []).map((a: any) => a.address ?? '');
     return {
       from,
       to,
+      cc,
       subject: envelope.subject ?? '',
       messageId: envelope.messageId ?? '',
       inReplyTo: envelope.inReplyTo ?? undefined,
@@ -411,6 +379,25 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       .replace(/=([0-9A-Fa-f]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
   }
 
+  private async emitAudit(action: AuditAction, mailboxId: string, workspaceId: string | null, metadata: Record<string, unknown>, level: AuditLevel = AuditLevel.INFO): Promise<void> {
+    try {
+      const service = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+      await service.execute({
+        action,
+        entityType: 'mailbox',
+        entityId: mailboxId,
+        userId: null,
+        workspaceId: workspaceId ?? null,
+        metadata,
+        category: AuditCategory.EMAIL,
+        level,
+        source: 'system',
+      });
+    } catch {
+      // fire-and-forget: never break polling loop
+    }
+  }
+
   private createRouter(): RouteInboundEmail {
     const createUser = new CreateUser(this.idGenerator, this.userRepository, this.passwordHasher);
     const addMember = new AddWorkspaceMember(this.idGenerator, this.memberRepository);
@@ -440,6 +427,7 @@ interface ImapConfig {
   user: string;
   pass: string;
   tls: boolean;
+  encryption?: string;
   folder: string;
   since: Date | null;
 }

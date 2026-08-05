@@ -45,6 +45,9 @@ import { TypeOrmAccountRepository } from '../../../../account/infrastructure/typ
 import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
 import { TypeOrmMailboxRepository } from '../../../../mailbox/infrastructure/typeorm/repositories/typeorm-mailbox.repository';
 import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit-log-create';
+import { AuditAction } from '../../../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
 import { CreateMailbox } from '../../../../mailbox/domain/services/mailbox-create';
 import { CreateWorkspaceRequest } from '../dto/create-workspace.request';
 import { AddMemberRequest } from '../dto/add-member.request';
@@ -79,7 +82,10 @@ export class WorkspaceController {
     const createService = new CreateWorkspace(this.idGenerator, this.workspaceRepository);
     const addMemberService = new AddWorkspaceMember(this.idGenerator, this.memberRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-    const supportEmailDomain = this.config.get<string>('SUPPORT_EMAIL_DOMAIN');
+    const systemMailbox = await this.mailboxRepository.findSystemMailbox();
+    const supportEmailDomain = systemMailbox
+      ? systemMailbox.address.split('@')[1]
+      : this.config.get<string>('SUPPORT_EMAIL_DOMAIN');
     const createMailbox = supportEmailDomain
       ? new CreateMailbox(this.idGenerator, this.mailboxRepository)
       : undefined;
@@ -238,7 +244,22 @@ export class WorkspaceController {
     });
     const service = new UpdateWorkspacePalette(this.workspaceRepository);
     const command = new UpdateWorkspacePaletteCommand(service);
-    return command.execute({ workspaceId, palette: body.palette });
+    const result = await command.execute({ workspaceId, palette: body.palette });
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.WORKSPACE_PALETTE_UPDATED,
+      entityType: 'workspace',
+      entityId: workspaceId,
+      userId: user.userId,
+      workspaceId,
+      metadata: { palette: body.palette },
+      category: AuditCategory.WORKSPACE,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
+    return result;
   }
 
   @Get(':slug/sla')
@@ -274,7 +295,59 @@ export class WorkspaceController {
     });
     const service = new UpdateWorkspaceSlaPolicy(this.workspaceRepository);
     const command = new UpdateSlaPolicyCommand(service);
-    return command.execute({ workspaceId, slaPolicy: body.slaPolicy });
+    const result = await command.execute({ workspaceId, slaPolicy: body.slaPolicy });
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.WORKSPACE_SLA_UPDATED,
+      entityType: 'workspace',
+      entityId: workspaceId,
+      userId: user.userId,
+      workspaceId,
+      metadata: { slaPolicy: body.slaPolicy },
+      category: AuditCategory.WORKSPACE,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
+    return result;
+  }
+
+  @Patch(':slug/system-mailbox')
+  async toggleSystemMailbox(
+    @Param('slug') slug: string,
+    @Body() body: { enabled: boolean },
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+
+    const workspace = await this.workspaceRepository.findById(workspaceId);
+    if (!workspace) throw new EntityNotFoundError('Workspace not found');
+
+    workspace.systemMailboxEnabled = body.enabled;
+    await this.workspaceRepository.update(workspace);
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.WORKSPACE_SYSTEM_MAILBOX_TOGGLED,
+      entityType: 'workspace',
+      entityId: workspaceId,
+      userId: user.userId,
+      workspaceId,
+      metadata: { systemMailboxEnabled: body.enabled },
+      category: AuditCategory.WORKSPACE,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
+    return { systemMailboxEnabled: workspace.systemMailboxEnabled };
   }
 
   @Get(':slug/export')
@@ -322,7 +395,22 @@ export class WorkspaceController {
     }
 
     const service = new ImportWorkspace(this.dataSource);
-    return service.execute(workspaceId, data);
+    const result = await service.execute(workspaceId, data);
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.WORKSPACE_IMPORT_STARTED,
+      entityType: 'workspace',
+      entityId: workspaceId,
+      userId: user.userId,
+      workspaceId,
+      metadata: { source: body.url ? 'url' : 'direct', imported: result },
+      category: AuditCategory.WORKSPACE,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
+    return result;
   }
 
   @Post(':slug/export/token')
@@ -340,6 +428,20 @@ export class WorkspaceController {
     });
     const { token, expiresAt } = createExportToken(workspaceId);
     const baseUrl = process.env.API_URL || process.env.BACKEND_URL || '';
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.WORKSPACE_EXPORT_CREATED,
+      entityType: 'workspace',
+      entityId: workspaceId,
+      userId: user.userId,
+      workspaceId,
+      metadata: {},
+      category: AuditCategory.WORKSPACE,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
     return {
       url: `${baseUrl}/workspaces/${slug}/export/${token}`,
       expiresAt,
@@ -407,6 +509,7 @@ export class WorkspaceController {
       isSystemAdmin: user.isSystemAdmin,
     });
 
+    let resultId: string;
     const existing = await this.emailSenderRepository.findByWorkspaceId(workspaceId);
     if (existing) {
       existing.smtpHost = body.smtpHost;
@@ -415,20 +518,35 @@ export class WorkspaceController {
       if (body.smtpPass) existing.smtpPass = body.smtpPass;
       existing.smtpFrom = body.smtpFrom;
       await this.emailSenderRepository.update(existing);
-      return { id: existing.getId() };
+      resultId = existing.getId();
+    } else {
+      const sender = new WorkspaceEmailSender({
+        id: this.idGenerator.create(),
+        workspaceId,
+        smtpHost: body.smtpHost,
+        smtpPort: body.smtpPort,
+        smtpUser: body.smtpUser,
+        smtpPass: body.smtpPass,
+        smtpFrom: body.smtpFrom,
+      });
+      await this.emailSenderRepository.create(sender);
+      resultId = sender.getId();
     }
 
-    const sender = new WorkspaceEmailSender({
-      id: this.idGenerator.create(),
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.EMAIL_SENDER_CONFIGURED,
+      entityType: 'email-sender',
+      entityId: workspaceId,
+      userId: user.userId,
       workspaceId,
-      smtpHost: body.smtpHost,
-      smtpPort: body.smtpPort,
-      smtpUser: body.smtpUser,
-      smtpPass: body.smtpPass,
-      smtpFrom: body.smtpFrom,
+      metadata: { smtpHost: body.smtpHost, smtpFrom: body.smtpFrom },
+      category: AuditCategory.CONFIG,
+      level: AuditLevel.INFO,
+      source: 'ui',
     });
-    await this.emailSenderRepository.create(sender);
-    return { id: sender.getId() };
+
+    return { id: resultId };
   }
 
   @Delete(':slug/email-sender')
@@ -443,7 +561,21 @@ export class WorkspaceController {
       permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
       isSystemAdmin: user.isSystemAdmin,
     });
+    const existing = await this.emailSenderRepository.findByWorkspaceId(workspaceId);
     await this.emailSenderRepository.delete(workspaceId);
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.EMAIL_SENDER_DELETED,
+      entityType: 'email-sender',
+      entityId: workspaceId,
+      userId: user.userId,
+      workspaceId,
+      metadata: { smtpHost: existing?.smtpHost, smtpFrom: existing?.smtpFrom },
+      category: AuditCategory.CONFIG,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
   }
 
   @Post(':slug/email-sender/test')
@@ -452,14 +584,15 @@ export class WorkspaceController {
     @Body() body: { smtpHost: string; smtpPort: number; smtpUser: string; smtpPass: string },
     @CurrentUser() user: AuthUser,
   ) {
-    await this.resolveWorkspaceId(slug);
+    const workspaceId = await this.resolveWorkspaceId(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     await ensurePermission.execute({
-      workspaceId: await this.resolveWorkspaceId(slug),
+      workspaceId,
       userId: user.userId,
       permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
       isSystemAdmin: user.isSystemAdmin,
     });
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
 
     try {
       const transporter = nodemailer.createTransport({
@@ -472,9 +605,35 @@ export class WorkspaceController {
         greetingTimeout: 10000,
       } as any);
       await transporter.verify();
+
+      await auditLog.execute({
+        action: AuditAction.EMAIL_SENDER_TEST_CONNECTION,
+        entityType: 'email-sender',
+        entityId: workspaceId,
+        userId: user.userId,
+        workspaceId,
+        metadata: { success: true, smtpHost: body.smtpHost },
+        category: AuditCategory.CONFIG,
+        level: AuditLevel.INFO,
+        source: 'ui',
+      });
+
       return { success: true };
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Connection failed';
+
+      await auditLog.execute({
+        action: AuditAction.EMAIL_SENDER_TEST_CONNECTION,
+        entityType: 'email-sender',
+        entityId: workspaceId,
+        userId: user.userId,
+        workspaceId,
+        metadata: { success: false, error: msg, smtpHost: body.smtpHost },
+        category: AuditCategory.CONFIG,
+        level: AuditLevel.WARNING,
+        source: 'ui',
+      });
+
       return { success: false, error: msg };
     }
   }

@@ -8,6 +8,8 @@ import { WorkspaceInvitationRepository } from '../../../workspace/domain/reposit
 import { InvitationStatus } from '../../../workspace/domain/enums/invitation-status.enum';
 import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 
 interface Props {
   email: string;
@@ -83,6 +85,9 @@ export class SignupUserCommand implements Command<Props, SignupResponse> {
 
     await this.createAuditLog.execute({
       action: AuditAction.USER_SIGNED_UP,
+      category: AuditCategory.USER,
+      level: AuditLevel.INFO,
+      source: 'ui',
       entityType: 'user',
       entityId: user.getId(),
       userId: user.getId(),

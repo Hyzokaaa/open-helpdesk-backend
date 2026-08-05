@@ -13,6 +13,8 @@ import { WorkspaceModel } from '../../../../workspace/infrastructure/typeorm/mod
 @Index(['workspaceId', 'createdAt'])
 @Index(['userId'])
 @Index(['entityType', 'entityId'])
+@Index(['category'])
+@Index(['level'])
 export class AuditLogEntryModel {
   @PrimaryColumn()
   id!: string;
@@ -26,11 +28,11 @@ export class AuditLogEntryModel {
   @Column()
   entityId!: string;
 
-  @ManyToOne(() => UserModel)
-  user!: UserModel;
+  @ManyToOne(() => UserModel, { nullable: true })
+  user!: UserModel | null;
 
-  @Column()
-  userId!: string;
+  @Column({ type: 'varchar', nullable: true })
+  userId!: string | null;
 
   @ManyToOne(() => WorkspaceModel, { nullable: true, onDelete: 'SET NULL' })
   workspace!: WorkspaceModel | null;
@@ -40,6 +42,15 @@ export class AuditLogEntryModel {
 
   @Column({ type: 'jsonb', nullable: true })
   metadata!: Record<string, unknown> | null;
+
+  @Column({ type: 'varchar', default: 'ticket' })
+  category!: string;
+
+  @Column({ type: 'varchar', default: 'info' })
+  level!: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  source!: string | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
