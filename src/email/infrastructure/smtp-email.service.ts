@@ -57,14 +57,19 @@ export class SmtpEmailService implements EmailService {
         try {
           const dbSettings = await this.systemEmailRepo.find();
           if (dbSettings) {
-            const hash = `${dbSettings.smtpHost}:${dbSettings.smtpPort}:${dbSettings.smtpUser}:${dbSettings.smtpPass}`;
+            const hash = `${dbSettings.smtpHost}:${dbSettings.smtpPort}:${dbSettings.smtpUser}:${dbSettings.smtpPass}:${dbSettings.encryption}`;
             if (hash !== this.dbConfigHash) {
               try { this.dbTransporter?.close(); } catch {}
+              const encryption = dbSettings.encryption ?? 'tls';
+              const tls = encryption === 'tls-insecure' ? { rejectUnauthorized: false } :
+                          encryption === 'none' ? { rejectUnauthorized: false } : undefined;
               this.dbTransporter = nodemailer.createTransport({
                 host: dbSettings.smtpHost,
                 port: dbSettings.smtpPort,
                 secure: dbSettings.smtpPort === 465,
                 auth: { user: dbSettings.smtpUser, pass: dbSettings.smtpPass },
+                ...(tls && { tls }),
+                ...((encryption === 'none') && { ignoreTLS: true }),
                 family: 4,
               } as any);
               this.dbFrom = dbSettings.smtpFrom;

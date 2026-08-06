@@ -38,6 +38,7 @@ export class TypeOrmWorkspaceEmailSenderRepository implements WorkspaceEmailSend
       smtpUser: model.smtpUser,
       smtpPass: model.smtpPass,
       smtpFrom: model.smtpFrom,
+      encryption: model.encryption,
     });
   }
 
@@ -50,6 +51,7 @@ export class TypeOrmWorkspaceEmailSenderRepository implements WorkspaceEmailSend
     model.smtpUser = sender.smtpUser;
     model.smtpPass = sender.smtpPass;
     model.smtpFrom = sender.smtpFrom;
+    model.encryption = sender.encryption;
     return model;
   }
 }

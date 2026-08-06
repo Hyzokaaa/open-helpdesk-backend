@@ -13,4 +13,8 @@ export class TestSystemEmailRequest {
   @IsString()
   @IsOptional()
   smtpPass?: string;
+
+  @IsString()
+  @IsOptional()
+  encryption?: string;
 }

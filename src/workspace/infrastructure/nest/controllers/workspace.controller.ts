@@ -492,13 +492,14 @@ export class WorkspaceController {
       smtpUser: sender.smtpUser,
       hasPassword: true,
       smtpFrom: sender.smtpFrom,
+      encryption: sender.encryption,
     };
   }
 
   @Post(':slug/email-sender')
   async createEmailSender(
     @Param('slug') slug: string,
-    @Body() body: { smtpHost: string; smtpPort: number; smtpUser: string; smtpPass: string; smtpFrom: string },
+    @Body() body: { smtpHost: string; smtpPort: number; smtpUser: string; smtpPass: string; smtpFrom: string; encryption?: string },
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
@@ -517,6 +518,7 @@ export class WorkspaceController {
       existing.smtpUser = body.smtpUser;
       if (body.smtpPass) existing.smtpPass = body.smtpPass;
       existing.smtpFrom = body.smtpFrom;
+      if (body.encryption) existing.encryption = body.encryption;
       await this.emailSenderRepository.update(existing);
       resultId = existing.getId();
     } else {
@@ -528,6 +530,7 @@ export class WorkspaceController {
         smtpUser: body.smtpUser,
         smtpPass: body.smtpPass,
         smtpFrom: body.smtpFrom,
+        encryption: body.encryption,
       });
       await this.emailSenderRepository.create(sender);
       resultId = sender.getId();
@@ -581,7 +584,7 @@ export class WorkspaceController {
   @Post(':slug/email-sender/test')
   async testEmailSender(
     @Param('slug') slug: string,
-    @Body() body: { smtpHost: string; smtpPort: number; smtpUser: string; smtpPass: string },
+    @Body() body: { smtpHost: string; smtpPort: number; smtpUser: string; smtpPass: string; encryption?: string },
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
@@ -595,12 +598,16 @@ export class WorkspaceController {
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
 
     try {
+      const encryption = body.encryption ?? 'tls';
+      const tls = encryption === 'tls-insecure' ? { rejectUnauthorized: false } :
+                  encryption === 'none' ? { rejectUnauthorized: false } : { rejectUnauthorized: true };
       const transporter = nodemailer.createTransport({
         host: body.smtpHost,
         port: body.smtpPort,
         secure: body.smtpPort === 465,
         auth: { user: body.smtpUser, pass: body.smtpPass },
-        tls: { rejectUnauthorized: true },
+        tls,
+        ...((encryption === 'none') && { ignoreTLS: true }),
         connectionTimeout: 10000,
         greetingTimeout: 10000,
       } as any);

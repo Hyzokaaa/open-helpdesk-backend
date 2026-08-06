@@ -6,12 +6,16 @@ import { SendEmailParams, SendEmailResult } from './email.service';
 const logger = new Logger('WorkspaceEmailSend');
 
 export async function sendViaWorkspaceSmtp(config: SmtpConfig, params: SendEmailParams): Promise<SendEmailResult> {
+  const encryption = config.encryption ?? 'tls';
+  const tls = encryption === 'tls-insecure' ? { rejectUnauthorized: false } :
+              encryption === 'none' ? { rejectUnauthorized: false } : { rejectUnauthorized: true };
   const transporter = nodemailer.createTransport({
     host: config.host,
     port: config.port,
     secure: config.secure,
     auth: { user: config.user, pass: config.pass },
-    tls: { rejectUnauthorized: true },
+    tls,
+    ...((encryption === 'none') && { ignoreTLS: true }),
     family: 4,
     connectionTimeout: 10000,
     greetingTimeout: 10000,
