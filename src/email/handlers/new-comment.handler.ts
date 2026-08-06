@@ -87,8 +87,8 @@ export class NewCommentHandler {
     for (const [lang, emails] of emailRecipients) {
       const result = await sendWorkspaceEmail(this.emailService, sender, {
         to: emails,
-        subject: template.subject({ ticketName: event.ticketName, ticketUrl, authorName: event.authorName, commentPreview: preview, workspaceName: event.workspaceName, lang }),
-        html: template.html({ ticketName: event.ticketName, ticketUrl, authorName: event.authorName, commentPreview: preview, workspaceName: event.workspaceName, lang }),
+        subject: template.subject({ ticketName: event.ticketName, ticketNumber: event.ticketNumber, ticketUrl, authorName: event.authorName, commentPreview: preview, workspaceName: event.workspaceName, lang }),
+        html: template.html({ ticketName: event.ticketName, ticketNumber: event.ticketNumber, ticketUrl, authorName: event.authorName, commentPreview: preview, workspaceName: event.workspaceName, lang }),
         ...(emailDomain && {
           messageId: `<comment-${event.commentId}@${emailDomain}>`,
           inReplyTo: `<ticket-${event.ticketId}@${emailDomain}>`,

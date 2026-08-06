@@ -26,6 +26,7 @@ export interface TicketAssignedEvent {
 export interface NewCommentEvent {
   ticketId: string;
   ticketName: string;
+  ticketNumber?: number;
   commentId: string;
   authorId: string;
   authorName: string;
