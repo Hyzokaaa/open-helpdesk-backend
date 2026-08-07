@@ -207,7 +207,7 @@ export class WorkspaceController {
     const service = new ChangeWorkspaceMemberRole(this.memberRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     const command = new ChangeMemberRoleCommand(service, auditLog);
-    return command.execute({
+    const result = await command.execute({
       workspaceId,
       targetUserId: userId,
       newRole: body.role as any,
@@ -215,6 +215,13 @@ export class WorkspaceController {
       isSystemAdmin: user.isSystemAdmin,
       targetLabel: targetUser ? `${targetUser.firstName} ${targetUser.lastName} (${targetUser.email})` : userId,
     });
+
+    if (targetUser?.autoCreated && body.role !== 'reporter') {
+      targetUser.autoCreated = false;
+      await this.userRepository.update(targetUser);
+    }
+
+    return result;
   }
 
   @Delete(':slug/members/:userId')
