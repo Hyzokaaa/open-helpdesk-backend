@@ -12,6 +12,8 @@ import { TypeOrmNotificationPreferenceRepository } from '../../notification/infr
 import { UlidGenerator } from '../../shared/infrastructure/ulid-generator';
 import { TypeOrmMailboxRepository } from '../../mailbox/infrastructure/typeorm/repositories/typeorm-mailbox.repository';
 import { TypeOrmWorkspaceEmailSenderRepository } from '../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-email-sender.repository';
+import { TypeOrmWorkspaceMemberRepository } from '../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
+import { ResolveWorkspaceAdmins } from '../../notification/domain/services/notification-resolve-workspace-admins';
 import { sendWorkspaceEmail } from '../domain/resolve-email-sender';
 import { TypeOrmTicketRepository } from '../../ticket/infrastructure/typeorm/repositories/typeorm-ticket.repository';
 import { TypeOrmTicketParticipantRepository } from '../../ticket/infrastructure/typeorm/repositories/typeorm-ticket-participant.repository';
@@ -40,6 +42,7 @@ export class TicketCreatedHandler {
     private readonly participantRepository: TypeOrmTicketParticipantRepository,
     private readonly emailSenderRepository: TypeOrmWorkspaceEmailSenderRepository,
     private readonly auditLogRepository: TypeOrmAuditLogRepository,
+    private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
     private readonly config: ConfigService,
   ) {
     this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173').split(',')[0].trim();
@@ -53,10 +56,21 @@ export class TicketCreatedHandler {
 
   private async notifyStakeholders(event: TicketCreatedEvent): Promise<void> {
     const resolveStakeholders = new ResolveTicketStakeholders(this.ticketRepository, this.participantRepository, this.userRepository);
-    const users = await resolveStakeholders.execute({
+    const ticketStakeholders = await resolveStakeholders.execute({
       ticketId: event.ticketId,
       excludeUserId: event.creatorId,
     });
+
+    const resolveAdmins = new ResolveWorkspaceAdmins(this.memberRepository, this.userRepository);
+    const admins = await resolveAdmins.execute({
+      workspaceId: event.workspaceId,
+      excludeUserId: event.creatorId,
+    });
+
+    const stakeholderIds = new Set(ticketStakeholders.map((u) => u.getId()));
+    const extraAdmins = admins.filter((u) => !stakeholderIds.has(u.getId()));
+
+    const users = [...ticketStakeholders, ...extraAdmins];
     if (users.length === 0) return;
 
     const dispatch = new DispatchNotifications(this.idGenerator, this.notificationRepository, this.preferenceRepository);
