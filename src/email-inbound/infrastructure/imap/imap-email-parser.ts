@@ -1,5 +1,6 @@
 export interface ParsedInboundEmail {
   fromAddress: string;
+  fromName?: string;
   toAddresses: string[];
   subject: string;
   body: string;
@@ -40,6 +41,7 @@ export class ImapEmailParser {
 
     return {
       fromAddress,
+      fromName: envelope.fromName || undefined,
       toAddresses,
       subject,
       body: body || '(No content)',
@@ -116,6 +118,7 @@ export class ImapEmailParser {
 
 export interface ImapEnvelope {
   from: string;
+  fromName?: string;
   to: string[];
   cc: string[];
   subject: string;

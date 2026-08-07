@@ -92,16 +92,16 @@ export class RouteInboundEmail {
     // 2. Find or create user
     let user = await this.userRepository.findByEmail(parsed.fromAddress);
     if (!user) {
-      const localPart = parsed.fromAddress.split('@')[0];
+      const { firstName, lastName } = this.extractNameFromEmail(parsed.fromName, parsed.fromAddress);
       user = await this.createUser.execute({
         email: parsed.fromAddress,
         password: randomBytes(32).toString('hex'),
-        firstName: localPart,
-        lastName: '',
+        firstName,
+        lastName,
         isEmailVerified: true,
         autoCreated: true,
       });
-      this.logger.log(`Auto-created reporter: ${parsed.fromAddress}`);
+      this.logger.log(`Auto-created reporter: ${parsed.fromAddress} (${firstName} ${lastName})`);
     }
 
     // 3. Ensure workspace membership
@@ -189,6 +189,19 @@ export class RouteInboundEmail {
     await this.uploadAttachments(parsed, ticket.getId(), null, user.getId());
 
     return { action: 'ticket-created', ticketId: ticket.getId() };
+  }
+
+  private extractNameFromEmail(
+    displayName: string | undefined,
+    email: string,
+  ): { firstName: string; lastName: string } {
+    if (displayName?.trim()) {
+      const parts = displayName.trim().split(/\s+/);
+      const firstName = parts[0];
+      const lastName = parts.slice(1).join(' ');
+      return { firstName, lastName };
+    }
+    return { firstName: email.split('@')[0], lastName: '' };
   }
 
   private async uploadAttachments(
