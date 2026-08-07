@@ -20,8 +20,8 @@ export class NewCommentTemplate {
   html(data: Data): string {
     const content = `
       <p style="color: #4b5563;"><strong>${data.authorName}:</strong></p>
-      <div style="background-color: white; border-left: 3px solid #059669; padding: 12px 16px; margin: 20px 0; color: #4b5563;">
-        ${data.commentPreview}
+      <div style="background-color: white; border-left: 3px solid #059669; padding: 12px 16px; margin: 20px 0; color: #4b5563; white-space: pre-line;">
+        ${data.commentPreview.replace(/\n/g, '<br>')}
       </div>
       ${buttonHtml(data.lang, data.ticketUrl)}
       <p style="color: #9ca3af; font-size: 12px; margin-top: 24px;">
