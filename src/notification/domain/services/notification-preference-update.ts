@@ -10,10 +10,13 @@ interface UpdatePreferenceProps {
   emailTicketAssigned?: boolean;
   emailStatusChanged?: boolean;
   emailCommentCreated?: boolean;
+  emailCsatSurvey?: boolean;
+  emailTransferRequest?: boolean;
   inAppTicketCreated?: boolean;
   inAppTicketAssigned?: boolean;
   inAppStatusChanged?: boolean;
   inAppCommentCreated?: boolean;
+  inAppTransferRequest?: boolean;
   bellUnreadOnly?: boolean;
 }
 
@@ -36,10 +39,13 @@ export class UpdateNotificationPreference {
         emailTicketAssigned: true,
         emailStatusChanged: true,
         emailCommentCreated: true,
+        emailCsatSurvey: true,
+        emailTransferRequest: true,
         inAppTicketCreated: true,
         inAppTicketAssigned: true,
         inAppStatusChanged: true,
         inAppCommentCreated: true,
+        inAppTransferRequest: true,
         bellUnreadOnly: false,
       });
     }
@@ -50,10 +56,13 @@ export class UpdateNotificationPreference {
     if (props.emailTicketAssigned !== undefined) pref.emailTicketAssigned = props.emailTicketAssigned;
     if (props.emailStatusChanged !== undefined) pref.emailStatusChanged = props.emailStatusChanged;
     if (props.emailCommentCreated !== undefined) pref.emailCommentCreated = props.emailCommentCreated;
+    if (props.emailCsatSurvey !== undefined) pref.emailCsatSurvey = props.emailCsatSurvey;
+    if (props.emailTransferRequest !== undefined) pref.emailTransferRequest = props.emailTransferRequest;
     if (props.inAppTicketCreated !== undefined) pref.inAppTicketCreated = props.inAppTicketCreated;
     if (props.inAppTicketAssigned !== undefined) pref.inAppTicketAssigned = props.inAppTicketAssigned;
     if (props.inAppStatusChanged !== undefined) pref.inAppStatusChanged = props.inAppStatusChanged;
     if (props.inAppCommentCreated !== undefined) pref.inAppCommentCreated = props.inAppCommentCreated;
+    if (props.inAppTransferRequest !== undefined) pref.inAppTransferRequest = props.inAppTransferRequest;
     if (props.bellUnreadOnly !== undefined) pref.bellUnreadOnly = props.bellUnreadOnly;
 
     await this.repository.upsert(pref);

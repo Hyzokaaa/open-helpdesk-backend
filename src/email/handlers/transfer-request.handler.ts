@@ -53,8 +53,8 @@ export class TransferRequestHandler {
       title: `${event.requesterName}: ${event.ticketName}`,
       ticketId: event.ticketId,
       workspaceSlug: event.workspaceSlug,
-      inAppPrefKey: 'inAppTicketAssigned',
-      emailPrefKey: 'emailTicketAssigned',
+      inAppPrefKey: 'inAppTransferRequest',
+      emailPrefKey: 'emailTransferRequest',
     });
 
     if (emailRecipients.size === 0) return;
@@ -124,8 +124,8 @@ export class TransferRequestHandler {
       title: `${event.ticketName}: transfer ${event.resolution}`,
       ticketId: event.ticketId,
       workspaceSlug: event.workspaceSlug,
-      inAppPrefKey: 'inAppTicketAssigned',
-      emailPrefKey: 'emailTicketAssigned',
+      inAppPrefKey: 'inAppTransferRequest',
+      emailPrefKey: 'emailTransferRequest',
     });
 
     if (emailRecipients.size === 0) return;

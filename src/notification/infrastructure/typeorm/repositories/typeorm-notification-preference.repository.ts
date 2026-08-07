@@ -46,10 +46,13 @@ export class TypeOrmNotificationPreferenceRepository
       emailTicketAssigned: model.emailTicketAssigned,
       emailStatusChanged: model.emailStatusChanged,
       emailCommentCreated: model.emailCommentCreated,
+      emailCsatSurvey: model.emailCsatSurvey,
+      emailTransferRequest: model.emailTransferRequest,
       inAppTicketCreated: model.inAppTicketCreated,
       inAppTicketAssigned: model.inAppTicketAssigned,
       inAppStatusChanged: model.inAppStatusChanged,
       inAppCommentCreated: model.inAppCommentCreated,
+      inAppTransferRequest: model.inAppTransferRequest,
       bellUnreadOnly: model.bellUnreadOnly,
     });
   }
@@ -66,10 +69,13 @@ export class TypeOrmNotificationPreferenceRepository
     model.emailTicketAssigned = pref.emailTicketAssigned;
     model.emailStatusChanged = pref.emailStatusChanged;
     model.emailCommentCreated = pref.emailCommentCreated;
+    model.emailCsatSurvey = pref.emailCsatSurvey;
+    model.emailTransferRequest = pref.emailTransferRequest;
     model.inAppTicketCreated = pref.inAppTicketCreated;
     model.inAppTicketAssigned = pref.inAppTicketAssigned;
     model.inAppStatusChanged = pref.inAppStatusChanged;
     model.inAppCommentCreated = pref.inAppCommentCreated;
+    model.inAppTransferRequest = pref.inAppTransferRequest;
     model.bellUnreadOnly = pref.bellUnreadOnly;
     return model;
   }

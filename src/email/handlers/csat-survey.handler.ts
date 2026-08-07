@@ -10,6 +10,7 @@ import { StatusChangedEvent } from '../domain/events';
 import { TypeOrmUserRepository } from '../../user/infrastructure/typeorm/repositories/typeorm-user.repository';
 import { TypeOrmTicketRepository } from '../../ticket/infrastructure/typeorm/repositories/typeorm-ticket.repository';
 import { TypeOrmCsatResponseRepository } from '../../csat/infrastructure/typeorm/repositories/typeorm-csat-response.repository';
+import { TypeOrmNotificationPreferenceRepository } from '../../notification/infrastructure/typeorm/repositories/typeorm-notification-preference.repository';
 import { UlidGenerator } from '../../shared/infrastructure/ulid-generator';
 import { CsatResponse } from '../../csat/domain/entities/csat-response';
 import { CSAT_SURVEY_GUARD, CsatSurveyGuard } from '../../csat/domain/csat-survey-guard';
@@ -26,6 +27,7 @@ export class CsatSurveyHandler implements OnModuleInit {
     private readonly userRepository: TypeOrmUserRepository,
     private readonly ticketRepository: TypeOrmTicketRepository,
     private readonly csatRepository: TypeOrmCsatResponseRepository,
+    private readonly preferenceRepository: TypeOrmNotificationPreferenceRepository,
     private readonly idGenerator: UlidGenerator,
     private readonly config: ConfigService,
   ) {
@@ -61,6 +63,9 @@ export class CsatSurveyHandler implements OnModuleInit {
 
     const creator = await this.userRepository.findById(ticket.creatorId);
     if (!creator) return;
+
+    const prefs = await this.preferenceRepository.findByUserId(creator.getId());
+    if (prefs && !prefs.emailCsatSurvey) return;
 
     const token = randomUUID();
     const csatResponse = new CsatResponse({

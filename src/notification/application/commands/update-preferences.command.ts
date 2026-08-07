@@ -9,10 +9,13 @@ interface Props {
   emailTicketAssigned?: boolean;
   emailStatusChanged?: boolean;
   emailCommentCreated?: boolean;
+  emailCsatSurvey?: boolean;
+  emailTransferRequest?: boolean;
   inAppTicketCreated?: boolean;
   inAppTicketAssigned?: boolean;
   inAppStatusChanged?: boolean;
   inAppCommentCreated?: boolean;
+  inAppTransferRequest?: boolean;
   bellUnreadOnly?: boolean;
 }
 
@@ -23,10 +26,13 @@ export interface UpdatePreferencesResponse {
   emailTicketAssigned: boolean;
   emailStatusChanged: boolean;
   emailCommentCreated: boolean;
+  emailCsatSurvey: boolean;
+  emailTransferRequest: boolean;
   inAppTicketCreated: boolean;
   inAppTicketAssigned: boolean;
   inAppStatusChanged: boolean;
   inAppCommentCreated: boolean;
+  inAppTransferRequest: boolean;
   bellUnreadOnly: boolean;
 }
 
@@ -45,10 +51,13 @@ export class UpdatePreferencesCommand implements Command<Props, UpdatePreference
       emailTicketAssigned: pref.emailTicketAssigned,
       emailStatusChanged: pref.emailStatusChanged,
       emailCommentCreated: pref.emailCommentCreated,
+      emailCsatSurvey: pref.emailCsatSurvey,
+      emailTransferRequest: pref.emailTransferRequest,
       inAppTicketCreated: pref.inAppTicketCreated,
       inAppTicketAssigned: pref.inAppTicketAssigned,
       inAppStatusChanged: pref.inAppStatusChanged,
       inAppCommentCreated: pref.inAppCommentCreated,
+      inAppTransferRequest: pref.inAppTransferRequest,
       bellUnreadOnly: pref.bellUnreadOnly,
     };
   }

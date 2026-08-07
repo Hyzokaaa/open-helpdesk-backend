@@ -38,6 +38,12 @@ export class NotificationPreferenceModel {
   emailCommentCreated!: boolean;
 
   @Column({ default: true })
+  emailCsatSurvey!: boolean;
+
+  @Column({ default: true })
+  emailTransferRequest!: boolean;
+
+  @Column({ default: true })
   inAppTicketCreated!: boolean;
 
   @Column({ default: true })
@@ -48,6 +54,9 @@ export class NotificationPreferenceModel {
 
   @Column({ default: true })
   inAppCommentCreated!: boolean;
+
+  @Column({ default: true })
+  inAppTransferRequest!: boolean;
 
   @Column({ default: false })
   bellUnreadOnly!: boolean;
