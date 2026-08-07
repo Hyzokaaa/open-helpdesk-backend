@@ -200,6 +200,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
       firstResponseBreached: model.firstResponseBreached ?? false,
       resolutionBreached: model.resolutionBreached ?? false,
       aiCache: model.aiCache ?? {},
+      registeredById: model.registeredById ?? null,
       mailboxId: model.mailboxId ?? null,
     });
   }
@@ -225,6 +226,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
     model.firstResponseBreached = ticket.firstResponseBreached;
     model.resolutionBreached = ticket.resolutionBreached;
     model.aiCache = ticket.aiCache;
+    model.registeredById = ticket.registeredById;
     model.mailboxId = ticket.mailboxId;
     return model;
   }
