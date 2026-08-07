@@ -63,13 +63,17 @@ export class TypeOrmTicketRepository implements TicketRepository {
       .where('ticket.workspaceId = :workspaceId', { workspaceId });
 
     if (filters.search) {
-      const isNumeric = /^\d+$/.test(filters.search.trim());
+      const search = filters.search.trim();
+      const isNumeric = /^\d+$/.test(search);
       if (isNumeric) {
-        qb.andWhere('ticket.ticketNumber = :ticketNumber', { ticketNumber: Number(filters.search.trim()) });
+        qb.andWhere(
+          '(CAST(ticket.ticketNumber AS TEXT) LIKE :numSearch OR ticket.name ILIKE :search OR ticket.description ILIKE :search)',
+          { numSearch: `%${search}%`, search: `%${search}%` },
+        );
       } else {
         qb.andWhere(
           '(ticket.name ILIKE :search OR ticket.description ILIKE :search)',
-          { search: `%${filters.search}%` },
+          { search: `%${search}%` },
         );
       }
     }
