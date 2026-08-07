@@ -177,6 +177,7 @@ export class WorkspaceController {
   @Get(':slug/members')
   async listMembers(
     @Param('slug') slug: string,
+    @Query('autoCreated') autoCreated: string | undefined,
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
@@ -188,7 +189,10 @@ export class WorkspaceController {
       isSystemAdmin: user.isSystemAdmin,
     });
     const query = new ListWorkspaceMembersQuery(this.memberRepository, this.userRepository);
-    return query.execute({ workspaceId });
+    return query.execute({
+      workspaceId,
+      autoCreated: autoCreated === 'true' ? true : autoCreated === 'false' ? false : undefined,
+    });
   }
 
   @Patch(':slug/members/:userId/role')
