@@ -101,6 +101,19 @@ export class TicketCreatedHandler {
           level: AuditLevel.ERROR,
           source: 'system',
         }).catch(() => {});
+      } else {
+        const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+        await auditLog.execute({
+          action: AuditAction.EMAIL_SENT,
+          entityType: 'email',
+          entityId: event.ticketId,
+          userId: null,
+          workspaceId: event.workspaceId,
+          metadata: { to: emails, ticketId: event.ticketId, type: 'ticket-notification' },
+          category: AuditCategory.EMAIL,
+          level: AuditLevel.INFO,
+          source: 'system',
+        }).catch(() => {});
       }
     }
   }
@@ -141,6 +154,19 @@ export class TicketCreatedHandler {
         metadata: { reason: 'notification', to: creator.email, ticketId: event.ticketId },
         category: AuditCategory.EMAIL,
         level: AuditLevel.ERROR,
+        source: 'system',
+      }).catch(() => {});
+    } else {
+      const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+      await auditLog.execute({
+        action: AuditAction.EMAIL_SENT,
+        entityType: 'email',
+        entityId: event.ticketId,
+        userId: null,
+        workspaceId: event.workspaceId,
+        metadata: { to: [creator.email], ticketId: event.ticketId, type: 'confirmation' },
+        category: AuditCategory.EMAIL,
+        level: AuditLevel.INFO,
         source: 'system',
       }).catch(() => {});
     }

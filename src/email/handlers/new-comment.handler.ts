@@ -109,6 +109,19 @@ export class NewCommentHandler {
           level: AuditLevel.ERROR,
           source: 'system',
         }).catch(() => {});
+      } else {
+        const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+        await auditLog.execute({
+          action: AuditAction.EMAIL_SENT,
+          entityType: 'email',
+          entityId: event.ticketId,
+          userId: null,
+          workspaceId: event.workspaceId,
+          metadata: { to: emails, ticketId: event.ticketId, type: 'comment-notification' },
+          category: AuditCategory.EMAIL,
+          level: AuditLevel.INFO,
+          source: 'system',
+        }).catch(() => {});
       }
     }
   }
