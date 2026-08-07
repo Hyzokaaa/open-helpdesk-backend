@@ -14,6 +14,11 @@ import { CurrentUser } from '../../../../shared/nest/decorators/current-user.dec
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
 import { EntityNotFoundError } from '../../../../shared/domain/errors';
+import { randomBytes } from 'crypto';
+import { CreateUser } from '../../../../user/domain/services/user-create';
+import { AddWorkspaceMember } from '../../../../workspace/domain/services/workspace-add-member';
+import { WorkspaceRole } from '../../../../workspace/domain/enums/workspace-role.enum';
+import { BcryptPasswordHasher } from '../../../../shared/infrastructure/bcrypt-password-hasher';
 import { ClaimStagedAttachments } from '../../../../attachment/domain/services/attachment-claim-staged';
 import { TypeOrmAttachmentRepository } from '../../../../attachment/infrastructure/typeorm/repositories/typeorm-attachment.repository';
 import { CreateTicket } from '../../../domain/services/ticket-create';
@@ -90,6 +95,16 @@ export class TicketController {
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     const validateCustomFields = new ValidateCustomFieldValues(this.customFieldDefinitionRepository);
     const claimAttachments = new ClaimStagedAttachments(this.attachmentRepository);
+
+    let creatorId = user.userId;
+    let creatorEmail = user.email;
+
+    if (body.onBehalfOf) {
+      const resolved = await this.resolveOnBehalfOf(body.onBehalfOf, workspace.getId());
+      creatorId = resolved.userId;
+      creatorEmail = resolved.email;
+    }
+
     const command = new CreateTicketCommand(service, ensurePermission, this.userRepository, this.eventPublisher, auditLog, validateCustomFields, claimAttachments);
     return command.execute({
       name: body.name,
@@ -99,8 +114,8 @@ export class TicketController {
       workspaceId: workspace.getId(),
       workspaceName: workspace.name,
       workspaceSlug: workspace.slug,
-      userId: user.userId,
-      userEmail: user.email,
+      userId: creatorId,
+      userEmail: creatorEmail,
       tagIds: body.tagIds,
       customFields: body.customFields,
       uploadTokens: body.uploadTokens,
@@ -676,5 +691,39 @@ export class TicketController {
     const workspace = await this.workspaceRepository.findBySlug(slug);
     if (!workspace) throw new EntityNotFoundError('Workspace not found');
     return workspace;
+  }
+
+  private async resolveOnBehalfOf(
+    email: string,
+    workspaceId: string,
+  ): Promise<{ userId: string; email: string }> {
+    let targetUser = await this.userRepository.findByEmail(email.toLowerCase());
+
+    if (!targetUser) {
+      const createUser = new CreateUser(this.idGenerator, this.userRepository, new BcryptPasswordHasher());
+      targetUser = await createUser.execute({
+        email: email.toLowerCase(),
+        password: randomBytes(32).toString('hex'),
+        firstName: email.split('@')[0],
+        lastName: '',
+        isEmailVerified: true,
+        autoCreated: true,
+      });
+    }
+
+    const existingMember = await this.memberRepository.findByWorkspaceAndUser(
+      workspaceId,
+      targetUser.getId(),
+    );
+    if (!existingMember) {
+      const addMember = new AddWorkspaceMember(this.idGenerator, this.memberRepository);
+      await addMember.execute({
+        workspaceId,
+        userId: targetUser.getId(),
+        role: WorkspaceRole.REPORTER,
+      });
+    }
+
+    return { userId: targetUser.getId(), email: targetUser.email };
   }
 }
