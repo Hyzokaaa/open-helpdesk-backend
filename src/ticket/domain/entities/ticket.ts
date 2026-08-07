@@ -27,6 +27,7 @@ interface Props {
   firstResponseBreached?: boolean;
   resolutionBreached?: boolean;
   aiCache?: Record<string, { source: string; result: string }>;
+  registeredById?: string | null;
   mailboxId?: string | null;
 }
 
@@ -53,6 +54,7 @@ export class Ticket {
   firstResponseBreached: boolean;
   resolutionBreached: boolean;
   aiCache: Record<string, { source: string; result: string }>;
+  registeredById: string | null;
   mailboxId: string | null;
 
   constructor(props: Props) {
@@ -78,6 +80,7 @@ export class Ticket {
     this.firstResponseBreached = props.firstResponseBreached ?? false;
     this.resolutionBreached = props.resolutionBreached ?? false;
     this.aiCache = props.aiCache ?? {};
+    this.registeredById = props.registeredById ?? null;
     this.mailboxId = props.mailboxId ?? null;
   }
 

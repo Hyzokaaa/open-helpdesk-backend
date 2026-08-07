@@ -81,6 +81,12 @@ export class TicketModel {
   @Column({ type: 'jsonb', default: {} })
   aiCache!: Record<string, { source: string; result: string }>;
 
+  @ManyToOne(() => UserModel, { nullable: true })
+  registeredBy!: UserModel | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  registeredById!: string | null;
+
   @Column({ type: 'varchar', nullable: true })
   mailboxId!: string | null;
 

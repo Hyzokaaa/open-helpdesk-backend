@@ -119,6 +119,7 @@ export class TicketController {
       tagIds: body.tagIds,
       customFields: body.customFields,
       uploadTokens: body.uploadTokens,
+      registeredById: body.onBehalfOf ? user.userId : null,
       isSystemAdmin: user.isSystemAdmin,
     });
   }

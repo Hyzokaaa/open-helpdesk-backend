@@ -27,6 +27,7 @@ interface Props {
   tagIds: string[];
   customFields?: Record<string, unknown>;
   uploadTokens?: string[];
+  registeredById?: string | null;
   isSystemAdmin: boolean;
 }
 
@@ -70,6 +71,7 @@ export class CreateTicketCommand implements Command<Props, CreateTicketResponse>
       creatorId: props.userId,
       tagIds: props.tagIds,
       customFields: validatedCustomFields,
+      registeredById: props.registeredById,
     });
 
     if (props.uploadTokens?.length && this.claimStagedAttachments) {
