@@ -12,7 +12,7 @@ interface Props {
   status: TicketStatus;
   category: TicketCategory;
   workspaceId: string;
-  creatorId: string;
+  reporterId: string;
   assigneeId: string | null;
   firstResponseAt?: Date | null;
   resolvedAt: Date | null;
@@ -39,7 +39,7 @@ export class Ticket {
   status: TicketStatus;
   category: TicketCategory;
   workspaceId: string;
-  creatorId: string;
+  reporterId: string;
   assigneeId: string | null;
   firstResponseAt: Date | null;
   resolvedAt: Date | null;
@@ -65,7 +65,7 @@ export class Ticket {
     this.status = props.status;
     this.category = props.category;
     this.workspaceId = props.workspaceId;
-    this.creatorId = props.creatorId;
+    this.reporterId = props.reporterId;
     this.assigneeId = props.assigneeId;
     this.firstResponseAt = props.firstResponseAt ?? null;
     this.resolvedAt = props.resolvedAt;

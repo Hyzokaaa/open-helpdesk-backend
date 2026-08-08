@@ -23,7 +23,7 @@ export interface TicketListItem {
   priority: string;
   status: string;
   category: string;
-  creatorId: string;
+  reporterId: string;
   assigneeId: string | null;
   ticketNumber: number;
   createdAt: Date | null;
@@ -54,7 +54,7 @@ export class ListTicketsQuery
       if (hasPermission(ctx.role, PERMISSIONS.TICKET_CREATE) && ctx.role !== WorkspaceRole.REPORTER) {
         filters.agentUserId = props.userId;
       } else {
-        filters.creatorId = props.userId;
+        filters.reporterId = props.userId;
       }
     }
 
@@ -72,7 +72,7 @@ export class ListTicketsQuery
         priority: ticket.priority,
         status: ticket.status,
         category: ticket.category,
-        creatorId: ticket.creatorId,
+        reporterId: ticket.reporterId,
         assigneeId: ticket.assigneeId,
         ticketNumber: ticket.ticketNumber,
         createdAt: ticket.createdAt,

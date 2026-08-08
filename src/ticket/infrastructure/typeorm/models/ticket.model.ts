@@ -40,10 +40,10 @@ export class TicketModel {
   workspaceId!: string;
 
   @ManyToOne(() => UserModel)
-  creator!: UserModel;
+  reporter!: UserModel;
 
   @Column()
-  creatorId!: string;
+  reporterId!: string;
 
   @ManyToOne(() => UserModel, { nullable: true })
   assignee!: UserModel | null;

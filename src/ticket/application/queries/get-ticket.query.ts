@@ -18,7 +18,7 @@ export interface TicketDetailResponse {
   status: string;
   category: string;
   workspaceId: string;
-  creatorId: string;
+  reporterId: string;
   registeredById: string | null;
   assigneeId: string | null;
   firstResponseAt: Date | null;
@@ -56,7 +56,7 @@ export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
       status: ticket.status,
       category: ticket.category,
       workspaceId: ticket.workspaceId,
-      creatorId: ticket.creatorId,
+      reporterId: ticket.reporterId,
       registeredById: ticket.registeredById,
       assigneeId: ticket.assigneeId,
       firstResponseAt: ticket.firstResponseAt,

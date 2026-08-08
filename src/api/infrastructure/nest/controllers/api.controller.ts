@@ -96,7 +96,7 @@ export class ApiController {
         priority: filters.priority,
         tagIds: filters.tagIds,
         assigneeId: filters.assigneeId,
-        creatorId: filters.creatorId,
+        reporterId: filters.reporterId,
         sortBy: filters.sortBy,
         sortOrder: filters.sortOrder,
       },

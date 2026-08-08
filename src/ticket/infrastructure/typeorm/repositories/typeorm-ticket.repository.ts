@@ -94,9 +94,9 @@ export class TypeOrmTicketRepository implements TicketRepository {
         assigneeId: filters.assigneeId,
       });
     }
-    if (filters.creatorId) {
-      qb.andWhere('ticket.creatorId = :creatorId', {
-        creatorId: filters.creatorId,
+    if (filters.reporterId) {
+      qb.andWhere('ticket.reporterId = :reporterId', {
+        reporterId: filters.reporterId,
       });
     }
     if (filters.agentUserId) {
@@ -185,7 +185,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
       status: model.status as TicketStatus,
       category: model.category as TicketCategory,
       workspaceId: model.workspaceId,
-      creatorId: model.creatorId,
+      reporterId: model.reporterId,
       assigneeId: model.assigneeId,
       firstResponseAt: model.firstResponseAt,
       resolvedAt: model.resolvedAt,
@@ -214,7 +214,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
     model.status = ticket.status;
     model.category = ticket.category;
     model.workspaceId = ticket.workspaceId;
-    model.creatorId = ticket.creatorId;
+    model.reporterId = ticket.reporterId;
     model.assigneeId = ticket.assigneeId;
     model.firstResponseAt = ticket.firstResponseAt;
     model.resolvedAt = ticket.resolvedAt;

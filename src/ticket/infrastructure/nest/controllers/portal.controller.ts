@@ -143,7 +143,7 @@ export class PortalController {
       priority: TicketPriority.MEDIUM,
       category: TicketCategory.ISSUE,
       workspaceId: workspace.getId(),
-      creatorId: user.getId(),
+      reporterId: user.getId(),
       tagIds: [],
       customFields: validatedCustomFields,
       portalToken,
@@ -164,8 +164,8 @@ export class PortalController {
       ticketName: ticket.name,
       priority: ticket.priority,
       category: ticket.category,
-      creatorId: user.getId(),
-      creatorName: `${user.firstName} ${user.lastName}`.trim(),
+      reporterId: user.getId(),
+      reporterName: `${user.firstName} ${user.lastName}`.trim(),
       workspaceId: workspace.getId(),
       workspaceName: workspace.name,
       workspaceSlug: workspace.slug,
@@ -199,7 +199,7 @@ export class PortalController {
     const ticket = await this.ticketRepository.findByPortalToken(portalToken);
     if (!ticket) throw new EntityNotFoundError('Ticket not found');
 
-    const creator = await this.userRepository.findById(ticket.creatorId);
+    const creator = await this.userRepository.findById(ticket.reporterId);
     const workspace = await this.workspaceRepository.findById(ticket.workspaceId);
 
     // Fetch comments with author names and dates
@@ -234,7 +234,7 @@ export class PortalController {
       category: ticket.category,
       customFields: ticket.customFields,
       createdAt: ticket.createdAt,
-      creatorName: creator ? `${creator.firstName} ${creator.lastName}`.trim() : '',
+      reporterName: creator ? `${creator.firstName} ${creator.lastName}`.trim() : '',
       workspaceName: workspace?.name ?? '',
       workspacePalette: workspace?.palette ?? null,
       attachments: attachmentList,
@@ -242,7 +242,7 @@ export class PortalController {
         id: c.id,
         content: c.content,
         authorName: authors.get(c.authorId) ?? '',
-        isCreator: c.authorId === ticket.creatorId,
+        isReporter: c.authorId === ticket.reporterId,
         createdAt: c.createdAt,
       })),
     };
@@ -261,7 +261,7 @@ export class PortalController {
     const comment = await createComment.execute({
       content: body.content,
       ticketId: ticket.getId(),
-      authorId: ticket.creatorId,
+      authorId: ticket.reporterId,
     });
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
@@ -272,7 +272,7 @@ export class PortalController {
       source: 'portal',
       entityType: 'comment',
       entityId: comment.getId(),
-      userId: ticket.creatorId,
+      userId: ticket.reporterId,
       workspaceId: ticket.workspaceId,
       metadata: { ticketId: ticket.getId() },
     });

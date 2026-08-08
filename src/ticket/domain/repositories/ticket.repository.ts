@@ -10,7 +10,7 @@ export interface TicketFilters {
   priority?: TicketPriority;
   tagIds?: string[];
   assigneeId?: string;
-  creatorId?: string;
+  reporterId?: string;
   agentUserId?: string;
   sortBy?: string;
   sortOrder?: 'ASC' | 'DESC';

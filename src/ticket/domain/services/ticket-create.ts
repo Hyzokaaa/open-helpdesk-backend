@@ -11,7 +11,7 @@ interface CreateTicketProps {
   priority: TicketPriority;
   category: TicketCategory;
   workspaceId: string;
-  creatorId: string;
+  reporterId: string;
   tagIds: string[];
   customFields?: Record<string, unknown>;
   registeredById?: string | null;
@@ -34,7 +34,7 @@ export class CreateTicket {
       status: TicketStatus.OPEN,
       category: props.category,
       workspaceId: props.workspaceId,
-      creatorId: props.creatorId,
+      reporterId: props.reporterId,
       assigneeId: null,
       firstResponseAt: null,
       resolvedAt: null,

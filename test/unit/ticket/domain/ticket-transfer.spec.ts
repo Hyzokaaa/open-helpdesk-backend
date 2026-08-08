@@ -6,7 +6,7 @@ import { TicketCategory } from '../../../../src/ticket/domain/enums/ticket-categ
 import { AccessDeniedError } from '../../../../src/shared/domain/errors';
 import { MockTicketRepository } from '../../../mocks/mock-ticket.repository';
 
-function makeTicket(overrides: Partial<{ assigneeId: string | null; creatorId: string }> = {}) {
+function makeTicket(overrides: Partial<{ assigneeId: string | null; reporterId: string }> = {}) {
   return new Ticket({
     id: 'ticket-1',
     name: 'Test',
@@ -15,7 +15,7 @@ function makeTicket(overrides: Partial<{ assigneeId: string | null; creatorId: s
     status: TicketStatus.IN_PROGRESS,
     category: TicketCategory.ISSUE,
     workspaceId: 'ws-1',
-    creatorId: overrides.creatorId ?? 'creator-1',
+    reporterId: overrides.reporterId ?? 'creator-1',
     assigneeId: overrides.assigneeId ?? 'agent-1',
     ticketNumber: 1,
     tagIds: [],
@@ -50,7 +50,7 @@ describe('TransferTicket', () => {
   });
 
   it('should transfer when user is the creator', async () => {
-    await repository.create(makeTicket({ assigneeId: 'agent-1', creatorId: 'creator-1' }));
+    await repository.create(makeTicket({ assigneeId: 'agent-1', reporterId: 'creator-1' }));
 
     const result = await service.execute({ ticketId: 'ticket-1', fromUserId: 'creator-1', toUserId: 'agent-3' });
 
@@ -58,7 +58,7 @@ describe('TransferTicket', () => {
   });
 
   it('should throw if user is neither assignee nor creator', async () => {
-    await repository.create(makeTicket({ assigneeId: 'agent-1', creatorId: 'creator-1' }));
+    await repository.create(makeTicket({ assigneeId: 'agent-1', reporterId: 'creator-1' }));
 
     await expect(
       service.execute({ ticketId: 'ticket-1', fromUserId: 'random-user', toUserId: 'agent-2' }),

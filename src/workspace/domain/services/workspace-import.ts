@@ -41,7 +41,7 @@ export class ImportWorkspace {
       const allEmailsSet = new Set<string>();
       for (const u of data.users) allEmailsSet.add(u.email);
       for (const t of data.tickets) {
-        allEmailsSet.add(t.creatorEmail);
+        allEmailsSet.add(t.reporterEmail);
         if (t.assigneeEmail) allEmailsSet.add(t.assigneeEmail);
         if (t.resolvedByEmail) allEmailsSet.add(t.resolvedByEmail);
       }
@@ -128,15 +128,15 @@ export class ImportWorkspace {
 
       // Build set of existing tickets to detect duplicates
       const existingTickets = await qr.query(
-        `SELECT name, "creatorId", "createdAt" FROM tickets WHERE "workspaceId" = $1 AND "deletedAt" IS NULL`, [targetWorkspaceId],
+        `SELECT name, "reporterId", "createdAt" FROM tickets WHERE "workspaceId" = $1 AND "deletedAt" IS NULL`, [targetWorkspaceId],
       );
       const existingTicketKeys = new Set(
-        existingTickets.map((t: any) => `${t.name}|${t.creatorId}|${new Date(t.createdAt).toISOString().slice(0, 19)}`),
+        existingTickets.map((t: any) => `${t.name}|${t.reporterId}|${new Date(t.createdAt).toISOString().slice(0, 19)}`),
       );
 
       for (const t of data.tickets) {
-        const creatorId = userIdFor(t.creatorEmail);
-        const ticketKey = `${t.name}|${creatorId}|${t.createdAt ? new Date(t.createdAt).toISOString().slice(0, 19) : ''}`;
+        const reporterId = userIdFor(t.reporterEmail);
+        const ticketKey = `${t.name}|${reporterId}|${t.createdAt ? new Date(t.createdAt).toISOString().slice(0, 19) : ''}`;
         if (existingTicketKeys.has(ticketKey)) continue;
 
         const newId = ulid();
@@ -144,14 +144,14 @@ export class ImportWorkspace {
         await qr.query(`
           INSERT INTO tickets (
             id, name, description, priority, status, category,
-            "workspaceId", "creatorId", "assigneeId", "ticketNumber",
+            "workspaceId", "reporterId", "assigneeId", "ticketNumber",
             "customFields", "discardReason", "portalToken",
             "firstResponseAt", "resolvedAt", "resolvedById",
             "firstResponseBreached", "resolutionBreached", "createdAt", "updatedAt"
           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
         `, [
           newId, t.name, t.description, t.priority, t.status, t.category,
-          targetWorkspaceId, userIdFor(t.creatorEmail), userIdFor(t.assigneeEmail), ticketNumber,
+          targetWorkspaceId, userIdFor(t.reporterEmail), userIdFor(t.assigneeEmail), ticketNumber,
           JSON.stringify(t.customFields), t.discardReason, null,
           t.firstResponseAt, t.resolvedAt, userIdFor(t.resolvedByEmail),
           t.firstResponseBreached, t.resolutionBreached, t.createdAt, t.updatedAt,

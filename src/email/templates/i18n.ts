@@ -23,8 +23,8 @@ const translations: Translations = {
     es: 'Nuevo ticket',
   },
   'ticketCreated.body': {
-    en: '{creatorName} created a new ticket in {workspaceName}.',
-    es: '{creatorName} creó un nuevo ticket en {workspaceName}.',
+    en: '{reporterName} created a new ticket in {workspaceName}.',
+    es: '{reporterName} creó un nuevo ticket en {workspaceName}.',
   },
   'ticketCreated.fieldTitle': {
     en: 'Title',

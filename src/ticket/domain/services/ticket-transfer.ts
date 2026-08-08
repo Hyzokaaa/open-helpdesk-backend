@@ -17,7 +17,7 @@ export class TransferTicket {
     if (!ticket) throw new EntityNotFoundError('Ticket not found');
 
     const isAssignee = ticket.assigneeId === props.fromUserId;
-    const isCreator = ticket.creatorId === props.fromUserId;
+    const isCreator = ticket.reporterId === props.fromUserId;
 
     if (!isAssignee && !isCreator) {
       throw new AccessDeniedError('You can only transfer tickets assigned to you or created by you');

@@ -15,7 +15,7 @@ function makeTicket(overrides: Partial<{ status: TicketStatus; assigneeId: strin
     status: overrides.status ?? TicketStatus.OPEN,
     category: TicketCategory.ISSUE,
     workspaceId: 'ws-1',
-    creatorId: 'creator-1',
+    reporterId: 'creator-1',
     assigneeId: overrides.assigneeId ?? null,
     ticketNumber: 1,
     tagIds: [],

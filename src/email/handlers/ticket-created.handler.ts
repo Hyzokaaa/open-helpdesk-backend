@@ -51,20 +51,20 @@ export class TicketCreatedHandler {
   @OnEvent('ticket.created')
   async handle(event: TicketCreatedEvent): Promise<void> {
     await this.notifyStakeholders(event);
-    await this.sendCreatorConfirmation(event);
+    await this.sendReporterConfirmation(event);
   }
 
   private async notifyStakeholders(event: TicketCreatedEvent): Promise<void> {
     const resolveStakeholders = new ResolveTicketStakeholders(this.ticketRepository, this.participantRepository, this.userRepository);
     const ticketStakeholders = await resolveStakeholders.execute({
       ticketId: event.ticketId,
-      excludeUserId: event.creatorId,
+      excludeUserId: event.reporterId,
     });
 
     const resolveAdmins = new ResolveWorkspaceAdmins(this.memberRepository, this.userRepository);
     const admins = await resolveAdmins.execute({
       workspaceId: event.workspaceId,
-      excludeUserId: event.creatorId,
+      excludeUserId: event.reporterId,
     });
 
     const stakeholderIds = new Set(ticketStakeholders.map((u) => u.getId()));
@@ -77,7 +77,7 @@ export class TicketCreatedHandler {
     const { emailRecipients } = await dispatch.execute({
       users,
       type: NotificationType.TICKET_CREATED,
-      title: `${event.creatorName}: ${event.ticketName}`,
+      title: `${event.reporterName}: ${event.ticketName}`,
       ticketId: event.ticketId,
       workspaceSlug: event.workspaceSlug,
       inAppPrefKey: 'inAppTicketCreated',
@@ -97,8 +97,8 @@ export class TicketCreatedHandler {
     for (const [lang, emails] of emailRecipients) {
       const result = await sendWorkspaceEmail(this.emailService, sender, {
         to: emails,
-        subject: template.subject({ ticketName: event.ticketName, ticketUrl, creatorName: event.creatorName, priority: event.priority, category: event.category, workspaceName: event.workspaceName, lang }),
-        html: template.html({ ticketName: event.ticketName, ticketUrl, creatorName: event.creatorName, priority: event.priority, category: event.category, workspaceName: event.workspaceName, lang }),
+        subject: template.subject({ ticketName: event.ticketName, ticketUrl, reporterName: event.reporterName, priority: event.priority, category: event.category, workspaceName: event.workspaceName, lang }),
+        html: template.html({ ticketName: event.ticketName, ticketUrl, reporterName: event.reporterName, priority: event.priority, category: event.category, workspaceName: event.workspaceName, lang }),
         ...(emailDomain && { messageId: `<ticket-${event.ticketId}@${emailDomain}>` }),
         ...(mailbox && { replyTo: mailbox.address }),
       });
@@ -132,7 +132,7 @@ export class TicketCreatedHandler {
     }
   }
 
-  private async sendCreatorConfirmation(event: TicketCreatedEvent): Promise<void> {
+  private async sendReporterConfirmation(event: TicketCreatedEvent): Promise<void> {
     if (!event.portalToken) return;
 
     if (event.source === 'email' && event.mailboxId) {
@@ -140,7 +140,7 @@ export class TicketCreatedHandler {
       if (sourceMailbox && sourceMailbox.autoReply === false) return;
     }
 
-    const creator = await this.userRepository.findById(event.creatorId);
+    const creator = await this.userRepository.findById(event.reporterId);
     if (!creator) return;
 
     const lang = creator.language || 'en';

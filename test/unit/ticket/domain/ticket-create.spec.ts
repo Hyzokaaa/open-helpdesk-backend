@@ -23,7 +23,7 @@ describe('CreateTicket', () => {
       priority: TicketPriority.HIGH,
       category: TicketCategory.BUG,
       workspaceId: 'ws-1',
-      creatorId: 'user-1',
+      reporterId: 'user-1',
       tagIds: ['tag-1'],
     });
 
@@ -31,7 +31,7 @@ describe('CreateTicket', () => {
     expect(ticket.status).toBe(TicketStatus.OPEN);
     expect(ticket.priority).toBe(TicketPriority.HIGH);
     expect(ticket.workspaceId).toBe('ws-1');
-    expect(ticket.creatorId).toBe('user-1');
+    expect(ticket.reporterId).toBe('user-1');
     expect(ticket.assigneeId).toBeNull();
     expect(ticket.tagIds).toEqual(['tag-1']);
   });
@@ -43,7 +43,7 @@ describe('CreateTicket', () => {
       priority: TicketPriority.LOW,
       category: TicketCategory.ISSUE,
       workspaceId: 'ws-1',
-      creatorId: 'user-1',
+      reporterId: 'user-1',
       tagIds: [],
     });
 

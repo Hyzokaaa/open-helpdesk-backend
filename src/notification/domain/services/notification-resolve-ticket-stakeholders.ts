@@ -20,7 +20,7 @@ export class ResolveTicketStakeholders {
     if (!ticket) return [];
 
     const recipientIds = new Set<string>();
-    recipientIds.add(ticket.creatorId);
+    recipientIds.add(ticket.reporterId);
     if (ticket.assigneeId) recipientIds.add(ticket.assigneeId);
 
     const participants = await this.participantRepository.findByTicketId(props.ticketId);

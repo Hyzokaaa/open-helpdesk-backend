@@ -96,13 +96,13 @@ export class TicketController {
     const validateCustomFields = new ValidateCustomFieldValues(this.customFieldDefinitionRepository);
     const claimAttachments = new ClaimStagedAttachments(this.attachmentRepository);
 
-    let creatorId = user.userId;
-    let creatorEmail = user.email;
+    let reporterId = user.userId;
+    let reporterEmail = user.email;
 
     if (body.onBehalfOf) {
       const resolved = await this.resolveOnBehalfOf(body.onBehalfOf, workspace.getId());
-      creatorId = resolved.userId;
-      creatorEmail = resolved.email;
+      reporterId = resolved.userId;
+      reporterEmail = resolved.email;
     }
 
     const command = new CreateTicketCommand(service, ensurePermission, this.userRepository, this.eventPublisher, auditLog, validateCustomFields, claimAttachments);
@@ -114,8 +114,8 @@ export class TicketController {
       workspaceId: workspace.getId(),
       workspaceName: workspace.name,
       workspaceSlug: workspace.slug,
-      userId: creatorId,
-      userEmail: creatorEmail,
+      userId: reporterId,
+      userEmail: reporterEmail,
       tagIds: body.tagIds,
       customFields: body.customFields,
       uploadTokens: body.uploadTokens,
@@ -143,7 +143,7 @@ export class TicketController {
         priority: filters.priority,
         tagIds: filters.tagIds,
         assigneeId: filters.assigneeId,
-        creatorId: filters.creatorId,
+        reporterId: filters.reporterId,
         sortBy: filters.sortBy,
         sortOrder: filters.sortOrder,
       },

@@ -59,9 +59,9 @@ export class CsatSurveyHandler implements OnModuleInit {
     const existing = await this.csatRepository.findByTicketId(event.ticketId);
     if (existing) return;
 
-    if (ticket.creatorId === event.changedById) return;
+    if (ticket.reporterId === event.changedById) return;
 
-    const creator = await this.userRepository.findById(ticket.creatorId);
+    const creator = await this.userRepository.findById(ticket.reporterId);
     if (!creator) return;
 
     const prefs = await this.preferenceRepository.findByUserId(creator.getId());
