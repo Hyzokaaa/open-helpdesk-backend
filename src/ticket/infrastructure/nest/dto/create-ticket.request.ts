@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsEmail,
   IsEnum,
   IsNotEmpty,
   IsObject,
@@ -37,4 +38,8 @@ export class CreateTicketRequest {
   @IsString({ each: true })
   @IsOptional()
   uploadTokens?: string[];
+
+  @IsEmail()
+  @IsOptional()
+  onBehalfOf?: string;
 }

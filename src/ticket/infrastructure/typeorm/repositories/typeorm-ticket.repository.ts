@@ -6,6 +6,7 @@ import { Ticket } from '../../../domain/entities/ticket';
 import { TicketCategory } from '../../../domain/enums/ticket-category.enum';
 import { TicketPriority } from '../../../domain/enums/ticket-priority.enum';
 import { TicketDiscardReason } from '../../../domain/enums/ticket-discard-reason.enum';
+import { TicketSource } from '../../../domain/enums/ticket-source.enum';
 import { TicketStatus } from '../../../domain/enums/ticket-status.enum';
 import {
   TicketFilters,
@@ -63,13 +64,17 @@ export class TypeOrmTicketRepository implements TicketRepository {
       .where('ticket.workspaceId = :workspaceId', { workspaceId });
 
     if (filters.search) {
-      const isNumeric = /^\d+$/.test(filters.search.trim());
+      const search = filters.search.trim();
+      const isNumeric = /^\d+$/.test(search);
       if (isNumeric) {
-        qb.andWhere('ticket.ticketNumber = :ticketNumber', { ticketNumber: Number(filters.search.trim()) });
+        qb.andWhere(
+          '(CAST(ticket.ticketNumber AS TEXT) LIKE :numSearch OR ticket.name ILIKE :search OR ticket.description ILIKE :search)',
+          { numSearch: `%${search}%`, search: `%${search}%` },
+        );
       } else {
         qb.andWhere(
           '(ticket.name ILIKE :search OR ticket.description ILIKE :search)',
-          { search: `%${filters.search}%` },
+          { search: `%${search}%` },
         );
       }
     }
@@ -90,9 +95,9 @@ export class TypeOrmTicketRepository implements TicketRepository {
         assigneeId: filters.assigneeId,
       });
     }
-    if (filters.creatorId) {
-      qb.andWhere('ticket.creatorId = :creatorId', {
-        creatorId: filters.creatorId,
+    if (filters.reporterId) {
+      qb.andWhere('ticket.reporterId = :reporterId', {
+        reporterId: filters.reporterId,
       });
     }
     if (filters.agentUserId) {
@@ -181,7 +186,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
       status: model.status as TicketStatus,
       category: model.category as TicketCategory,
       workspaceId: model.workspaceId,
-      creatorId: model.creatorId,
+      reporterId: model.reporterId,
       assigneeId: model.assigneeId,
       firstResponseAt: model.firstResponseAt,
       resolvedAt: model.resolvedAt,
@@ -196,6 +201,8 @@ export class TypeOrmTicketRepository implements TicketRepository {
       firstResponseBreached: model.firstResponseBreached ?? false,
       resolutionBreached: model.resolutionBreached ?? false,
       aiCache: model.aiCache ?? {},
+      source: model.source as TicketSource,
+      registeredById: model.registeredById ?? null,
       mailboxId: model.mailboxId ?? null,
     });
   }
@@ -209,7 +216,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
     model.status = ticket.status;
     model.category = ticket.category;
     model.workspaceId = ticket.workspaceId;
-    model.creatorId = ticket.creatorId;
+    model.reporterId = ticket.reporterId;
     model.assigneeId = ticket.assigneeId;
     model.firstResponseAt = ticket.firstResponseAt;
     model.resolvedAt = ticket.resolvedAt;
@@ -221,6 +228,8 @@ export class TypeOrmTicketRepository implements TicketRepository {
     model.firstResponseBreached = ticket.firstResponseBreached;
     model.resolutionBreached = ticket.resolutionBreached;
     model.aiCache = ticket.aiCache;
+    model.source = ticket.source;
+    model.registeredById = ticket.registeredById;
     model.mailboxId = ticket.mailboxId;
     return model;
   }

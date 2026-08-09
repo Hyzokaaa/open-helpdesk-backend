@@ -37,6 +37,7 @@ export class SystemEmailSettingsController {
         smtpUser: settings.smtpUser,
         hasPassword: !!settings.smtpPass,
         smtpFrom: settings.smtpFrom,
+        encryption: settings.encryption,
       } : null,
       envConfigured,
     };
@@ -56,6 +57,7 @@ export class SystemEmailSettingsController {
       smtpUser: body.smtpUser,
       smtpPass: (!body.smtpPass || body.smtpPass === '__keep__') ? (existing?.smtpPass ?? '') : body.smtpPass,
       smtpFrom: body.smtpFrom,
+      encryption: body.encryption,
     });
     await this.repository.save(settings);
 
@@ -116,11 +118,16 @@ export class SystemEmailSettingsController {
 
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const nodemailer = require('nodemailer');
+    const encryption = body.encryption ?? 'tls';
+    const tls = encryption === 'tls-insecure' ? { rejectUnauthorized: false } :
+                encryption === 'none' ? { rejectUnauthorized: false } : undefined;
     const transporter = nodemailer.createTransport({
       host: body.smtpHost,
       port: body.smtpPort,
       secure: body.smtpPort === 465,
       auth: { user: body.smtpUser, pass: password },
+      ...(tls && { tls }),
+      ...((encryption === 'none') && { ignoreTLS: true }),
       connectionTimeout: 10000,
       greetingTimeout: 10000,
       logger: false,

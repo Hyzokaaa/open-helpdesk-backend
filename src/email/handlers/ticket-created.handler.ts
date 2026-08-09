@@ -12,6 +12,8 @@ import { TypeOrmNotificationPreferenceRepository } from '../../notification/infr
 import { UlidGenerator } from '../../shared/infrastructure/ulid-generator';
 import { TypeOrmMailboxRepository } from '../../mailbox/infrastructure/typeorm/repositories/typeorm-mailbox.repository';
 import { TypeOrmWorkspaceEmailSenderRepository } from '../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-email-sender.repository';
+import { TypeOrmWorkspaceMemberRepository } from '../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
+import { ResolveWorkspaceAdmins } from '../../notification/domain/services/notification-resolve-workspace-admins';
 import { sendWorkspaceEmail } from '../domain/resolve-email-sender';
 import { TypeOrmTicketRepository } from '../../ticket/infrastructure/typeorm/repositories/typeorm-ticket.repository';
 import { TypeOrmTicketParticipantRepository } from '../../ticket/infrastructure/typeorm/repositories/typeorm-ticket-participant.repository';
@@ -40,6 +42,7 @@ export class TicketCreatedHandler {
     private readonly participantRepository: TypeOrmTicketParticipantRepository,
     private readonly emailSenderRepository: TypeOrmWorkspaceEmailSenderRepository,
     private readonly auditLogRepository: TypeOrmAuditLogRepository,
+    private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
     private readonly config: ConfigService,
   ) {
     this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173').split(',')[0].trim();
@@ -48,22 +51,33 @@ export class TicketCreatedHandler {
   @OnEvent('ticket.created')
   async handle(event: TicketCreatedEvent): Promise<void> {
     await this.notifyStakeholders(event);
-    await this.sendCreatorConfirmation(event);
+    await this.sendReporterConfirmation(event);
   }
 
   private async notifyStakeholders(event: TicketCreatedEvent): Promise<void> {
     const resolveStakeholders = new ResolveTicketStakeholders(this.ticketRepository, this.participantRepository, this.userRepository);
-    const users = await resolveStakeholders.execute({
+    const ticketStakeholders = await resolveStakeholders.execute({
       ticketId: event.ticketId,
-      excludeUserId: event.creatorId,
+      excludeUserId: event.reporterId,
     });
+
+    const resolveAdmins = new ResolveWorkspaceAdmins(this.memberRepository, this.userRepository);
+    const admins = await resolveAdmins.execute({
+      workspaceId: event.workspaceId,
+      excludeUserId: event.reporterId,
+    });
+
+    const stakeholderIds = new Set(ticketStakeholders.map((u) => u.getId()));
+    const extraAdmins = admins.filter((u) => !stakeholderIds.has(u.getId()));
+
+    const users = [...ticketStakeholders, ...extraAdmins];
     if (users.length === 0) return;
 
     const dispatch = new DispatchNotifications(this.idGenerator, this.notificationRepository, this.preferenceRepository);
     const { emailRecipients } = await dispatch.execute({
       users,
       type: NotificationType.TICKET_CREATED,
-      title: `${event.creatorName}: ${event.ticketName}`,
+      title: `${event.reporterName}: ${event.ticketName}`,
       ticketId: event.ticketId,
       workspaceSlug: event.workspaceSlug,
       inAppPrefKey: 'inAppTicketCreated',
@@ -83,8 +97,8 @@ export class TicketCreatedHandler {
     for (const [lang, emails] of emailRecipients) {
       const result = await sendWorkspaceEmail(this.emailService, sender, {
         to: emails,
-        subject: template.subject({ ticketName: event.ticketName, ticketUrl, creatorName: event.creatorName, priority: event.priority, category: event.category, workspaceName: event.workspaceName, lang }),
-        html: template.html({ ticketName: event.ticketName, ticketUrl, creatorName: event.creatorName, priority: event.priority, category: event.category, workspaceName: event.workspaceName, lang }),
+        subject: template.subject({ ticketName: event.ticketName, ticketUrl, reporterName: event.reporterName, priority: event.priority, category: event.category, workspaceName: event.workspaceName, lang }),
+        html: template.html({ ticketName: event.ticketName, ticketUrl, reporterName: event.reporterName, priority: event.priority, category: event.category, workspaceName: event.workspaceName, lang }),
         ...(emailDomain && { messageId: `<ticket-${event.ticketId}@${emailDomain}>` }),
         ...(mailbox && { replyTo: mailbox.address }),
       });
@@ -101,11 +115,24 @@ export class TicketCreatedHandler {
           level: AuditLevel.ERROR,
           source: 'system',
         }).catch(() => {});
+      } else {
+        const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+        await auditLog.execute({
+          action: AuditAction.EMAIL_SENT,
+          entityType: 'email',
+          entityId: event.ticketId,
+          userId: null,
+          workspaceId: event.workspaceId,
+          metadata: { to: emails, ticketId: event.ticketId, type: 'ticket-notification' },
+          category: AuditCategory.EMAIL,
+          level: AuditLevel.INFO,
+          source: 'system',
+        }).catch(() => {});
       }
     }
   }
 
-  private async sendCreatorConfirmation(event: TicketCreatedEvent): Promise<void> {
+  private async sendReporterConfirmation(event: TicketCreatedEvent): Promise<void> {
     if (!event.portalToken) return;
 
     if (event.source === 'email' && event.mailboxId) {
@@ -113,7 +140,7 @@ export class TicketCreatedHandler {
       if (sourceMailbox && sourceMailbox.autoReply === false) return;
     }
 
-    const creator = await this.userRepository.findById(event.creatorId);
+    const creator = await this.userRepository.findById(event.reporterId);
     if (!creator) return;
 
     const lang = creator.language || 'en';
@@ -141,6 +168,19 @@ export class TicketCreatedHandler {
         metadata: { reason: 'notification', to: creator.email, ticketId: event.ticketId },
         category: AuditCategory.EMAIL,
         level: AuditLevel.ERROR,
+        source: 'system',
+      }).catch(() => {});
+    } else {
+      const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+      await auditLog.execute({
+        action: AuditAction.EMAIL_SENT,
+        entityType: 'email',
+        entityId: event.ticketId,
+        userId: null,
+        workspaceId: event.workspaceId,
+        metadata: { to: [creator.email], ticketId: event.ticketId, type: 'confirmation' },
+        category: AuditCategory.EMAIL,
+        level: AuditLevel.INFO,
         source: 'system',
       }).catch(() => {});
     }

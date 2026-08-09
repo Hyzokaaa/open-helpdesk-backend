@@ -35,7 +35,7 @@ export class TicketFilterDto extends PaginationDto {
 
   @IsString()
   @IsOptional()
-  creatorId?: string;
+  reporterId?: string;
 
   @IsString()
   @IsOptional()

@@ -3,8 +3,8 @@ export interface TicketCreatedEvent {
   ticketName: string;
   priority: string;
   category: string;
-  creatorId: string;
-  creatorName: string;
+  reporterId: string;
+  reporterName: string;
   workspaceId: string;
   workspaceName: string;
   workspaceSlug: string;
@@ -26,6 +26,7 @@ export interface TicketAssignedEvent {
 export interface NewCommentEvent {
   ticketId: string;
   ticketName: string;
+  ticketNumber?: number;
   commentId: string;
   authorId: string;
   authorName: string;

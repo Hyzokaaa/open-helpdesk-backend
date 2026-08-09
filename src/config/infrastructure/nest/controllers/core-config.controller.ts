@@ -14,10 +14,12 @@ export class CoreConfigController {
   @Get('public')
   async getPublicConfig() {
     const dbSettings = await this.systemEmailRepo.find();
+    const emailFrom = dbSettings?.smtpFrom || process.env.EMAIL_FROM || null;
     return {
       saasMode: false,
       aiEnabled: !!process.env.AI_API_KEY,
       emailConfigured: !!dbSettings || !!(process.env.SMTP_HOST || process.env.EMAIL_API_KEY),
+      systemEmailFrom: emailFrom,
     };
   }
 }

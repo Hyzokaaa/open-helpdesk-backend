@@ -4,7 +4,7 @@ import { emailLayout, buttonHtml } from './base.template';
 interface Data {
   ticketName: string;
   ticketUrl: string;
-  creatorName: string;
+  reporterName: string;
   priority: string;
   category: string;
   workspaceName: string;
@@ -19,7 +19,7 @@ export class TicketCreatedTemplate {
   html(data: Data): string {
     const content = `
       <h2 style="color: #1f2937; margin-top: 0;">${t('ticketCreated.title', data.lang)}</h2>
-      <p style="color: #4b5563;">${t('ticketCreated.body', data.lang, { creatorName: `<strong>${data.creatorName}</strong>`, workspaceName: `<strong>${data.workspaceName}</strong>` })}</p>
+      <p style="color: #4b5563;">${t('ticketCreated.body', data.lang, { reporterName: `<strong>${data.reporterName}</strong>`, workspaceName: `<strong>${data.workspaceName}</strong>` })}</p>
       <table style="width: 100%; margin: 20px 0;">
         <tr><td style="color: #6b7280; padding: 4px 0;">${t('ticketCreated.fieldTitle', data.lang)}</td><td style="color: #1f2937; font-weight: bold;">${data.ticketName}</td></tr>
         <tr><td style="color: #6b7280; padding: 4px 0;">${t('ticketCreated.fieldPriority', data.lang)}</td><td style="color: #1f2937;">${t(`priority.${data.priority}`, data.lang)}</td></tr>

@@ -13,7 +13,7 @@ import { MockTicketRepository } from '../../../mocks/mock-ticket.repository';
 import { MockTicketParticipantRepository } from '../../../mocks/mock-ticket-participant.repository';
 import { MockWorkspaceMemberRepository } from '../../../mocks/mock-workspace-member.repository';
 
-function makeTicket(overrides: Partial<{ id: string; workspaceId: string; creatorId: string; assigneeId: string | null; status: string }> = {}) {
+function makeTicket(overrides: Partial<{ id: string; workspaceId: string; reporterId: string; assigneeId: string | null; status: string }> = {}) {
   return new Ticket({
     id: overrides.id ?? 'ticket-1',
     name: 'Test',
@@ -22,7 +22,7 @@ function makeTicket(overrides: Partial<{ id: string; workspaceId: string; creato
     status: (overrides.status as TicketStatus) ?? TicketStatus.PENDING,
     category: TicketCategory.ISSUE,
     workspaceId: overrides.workspaceId ?? 'ws-1',
-    creatorId: overrides.creatorId ?? 'creator-1',
+    reporterId: overrides.reporterId ?? 'creator-1',
     assigneeId: overrides.assigneeId ?? null,
     ticketNumber: 1,
     tagIds: [],
@@ -100,7 +100,7 @@ describe('EnsureTicketAccess', () => {
 
   it('should return full for reporter who created the ticket', async () => {
     memberRepo.seed(makeMember('reporter-1', WorkspaceRole.REPORTER));
-    await ticketRepo.create(makeTicket({ creatorId: 'reporter-1' }));
+    await ticketRepo.create(makeTicket({ reporterId: 'reporter-1' }));
 
     const result = await service.execute({
       ticketId: 'ticket-1', userId: 'reporter-1', workspaceId: 'ws-1', isSystemAdmin: false,

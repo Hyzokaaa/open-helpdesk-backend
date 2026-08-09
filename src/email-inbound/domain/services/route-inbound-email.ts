@@ -12,6 +12,7 @@ import { CreateTicket } from '../../../ticket/domain/services/ticket-create';
 import { CreateComment } from '../../../comment/domain/services/comment-create';
 import { CreateAttachment } from '../../../attachment/domain/services/attachment-create';
 import { TicketPriority } from '../../../ticket/domain/enums/ticket-priority.enum';
+import { TicketSource } from '../../../ticket/domain/enums/ticket-source.enum';
 import { TicketCategory } from '../../../ticket/domain/enums/ticket-category.enum';
 import { WorkspaceRole } from '../../../workspace/domain/enums/workspace-role.enum';
 import { TicketCreatedEvent, NewCommentEvent } from '../../../email/domain/events';
@@ -92,16 +93,16 @@ export class RouteInboundEmail {
     // 2. Find or create user
     let user = await this.userRepository.findByEmail(parsed.fromAddress);
     if (!user) {
-      const localPart = parsed.fromAddress.split('@')[0];
+      const { firstName, lastName } = this.extractNameFromEmail(parsed.fromName, parsed.fromAddress);
       user = await this.createUser.execute({
         email: parsed.fromAddress,
         password: randomBytes(32).toString('hex'),
-        firstName: localPart,
-        lastName: '',
+        firstName,
+        lastName,
         isEmailVerified: true,
         autoCreated: true,
       });
-      this.logger.log(`Auto-created reporter: ${parsed.fromAddress}`);
+      this.logger.log(`Auto-created reporter: ${parsed.fromAddress} (${firstName} ${lastName})`);
     }
 
     // 3. Ensure workspace membership
@@ -164,8 +165,9 @@ export class RouteInboundEmail {
       priority: TicketPriority.MEDIUM,
       category: TicketCategory.ISSUE,
       workspaceId: workspaceId,
-      creatorId: user.getId(),
+      reporterId: user.getId(),
       tagIds: [],
+      source: TicketSource.EMAIL,
       portalToken: randomUUID(),
       mailboxId: mailbox.getId(),
     });
@@ -175,8 +177,8 @@ export class RouteInboundEmail {
       ticketName: ticket.name,
       priority: ticket.priority,
       category: ticket.category,
-      creatorId: user.getId(),
-      creatorName: `${user.firstName} ${user.lastName}`.trim(),
+      reporterId: user.getId(),
+      reporterName: `${user.firstName} ${user.lastName}`.trim(),
       workspaceId: workspace.getId(),
       workspaceName: workspace.name,
       workspaceSlug: workspace.slug,
@@ -189,6 +191,19 @@ export class RouteInboundEmail {
     await this.uploadAttachments(parsed, ticket.getId(), null, user.getId());
 
     return { action: 'ticket-created', ticketId: ticket.getId() };
+  }
+
+  private extractNameFromEmail(
+    displayName: string | undefined,
+    email: string,
+  ): { firstName: string; lastName: string } {
+    if (displayName?.trim()) {
+      const parts = displayName.trim().split(/\s+/);
+      const firstName = parts[0];
+      const lastName = parts.slice(1).join(' ');
+      return { firstName, lastName };
+    }
+    return { firstName: email.split('@')[0], lastName: '' };
   }
 
   private async uploadAttachments(

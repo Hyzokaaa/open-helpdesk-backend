@@ -12,10 +12,13 @@ export interface PreferencesResponse {
   emailTicketAssigned: boolean;
   emailStatusChanged: boolean;
   emailCommentCreated: boolean;
+  emailCsatSurvey: boolean;
+  emailTransferRequest: boolean;
   inAppTicketCreated: boolean;
   inAppTicketAssigned: boolean;
   inAppStatusChanged: boolean;
   inAppCommentCreated: boolean;
+  inAppTransferRequest: boolean;
   bellUnreadOnly: boolean;
 }
 
@@ -26,10 +29,13 @@ const DEFAULTS: PreferencesResponse = {
   emailTicketAssigned: true,
   emailStatusChanged: true,
   emailCommentCreated: true,
+  emailCsatSurvey: true,
+  emailTransferRequest: true,
   inAppTicketCreated: true,
   inAppTicketAssigned: true,
   inAppStatusChanged: true,
   inAppCommentCreated: true,
+  inAppTransferRequest: true,
   bellUnreadOnly: false,
 };
 
@@ -47,10 +53,13 @@ export class GetPreferencesQuery implements Query<Props, PreferencesResponse> {
       emailTicketAssigned: pref.emailTicketAssigned,
       emailStatusChanged: pref.emailStatusChanged,
       emailCommentCreated: pref.emailCommentCreated,
+      emailCsatSurvey: pref.emailCsatSurvey,
+      emailTransferRequest: pref.emailTransferRequest,
       inAppTicketCreated: pref.inAppTicketCreated,
       inAppTicketAssigned: pref.inAppTicketAssigned,
       inAppStatusChanged: pref.inAppStatusChanged,
       inAppCommentCreated: pref.inAppCommentCreated,
+      inAppTransferRequest: pref.inAppTransferRequest,
       bellUnreadOnly: pref.bellUnreadOnly,
     };
   }

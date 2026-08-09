@@ -39,7 +39,7 @@ export class EnsureTicketAccess {
     const isAgent = ctx.role === WorkspaceRole.AGENT;
     const hasDirectAccess = isAgent
       ? (ticket.assigneeId === props.userId || ticket.status === 'open')
-      : ticket.creatorId === props.userId;
+      : ticket.reporterId === props.userId;
 
     if (hasDirectAccess) return 'full';
 

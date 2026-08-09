@@ -177,6 +177,7 @@ export class WorkspaceController {
   @Get(':slug/members')
   async listMembers(
     @Param('slug') slug: string,
+    @Query('autoCreated') autoCreated: string | undefined,
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
@@ -188,7 +189,10 @@ export class WorkspaceController {
       isSystemAdmin: user.isSystemAdmin,
     });
     const query = new ListWorkspaceMembersQuery(this.memberRepository, this.userRepository);
-    return query.execute({ workspaceId });
+    return query.execute({
+      workspaceId,
+      autoCreated: autoCreated === 'true' ? true : autoCreated === 'false' ? false : undefined,
+    });
   }
 
   @Patch(':slug/members/:userId/role')
@@ -203,7 +207,7 @@ export class WorkspaceController {
     const service = new ChangeWorkspaceMemberRole(this.memberRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     const command = new ChangeMemberRoleCommand(service, auditLog);
-    return command.execute({
+    const result = await command.execute({
       workspaceId,
       targetUserId: userId,
       newRole: body.role as any,
@@ -211,6 +215,13 @@ export class WorkspaceController {
       isSystemAdmin: user.isSystemAdmin,
       targetLabel: targetUser ? `${targetUser.firstName} ${targetUser.lastName} (${targetUser.email})` : userId,
     });
+
+    if (targetUser?.autoCreated && body.role !== 'reporter') {
+      targetUser.autoCreated = false;
+      await this.userRepository.update(targetUser);
+    }
+
+    return result;
   }
 
   @Delete(':slug/members/:userId')
@@ -492,13 +503,14 @@ export class WorkspaceController {
       smtpUser: sender.smtpUser,
       hasPassword: true,
       smtpFrom: sender.smtpFrom,
+      encryption: sender.encryption,
     };
   }
 
   @Post(':slug/email-sender')
   async createEmailSender(
     @Param('slug') slug: string,
-    @Body() body: { smtpHost: string; smtpPort: number; smtpUser: string; smtpPass: string; smtpFrom: string },
+    @Body() body: { smtpHost: string; smtpPort: number; smtpUser: string; smtpPass: string; smtpFrom: string; encryption?: string },
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
@@ -517,6 +529,7 @@ export class WorkspaceController {
       existing.smtpUser = body.smtpUser;
       if (body.smtpPass) existing.smtpPass = body.smtpPass;
       existing.smtpFrom = body.smtpFrom;
+      if (body.encryption) existing.encryption = body.encryption;
       await this.emailSenderRepository.update(existing);
       resultId = existing.getId();
     } else {
@@ -528,6 +541,7 @@ export class WorkspaceController {
         smtpUser: body.smtpUser,
         smtpPass: body.smtpPass,
         smtpFrom: body.smtpFrom,
+        encryption: body.encryption,
       });
       await this.emailSenderRepository.create(sender);
       resultId = sender.getId();
@@ -581,7 +595,7 @@ export class WorkspaceController {
   @Post(':slug/email-sender/test')
   async testEmailSender(
     @Param('slug') slug: string,
-    @Body() body: { smtpHost: string; smtpPort: number; smtpUser: string; smtpPass: string },
+    @Body() body: { smtpHost: string; smtpPort: number; smtpUser: string; smtpPass: string; encryption?: string },
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
@@ -595,12 +609,16 @@ export class WorkspaceController {
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
 
     try {
+      const encryption = body.encryption ?? 'tls';
+      const tls = encryption === 'tls-insecure' ? { rejectUnauthorized: false } :
+                  encryption === 'none' ? { rejectUnauthorized: false } : { rejectUnauthorized: true };
       const transporter = nodemailer.createTransport({
         host: body.smtpHost,
         port: body.smtpPort,
         secure: body.smtpPort === 465,
         auth: { user: body.smtpUser, pass: body.smtpPass },
-        tls: { rejectUnauthorized: true },
+        tls,
+        ...((encryption === 'none') && { ignoreTLS: true }),
         connectionTimeout: 10000,
         greetingTimeout: 10000,
       } as any);

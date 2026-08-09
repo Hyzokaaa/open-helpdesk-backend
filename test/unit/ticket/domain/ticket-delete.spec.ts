@@ -19,7 +19,7 @@ describe('DeleteTicket', () => {
     await repository.create(new Ticket({
       id: 'ticket-1', name: 'T', description: '', priority: TicketPriority.LOW,
       status: TicketStatus.PENDING, category: TicketCategory.BUG, workspaceId: 'ws-1',
-      creatorId: 'u-1', assigneeId: null, resolvedAt: null, resolvedById: null, createdAt: new Date(), deletedAt: null, tagIds: [],
+      reporterId: 'u-1', assigneeId: null, resolvedAt: null, resolvedById: null, createdAt: new Date(), deletedAt: null, tagIds: [],
       customFields: {}, discardReason: null,
     }));
 

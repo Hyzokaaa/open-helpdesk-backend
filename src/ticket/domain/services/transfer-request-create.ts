@@ -24,7 +24,7 @@ export class CreateTransferRequest {
     const ticket = await this.ticketRepository.findById(props.ticketId);
     if (!ticket) throw new EntityNotFoundError('Ticket not found');
 
-    if (ticket.assigneeId !== props.requesterId && ticket.creatorId !== props.requesterId) {
+    if (ticket.assigneeId !== props.requesterId && ticket.reporterId !== props.requesterId) {
       throw new DomainValidationError('You can only transfer tickets assigned to you or created by you');
     }
 

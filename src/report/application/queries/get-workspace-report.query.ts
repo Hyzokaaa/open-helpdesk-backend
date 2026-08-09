@@ -106,7 +106,7 @@ export class GetWorkspaceReportQuery {
        INNER JOIN LATERAL (
          SELECT MIN(c."createdAt") as first_response
          FROM comments c
-         WHERE c."ticketId" = t.id AND c."authorId" != t."creatorId"
+         WHERE c."ticketId" = t.id AND c."authorId" != t."reporterId"
        ) fr ON fr.first_response IS NOT NULL
        WHERE t."workspaceId" = $1 AND t."createdAt" >= $2 AND t."createdAt" < $3 AND t."deletedAt" IS NULL`,
       [props.workspaceId, props.dateFrom, props.dateTo],

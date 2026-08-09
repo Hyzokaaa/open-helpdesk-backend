@@ -23,8 +23,8 @@ const translations: Translations = {
     es: 'Nuevo ticket',
   },
   'ticketCreated.body': {
-    en: '{creatorName} created a new ticket in {workspaceName}.',
-    es: '{creatorName} creó un nuevo ticket en {workspaceName}.',
+    en: '{reporterName} created a new ticket in {workspaceName}.',
+    es: '{reporterName} creó un nuevo ticket en {workspaceName}.',
   },
   'ticketCreated.fieldTitle': {
     en: 'Title',
@@ -66,17 +66,9 @@ const translations: Translations = {
   },
 
   // New comment
-  'newComment.title': {
-    en: 'New Comment',
-    es: 'Nuevo Comentario',
-  },
-  'newComment.subject': {
-    en: 'New comment on',
-    es: 'Nuevo comentario en',
-  },
-  'newComment.body': {
-    en: '{authorName} commented on {ticketName}:',
-    es: '{authorName} comentó en {ticketName}:',
+  'newComment.footer': {
+    en: 'Reply to this email to respond · {ticketNumber} · {workspaceName}',
+    es: 'Responde a este email para comentar · {ticketNumber} · {workspaceName}',
   },
 
   // Status changed

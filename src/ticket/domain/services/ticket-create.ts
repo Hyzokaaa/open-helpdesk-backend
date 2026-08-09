@@ -3,6 +3,7 @@ import { Ticket } from '../entities/ticket';
 import { TicketCategory } from '../enums/ticket-category.enum';
 import { TicketPriority } from '../enums/ticket-priority.enum';
 import { TicketStatus } from '../enums/ticket-status.enum';
+import { TicketSource } from '../enums/ticket-source.enum';
 import { TicketRepository } from '../repositories/ticket.repository';
 
 interface CreateTicketProps {
@@ -11,9 +12,11 @@ interface CreateTicketProps {
   priority: TicketPriority;
   category: TicketCategory;
   workspaceId: string;
-  creatorId: string;
+  reporterId: string;
   tagIds: string[];
   customFields?: Record<string, unknown>;
+  source?: TicketSource;
+  registeredById?: string | null;
   portalToken?: string | null;
   mailboxId?: string | null;
 }
@@ -33,7 +36,7 @@ export class CreateTicket {
       status: TicketStatus.OPEN,
       category: props.category,
       workspaceId: props.workspaceId,
-      creatorId: props.creatorId,
+      reporterId: props.reporterId,
       assigneeId: null,
       firstResponseAt: null,
       resolvedAt: null,
@@ -43,6 +46,8 @@ export class CreateTicket {
       tagIds: props.tagIds,
       customFields: props.customFields ?? {},
       discardReason: null,
+      source: props.source,
+      registeredById: props.registeredById ?? null,
       portalToken: props.portalToken ?? null,
       mailboxId: props.mailboxId ?? null,
     });

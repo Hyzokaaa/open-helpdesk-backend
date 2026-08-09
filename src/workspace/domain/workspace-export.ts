@@ -19,7 +19,7 @@ export interface WorkspaceExportTicket {
   priority: string;
   status: string;
   category: string;
-  creatorEmail: string;
+  reporterEmail: string;
   assigneeEmail: string | null;
   ticketNumber: number;
   customFields: Record<string, unknown>;

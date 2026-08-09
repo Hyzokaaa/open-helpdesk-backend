@@ -34,7 +34,7 @@ export class ExportWorkspace {
       // Also map users referenced in tickets but not members (e.g. deleted members)
       const ticketUserIds = await qr.query(`
         SELECT DISTINCT x.uid FROM (
-          SELECT "creatorId" as uid FROM tickets WHERE "workspaceId" = $1
+          SELECT "reporterId" as uid FROM tickets WHERE "workspaceId" = $1
           UNION SELECT "assigneeId" FROM tickets WHERE "workspaceId" = $1 AND "assigneeId" IS NOT NULL
           UNION SELECT "resolvedById" FROM tickets WHERE "workspaceId" = $1 AND "resolvedById" IS NOT NULL
         ) x WHERE x.uid NOT IN (SELECT "userId" FROM workspace_members WHERE "workspaceId" = $1)
@@ -55,7 +55,7 @@ export class ExportWorkspace {
 
       const tickets = await qr.query(`
         SELECT t.id, t.name, t.description, t.priority, t.status, t.category,
-          t."creatorId", t."assigneeId", t."ticketNumber", t."customFields",
+          t."reporterId", t."assigneeId", t."ticketNumber", t."customFields",
           t."discardReason", t."portalToken", t."firstResponseAt", t."resolvedAt",
           t."resolvedById", t."firstResponseBreached", t."resolutionBreached",
           t."createdAt", t."updatedAt",
@@ -131,7 +131,7 @@ export class ExportWorkspace {
           priority: t.priority,
           status: t.status,
           category: t.category,
-          creatorEmail: emailFor(t.creatorId)!,
+          reporterEmail: emailFor(t.reporterId)!,
           assigneeEmail: emailFor(t.assigneeId),
           ticketNumber: t.ticketNumber,
           customFields: t.customFields ?? {},

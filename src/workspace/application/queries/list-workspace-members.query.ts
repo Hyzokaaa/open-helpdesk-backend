@@ -4,6 +4,7 @@ import { WorkspaceMemberRepository } from '../../domain/repositories/workspace-m
 
 interface Props {
   workspaceId: string;
+  autoCreated?: boolean;
 }
 
 export interface MemberListItem {
@@ -13,6 +14,7 @@ export interface MemberListItem {
   firstName: string;
   lastName: string;
   role: string;
+  autoCreated: boolean;
 }
 
 export class ListWorkspaceMembersQuery implements Query<Props, MemberListItem[]> {
@@ -28,7 +30,7 @@ export class ListWorkspaceMembersQuery implements Query<Props, MemberListItem[]>
 
     const userMap = new Map(users.map((u) => [u.getId(), u]));
 
-    return members.map((member) => {
+    const result = members.map((member) => {
       const user = userMap.get(member.userId);
       return {
         id: member.getId(),
@@ -37,7 +39,14 @@ export class ListWorkspaceMembersQuery implements Query<Props, MemberListItem[]>
         firstName: user?.firstName ?? '',
         lastName: user?.lastName ?? '',
         role: member.role,
+        autoCreated: user?.autoCreated ?? false,
       };
     });
+
+    if (props.autoCreated !== undefined) {
+      return result.filter((m) => m.autoCreated === props.autoCreated);
+    }
+
+    return result;
   }
 }

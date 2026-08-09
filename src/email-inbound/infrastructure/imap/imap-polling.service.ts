@@ -350,10 +350,12 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
 
   private mapEnvelope(envelope: any): ImapEnvelope {
     const from = envelope.from?.[0]?.address ?? '';
+    const fromName = envelope.from?.[0]?.name ?? undefined;
     const to = (envelope.to ?? []).map((a: any) => a.address ?? '');
     const cc = (envelope.cc ?? []).map((a: any) => a.address ?? '');
     return {
       from,
+      fromName,
       to,
       cc,
       subject: envelope.subject ?? '',

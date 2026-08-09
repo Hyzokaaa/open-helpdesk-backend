@@ -28,7 +28,7 @@ describe('UpdateTicketCommand', () => {
       status: TicketStatus.PENDING,
       category: TicketCategory.BUG,
       workspaceId: 'ws-1',
-      creatorId: 'creator-1',
+      reporterId: 'creator-1',
       assigneeId: null,
       resolvedAt: null,
       createdAt: new Date(),

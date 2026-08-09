@@ -27,9 +27,10 @@ describe('UpdateNotificationPreference', () => {
       emailEnabled: true, inAppEnabled: true,
       emailTicketCreated: true, emailTicketAssigned: true,
       emailStatusChanged: true, emailCommentCreated: true,
+      emailCsatSurvey: true, emailTransferRequest: true,
       inAppTicketCreated: true, inAppTicketAssigned: true,
       inAppStatusChanged: true, inAppCommentCreated: true,
-      bellUnreadOnly: false,
+      inAppTransferRequest: true, bellUnreadOnly: false,
     }));
 
     const pref = await service.execute({ userId: 'user-1', bellUnreadOnly: true, inAppEnabled: false });

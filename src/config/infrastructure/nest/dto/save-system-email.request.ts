@@ -16,4 +16,8 @@ export class SaveSystemEmailRequest {
 
   @IsEmail()
   smtpFrom!: string;
+
+  @IsString()
+  @IsOptional()
+  encryption?: string;
 }

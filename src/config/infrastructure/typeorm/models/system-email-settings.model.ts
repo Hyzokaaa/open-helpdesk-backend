@@ -26,6 +26,9 @@ export class SystemEmailSettingsModel {
   @Column()
   smtpFrom!: string;
 
+  @Column({ default: 'tls' })
+  encryption!: string;
+
   @CreateDateColumn()
   createdAt!: Date;
 

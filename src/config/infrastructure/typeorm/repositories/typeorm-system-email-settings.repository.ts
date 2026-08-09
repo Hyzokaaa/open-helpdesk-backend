@@ -22,6 +22,7 @@ export class TypeOrmSystemEmailSettingsRepository implements SystemEmailSettings
       smtpUser: model.smtpUser,
       smtpPass: model.smtpPass,
       smtpFrom: model.smtpFrom,
+      encryption: model.encryption,
     });
   }
 
@@ -33,6 +34,7 @@ export class TypeOrmSystemEmailSettingsRepository implements SystemEmailSettings
       smtpUser: settings.smtpUser,
       smtpPass: settings.smtpPass,
       smtpFrom: settings.smtpFrom,
+      encryption: settings.encryption,
     });
   }
 

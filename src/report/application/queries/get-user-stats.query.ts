@@ -215,20 +215,20 @@ export class GetUserStatsQuery {
   private async getReporterOverview(props: Props): Promise<UserStatsResult['overview']> {
     const [ticketsCreated] = await this.dataSource.query(
       `SELECT COUNT(*) as count FROM tickets
-       WHERE "workspaceId" = $1 AND "creatorId" = $2 AND "deletedAt" IS NULL`,
+       WHERE "workspaceId" = $1 AND "reporterId" = $2 AND "deletedAt" IS NULL`,
       [props.workspaceId, props.targetUserId],
     );
 
     const [ticketsResolved] = await this.dataSource.query(
       `SELECT COUNT(*) as count FROM tickets
-       WHERE "workspaceId" = $1 AND "creatorId" = $2 AND status = 'resolved'
+       WHERE "workspaceId" = $1 AND "reporterId" = $2 AND status = 'resolved'
          AND "deletedAt" IS NULL`,
       [props.workspaceId, props.targetUserId],
     );
 
     const [ticketsPending] = await this.dataSource.query(
       `SELECT COUNT(*) as count FROM tickets
-       WHERE "workspaceId" = $1 AND "creatorId" = $2
+       WHERE "workspaceId" = $1 AND "reporterId" = $2
          AND status IN ('open', 'pending', 'in-progress') AND "deletedAt" IS NULL`,
       [props.workspaceId, props.targetUserId],
     );
@@ -236,7 +236,7 @@ export class GetUserStatsQuery {
     const [avgResolution] = await this.dataSource.query(
       `SELECT AVG(EXTRACT(EPOCH FROM ("resolvedAt" - "createdAt")) / 3600) as avg_hours
        FROM tickets
-       WHERE "workspaceId" = $1 AND "creatorId" = $2
+       WHERE "workspaceId" = $1 AND "reporterId" = $2
          AND "resolvedAt" IS NOT NULL AND "deletedAt" IS NULL`,
       [props.workspaceId, props.targetUserId],
     );
@@ -247,7 +247,7 @@ export class GetUserStatsQuery {
         COUNT(*) as total
        FROM csat_responses cr
        INNER JOIN tickets t ON t.id = cr."ticketId"
-       WHERE cr."workspaceId" = $1 AND t."creatorId" = $2
+       WHERE cr."workspaceId" = $1 AND t."reporterId" = $2
          AND cr.rating IS NOT NULL AND t."deletedAt" IS NULL`,
       [props.workspaceId, props.targetUserId],
     );
@@ -272,7 +272,7 @@ export class GetUserStatsQuery {
     const rows = await this.dataSource.query(
       `SELECT status, COUNT(*) as count
        FROM tickets
-       WHERE "workspaceId" = $1 AND "creatorId" = $2 AND "deletedAt" IS NULL
+       WHERE "workspaceId" = $1 AND "reporterId" = $2 AND "deletedAt" IS NULL
        GROUP BY status ORDER BY count DESC`,
       [props.workspaceId, props.targetUserId],
     );
@@ -284,7 +284,7 @@ export class GetUserStatsQuery {
     const rows = await this.dataSource.query(
       `SELECT DATE("createdAt") as date, COUNT(*) as count
        FROM tickets
-       WHERE "workspaceId" = $1 AND "creatorId" = $2
+       WHERE "workspaceId" = $1 AND "reporterId" = $2
          AND "createdAt" >= $3 AND "createdAt" < $4
          AND "deletedAt" IS NULL
        GROUP BY DATE("createdAt") ORDER BY date`,

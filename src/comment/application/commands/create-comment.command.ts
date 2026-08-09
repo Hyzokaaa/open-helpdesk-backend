@@ -53,7 +53,7 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
     const workspace = await this.workspaceRepository.findBySlug(props.workspaceSlug);
     const author = await this.userRepository.findById(props.authorId);
 
-    if (ticket && ticket.firstResponseAt === null && props.authorId !== ticket.creatorId) {
+    if (ticket && ticket.firstResponseAt === null && props.authorId !== ticket.reporterId) {
       ticket.firstResponseAt = new Date();
       await this.ticketRepository.update(ticket);
     }
@@ -63,6 +63,7 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
       const event: NewCommentEvent = {
         ticketId: props.ticketId,
         ticketName: ticket.name,
+        ticketNumber: ticket.ticketNumber,
         commentId: comment.getId(),
         authorId: props.authorId,
         authorName: `${author.firstName} ${author.lastName}`,

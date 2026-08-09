@@ -3,6 +3,7 @@ import { emailLayout, buttonHtml } from './base.template';
 
 interface Data {
   ticketName: string;
+  ticketNumber?: number;
   ticketUrl: string;
   authorName: string;
   commentPreview: string;
@@ -12,17 +13,20 @@ interface Data {
 
 export class NewCommentTemplate {
   subject(data: Data): string {
-    return `[${data.workspaceName}] ${t('newComment.subject', data.lang)}: ${data.ticketName}`;
+    const ref = data.ticketNumber ? ` — #${data.ticketNumber}` : '';
+    return `[${data.workspaceName}] Re: ${data.ticketName}${ref}`;
   }
 
   html(data: Data): string {
     const content = `
-      <h2 style="color: #1f2937; margin-top: 0;">${t('newComment.title', data.lang)}</h2>
-      <p style="color: #4b5563;">${t('newComment.body', data.lang, { authorName: `<strong>${data.authorName}</strong>`, ticketName: `<strong>${data.ticketName}</strong>` })}</p>
-      <div style="background-color: white; border-left: 3px solid #059669; padding: 12px 16px; margin: 20px 0; color: #4b5563;">
-        ${data.commentPreview}
+      <p style="color: #4b5563;"><strong>${data.authorName}:</strong></p>
+      <div style="background-color: white; border-left: 3px solid #059669; padding: 12px 16px; margin: 20px 0; color: #4b5563; white-space: pre-line;">
+        ${data.commentPreview.replace(/\n/g, '<br>')}
       </div>
-      ${buttonHtml(data.lang, data.ticketUrl)}`;
+      ${buttonHtml(data.lang, data.ticketUrl)}
+      <p style="color: #9ca3af; font-size: 12px; margin-top: 24px;">
+        ${t('newComment.footer', data.lang, { ticketNumber: data.ticketNumber ? `#${data.ticketNumber}` : '', workspaceName: data.workspaceName })}
+      </p>`;
     return emailLayout(data.lang, content);
   }
 }

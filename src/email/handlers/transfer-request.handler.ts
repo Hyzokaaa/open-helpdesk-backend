@@ -13,6 +13,11 @@ import { TypeOrmMailboxRepository } from '../../mailbox/infrastructure/typeorm/r
 import { TypeOrmWorkspaceEmailSenderRepository } from '../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-email-sender.repository';
 import { TypeOrmTicketRepository } from '../../ticket/infrastructure/typeorm/repositories/typeorm-ticket.repository';
 import { sendWorkspaceEmail } from '../domain/resolve-email-sender';
+import { TypeOrmAuditLogRepository } from '../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
+import { CreateAuditLogEntry } from '../../audit-log/domain/services/audit-log-create';
+import { AuditAction } from '../../audit-log/domain/enums/audit-action.enum';
+import { AuditCategory } from '../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../audit-log/domain/enums/audit-level.enum';
 import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
 
@@ -30,6 +35,7 @@ export class TransferRequestHandler {
     private readonly mailboxRepository: TypeOrmMailboxRepository,
     private readonly ticketRepository: TypeOrmTicketRepository,
     private readonly emailSenderRepository: TypeOrmWorkspaceEmailSenderRepository,
+    private readonly auditLogRepository: TypeOrmAuditLogRepository,
     private readonly config: ConfigService,
   ) {
     this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173').split(',')[0].trim();
@@ -47,8 +53,8 @@ export class TransferRequestHandler {
       title: `${event.requesterName}: ${event.ticketName}`,
       ticketId: event.ticketId,
       workspaceSlug: event.workspaceSlug,
-      inAppPrefKey: 'inAppTicketAssigned',
-      emailPrefKey: 'emailTicketAssigned',
+      inAppPrefKey: 'inAppTransferRequest',
+      emailPrefKey: 'emailTransferRequest',
     });
 
     if (emailRecipients.size === 0) return;
@@ -63,7 +69,7 @@ export class TransferRequestHandler {
     const sender = await this.emailSenderRepository.findByWorkspaceId(event.workspaceId);
 
     for (const [lang, emails] of emailRecipients) {
-      await sendWorkspaceEmail(this.emailService, sender, {
+      const result = await sendWorkspaceEmail(this.emailService, sender, {
         to: emails,
         subject: template.createdSubject({ ticketName: event.ticketName, ticketUrl, requesterName: event.requesterName, workspaceName: event.workspaceName, lang }),
         html: template.createdHtml({ ticketName: event.ticketName, ticketUrl, requesterName: event.requesterName, workspaceName: event.workspaceName, lang }),
@@ -74,6 +80,33 @@ export class TransferRequestHandler {
         }),
         ...(mailbox && { replyTo: mailbox.address }),
       });
+      if (!result.success) {
+        const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+        await auditLog.execute({
+          action: AuditAction.EMAIL_SEND_FAILED,
+          entityType: 'email',
+          entityId: event.ticketId,
+          userId: null,
+          workspaceId: event.workspaceId,
+          metadata: { reason: 'notification', to: emails, ticketId: event.ticketId },
+          category: AuditCategory.EMAIL,
+          level: AuditLevel.ERROR,
+          source: 'system',
+        }).catch(() => {});
+      } else {
+        const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+        await auditLog.execute({
+          action: AuditAction.EMAIL_SENT,
+          entityType: 'email',
+          entityId: event.ticketId,
+          userId: null,
+          workspaceId: event.workspaceId,
+          metadata: { to: emails, ticketId: event.ticketId, type: 'transfer-request' },
+          category: AuditCategory.EMAIL,
+          level: AuditLevel.INFO,
+          source: 'system',
+        }).catch(() => {});
+      }
     }
   }
 
@@ -91,8 +124,8 @@ export class TransferRequestHandler {
       title: `${event.ticketName}: transfer ${event.resolution}`,
       ticketId: event.ticketId,
       workspaceSlug: event.workspaceSlug,
-      inAppPrefKey: 'inAppTicketAssigned',
-      emailPrefKey: 'emailTicketAssigned',
+      inAppPrefKey: 'inAppTransferRequest',
+      emailPrefKey: 'emailTransferRequest',
     });
 
     if (emailRecipients.size === 0) return;
@@ -107,7 +140,7 @@ export class TransferRequestHandler {
     const sender = await this.emailSenderRepository.findByWorkspaceId(event.workspaceId);
 
     for (const [lang, emails] of emailRecipients) {
-      await sendWorkspaceEmail(this.emailService, sender, {
+      const result = await sendWorkspaceEmail(this.emailService, sender, {
         to: emails,
         subject: template.resolvedSubject({ ticketName: event.ticketName, ticketUrl, resolution: event.resolution, workspaceName: event.workspaceName, lang }),
         html: template.resolvedHtml({ ticketName: event.ticketName, ticketUrl, resolution: event.resolution, workspaceName: event.workspaceName, lang }),
@@ -117,6 +150,33 @@ export class TransferRequestHandler {
         }),
         ...(mailbox && { replyTo: mailbox.address }),
       });
+      if (!result.success) {
+        const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+        await auditLog.execute({
+          action: AuditAction.EMAIL_SEND_FAILED,
+          entityType: 'email',
+          entityId: event.ticketId,
+          userId: null,
+          workspaceId: event.workspaceId,
+          metadata: { reason: 'notification', to: emails, ticketId: event.ticketId },
+          category: AuditCategory.EMAIL,
+          level: AuditLevel.ERROR,
+          source: 'system',
+        }).catch(() => {});
+      } else {
+        const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+        await auditLog.execute({
+          action: AuditAction.EMAIL_SENT,
+          entityType: 'email',
+          entityId: event.ticketId,
+          userId: null,
+          workspaceId: event.workspaceId,
+          metadata: { to: emails, ticketId: event.ticketId, type: 'transfer-request' },
+          category: AuditCategory.EMAIL,
+          level: AuditLevel.INFO,
+          source: 'system',
+        }).catch(() => {});
+      }
     }
   }
 }
