@@ -6,6 +6,7 @@ import { Ticket } from '../../../domain/entities/ticket';
 import { TicketCategory } from '../../../domain/enums/ticket-category.enum';
 import { TicketPriority } from '../../../domain/enums/ticket-priority.enum';
 import { TicketDiscardReason } from '../../../domain/enums/ticket-discard-reason.enum';
+import { TicketSource } from '../../../domain/enums/ticket-source.enum';
 import { TicketStatus } from '../../../domain/enums/ticket-status.enum';
 import {
   TicketFilters,
@@ -200,6 +201,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
       firstResponseBreached: model.firstResponseBreached ?? false,
       resolutionBreached: model.resolutionBreached ?? false,
       aiCache: model.aiCache ?? {},
+      source: model.source as TicketSource,
       registeredById: model.registeredById ?? null,
       mailboxId: model.mailboxId ?? null,
     });
@@ -226,6 +228,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
     model.firstResponseBreached = ticket.firstResponseBreached;
     model.resolutionBreached = ticket.resolutionBreached;
     model.aiCache = ticket.aiCache;
+    model.source = ticket.source;
     model.registeredById = ticket.registeredById;
     model.mailboxId = ticket.mailboxId;
     return model;

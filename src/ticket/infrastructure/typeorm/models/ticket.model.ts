@@ -84,6 +84,9 @@ export class TicketModel {
   @ManyToOne(() => UserModel, { nullable: true })
   registeredBy!: UserModel | null;
 
+  @Column({ type: 'varchar', default: 'ui' })
+  source!: string;
+
   @Column({ type: 'varchar', nullable: true })
   registeredById!: string | null;
 

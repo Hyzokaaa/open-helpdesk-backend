@@ -18,6 +18,7 @@ import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator'
 import { NestEventPublisher } from '../../../../shared/infrastructure/nest-event-publisher';
 import { EntityNotFoundError } from '../../../../shared/domain/errors';
 import { CreateTicket } from '../../../../ticket/domain/services/ticket-create';
+import { TicketSource } from '../../../../ticket/domain/enums/ticket-source.enum';
 import { UpdateTicket } from '../../../../ticket/domain/services/ticket-update';
 import { ChangeTicketStatus } from '../../../../ticket/domain/services/ticket-change-status';
 import { AssignTicket } from '../../../../ticket/domain/services/ticket-assign';
@@ -151,6 +152,7 @@ export class ApiController {
       userEmail: user.email,
       tagIds: body.tagIds,
       customFields: body.customFields,
+      source: TicketSource.API,
       isSystemAdmin: user.isSystemAdmin,
     });
   }

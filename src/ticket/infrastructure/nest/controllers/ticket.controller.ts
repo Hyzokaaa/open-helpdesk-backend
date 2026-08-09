@@ -19,6 +19,7 @@ import { CreateUser } from '../../../../user/domain/services/user-create';
 import { AddWorkspaceMember } from '../../../../workspace/domain/services/workspace-add-member';
 import { WorkspaceRole } from '../../../../workspace/domain/enums/workspace-role.enum';
 import { BcryptPasswordHasher } from '../../../../shared/infrastructure/bcrypt-password-hasher';
+import { TicketSource } from '../../../domain/enums/ticket-source.enum';
 import { ClaimStagedAttachments } from '../../../../attachment/domain/services/attachment-claim-staged';
 import { TypeOrmAttachmentRepository } from '../../../../attachment/infrastructure/typeorm/repositories/typeorm-attachment.repository';
 import { CreateTicket } from '../../../domain/services/ticket-create';
@@ -119,6 +120,7 @@ export class TicketController {
       tagIds: body.tagIds,
       customFields: body.customFields,
       uploadTokens: body.uploadTokens,
+      source: TicketSource.UI,
       registeredById: body.onBehalfOf ? user.userId : null,
       isSystemAdmin: user.isSystemAdmin,
     });

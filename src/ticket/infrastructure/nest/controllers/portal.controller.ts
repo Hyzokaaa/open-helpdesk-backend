@@ -25,6 +25,7 @@ import { ClaimStagedAttachments } from '../../../../attachment/domain/services/a
 import { StageAttachment } from '../../../../attachment/domain/services/attachment-stage';
 import { StageUploadCommand, StageUploadResponse } from '../../.././../attachment/application/commands/stage-upload.command';
 import { TicketPriority } from '../../../domain/enums/ticket-priority.enum';
+import { TicketSource } from '../../../domain/enums/ticket-source.enum';
 import { TicketCategory } from '../../../domain/enums/ticket-category.enum';
 import { WorkspaceRole } from '../../../../workspace/domain/enums/workspace-role.enum';
 import { TicketCreatedEvent } from '../../../../email/domain/events';
@@ -146,6 +147,7 @@ export class PortalController {
       reporterId: user.getId(),
       tagIds: [],
       customFields: validatedCustomFields,
+      source: TicketSource.PORTAL,
       portalToken,
     });
 

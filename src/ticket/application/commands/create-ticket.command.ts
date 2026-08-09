@@ -13,6 +13,7 @@ import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.en
 import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 import { ValidateCustomFieldValues } from '../../../custom-field/domain/services/custom-field-validate-values';
 import { ClaimStagedAttachments } from '../../../attachment/domain/services/attachment-claim-staged';
+import { TicketSource } from '../../domain/enums/ticket-source.enum';
 
 interface Props {
   name: string;
@@ -27,6 +28,7 @@ interface Props {
   tagIds: string[];
   customFields?: Record<string, unknown>;
   uploadTokens?: string[];
+  source?: TicketSource;
   registeredById?: string | null;
   isSystemAdmin: boolean;
 }
@@ -71,6 +73,7 @@ export class CreateTicketCommand implements Command<Props, CreateTicketResponse>
       reporterId: props.userId,
       tagIds: props.tagIds,
       customFields: validatedCustomFields,
+      source: props.source,
       registeredById: props.registeredById,
     });
 

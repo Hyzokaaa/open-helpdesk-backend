@@ -12,6 +12,7 @@ import { CreateTicket } from '../../../ticket/domain/services/ticket-create';
 import { CreateComment } from '../../../comment/domain/services/comment-create';
 import { CreateAttachment } from '../../../attachment/domain/services/attachment-create';
 import { TicketPriority } from '../../../ticket/domain/enums/ticket-priority.enum';
+import { TicketSource } from '../../../ticket/domain/enums/ticket-source.enum';
 import { TicketCategory } from '../../../ticket/domain/enums/ticket-category.enum';
 import { WorkspaceRole } from '../../../workspace/domain/enums/workspace-role.enum';
 import { TicketCreatedEvent, NewCommentEvent } from '../../../email/domain/events';
@@ -166,6 +167,7 @@ export class RouteInboundEmail {
       workspaceId: workspaceId,
       reporterId: user.getId(),
       tagIds: [],
+      source: TicketSource.EMAIL,
       portalToken: randomUUID(),
       mailboxId: mailbox.getId(),
     });
