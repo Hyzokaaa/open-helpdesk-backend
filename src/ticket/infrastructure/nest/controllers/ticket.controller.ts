@@ -120,6 +120,7 @@ export class TicketController {
       tagIds: body.tagIds,
       customFields: body.customFields,
       uploadTokens: body.uploadTokens,
+      departmentId: body.departmentId,
       source: TicketSource.UI,
       registeredById: body.onBehalfOf ? user.userId : null,
       isSystemAdmin: user.isSystemAdmin,
@@ -144,6 +145,7 @@ export class TicketController {
         excludeStatus: filters.excludeStatus,
         priority: filters.priority,
         tagIds: filters.tagIds,
+        departmentId: filters.departmentId,
         assigneeId: filters.assigneeId,
         reporterId: filters.reporterId,
         sortBy: filters.sortBy,
@@ -234,6 +236,7 @@ export class TicketController {
       priority: body.priority,
       category: body.category,
       tagIds: body.tagIds,
+      departmentId: body.departmentId,
       customFields: body.customFields,
       isSystemAdmin: user.isSystemAdmin,
     });

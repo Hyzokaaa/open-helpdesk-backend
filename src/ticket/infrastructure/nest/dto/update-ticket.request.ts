@@ -30,6 +30,10 @@ export class UpdateTicketRequest {
   @IsOptional()
   tagIds?: string[];
 
+  @IsString()
+  @IsOptional()
+  departmentId?: string | null;
+
   @IsObject()
   @IsOptional()
   customFields?: Record<string, unknown>;

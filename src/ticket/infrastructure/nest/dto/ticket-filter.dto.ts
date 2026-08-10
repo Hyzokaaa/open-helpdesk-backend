@@ -31,6 +31,10 @@ export class TicketFilterDto extends PaginationDto {
 
   @IsString()
   @IsOptional()
+  departmentId?: string;
+
+  @IsString()
+  @IsOptional()
   assigneeId?: string;
 
   @IsString()

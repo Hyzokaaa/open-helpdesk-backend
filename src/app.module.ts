@@ -11,6 +11,7 @@ import { SharedModule } from "./shared/shared.module";
 import { UserModule } from "./user/user.module";
 import { WorkspaceModule } from "./workspace/workspace.module";
 import { TagModule } from "./tag/tag.module";
+import { DepartmentModule } from "./department/department.module";
 import { TicketModule } from "./ticket/ticket.module";
 import { CommentModule } from "./comment/comment.module";
 import { AttachmentModule } from "./attachment/attachment.module";
@@ -67,6 +68,7 @@ import { SystemMailboxController } from "./mailbox/infrastructure/nest/controlle
     UserModule,
     WorkspaceModule,
     TagModule,
+    DepartmentModule,
     TicketModule,
     CommentModule,
     AttachmentModule,

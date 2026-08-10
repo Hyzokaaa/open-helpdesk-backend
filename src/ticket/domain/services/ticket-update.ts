@@ -11,6 +11,7 @@ interface UpdateTicketProps {
   priority?: TicketPriority;
   category?: TicketCategory;
   tagIds?: string[];
+  departmentId?: string | null;
   customFields?: Record<string, unknown>;
 }
 
@@ -28,6 +29,7 @@ export class UpdateTicket {
     if (props.priority !== undefined) ticket.priority = props.priority;
     if (props.category !== undefined) ticket.category = props.category;
     if (props.tagIds !== undefined) ticket.tagIds = props.tagIds;
+    if (props.departmentId !== undefined) ticket.departmentId = props.departmentId;
     if (props.customFields !== undefined) ticket.customFields = { ...ticket.customFields, ...props.customFields };
 
     await this.repository.update(ticket);

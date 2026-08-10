@@ -97,6 +97,13 @@ export enum AuditAction {
   TAG_CREATED = 'tag-created',
   TAG_DELETED = 'tag-deleted',
 
+  // Departments
+  DEPARTMENT_CREATED = 'department-created',
+  DEPARTMENT_UPDATED = 'department-updated',
+  DEPARTMENT_DELETED = 'department-deleted',
+  DEPARTMENT_MEMBER_ADDED = 'department-member-added',
+  DEPARTMENT_MEMBER_REMOVED = 'department-member-removed',
+
   // Canned responses
   CANNED_RESPONSE_CREATED = 'canned-response-created',
   CANNED_RESPONSE_UPDATED = 'canned-response-updated',

@@ -9,6 +9,7 @@ export interface TicketFilters {
   excludeStatus?: string;
   priority?: TicketPriority;
   tagIds?: string[];
+  departmentId?: string;
   assigneeId?: string;
   reporterId?: string;
   agentUserId?: string;

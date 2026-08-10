@@ -15,6 +15,7 @@ interface CreateTicketProps {
   reporterId: string;
   tagIds: string[];
   customFields?: Record<string, unknown>;
+  departmentId?: string | null;
   source?: TicketSource;
   registeredById?: string | null;
   portalToken?: string | null;
@@ -46,6 +47,7 @@ export class CreateTicket {
       tagIds: props.tagIds,
       customFields: props.customFields ?? {},
       discardReason: null,
+      departmentId: props.departmentId ?? null,
       source: props.source,
       registeredById: props.registeredById ?? null,
       portalToken: props.portalToken ?? null,
