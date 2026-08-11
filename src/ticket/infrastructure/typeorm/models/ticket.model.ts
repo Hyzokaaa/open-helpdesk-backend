@@ -94,6 +94,9 @@ export class TicketModel {
   @Column({ type: 'varchar', nullable: true })
   mailboxId!: string | null;
 
+  @Column({ type: 'timestamptz', nullable: true })
+  originDate!: Date | null;
+
   @ManyToOne(() => DepartmentModel, { nullable: true })
   department!: DepartmentModel | null;
 

@@ -170,6 +170,7 @@ export class RouteInboundEmail {
       source: TicketSource.EMAIL,
       portalToken: randomUUID(),
       mailboxId: mailbox.getId(),
+      originDate: parsed.date ?? null,
     });
 
     const ticketEvent: TicketCreatedEvent = {

@@ -26,6 +26,7 @@ export interface TicketDetailResponse {
   resolvedAt: Date | null;
   ticketNumber: number;
   createdAt: Date | null;
+  originDate: Date | null;
   tagIds: string[];
   customFields: Record<string, unknown>;
   discardReason: string | null;
@@ -66,6 +67,7 @@ export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
       resolvedAt: ticket.resolvedAt,
       ticketNumber: ticket.ticketNumber,
       createdAt: ticket.createdAt,
+      originDate: ticket.originDate,
       tagIds: ticket.tagIds,
       customFields: ticket.customFields,
       discardReason: ticket.discardReason,

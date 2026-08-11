@@ -20,6 +20,7 @@ interface CreateTicketProps {
   registeredById?: string | null;
   portalToken?: string | null;
   mailboxId?: string | null;
+  originDate?: Date | null;
 }
 
 export class CreateTicket {
@@ -52,6 +53,7 @@ export class CreateTicket {
       registeredById: props.registeredById ?? null,
       portalToken: props.portalToken ?? null,
       mailboxId: props.mailboxId ?? null,
+      originDate: props.originDate ?? null,
     });
 
     await this.repository.create(ticket);
