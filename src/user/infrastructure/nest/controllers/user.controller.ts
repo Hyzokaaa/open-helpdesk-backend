@@ -1,6 +1,9 @@
 import {
   Body,
+  ConflictException,
   Controller,
+  ForbiddenException,
+  NotFoundException,
   Get,
   Inject,
   Param,
@@ -284,26 +287,41 @@ export class UserController {
     return result;
   }
 
-  @Patch(':id/name')
-  async updateUserName(
+  @Patch(':id/profile')
+  async updateUserProfile(
     @Param('id') id: string,
-    @Body() body: { firstName: string; lastName: string },
+    @Body() body: { firstName?: string; lastName?: string; email?: string },
     @CurrentUser() authUser: AuthUser,
   ) {
     if (!authUser.isSystemAdmin) {
-      throw new Error('Only system admins can edit user names');
+      throw new ForbiddenException('Only system admins can edit user profiles');
     }
 
     const existing = await this.userRepository.findById(id);
-    if (!existing) throw new Error('User not found');
+    if (!existing) throw new NotFoundException('User not found');
 
-    const service = new UpdateUserProfile(this.userRepository);
-    const command = new UpdateUserProfileCommand(service);
-    const result = await command.execute({
-      userId: id,
-      firstName: body.firstName,
-      lastName: body.lastName,
-    });
+    const before: Record<string, string> = {};
+    const after: Record<string, string> = {};
+
+    if (body.firstName !== undefined) {
+      before.firstName = existing.firstName;
+      existing.firstName = body.firstName;
+      after.firstName = body.firstName;
+    }
+    if (body.lastName !== undefined) {
+      before.lastName = existing.lastName;
+      existing.lastName = body.lastName;
+      after.lastName = body.lastName;
+    }
+    if (body.email !== undefined && body.email.toLowerCase() !== existing.email.toLowerCase()) {
+      const emailTaken = await this.userRepository.findByEmail(body.email);
+      if (emailTaken) throw new ConflictException('Email already in use');
+      before.email = existing.email;
+      existing.email = body.email.toLowerCase();
+      after.email = existing.email;
+    }
+
+    await this.userRepository.update(existing);
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({
@@ -312,16 +330,13 @@ export class UserController {
       entityId: id,
       userId: authUser.userId,
       workspaceId: null,
-      metadata: {
-        before: { firstName: existing.firstName, lastName: existing.lastName },
-        after: { firstName: body.firstName, lastName: body.lastName },
-      },
+      metadata: { before, after },
       category: AuditCategory.USER,
       level: AuditLevel.INFO,
       source: 'ui',
     });
 
-    return result;
+    return { firstName: existing.firstName, lastName: existing.lastName, email: existing.email };
   }
 
   @Patch(':id/system-admin')

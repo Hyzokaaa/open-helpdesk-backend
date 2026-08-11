@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -243,7 +244,7 @@ export class WorkspaceController {
 
     const targetUser = await this.userRepository.findById(userId);
     if (!targetUser) throw new EntityNotFoundError('User not found');
-    if (!targetUser.autoCreated) throw new Error('Only auto-created contacts can be edited');
+    if (!targetUser.autoCreated) throw new BadRequestException('Only auto-created contacts can be edited');
 
     const before = { firstName: targetUser.firstName, lastName: targetUser.lastName };
     targetUser.firstName = body.firstName.substring(0, 40);
