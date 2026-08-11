@@ -11,8 +11,9 @@ interface Props {
   requesterId: string;
   targetUserId: string;
   isSystemAdmin: boolean;
-  dateFrom: Date;
-  dateTo: Date;
+  dateFrom: Date | null;
+  dateTo: Date | null;
+  dateField?: 'received' | 'sent';
 }
 
 export interface UserStatsUser {
@@ -109,6 +110,14 @@ export class GetUserStatsQuery {
     };
   }
 
+  private dateClause(col: string, paramIdx: number, props: Props): { sql: string; params: any[] } {
+    if (!props.dateFrom || !props.dateTo) return { sql: '', params: [] };
+    return {
+      sql: ` AND ${col} >= $${paramIdx} AND ${col} < $${paramIdx + 1}`,
+      params: [props.dateFrom, props.dateTo],
+    };
+  }
+
   private async getOverview(props: Props): Promise<UserStatsResult['overview']> {
     const [resolvedTotal] = await this.dataSource.query(
       `SELECT COUNT(*) as count FROM tickets
@@ -117,12 +126,12 @@ export class GetUserStatsQuery {
       [props.workspaceId, props.targetUserId],
     );
 
+    const rpDate = this.dateClause('"resolvedAt"', 3, props);
     const [resolvedPeriod] = await this.dataSource.query(
       `SELECT COUNT(*) as count FROM tickets
-       WHERE "workspaceId" = $1 AND "resolvedById" = $2
-         AND "resolvedAt" >= $3 AND "resolvedAt" < $4 AND "deletedAt" IS NULL
+       WHERE "workspaceId" = $1 AND "resolvedById" = $2${rpDate.sql} AND "deletedAt" IS NULL
          AND "discardReason" IS NULL`,
-      [props.workspaceId, props.targetUserId, props.dateFrom, props.dateTo],
+      [props.workspaceId, props.targetUserId, ...rpDate.params],
     );
 
     const [totalAssigned] = await this.dataSource.query(
@@ -138,15 +147,16 @@ export class GetUserStatsQuery {
       [props.workspaceId, props.targetUserId],
     );
 
+    const arDate = this.dateClause('"resolvedAt"', 3, props);
     const [avgResolution] = await this.dataSource.query(
       `SELECT AVG(EXTRACT(EPOCH FROM ("resolvedAt" - "createdAt")) / 3600) as avg_hours
        FROM tickets
-       WHERE "workspaceId" = $1 AND "resolvedById" = $2
-         AND "resolvedAt" >= $3 AND "resolvedAt" < $4 AND "deletedAt" IS NULL
+       WHERE "workspaceId" = $1 AND "resolvedById" = $2${arDate.sql} AND "deletedAt" IS NULL
          AND "discardReason" IS NULL`,
-      [props.workspaceId, props.targetUserId, props.dateFrom, props.dateTo],
+      [props.workspaceId, props.targetUserId, ...arDate.params],
     );
 
+    const frDate = this.dateClause('t."createdAt"', 3, props);
     const [avgFirstResponse] = await this.dataSource.query(
       `SELECT AVG(EXTRACT(EPOCH FROM (fr.first_response - t."createdAt")) / 3600) as avg_hours
        FROM tickets t
@@ -155,20 +165,20 @@ export class GetUserStatsQuery {
          FROM comments c
          WHERE c."ticketId" = t.id AND c."authorId" = $2
        ) fr ON fr.first_response IS NOT NULL
-       WHERE t."workspaceId" = $1 AND t."createdAt" >= $3 AND t."createdAt" < $4 AND t."deletedAt" IS NULL`,
-      [props.workspaceId, props.targetUserId, props.dateFrom, props.dateTo],
+       WHERE t."workspaceId" = $1${frDate.sql} AND t."deletedAt" IS NULL`,
+      [props.workspaceId, props.targetUserId, ...frDate.params],
     );
 
+    const csDate = this.dateClause('cr."respondedAt"', 3, props);
     const [csatResult] = await this.dataSource.query(
       `SELECT
         AVG(CASE cr.rating WHEN 'good' THEN 100 WHEN 'neutral' THEN 50 WHEN 'bad' THEN 0 END) as score,
         COUNT(*) as total
        FROM csat_responses cr
        INNER JOIN tickets t ON t.id = cr."ticketId"
-       WHERE cr."workspaceId" = $1 AND t."resolvedById" = $2
-         AND cr."respondedAt" >= $3 AND cr."respondedAt" < $4
+       WHERE cr."workspaceId" = $1 AND t."resolvedById" = $2${csDate.sql}
          AND cr.rating IS NOT NULL AND t."deletedAt" IS NULL`,
-      [props.workspaceId, props.targetUserId, props.dateFrom, props.dateTo],
+      [props.workspaceId, props.targetUserId, ...csDate.params],
     );
 
     return {
@@ -196,14 +206,14 @@ export class GetUserStatsQuery {
   }
 
   private async getResolutionTrend(props: Props): Promise<{ date: string; resolved: number }[]> {
+    const dc = this.dateClause('"resolvedAt"', 3, props);
     const rows = await this.dataSource.query(
       `SELECT DATE("resolvedAt") as date, COUNT(*) as count
        FROM tickets
-       WHERE "workspaceId" = $1 AND "resolvedById" = $2
-         AND "resolvedAt" >= $3 AND "resolvedAt" < $4
+       WHERE "workspaceId" = $1 AND "resolvedById" = $2${dc.sql}
          AND "deletedAt" IS NULL AND "discardReason" IS NULL
        GROUP BY DATE("resolvedAt") ORDER BY date`,
-      [props.workspaceId, props.targetUserId, props.dateFrom, props.dateTo],
+      [props.workspaceId, props.targetUserId, ...dc.params],
     );
 
     return rows.map((r: any) => ({
@@ -213,34 +223,40 @@ export class GetUserStatsQuery {
   }
 
   private async getReporterOverview(props: Props): Promise<UserStatsResult['overview']> {
+    const dateCol = props.dateField === 'sent'
+      ? 'COALESCE("originDate", "createdAt")'
+      : '"createdAt"';
+    const dc = this.dateClause(dateCol, 3, props);
+
     const [ticketsCreated] = await this.dataSource.query(
       `SELECT COUNT(*) as count FROM tickets
-       WHERE "workspaceId" = $1 AND "reporterId" = $2 AND "deletedAt" IS NULL`,
-      [props.workspaceId, props.targetUserId],
+       WHERE "workspaceId" = $1 AND "reporterId" = $2${dc.sql} AND "deletedAt" IS NULL`,
+      [props.workspaceId, props.targetUserId, ...dc.params],
     );
 
     const [ticketsResolved] = await this.dataSource.query(
       `SELECT COUNT(*) as count FROM tickets
-       WHERE "workspaceId" = $1 AND "reporterId" = $2 AND status = 'resolved'
+       WHERE "workspaceId" = $1 AND "reporterId" = $2 AND status = 'resolved'${dc.sql}
          AND "deletedAt" IS NULL`,
-      [props.workspaceId, props.targetUserId],
+      [props.workspaceId, props.targetUserId, ...dc.params],
     );
 
     const [ticketsPending] = await this.dataSource.query(
       `SELECT COUNT(*) as count FROM tickets
        WHERE "workspaceId" = $1 AND "reporterId" = $2
-         AND status IN ('open', 'pending', 'in-progress') AND "deletedAt" IS NULL`,
-      [props.workspaceId, props.targetUserId],
+         AND status IN ('open', 'pending', 'in-progress')${dc.sql} AND "deletedAt" IS NULL`,
+      [props.workspaceId, props.targetUserId, ...dc.params],
     );
 
     const [avgResolution] = await this.dataSource.query(
       `SELECT AVG(EXTRACT(EPOCH FROM ("resolvedAt" - "createdAt")) / 3600) as avg_hours
        FROM tickets
        WHERE "workspaceId" = $1 AND "reporterId" = $2
-         AND "resolvedAt" IS NOT NULL AND "deletedAt" IS NULL`,
-      [props.workspaceId, props.targetUserId],
+         AND "resolvedAt" IS NOT NULL${dc.sql} AND "deletedAt" IS NULL`,
+      [props.workspaceId, props.targetUserId, ...dc.params],
     );
 
+    const csDate = this.dateClause('cr."respondedAt"', 3, props);
     const [csatResult] = await this.dataSource.query(
       `SELECT
         AVG(CASE cr.rating WHEN 'good' THEN 100 WHEN 'neutral' THEN 50 WHEN 'bad' THEN 0 END) as score,
@@ -248,8 +264,8 @@ export class GetUserStatsQuery {
        FROM csat_responses cr
        INNER JOIN tickets t ON t.id = cr."ticketId"
        WHERE cr."workspaceId" = $1 AND t."reporterId" = $2
-         AND cr.rating IS NOT NULL AND t."deletedAt" IS NULL`,
-      [props.workspaceId, props.targetUserId],
+         AND cr.rating IS NOT NULL${csDate.sql} AND t."deletedAt" IS NULL`,
+      [props.workspaceId, props.targetUserId, ...csDate.params],
     );
 
     return {
@@ -281,14 +297,17 @@ export class GetUserStatsQuery {
   }
 
   private async getCreationTrend(props: Props): Promise<{ date: string; resolved: number }[]> {
+    const dateExpr = props.dateField === 'sent'
+      ? 'COALESCE("originDate", "createdAt")'
+      : '"createdAt"';
+    const dc = this.dateClause(dateExpr, 3, props);
     const rows = await this.dataSource.query(
-      `SELECT DATE("createdAt") as date, COUNT(*) as count
+      `SELECT DATE(${dateExpr}) as date, COUNT(*) as count
        FROM tickets
-       WHERE "workspaceId" = $1 AND "reporterId" = $2
-         AND "createdAt" >= $3 AND "createdAt" < $4
+       WHERE "workspaceId" = $1 AND "reporterId" = $2${dc.sql}
          AND "deletedAt" IS NULL
-       GROUP BY DATE("createdAt") ORDER BY date`,
-      [props.workspaceId, props.targetUserId, props.dateFrom, props.dateTo],
+       GROUP BY DATE(${dateExpr}) ORDER BY date`,
+      [props.workspaceId, props.targetUserId, ...dc.params],
     );
 
     return rows.map((r: any) => ({

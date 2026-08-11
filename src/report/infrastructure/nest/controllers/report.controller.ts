@@ -42,8 +42,8 @@ export class ReportController {
       workspaceId: workspace.getId(),
       userId: user.userId,
       isSystemAdmin: user.isSystemAdmin,
-      dateFrom: new Date(filters.dateFrom),
-      dateTo: new Date(filters.dateTo),
+      dateFrom: filters.dateFrom ? new Date(filters.dateFrom) : null,
+      dateTo: filters.dateTo ? new Date(filters.dateTo) : null,
     });
   }
 
@@ -62,8 +62,8 @@ export class ReportController {
       workspaceId: workspace.getId(),
       userId: user.userId,
       isSystemAdmin: user.isSystemAdmin,
-      dateFrom: new Date(filters.dateFrom),
-      dateTo: new Date(filters.dateTo),
+      dateFrom: filters.dateFrom ? new Date(filters.dateFrom) : null,
+      dateTo: filters.dateTo ? new Date(filters.dateTo) : null,
     });
   }
 
@@ -83,8 +83,9 @@ export class ReportController {
       requesterId: user.userId,
       targetUserId: user.userId,
       isSystemAdmin: user.isSystemAdmin,
-      dateFrom: new Date(filters.dateFrom),
-      dateTo: new Date(filters.dateTo),
+      dateFrom: filters.dateFrom ? new Date(filters.dateFrom) : null,
+      dateTo: filters.dateTo ? new Date(filters.dateTo) : null,
+      dateField: filters.dateField ?? 'received',
     });
   }
 
@@ -105,8 +106,9 @@ export class ReportController {
       requesterId: user.userId,
       targetUserId: userId,
       isSystemAdmin: user.isSystemAdmin,
-      dateFrom: new Date(filters.dateFrom),
-      dateTo: new Date(filters.dateTo),
+      dateFrom: filters.dateFrom ? new Date(filters.dateFrom) : null,
+      dateTo: filters.dateTo ? new Date(filters.dateTo) : null,
+      dateField: filters.dateField ?? 'received',
     });
   }
 }

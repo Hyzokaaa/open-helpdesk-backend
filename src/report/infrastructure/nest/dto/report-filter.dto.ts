@@ -1,9 +1,15 @@
-import { IsDateString, IsOptional } from 'class-validator';
+import { IsDateString, IsIn, IsOptional } from 'class-validator';
 
 export class ReportFilterDto {
+  @IsOptional()
   @IsDateString()
-  dateFrom!: string;
+  dateFrom?: string;
 
+  @IsOptional()
   @IsDateString()
-  dateTo!: string;
+  dateTo?: string;
+
+  @IsOptional()
+  @IsIn(['received', 'sent'])
+  dateField?: 'received' | 'sent';
 }

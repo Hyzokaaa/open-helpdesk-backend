@@ -6,8 +6,8 @@ interface Props {
   workspaceId: string;
   userId: string;
   isSystemAdmin: boolean;
-  dateFrom: Date;
-  dateTo: Date;
+  dateFrom: Date | null;
+  dateTo: Date | null;
 }
 
 export interface ReportOverviewResult {
@@ -23,6 +23,14 @@ export class GetWorkspaceReportOverviewQuery {
     private readonly ensurePermission: EnsureWorkspacePermission,
   ) {}
 
+  private dateClause(col: string, paramIdx: number, props: Props): { sql: string; params: any[] } {
+    if (!props.dateFrom || !props.dateTo) return { sql: '', params: [] };
+    return {
+      sql: ` AND ${col} >= $${paramIdx} AND ${col} < $${paramIdx + 1}`,
+      params: [props.dateFrom, props.dateTo],
+    };
+  }
+
   async execute(props: Props): Promise<ReportOverviewResult> {
     await this.ensurePermission.execute({
       workspaceId: props.workspaceId,
@@ -37,21 +45,24 @@ export class GetWorkspaceReportOverviewQuery {
       [props.workspaceId],
     );
 
+    const rvDate = this.dateClause('"resolvedAt"', 2, props);
     const [resolvedResult] = await this.dataSource.query(
       `SELECT COUNT(*) as count FROM tickets
-       WHERE "workspaceId" = $1 AND "resolvedAt" >= $2 AND "resolvedAt" < $3 AND "deletedAt" IS NULL
+       WHERE "workspaceId" = $1${rvDate.sql} AND "deletedAt" IS NULL
          AND "discardReason" IS NULL`,
-      [props.workspaceId, props.dateFrom, props.dateTo],
+      [props.workspaceId, ...rvDate.params],
     );
 
+    const arDate = this.dateClause('"resolvedAt"', 2, props);
     const [avgResolution] = await this.dataSource.query(
       `SELECT AVG(EXTRACT(EPOCH FROM ("resolvedAt" - "createdAt")) / 3600) as avg_hours
        FROM tickets
-       WHERE "workspaceId" = $1 AND "resolvedAt" >= $2 AND "resolvedAt" < $3 AND "deletedAt" IS NULL
+       WHERE "workspaceId" = $1${arDate.sql} AND "deletedAt" IS NULL
          AND "discardReason" IS NULL`,
-      [props.workspaceId, props.dateFrom, props.dateTo],
+      [props.workspaceId, ...arDate.params],
     );
 
+    const frDate = this.dateClause('t."createdAt"', 2, props);
     const [avgFirstResponse] = await this.dataSource.query(
       `SELECT AVG(EXTRACT(EPOCH FROM (fr.first_response - t."createdAt")) / 3600) as avg_hours
        FROM tickets t
@@ -60,8 +71,8 @@ export class GetWorkspaceReportOverviewQuery {
          FROM comments c
          WHERE c."ticketId" = t.id AND c."authorId" != t."reporterId"
        ) fr ON fr.first_response IS NOT NULL
-       WHERE t."workspaceId" = $1 AND t."createdAt" >= $2 AND t."createdAt" < $3 AND t."deletedAt" IS NULL`,
-      [props.workspaceId, props.dateFrom, props.dateTo],
+       WHERE t."workspaceId" = $1${frDate.sql} AND t."deletedAt" IS NULL`,
+      [props.workspaceId, ...frDate.params],
     );
 
     return {
