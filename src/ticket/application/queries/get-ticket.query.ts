@@ -29,6 +29,7 @@ export interface TicketDetailResponse {
   tagIds: string[];
   customFields: Record<string, unknown>;
   discardReason: string | null;
+  departmentId: string | null;
   firstResponseBreached: boolean;
   resolutionBreached: boolean;
   accessLevel: TicketAccessLevel;
@@ -68,6 +69,7 @@ export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
       tagIds: ticket.tagIds,
       customFields: ticket.customFields,
       discardReason: ticket.discardReason,
+      departmentId: ticket.departmentId,
       firstResponseBreached: ticket.firstResponseBreached,
       resolutionBreached: ticket.resolutionBreached,
       accessLevel,

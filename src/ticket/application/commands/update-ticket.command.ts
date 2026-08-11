@@ -22,6 +22,7 @@ interface Props {
   priority?: TicketPriority;
   category?: TicketCategory;
   tagIds?: string[];
+  departmentId?: string | null;
   customFields?: Record<string, unknown>;
 }
 
@@ -85,6 +86,7 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
       priority: canEditPriority ? props.priority : undefined,
       category: canEditCategory ? props.category : undefined,
       tagIds: canEditTags ? props.tagIds : undefined,
+      departmentId: props.departmentId,
       customFields: validatedCustomFields,
     });
 

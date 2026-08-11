@@ -12,6 +12,7 @@ import {
 import { UserModel } from '../../../../user/infrastructure/typeorm/models/user.model';
 import { WorkspaceModel } from '../../../../workspace/infrastructure/typeorm/models/workspace.model';
 import { TagModel } from '../../../../tag/infrastructure/typeorm/models/tag.model';
+import { DepartmentModel } from '../../../../department/infrastructure/typeorm/models/department.model';
 
 @Entity('tickets')
 export class TicketModel {
@@ -92,6 +93,12 @@ export class TicketModel {
 
   @Column({ type: 'varchar', nullable: true })
   mailboxId!: string | null;
+
+  @ManyToOne(() => DepartmentModel, { nullable: true })
+  department!: DepartmentModel | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  departmentId!: string | null;
 
   @ManyToMany(() => TagModel)
   @JoinTable({ name: 'ticket_tag' })

@@ -34,6 +34,10 @@ export class CreateTicketRequest {
   @IsOptional()
   customFields?: Record<string, unknown>;
 
+  @IsString()
+  @IsOptional()
+  departmentId?: string;
+
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
