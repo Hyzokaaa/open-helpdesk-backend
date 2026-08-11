@@ -43,6 +43,10 @@ export class TicketFilterDto extends PaginationDto {
 
   @IsString()
   @IsOptional()
+  registeredById?: string;
+
+  @IsString()
+  @IsOptional()
   sortBy?: string;
 
   @IsString()
