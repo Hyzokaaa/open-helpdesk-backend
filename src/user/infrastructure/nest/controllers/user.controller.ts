@@ -284,6 +284,46 @@ export class UserController {
     return result;
   }
 
+  @Patch(':id/name')
+  async updateUserName(
+    @Param('id') id: string,
+    @Body() body: { firstName: string; lastName: string },
+    @CurrentUser() authUser: AuthUser,
+  ) {
+    if (!authUser.isSystemAdmin) {
+      throw new Error('Only system admins can edit user names');
+    }
+
+    const existing = await this.userRepository.findById(id);
+    if (!existing) throw new Error('User not found');
+
+    const service = new UpdateUserProfile(this.userRepository);
+    const command = new UpdateUserProfileCommand(service);
+    const result = await command.execute({
+      userId: id,
+      firstName: body.firstName,
+      lastName: body.lastName,
+    });
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.USER_NAME_UPDATED,
+      entityType: 'user',
+      entityId: id,
+      userId: authUser.userId,
+      workspaceId: null,
+      metadata: {
+        before: { firstName: existing.firstName, lastName: existing.lastName },
+        after: { firstName: body.firstName, lastName: body.lastName },
+      },
+      category: AuditCategory.USER,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
+    return result;
+  }
+
   @Patch(':id/system-admin')
   toggleSystemAdmin(
     @Param('id') id: string,
