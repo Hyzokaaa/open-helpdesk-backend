@@ -32,6 +32,7 @@ interface Props {
   departmentId?: string | null;
   registeredById?: string | null;
   mailboxId?: string | null;
+  originDate?: Date | null;
 }
 
 export class Ticket {
@@ -61,6 +62,7 @@ export class Ticket {
   source: TicketSource;
   registeredById: string | null;
   mailboxId: string | null;
+  originDate: Date | null;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -89,6 +91,7 @@ export class Ticket {
     this.source = props.source ?? TicketSource.UI;
     this.registeredById = props.registeredById ?? null;
     this.mailboxId = props.mailboxId ?? null;
+    this.originDate = props.originDate ?? null;
   }
 
   getId(): string {

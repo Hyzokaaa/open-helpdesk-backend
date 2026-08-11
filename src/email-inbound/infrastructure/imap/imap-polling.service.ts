@@ -353,6 +353,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     const fromName = envelope.from?.[0]?.name ?? undefined;
     const to = (envelope.to ?? []).map((a: any) => a.address ?? '');
     const cc = (envelope.cc ?? []).map((a: any) => a.address ?? '');
+    const date = envelope.date ? new Date(envelope.date) : undefined;
     return {
       from,
       fromName,
@@ -361,6 +362,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       subject: envelope.subject ?? '',
       messageId: envelope.messageId ?? '',
       inReplyTo: envelope.inReplyTo ?? undefined,
+      date: date && !isNaN(date.getTime()) ? date : undefined,
     };
   }
 

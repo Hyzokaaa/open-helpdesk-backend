@@ -100,6 +100,11 @@ export class TypeOrmTicketRepository implements TicketRepository {
         reporterId: filters.reporterId,
       });
     }
+    if (filters.registeredById) {
+      qb.andWhere('ticket.registeredById = :registeredById', {
+        registeredById: filters.registeredById,
+      });
+    }
     if (filters.agentUserId) {
       qb.andWhere(
         '(ticket.assigneeId = :agentUserId OR ticket.status = :openStatus OR ticket.id IN ' +
@@ -126,6 +131,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
     }
 
     const VALID_SORT_FIELDS: Record<string, { col: string; lower: boolean }> = {
+      ticketNumber: { col: 'ticket.ticketNumber', lower: false },
       name: { col: 'ticket.name', lower: true },
       priority: { col: 'ticket.priority', lower: false },
       status: { col: 'ticket.status', lower: false },
@@ -210,6 +216,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
       source: model.source as TicketSource,
       registeredById: model.registeredById ?? null,
       mailboxId: model.mailboxId ?? null,
+      originDate: model.originDate ?? null,
     });
   }
 
@@ -238,6 +245,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
     model.source = ticket.source;
     model.registeredById = ticket.registeredById;
     model.mailboxId = ticket.mailboxId;
+    model.originDate = ticket.originDate;
     return model;
   }
 }

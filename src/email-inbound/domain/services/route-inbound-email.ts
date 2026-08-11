@@ -170,6 +170,7 @@ export class RouteInboundEmail {
       source: TicketSource.EMAIL,
       portalToken: randomUUID(),
       mailboxId: mailbox.getId(),
+      originDate: parsed.date ?? null,
     });
 
     const ticketEvent: TicketCreatedEvent = {
@@ -198,12 +199,17 @@ export class RouteInboundEmail {
     email: string,
   ): { firstName: string; lastName: string } {
     if (displayName?.trim()) {
-      const parts = displayName.trim().split(/\s+/);
-      const firstName = parts[0];
-      const lastName = parts.slice(1).join(' ');
+      let clean = displayName.trim();
+      // Reject garbage names (Exchange internal addresses, encoded strings)
+      if (clean.includes('+20') || clean.includes('_o=') || clean.includes('_ou=') || clean.length > 80) {
+        return { firstName: email.split('@')[0].substring(0, 40), lastName: '' };
+      }
+      const parts = clean.split(/\s+/);
+      const firstName = parts[0].substring(0, 40);
+      const lastName = parts.slice(1).join(' ').substring(0, 40);
       return { firstName, lastName };
     }
-    return { firstName: email.split('@')[0], lastName: '' };
+    return { firstName: email.split('@')[0].substring(0, 40), lastName: '' };
   }
 
   private async uploadAttachments(

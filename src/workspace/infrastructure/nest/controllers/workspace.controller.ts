@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -222,6 +223,48 @@ export class WorkspaceController {
     }
 
     return result;
+  }
+
+  @Patch(':slug/members/:userId/name')
+  async updateContactName(
+    @Param('slug') slug: string,
+    @Param('userId') userId: string,
+    @Body() body: { firstName: string; lastName: string },
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_MEMBERS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+
+    const targetUser = await this.userRepository.findById(userId);
+    if (!targetUser) throw new EntityNotFoundError('User not found');
+    if (!targetUser.autoCreated) throw new BadRequestException('Only auto-created contacts can be edited');
+
+    const before = { firstName: targetUser.firstName, lastName: targetUser.lastName };
+    targetUser.firstName = body.firstName.substring(0, 40);
+    targetUser.lastName = body.lastName.substring(0, 40);
+    await this.userRepository.update(targetUser);
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    await auditLog.execute({
+      action: AuditAction.USER_NAME_UPDATED,
+      entityType: 'user',
+      entityId: userId,
+      userId: user.userId,
+      workspaceId,
+      metadata: { before, after: { firstName: targetUser.firstName, lastName: targetUser.lastName } },
+      category: AuditCategory.USER,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
+    return { firstName: targetUser.firstName, lastName: targetUser.lastName };
   }
 
   @Delete(':slug/members/:userId')

@@ -12,6 +12,7 @@ export interface TicketFilters {
   departmentId?: string;
   assigneeId?: string;
   reporterId?: string;
+  registeredById?: string;
   agentUserId?: string;
   sortBy?: string;
   sortOrder?: 'ASC' | 'DESC';

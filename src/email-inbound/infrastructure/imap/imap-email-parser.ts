@@ -7,6 +7,7 @@ export interface ParsedInboundEmail {
   inReplyToTicketId: string | null;
   attachments: ParsedAttachment[];
   mailboxId?: string;
+  date?: Date;
 }
 
 export interface ParsedAttachment {
@@ -47,6 +48,7 @@ export class ImapEmailParser {
       body: body || '(No content)',
       inReplyToTicketId,
       attachments,
+      date: envelope.date ?? undefined,
     };
   }
 
@@ -124,4 +126,5 @@ export interface ImapEnvelope {
   subject: string;
   messageId: string;
   inReplyTo?: string;
+  date?: Date;
 }
