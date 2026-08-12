@@ -36,7 +36,7 @@ export class CreateImapMailbox {
       id: this.idGenerator.create(),
       address: props.address,
       workspaceId: props.workspaceId,
-      isActive: true,
+      isActive: false,
       type: MailboxType.IMAP,
       imapHost: props.imapHost,
       imapPort: props.imapPort,
