@@ -21,6 +21,7 @@ import { AccountModule } from "./account/account.module";
 import { AuditLogModule } from "./audit-log/audit-log.module";
 import { CannedResponseModule } from "./canned-response/canned-response.module";
 import { CustomFieldModule } from "./custom-field/custom-field.module";
+import { EmailRuleModule } from "./email-rule/email-rule.module";
 import { ReportModule } from "./report/report.module";
 import { CsatModule } from "./csat/csat.module";
 import { MailboxModule } from "./mailbox/mailbox.module";
@@ -77,6 +78,7 @@ import { SystemMailboxController } from "./mailbox/infrastructure/nest/controlle
     AccountModule,
     AuditLogModule,
     CannedResponseModule,
+    EmailRuleModule,
     CustomFieldModule,
     ReportModule,
     CsatModule,
