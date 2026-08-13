@@ -12,7 +12,7 @@ export class MailboxModel {
   @PrimaryColumn()
   id!: string;
 
-  @Column({ unique: true })
+  @Column()
   address!: string;
 
   @ManyToOne(() => WorkspaceModel, { onDelete: 'CASCADE', nullable: true })
