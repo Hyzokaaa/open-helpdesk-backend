@@ -32,6 +32,15 @@ export class WorkspaceModel {
   @Column({ type: 'boolean', default: true })
   systemMailboxEnabled!: boolean;
 
+  @Column({ type: 'varchar', nullable: true })
+  customDomain!: string | null;
+
+  @Column({ type: 'boolean', default: false })
+  customDomainVerified!: boolean;
+
+  @Column({ type: 'varchar', nullable: true })
+  domainVerificationToken!: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 

@@ -28,6 +28,9 @@ export enum AuditAction {
   WORKSPACE_MEMBERS_IMPORTED = 'workspace-members-imported',
   WORKSPACE_EXPORT_CREATED = 'workspace-export-created',
   WORKSPACE_SYSTEM_MAILBOX_TOGGLED = 'workspace-system-mailbox-toggled',
+  WORKSPACE_CUSTOM_DOMAIN_SET = 'workspace-custom-domain-set',
+  WORKSPACE_CUSTOM_DOMAIN_VERIFIED = 'workspace-custom-domain-verified',
+  WORKSPACE_CUSTOM_DOMAIN_REMOVED = 'workspace-custom-domain-removed',
 
   // Members
   MEMBER_ADDED = 'member-added',
