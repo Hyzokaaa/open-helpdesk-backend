@@ -24,11 +24,38 @@ async function bootstrap() {
   app.useGlobalFilters(new DomainExceptionFilter());
 
   const frontendUrl = process.env.FRONTEND_URL;
-  const origin = frontendUrl?.includes(",")
+  const allowedOrigins = frontendUrl
     ? frontendUrl.split(",").map((u) => u.trim())
-    : frontendUrl || "http://localhost:5173";
+    : ["http://localhost:5173"];
+
+  const verifiedDomainCache = new Map<string, boolean>();
+  let cacheExpiry = 0;
+
   app.enableCors({
-    origin,
+    origin: async (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+
+      try {
+        const now = Date.now();
+        if (now > cacheExpiry) {
+          verifiedDomainCache.clear();
+          cacheExpiry = now + 60_000;
+        }
+
+        const host = new URL(origin).hostname;
+        if (verifiedDomainCache.has(host)) return callback(null, verifiedDomainCache.get(host));
+
+        const { TypeOrmWorkspaceRepository } = await import("./workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository");
+        const repo = app.get(TypeOrmWorkspaceRepository);
+        const workspaces = await repo.findByCustomDomain(host);
+        const allowed = workspaces.some((w) => w.customDomainVerified);
+        verifiedDomainCache.set(host, allowed);
+        callback(null, allowed);
+      } catch {
+        callback(null, false);
+      }
+    },
     exposedHeaders: ["X-Unread-Count", "Date"],
   });
 
