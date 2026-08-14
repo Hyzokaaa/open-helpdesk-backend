@@ -708,7 +708,7 @@ export class WorkspaceController {
   @Patch(':slug/custom-domain')
   async setCustomDomain(
     @Param('slug') slug: string,
-    @Body() body: { domain: string | null },
+    @Body() body: { domain: string | null; autoVerify?: boolean },
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
@@ -721,7 +721,7 @@ export class WorkspaceController {
     });
 
     const service = new SetCustomDomain(this.workspaceRepository);
-    const workspace = await service.execute({ workspaceId, domain: body.domain });
+    const workspace = await service.execute({ workspaceId, domain: body.domain, autoVerify: body.autoVerify });
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     const isRemoval = body.domain === null;

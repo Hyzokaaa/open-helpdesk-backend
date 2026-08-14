@@ -21,6 +21,14 @@ export class DomainCheckController {
   }
 
   @Public()
+  @Get('default-workspace')
+  async defaultWorkspace() {
+    const all = await this.workspaceRepository.findAll();
+    if (all.length !== 1) throw new NotFoundException();
+    return { slug: all[0].slug, name: all[0].name };
+  }
+
+  @Public()
   @Get('resolve-domain')
   async resolveDomain(@Query('host') host: string) {
     if (!host) throw new NotFoundException();

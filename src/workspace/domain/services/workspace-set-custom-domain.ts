@@ -6,6 +6,7 @@ import { WorkspaceRepository } from '../repositories/workspace.repository';
 interface SetCustomDomainProps {
   workspaceId: string;
   domain: string | null;
+  autoVerify?: boolean;
 }
 
 const DOMAIN_REGEX = /^(?!-)[a-zA-Z0-9-]{1,63}(?<!-)(\.[a-zA-Z0-9-]{1,63})*\.[a-zA-Z]{2,}$/;
@@ -31,8 +32,8 @@ export class SetCustomDomain {
     }
 
     workspace.customDomain = domain;
-    workspace.customDomainVerified = false;
-    workspace.domainVerificationToken = `oh-verify=${randomBytes(16).toString('hex')}`;
+    workspace.customDomainVerified = !!props.autoVerify;
+    workspace.domainVerificationToken = props.autoVerify ? null : `oh-verify=${randomBytes(16).toString('hex')}`;
     await this.repository.update(workspace);
     return workspace;
   }
