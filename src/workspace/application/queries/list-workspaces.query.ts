@@ -19,6 +19,8 @@ export interface WorkspaceListItem {
   role: string;
   ownerName?: string;
   palette: string | null;
+  customDomain: string | null;
+  customDomainVerified: boolean;
 }
 
 export class ListWorkspacesQuery implements Query<Props, WorkspaceListItem[]> {
@@ -51,6 +53,8 @@ export class ListWorkspacesQuery implements Query<Props, WorkspaceListItem[]> {
           role: membership?.role ?? 'admin',
           ownerName,
           palette: workspace.palette,
+          customDomain: workspace.customDomain,
+          customDomainVerified: workspace.customDomainVerified,
         });
       }
       return result;
@@ -69,6 +73,8 @@ export class ListWorkspacesQuery implements Query<Props, WorkspaceListItem[]> {
           description: workspace.description,
           role: membership.role,
           palette: workspace.palette,
+          customDomain: workspace.customDomain,
+          customDomainVerified: workspace.customDomainVerified,
         });
       }
     }
