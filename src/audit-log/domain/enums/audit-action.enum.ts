@@ -32,6 +32,7 @@ export enum AuditAction {
   WORKSPACE_CUSTOM_DOMAIN_VERIFIED = 'workspace-custom-domain-verified',
   WORKSPACE_CUSTOM_DOMAIN_REMOVED = 'workspace-custom-domain-removed',
   WORKSPACE_BRANDING_UPDATED = 'workspace-branding-updated',
+  SYSTEM_BRANDING_UPDATED = 'system-branding-updated',
 
   // Members
   MEMBER_ADDED = 'member-added',

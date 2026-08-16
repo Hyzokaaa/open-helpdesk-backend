@@ -12,7 +12,10 @@ interface SetCustomDomainProps {
 const DOMAIN_REGEX = /^(?!-)[a-zA-Z0-9-]{1,63}(?<!-)(\.[a-zA-Z0-9-]{1,63})*\.[a-zA-Z]{2,}$/;
 
 export class SetCustomDomain {
-  constructor(private readonly repository: WorkspaceRepository) {}
+  constructor(
+    private readonly repository: WorkspaceRepository,
+    private readonly frontendHosts: string[] = [],
+  ) {}
 
   async execute(props: SetCustomDomainProps): Promise<Workspace> {
     const workspace = await this.repository.findById(props.workspaceId);
@@ -29,6 +32,10 @@ export class SetCustomDomain {
     const domain = props.domain.toLowerCase().trim();
     if (!DOMAIN_REGEX.test(domain)) {
       throw new DomainValidationError('Invalid domain format');
+    }
+
+    if (this.frontendHosts.some((host) => host === domain)) {
+      throw new DomainValidationError('This hostname is already the platform URL. Custom domain is not needed for routing.');
     }
 
     workspace.customDomain = domain;

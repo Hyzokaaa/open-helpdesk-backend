@@ -728,7 +728,11 @@ export class WorkspaceController {
       isSystemAdmin: user.isSystemAdmin,
     });
 
-    const service = new SetCustomDomain(this.workspaceRepository);
+    const frontendUrl = this.config.get<string>('FRONTEND_URL', '');
+    const frontendHosts = frontendUrl.split(',').map((u) => {
+      try { return new URL(u.trim()).hostname; } catch { return ''; }
+    }).filter(Boolean);
+    const service = new SetCustomDomain(this.workspaceRepository, frontendHosts);
     const workspace = await service.execute({ workspaceId, domain: body.domain, autoVerify: body.autoVerify });
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
