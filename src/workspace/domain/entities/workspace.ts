@@ -24,6 +24,9 @@ interface Props {
   customDomain?: string | null;
   customDomainVerified?: boolean;
   domainVerificationToken?: string | null;
+  appName?: string | null;
+  appSubtitle?: string | null;
+  logo?: string | null;
 }
 
 export class Workspace {
@@ -38,6 +41,9 @@ export class Workspace {
   customDomain: string | null;
   customDomainVerified: boolean;
   domainVerificationToken: string | null;
+  appName: string | null;
+  appSubtitle: string | null;
+  logo: string | null;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -51,6 +57,9 @@ export class Workspace {
     this.customDomain = props.customDomain ?? null;
     this.customDomainVerified = props.customDomainVerified ?? false;
     this.domainVerificationToken = props.domainVerificationToken ?? null;
+    this.appName = props.appName ?? null;
+    this.appSubtitle = props.appSubtitle ?? null;
+    this.logo = props.logo ?? null;
   }
 
   getId(): string {

@@ -18,6 +18,9 @@ export interface WorkspaceResponse {
   customDomain: string | null;
   customDomainVerified: boolean;
   domainVerificationToken: string | null;
+  appName: string | null;
+  appSubtitle: string | null;
+  logo: string | null;
 }
 
 export class GetWorkspaceQuery implements Query<Props, WorkspaceResponse> {
@@ -47,6 +50,9 @@ export class GetWorkspaceQuery implements Query<Props, WorkspaceResponse> {
       customDomain: workspace.customDomain,
       customDomainVerified: workspace.customDomainVerified,
       domainVerificationToken: workspace.domainVerificationToken,
+      appName: workspace.appName,
+      appSubtitle: workspace.appSubtitle,
+      logo: workspace.logo,
     };
   }
 }
