@@ -11,6 +11,7 @@ export interface SendEmailParams {
 
 export interface SendEmailResult {
   success: boolean;
+  mock?: boolean;
 }
 
 export interface EmailService {

@@ -21,6 +21,9 @@ interface Props {
   palette?: string | null;
   slaPolicy?: SlaPolicy | null;
   systemMailboxEnabled?: boolean;
+  customDomain?: string | null;
+  customDomainVerified?: boolean;
+  domainVerificationToken?: string | null;
 }
 
 export class Workspace {
@@ -32,6 +35,9 @@ export class Workspace {
   palette: string | null;
   slaPolicy: SlaPolicy | null;
   systemMailboxEnabled: boolean;
+  customDomain: string | null;
+  customDomainVerified: boolean;
+  domainVerificationToken: string | null;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -42,6 +48,9 @@ export class Workspace {
     this.palette = props.palette ?? null;
     this.slaPolicy = props.slaPolicy ?? null;
     this.systemMailboxEnabled = props.systemMailboxEnabled ?? true;
+    this.customDomain = props.customDomain ?? null;
+    this.customDomainVerified = props.customDomainVerified ?? false;
+    this.domainVerificationToken = props.domainVerificationToken ?? null;
   }
 
   getId(): string {

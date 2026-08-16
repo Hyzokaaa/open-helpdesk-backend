@@ -27,16 +27,11 @@ export class CreateImapMailbox {
   ) {}
 
   async execute(props: CreateImapMailboxProps): Promise<Mailbox> {
-    const existing = await this.repository.findByAddress(props.address);
-    if (existing) {
-      throw new DomainValidationError('A mailbox with this address already exists');
-    }
-
     const mailbox = new Mailbox({
       id: this.idGenerator.create(),
       address: props.address,
       workspaceId: props.workspaceId,
-      isActive: true,
+      isActive: false,
       type: MailboxType.IMAP,
       imapHost: props.imapHost,
       imapPort: props.imapPort,

@@ -18,7 +18,7 @@ export class CoreConfigController {
     return {
       saasMode: false,
       aiEnabled: !!process.env.AI_API_KEY,
-      emailConfigured: !!dbSettings || !!(process.env.SMTP_HOST || process.env.EMAIL_API_KEY),
+      emailConfigured: !!(dbSettings?.smtpHost) || !!(process.env.SMTP_HOST && process.env.SMTP_USER) || !!process.env.EMAIL_API_KEY,
       systemEmailFrom: emailFrom,
     };
   }

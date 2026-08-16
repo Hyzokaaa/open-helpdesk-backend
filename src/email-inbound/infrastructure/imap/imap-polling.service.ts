@@ -26,6 +26,8 @@ import { MailboxType } from '../../../mailbox/domain/enums/mailbox-type.enum';
 import { Mailbox } from '../../../mailbox/domain/entities/mailbox';
 import { ImapEmailParser, ImapEnvelope } from './imap-email-parser';
 import { ProcessedEmailRepository } from '../typeorm/repositories/processed-email.repository';
+import { TypeOrmEmailRuleRepository } from '../../../email-rule/infrastructure/typeorm/repositories/typeorm-email-rule.repository';
+import { EvaluateEmailRules } from '../../../email-rule/domain/services/email-rule-evaluate';
 
 const REFRESH_INTERVAL = 60000;
 
@@ -59,6 +61,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     @Inject() private readonly attachmentRepository: TypeOrmAttachmentRepository,
     @Inject() private readonly storageService: S3StorageService,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
+    @Inject() private readonly emailRuleRepository: TypeOrmEmailRuleRepository,
   ) {}
 
   async onModuleInit() {
@@ -66,7 +69,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     this.refreshTimer = setInterval(() => this.refreshPollers(), REFRESH_INTERVAL);
   }
 
-  async importMailbox(mailboxId: string, since: Date | null): Promise<{ processed: number; total: number }> {
+  async importMailbox(mailboxId: string, since: Date | null): Promise<{ processed: number; rejected: number; total: number }> {
     const mailbox = await this.mailboxRepository.findById(mailboxId);
     if (!mailbox || !mailbox.imapHost || !mailbox.imapUser || !mailbox.imapPass) {
       throw new Error('Mailbox not found or IMAP not configured');
@@ -86,14 +89,16 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     const parser = new ImapEmailParser();
     const router = this.createRouter();
     let processed = 0;
+    let rejected = 0;
 
     for (const msg of fetched) {
-      const wasProcessed = await this.processMessage(msg, parser, router, mailbox.getId(), mailbox.workspaceId, mailbox);
-      if (wasProcessed) processed++;
+      const result = await this.processMessage(msg, parser, router, mailbox.getId(), mailbox.workspaceId, mailbox);
+      if (result === 'created') processed++;
+      else if (result === 'rejected') rejected++;
     }
 
-    this.logger.log(`IMAP import [${mailbox.address}]: processed ${processed}/${fetched.length} email(s)`);
-    return { processed, total: fetched.length };
+    this.logger.log(`IMAP import [${mailbox.address}]: processed ${processed}, rejected ${rejected}, total ${fetched.length}`);
+    return { processed, rejected, total: fetched.length };
   }
 
   async refreshNow(): Promise<void> {
@@ -192,8 +197,8 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
         let count = 0;
 
         for (const msg of fetched) {
-          const wasProcessed = await this.processMessage(msg, parser, router, mailbox.getId(), mailbox.workspaceId, mailbox);
-          if (wasProcessed) count++;
+          const result = await this.processMessage(msg, parser, router, mailbox.getId(), mailbox.workspaceId, mailbox);
+          if (result === 'created') count++;
         }
 
         if (count > 0) this.logger.log(`IMAP [${mailbox.address}]: processed ${count} email(s)`);
@@ -291,11 +296,11 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     return results;
   }
 
-  private async processMessage(msg: FetchedMessage, parser: ImapEmailParser, router: RouteInboundEmail, mailboxId?: string, workspaceId?: string | null, mailbox?: Mailbox): Promise<boolean> {
+  private async processMessage(msg: FetchedMessage, parser: ImapEmailParser, router: RouteInboundEmail, mailboxId?: string, workspaceId?: string | null, mailbox?: Mailbox): Promise<'created' | 'rejected' | 'skipped'> {
     try {
       if (msg.envelope.messageId) {
         const alreadyProcessed = await this.processedEmailRepository.exists(msg.envelope.messageId);
-        if (alreadyProcessed) return false;
+        if (alreadyProcessed) return 'skipped';
       }
 
       const parsed = await parser.parse(msg.envelope, msg.body);
@@ -319,7 +324,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
           if (msg.envelope.messageId) {
             await this.processedEmailRepository.markProcessed(msg.envelope.messageId);
           }
-          return false;
+          return 'skipped';
         }
       }
 
@@ -336,11 +341,11 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
         this.emitAudit(AuditAction.EMAIL_RECEIVED, mailboxId, workspaceId ?? null, { from: parsed.fromAddress, subject: parsed.subject, action: result.action, ticketId: result.ticketId ?? null }).catch(() => {});
       }
 
-      return true;
+      return result.action === 'rejected' ? 'rejected' : 'created';
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : 'Unknown error';
       this.logger.error(`IMAP: failed to process message UID ${msg.uid}: ${errMsg}`);
-      return false;
+      return 'skipped';
     }
   }
 
@@ -427,6 +432,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     const createTicket = new CreateTicket(this.idGenerator, this.ticketRepository);
     const createComment = new CreateComment(this.idGenerator, this.commentRepository);
     const createAttachment = new CreateAttachment(this.idGenerator, this.attachmentRepository, this.storageService);
+    const evaluateRules = new EvaluateEmailRules(this.emailRuleRepository);
 
     return new RouteInboundEmail(
       this.mailboxRepository,
@@ -440,6 +446,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       createComment,
       this.eventPublisher,
       createAttachment,
+      evaluateRules,
     );
   }
 }

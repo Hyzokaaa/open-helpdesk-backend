@@ -107,7 +107,7 @@ export class SmtpEmailService implements EmailService {
       this.logger.log(
         `[EMAIL MOCK] To: ${recipient} | Subject: ${params.subject}`,
       );
-      return { success: true };
+      return { success: true, mock: true };
     }
 
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {

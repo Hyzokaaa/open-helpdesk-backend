@@ -29,6 +29,8 @@ import { ChangeMemberRoleCommand } from '../../../application/commands/change-me
 import { UpdateWorkspace } from '../../../domain/services/workspace-update';
 import { UpdateWorkspaceCommand } from '../../../application/commands/update-workspace.command';
 import { UpdateWorkspacePalette } from '../../../domain/services/workspace-update-palette';
+import { SetCustomDomain } from '../../../domain/services/workspace-set-custom-domain';
+import { VerifyCustomDomain } from '../../../domain/services/workspace-verify-custom-domain';
 import { UpdateWorkspacePaletteCommand } from '../../../application/commands/update-workspace-palette.command';
 import { UpdateWorkspaceSlaPolicy } from '../../../domain/services/workspace-update-sla-policy';
 import { UpdateSlaPolicyCommand } from '../../../application/commands/update-sla-policy.command';
@@ -107,9 +109,13 @@ export class WorkspaceController {
   }
 
   @Get(':slug')
-  get(@Param('slug') slug: string) {
+  async get(@Param('slug') slug: string) {
     const query = new GetWorkspaceQuery(this.workspaceRepository, this.mailboxRepository);
-    return query.execute({ slug });
+    const result = await query.execute({ slug });
+    return {
+      ...result,
+      cnameTarget: this.config.get<string>('CUSTOM_DOMAIN_CNAME_TARGET', 'proxy.example.com'),
+    };
   }
 
   @Patch(':slug')
@@ -697,6 +703,82 @@ export class WorkspaceController {
 
       return { success: false, error: msg };
     }
+  }
+
+  @Patch(':slug/custom-domain')
+  async setCustomDomain(
+    @Param('slug') slug: string,
+    @Body() body: { domain: string | null; autoVerify?: boolean },
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+
+    const service = new SetCustomDomain(this.workspaceRepository);
+    const workspace = await service.execute({ workspaceId, domain: body.domain, autoVerify: body.autoVerify });
+
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    const isRemoval = body.domain === null;
+    await auditLog.execute({
+      action: isRemoval ? AuditAction.WORKSPACE_CUSTOM_DOMAIN_REMOVED : AuditAction.WORKSPACE_CUSTOM_DOMAIN_SET,
+      entityType: 'workspace',
+      entityId: workspaceId,
+      userId: user.userId,
+      workspaceId,
+      metadata: { domain: body.domain },
+      category: AuditCategory.WORKSPACE,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
+
+    return {
+      customDomain: workspace.customDomain,
+      customDomainVerified: workspace.customDomainVerified,
+      domainVerificationToken: workspace.domainVerificationToken,
+      cnameTarget: this.config.get<string>('CUSTOM_DOMAIN_CNAME_TARGET', 'proxy.example.com'),
+    };
+  }
+
+  @Post(':slug/custom-domain/verify')
+  async verifyCustomDomain(
+    @Param('slug') slug: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+
+    const cnameTarget = this.config.get<string>('CUSTOM_DOMAIN_CNAME_TARGET', 'proxy.example.com');
+    const service = new VerifyCustomDomain(this.workspaceRepository, cnameTarget);
+    const result = await service.execute({ workspaceId });
+
+    if (result.verified) {
+      const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+      await auditLog.execute({
+        action: AuditAction.WORKSPACE_CUSTOM_DOMAIN_VERIFIED,
+        entityType: 'workspace',
+        entityId: workspaceId,
+        userId: user.userId,
+        workspaceId,
+        metadata: { domain: (await this.workspaceRepository.findById(workspaceId))?.customDomain },
+        category: AuditCategory.WORKSPACE,
+        level: AuditLevel.INFO,
+        source: 'ui',
+      });
+    }
+
+    return result;
   }
 
   private async resolveWorkspaceId(slug: string): Promise<string> {

@@ -15,6 +15,9 @@ export interface WorkspaceResponse {
   palette: string | null;
   supportEmail: string | null;
   systemMailboxEnabled: boolean;
+  customDomain: string | null;
+  customDomainVerified: boolean;
+  domainVerificationToken: string | null;
 }
 
 export class GetWorkspaceQuery implements Query<Props, WorkspaceResponse> {
@@ -41,6 +44,9 @@ export class GetWorkspaceQuery implements Query<Props, WorkspaceResponse> {
       palette: workspace.palette,
       supportEmail: mailbox?.address ?? null,
       systemMailboxEnabled: workspace.systemMailboxEnabled,
+      customDomain: workspace.customDomain,
+      customDomainVerified: workspace.customDomainVerified,
+      domainVerificationToken: workspace.domainVerificationToken,
     };
   }
 }

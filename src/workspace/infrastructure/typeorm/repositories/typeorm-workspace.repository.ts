@@ -28,6 +28,11 @@ export class TypeOrmWorkspaceRepository implements WorkspaceRepository {
     return model ? this.toDomain(model) : null;
   }
 
+  async findByCustomDomain(domain: string): Promise<Workspace[]> {
+    const models = await this.repository.findBy({ customDomain: domain });
+    return models.map((m) => this.toDomain(m));
+  }
+
   private static readonly VALID_SORT_FIELDS: Record<string, { col: string; lower: boolean }> = {
     name: { col: 'workspace.name', lower: true },
     slug: { col: 'workspace.slug', lower: true },
@@ -88,6 +93,9 @@ export class TypeOrmWorkspaceRepository implements WorkspaceRepository {
       palette: (model.metadata as any)?.palette ?? null,
       slaPolicy: model.slaPolicy as any ?? null,
       systemMailboxEnabled: model.systemMailboxEnabled ?? true,
+      customDomain: model.customDomain ?? null,
+      customDomainVerified: model.customDomainVerified ?? false,
+      domainVerificationToken: model.domainVerificationToken ?? null,
     });
   }
 
@@ -101,6 +109,9 @@ export class TypeOrmWorkspaceRepository implements WorkspaceRepository {
     model.metadata = { palette: workspace.palette };
     model.slaPolicy = workspace.slaPolicy as any;
     model.systemMailboxEnabled = workspace.systemMailboxEnabled;
+    model.customDomain = workspace.customDomain;
+    model.customDomainVerified = workspace.customDomainVerified;
+    model.domainVerificationToken = workspace.domainVerificationToken;
     return model;
   }
 }

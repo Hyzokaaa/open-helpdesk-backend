@@ -17,6 +17,7 @@ import { TicketCategory } from '../../../ticket/domain/enums/ticket-category.enu
 import { WorkspaceRole } from '../../../workspace/domain/enums/workspace-role.enum';
 import { TicketCreatedEvent, NewCommentEvent } from '../../../email/domain/events';
 import { ParsedInboundEmail } from '../../infrastructure/imap/imap-email-parser';
+import { EvaluateEmailRules } from '../../../email-rule/domain/services/email-rule-evaluate';
 
 export interface RouteInboundEmailResult {
   action: 'ticket-created' | 'comment-added' | 'rejected';
@@ -39,6 +40,7 @@ export class RouteInboundEmail {
     private readonly createComment: CreateComment,
     private readonly eventPublisher: EventPublisher,
     private readonly createAttachment?: CreateAttachment,
+    private readonly evaluateRules?: EvaluateEmailRules,
   ) {}
 
   async execute(parsed: ParsedInboundEmail): Promise<RouteInboundEmailResult> {
@@ -48,12 +50,17 @@ export class RouteInboundEmail {
     if (parsed.mailboxId) {
       const pollerMailbox = await this.mailboxRepository.findById(parsed.mailboxId);
       if (pollerMailbox?.isActive) {
-        // Check if the email was actually sent TO this mailbox's address
-        const recipients = parsed.toAddresses.map(a => a.toLowerCase());
-        if (recipients.includes(pollerMailbox.address.toLowerCase())) {
+        if (pollerMailbox.addressMode === 'all') {
+          // Accept any email in this mailbox regardless of To/CC
           mailbox = pollerMailbox;
-        } else if (pollerMailbox.workspaceId === null) {
-          viaSystemMailbox = true;
+        } else {
+          // Check if the email was actually sent TO this mailbox's address
+          const recipients = parsed.toAddresses.map(a => a.toLowerCase());
+          if (recipients.includes(pollerMailbox.address.toLowerCase())) {
+            mailbox = pollerMailbox;
+          } else if (pollerMailbox.workspaceId === null) {
+            viaSystemMailbox = true;
+          }
         }
       }
     }
@@ -90,7 +97,21 @@ export class RouteInboundEmail {
 
     const workspaceId = mailbox.workspaceId;
 
-    // 2. Find or create user
+    // 2. Evaluate email rules (before creating user/member)
+    let ruleResult = { action: 'proceed' as const } as import('../../../email-rule/domain/services/email-rule-evaluate').EmailRuleResult;
+    if (this.evaluateRules) {
+      ruleResult = await this.evaluateRules.execute(
+        { fromAddress: parsed.fromAddress, toAddresses: parsed.toAddresses, subject: parsed.subject },
+        workspaceId,
+        mailbox.getId(),
+      );
+      if (ruleResult.action === 'reject') {
+        this.logger.log(`Email rejected by rule "${ruleResult.matchedRuleName}": ${parsed.fromAddress} — ${parsed.subject}`);
+        return { action: 'rejected', reason: 'rule-rejected' };
+      }
+    }
+
+    // 3. Find or create user (only if not rejected)
     let user = await this.userRepository.findByEmail(parsed.fromAddress);
     if (!user) {
       const { firstName, lastName } = this.extractNameFromEmail(parsed.fromName, parsed.fromAddress);
@@ -162,15 +183,16 @@ export class RouteInboundEmail {
     const ticket = await this.createTicket.execute({
       name: parsed.subject,
       description: parsed.body,
-      priority: TicketPriority.MEDIUM,
-      category: TicketCategory.ISSUE,
+      priority: ruleResult.priority ?? TicketPriority.MEDIUM,
+      category: ruleResult.category ?? TicketCategory.ISSUE,
       workspaceId: workspaceId,
       reporterId: user.getId(),
-      tagIds: [],
+      tagIds: ruleResult.tagIds ?? [],
       source: TicketSource.EMAIL,
       portalToken: randomUUID(),
       mailboxId: mailbox.getId(),
       originDate: parsed.date ?? null,
+      departmentId: ruleResult.departmentId ?? null,
     });
 
     const ticketEvent: TicketCreatedEvent = {
@@ -187,6 +209,11 @@ export class RouteInboundEmail {
       source: 'email',
       mailboxId: mailbox.getId(),
     };
+    if (ruleResult.assigneeId) {
+      ticket.assigneeId = ruleResult.assigneeId;
+      await this.ticketRepository.update(ticket);
+    }
+
     this.eventPublisher.emit('ticket.created', ticketEvent);
 
     await this.uploadAttachments(parsed, ticket.getId(), null, user.getId());

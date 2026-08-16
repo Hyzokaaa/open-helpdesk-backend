@@ -158,15 +158,16 @@ export class WorkspaceInvitationController {
         if (invitation) {
           const invitationUrl = `${frontendUrl}/invite/${invitation.token}`;
           try {
-            await sendWorkspaceEmail(this.emailService, sender, invitationEmail({
+            const emailResult = await sendWorkspaceEmail(this.emailService, sender, invitationEmail({
               to: result.email,
               workspaceName: workspace.name,
               inviterName,
               invitationUrl,
               lang: 'en',
             }));
+            (result as any).emailSent = emailResult.success && !emailResult.mock;
           } catch {
-            // Email failure should not fail the batch
+            (result as any).emailSent = false;
           }
         }
       }
@@ -253,14 +254,16 @@ export class WorkspaceInvitationController {
     const invitationUrl = `${frontendUrl}/invite/${invitation.token}`;
 
     const sender = await this.emailSenderRepository.findByWorkspaceId(workspace.getId());
+    let emailSent = false;
     try {
-      await sendWorkspaceEmail(this.emailService, sender, invitationEmail({
+      const emailResult = await sendWorkspaceEmail(this.emailService, sender, invitationEmail({
         to: invitation.email,
         workspaceName: workspace.name,
         inviterName,
         invitationUrl,
         lang: 'en',
       }));
+      emailSent = emailResult.success && !emailResult.mock;
     } catch {
       // Email failure should not fail the resend
     }
@@ -272,13 +275,13 @@ export class WorkspaceInvitationController {
       entityId: id,
       userId: user.userId,
       workspaceId: workspace.getId(),
-      metadata: { email: invitation.email },
+      metadata: { email: invitation.email, emailSent },
       category: AuditCategory.WORKSPACE,
       level: AuditLevel.INFO,
       source: 'ui',
     });
 
-    return { id: invitation.getId(), email: invitation.email, expiresAt: invitation.expiresAt };
+    return { id: invitation.getId(), email: invitation.email, expiresAt: invitation.expiresAt, emailSent };
   }
 
   @Delete(':slug/invitations/:id')
