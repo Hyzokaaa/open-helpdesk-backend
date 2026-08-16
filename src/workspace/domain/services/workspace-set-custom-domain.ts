@@ -35,7 +35,7 @@ export class SetCustomDomain {
     }
 
     if (this.frontendHosts.some((host) => host === domain)) {
-      throw new DomainValidationError('This hostname is already the platform URL. Custom domain is not needed for routing.');
+      throw new DomainValidationError(`"${domain}" is the platform's own URL and cannot be used as a custom domain. Use a different hostname (e.g. helpdesk.yourcompany.com).`);
     }
 
     workspace.customDomain = domain;
