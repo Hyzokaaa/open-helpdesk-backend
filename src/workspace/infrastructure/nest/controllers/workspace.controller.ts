@@ -36,7 +36,8 @@ import { SetCustomDomain } from '../../../domain/services/workspace-set-custom-d
 import { VerifyCustomDomain } from '../../../domain/services/workspace-verify-custom-domain';
 import { SetBranding } from '../../../domain/services/workspace-set-branding';
 import { SetBrandingCommand } from '../../../application/commands/set-branding.command';
-import { S3StorageService } from '../../../../shared/infrastructure/s3-storage.service';
+import { StorageService } from '../../../../shared/domain/storage-service';
+import { STORAGE_SERVICE } from '../../../../shared/shared.module';
 import { UpdateWorkspacePaletteCommand } from '../../../application/commands/update-workspace-palette.command';
 import { UpdateWorkspaceSlaPolicy } from '../../../domain/services/workspace-update-sla-policy';
 import { UpdateSlaPolicyCommand } from '../../../application/commands/update-sla-policy.command';
@@ -82,7 +83,7 @@ export class WorkspaceController {
     @Inject() private readonly mailboxRepository: TypeOrmMailboxRepository,
     @Inject() private readonly config: ConfigService,
     @Inject() private readonly emailSenderRepository: TypeOrmWorkspaceEmailSenderRepository,
-    @Inject() private readonly s3Storage: S3StorageService,
+    @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -121,7 +122,7 @@ export class WorkspaceController {
     const result = await query.execute({ slug });
     return {
       ...result,
-      logo: result.logo ? await this.s3Storage.getPresignedUrl(result.logo) : null,
+      logo: result.logo ? await this.storage.getPresignedUrl(result.logo) : null,
       cnameTarget: this.config.get<string>('CUSTOM_DOMAIN_CNAME_TARGET', 'proxy.example.com'),
     };
   }
@@ -844,14 +845,14 @@ export class WorkspaceController {
     });
 
     const key = `workspaces/${workspaceId}/logo`;
-    await this.s3Storage.upload(file.buffer, key, file.mimetype);
+    await this.storage.upload(file.buffer, key, file.mimetype);
 
     const workspace = await this.workspaceRepository.findById(workspaceId);
     if (!workspace) throw new EntityNotFoundError('Workspace not found');
     workspace.logo = key;
     await this.workspaceRepository.update(workspace);
 
-    const logoUrl = await this.s3Storage.getPresignedUrl(key);
+    const logoUrl = await this.storage.getPresignedUrl(key);
     return { logo: logoUrl };
   }
 
@@ -873,7 +874,7 @@ export class WorkspaceController {
     if (!workspace) throw new EntityNotFoundError('Workspace not found');
 
     if (workspace.logo) {
-      await this.s3Storage.delete(workspace.logo);
+      await this.storage.delete(workspace.logo);
       workspace.logo = null;
       await this.workspaceRepository.update(workspace);
     }

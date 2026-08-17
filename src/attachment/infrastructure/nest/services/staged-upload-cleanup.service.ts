@@ -1,6 +1,7 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { TypeOrmAttachmentRepository } from '../../typeorm/repositories/typeorm-attachment.repository';
-import { S3StorageService } from '../../../../shared/infrastructure/s3-storage.service';
+import { StorageService } from '../../../../shared/domain/storage-service';
+import { STORAGE_SERVICE } from '../../../../shared/shared.module';
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
@@ -11,7 +12,7 @@ export class StagedUploadCleanupService implements OnModuleInit, OnModuleDestroy
 
   constructor(
     private readonly attachmentRepository: TypeOrmAttachmentRepository,
-    private readonly s3Storage: S3StorageService,
+    @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
   ) {}
 
   onModuleInit(): void {
@@ -35,7 +36,7 @@ export class StagedUploadCleanupService implements OnModuleInit, OnModuleDestroy
 
     for (const attachment of expired) {
       try {
-        await this.s3Storage.delete(attachment.s3Key);
+        await this.storage.delete(attachment.s3Key);
       } catch (error) {
         this.logger.warn(`Failed to delete S3 object ${attachment.s3Key}: ${error}`);
       }

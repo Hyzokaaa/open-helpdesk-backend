@@ -1,13 +1,14 @@
 import { Controller, Get, Inject, NotFoundException, Query } from '@nestjs/common';
 import { Public } from '../../../../shared/nest/decorators/public.decorator';
 import { TypeOrmWorkspaceRepository } from '../../typeorm/repositories/typeorm-workspace.repository';
-import { S3StorageService } from '../../../../shared/infrastructure/s3-storage.service';
+import { StorageService } from '../../../../shared/domain/storage-service';
+import { STORAGE_SERVICE } from '../../../../shared/shared.module';
 
 @Controller('internal')
 export class DomainCheckController {
   constructor(
     @Inject() private readonly workspaceRepository: TypeOrmWorkspaceRepository,
-    @Inject() private readonly s3Storage: S3StorageService,
+    @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
   ) {}
 
   @Public()
@@ -46,7 +47,7 @@ export class DomainCheckController {
         palette: w.palette,
         appName: w.appName,
         appSubtitle: w.appSubtitle,
-        logo: w.logo ? await this.s3Storage.getPresignedUrl(w.logo) : null,
+        logo: w.logo ? await this.storage.getPresignedUrl(w.logo) : null,
       })),
     );
 
