@@ -40,7 +40,7 @@ function buildOAuthProviders(): Provider[] {
   return providers;
 }
 
-const isFilesystem = (process.env.STORAGE_PROVIDER || 'filesystem') === 'filesystem';
+const isFilesystem = process.env.STORAGE_PROVIDER === 'filesystem';
 
 const storageProvider: Provider = {
   provide: STORAGE_SERVICE,
