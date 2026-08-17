@@ -14,7 +14,8 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
-import { S3StorageService } from '../../../../shared/infrastructure/s3-storage.service';
+import { StorageService } from '../../../../shared/domain/storage-service';
+import { STORAGE_SERVICE } from '../../../../shared/shared.module';
 import { AccessDeniedError, DomainValidationError } from '../../../../shared/domain/errors';
 import { SystemBranding } from '../../../domain/entities/system-branding';
 import { TypeOrmSystemBrandingRepository } from '../../typeorm/repositories/typeorm-system-branding.repository';
@@ -33,7 +34,7 @@ export class SystemBrandingController {
   constructor(
     @Inject() private readonly repository: TypeOrmSystemBrandingRepository,
     @Inject() private readonly idGenerator: UlidGenerator,
-    @Inject() private readonly s3Storage: S3StorageService,
+    @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
   ) {}
 
@@ -57,7 +58,7 @@ export class SystemBrandingController {
     return {
       appName: branding?.appName ?? null,
       appSubtitle: branding?.appSubtitle ?? null,
-      logo: branding?.logo ? await this.s3Storage.getPresignedUrl(branding.logo) : null,
+      logo: branding?.logo ? await this.storage.getPresignedUrl(branding.logo) : null,
     };
   }
 
@@ -98,7 +99,7 @@ export class SystemBrandingController {
     return {
       appName: branding.appName,
       appSubtitle: branding.appSubtitle,
-      logo: branding.logo ? await this.s3Storage.getPresignedUrl(branding.logo) : null,
+      logo: branding.logo ? await this.storage.getPresignedUrl(branding.logo) : null,
     };
   }
 
@@ -123,11 +124,11 @@ export class SystemBrandingController {
     }
 
     const key = 'system/branding/logo';
-    await this.s3Storage.upload(file.buffer, key, file.mimetype);
+    await this.storage.upload(file.buffer, key, file.mimetype);
     branding.logo = key;
     await this.repository.save(branding);
 
-    return { logo: await this.s3Storage.getPresignedUrl(key) };
+    return { logo: await this.storage.getPresignedUrl(key) };
   }
 
   @Delete('branding/logo')
@@ -136,7 +137,7 @@ export class SystemBrandingController {
 
     const branding = await this.repository.find();
     if (branding?.logo) {
-      await this.s3Storage.delete(branding.logo);
+      await this.storage.delete(branding.logo);
       branding.logo = null;
       await this.repository.save(branding);
     }

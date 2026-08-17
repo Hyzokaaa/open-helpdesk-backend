@@ -21,7 +21,8 @@ import { CreateComment } from '../../../comment/domain/services/comment-create';
 import { RouteInboundEmail } from '../../domain/services/route-inbound-email';
 import { CreateAttachment } from '../../../attachment/domain/services/attachment-create';
 import { TypeOrmAttachmentRepository } from '../../../attachment/infrastructure/typeorm/repositories/typeorm-attachment.repository';
-import { S3StorageService } from '../../../shared/infrastructure/s3-storage.service';
+import { StorageService } from '../../../shared/domain/storage-service';
+import { STORAGE_SERVICE } from '../../../shared/shared.module';
 import { MailboxType } from '../../../mailbox/domain/enums/mailbox-type.enum';
 import { Mailbox } from '../../../mailbox/domain/entities/mailbox';
 import { ImapEmailParser, ImapEnvelope } from './imap-email-parser';
@@ -59,7 +60,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     @Inject() private readonly eventPublisher: NestEventPublisher,
     @Inject() private readonly processedEmailRepository: ProcessedEmailRepository,
     @Inject() private readonly attachmentRepository: TypeOrmAttachmentRepository,
-    @Inject() private readonly storageService: S3StorageService,
+    @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
     @Inject() private readonly emailRuleRepository: TypeOrmEmailRuleRepository,
   ) {}
@@ -431,7 +432,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     const addMember = new AddWorkspaceMember(this.idGenerator, this.memberRepository);
     const createTicket = new CreateTicket(this.idGenerator, this.ticketRepository);
     const createComment = new CreateComment(this.idGenerator, this.commentRepository);
-    const createAttachment = new CreateAttachment(this.idGenerator, this.attachmentRepository, this.storageService);
+    const createAttachment = new CreateAttachment(this.idGenerator, this.attachmentRepository, this.storage);
     const evaluateRules = new EvaluateEmailRules(this.emailRuleRepository);
 
     return new RouteInboundEmail(

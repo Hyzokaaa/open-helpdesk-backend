@@ -12,7 +12,8 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
-import { S3StorageService } from '../../../../shared/infrastructure/s3-storage.service';
+import { StorageService } from '../../../../shared/domain/storage-service';
+import { STORAGE_SERVICE } from '../../../../shared/shared.module';
 import { AccessDeniedError } from '../../../../shared/domain/errors';
 import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
 import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit-log-create';
@@ -34,7 +35,7 @@ export class AttachmentController {
   constructor(
     @Inject() private readonly attachmentRepository: TypeOrmAttachmentRepository,
     @Inject() private readonly idGenerator: UlidGenerator,
-    @Inject() private readonly s3Storage: S3StorageService,
+    @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
   ) {}
 
@@ -44,7 +45,7 @@ export class AttachmentController {
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: AuthUser,
   ) {
-    const service = new StageAttachment(this.idGenerator, this.attachmentRepository, this.s3Storage);
+    const service = new StageAttachment(this.idGenerator, this.attachmentRepository, this.storage);
     const command = new StageUploadCommand(service);
     const result = await command.execute({
       buffer: file.buffer,
@@ -77,7 +78,7 @@ export class AttachmentController {
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: AuthUser,
   ) {
-    const service = new CreateAttachment(this.idGenerator, this.attachmentRepository, this.s3Storage);
+    const service = new CreateAttachment(this.idGenerator, this.attachmentRepository, this.storage);
     const command = new UploadAttachmentCommand(service);
     return command.execute({
       buffer: file.buffer,
@@ -92,7 +93,7 @@ export class AttachmentController {
 
   @Get('workspaces/:slug/tickets/:ticketId/attachments')
   listByTicket(@Param('ticketId') ticketId: string) {
-    const query = new ListTicketAttachmentsQuery(this.attachmentRepository, this.s3Storage);
+    const query = new ListTicketAttachmentsQuery(this.attachmentRepository, this.storage);
     return query.execute({ ticketId });
   }
 
@@ -103,7 +104,7 @@ export class AttachmentController {
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: AuthUser,
   ) {
-    const service = new CreateAttachment(this.idGenerator, this.attachmentRepository, this.s3Storage);
+    const service = new CreateAttachment(this.idGenerator, this.attachmentRepository, this.storage);
     const command = new UploadAttachmentCommand(service);
     return command.execute({
       buffer: file.buffer,
@@ -118,7 +119,7 @@ export class AttachmentController {
 
   @Get('attachments/:id')
   get(@Param('id') id: string) {
-    const query = new GetAttachmentQuery(this.attachmentRepository, this.s3Storage);
+    const query = new GetAttachmentQuery(this.attachmentRepository, this.storage);
     return query.execute({ attachmentId: id });
   }
 
@@ -132,7 +133,7 @@ export class AttachmentController {
       throw new AccessDeniedError('You can only delete your own attachments');
     }
 
-    const service = new DeleteAttachment(this.attachmentRepository, this.s3Storage);
+    const service = new DeleteAttachment(this.attachmentRepository, this.storage);
     const command = new DeleteAttachmentCommand(service);
     const result = await command.execute({ attachmentId: id });
 

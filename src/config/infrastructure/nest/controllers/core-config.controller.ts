@@ -3,7 +3,8 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { Public } from '../../../../shared/nest/decorators/public.decorator';
 import { TypeOrmSystemEmailSettingsRepository } from '../../typeorm/repositories/typeorm-system-email-settings.repository';
 import { TypeOrmSystemBrandingRepository } from '../../typeorm/repositories/typeorm-system-branding.repository';
-import { S3StorageService } from '../../../../shared/infrastructure/s3-storage.service';
+import { StorageService } from '../../../../shared/domain/storage-service';
+import { STORAGE_SERVICE } from '../../../../shared/shared.module';
 
 @Public()
 @SkipThrottle()
@@ -12,7 +13,7 @@ export class CoreConfigController {
   constructor(
     @Inject() private readonly systemEmailRepo: TypeOrmSystemEmailSettingsRepository,
     @Inject() private readonly systemBrandingRepo: TypeOrmSystemBrandingRepository,
-    @Inject() private readonly s3Storage: S3StorageService,
+    @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
   ) {}
 
   @Get('public')
@@ -27,7 +28,7 @@ export class CoreConfigController {
       systemEmailFrom: emailFrom,
       brandingAppName: branding?.appName ?? null,
       brandingAppSubtitle: branding?.appSubtitle ?? null,
-      brandingLogo: branding?.logo ? await this.s3Storage.getPresignedUrl(branding.logo) : null,
+      brandingLogo: branding?.logo ? await this.storage.getPresignedUrl(branding.logo) : null,
     };
   }
 }

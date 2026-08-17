@@ -15,7 +15,8 @@ import { Public } from '../../../../shared/nest/decorators/public.decorator';
 import { EntityNotFoundError } from '../../../../shared/domain/errors';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
 import { BcryptPasswordHasher } from '../../../../shared/infrastructure/bcrypt-password-hasher';
-import { S3StorageService } from '../../../../shared/infrastructure/s3-storage.service';
+import { StorageService } from '../../../../shared/domain/storage-service';
+import { STORAGE_SERVICE } from '../../../../shared/shared.module';
 import { NestEventPublisher } from '../../../../shared/infrastructure/nest-event-publisher';
 import { CreateUser } from '../../../../user/domain/services/user-create';
 import { AddWorkspaceMember } from '../../../../workspace/domain/services/workspace-add-member';
@@ -58,7 +59,7 @@ export class PortalController {
     @Inject() private readonly idGenerator: UlidGenerator,
     @Inject() private readonly passwordHasher: BcryptPasswordHasher,
     @Inject() private readonly eventPublisher: NestEventPublisher,
-    @Inject() private readonly s3Storage: S3StorageService,
+    @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
     @Inject() private readonly customFieldDefinitionRepository: TypeOrmCustomFieldDefinitionRepository,
     @Inject() private readonly commentRepository: TypeOrmCommentRepository,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
@@ -238,7 +239,7 @@ export class PortalController {
         originalName: a.originalName,
         mimeType: a.mimeType,
         size: a.size,
-        downloadUrl: await this.s3Storage.getPresignedUrl(a.s3Key),
+        downloadUrl: await this.storage.getPresignedUrl(a.s3Key),
       })),
     );
 
@@ -304,7 +305,7 @@ export class PortalController {
     @Param('slug') slug: string,
     @UploadedFile() file: Express.Multer.File,
   ): Promise<StageUploadResponse> {
-    const service = new StageAttachment(this.idGenerator, this.attachmentRepository, this.s3Storage);
+    const service = new StageAttachment(this.idGenerator, this.attachmentRepository, this.storage);
     const command = new StageUploadCommand(service);
     return command.execute({
       buffer: file.buffer,
