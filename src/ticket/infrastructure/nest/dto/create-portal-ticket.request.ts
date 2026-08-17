@@ -29,4 +29,8 @@ export class CreatePortalTicketRequest {
 
   @IsOptional()
   customFields?: Record<string, unknown>;
+
+  @IsString()
+  @IsOptional()
+  departmentId?: string;
 }
