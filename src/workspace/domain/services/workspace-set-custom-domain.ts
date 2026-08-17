@@ -14,7 +14,7 @@ const DOMAIN_REGEX = /^(?!-)[a-zA-Z0-9-]{1,63}(?<!-)(\.[a-zA-Z0-9-]{1,63})*\.[a-
 export class SetCustomDomain {
   constructor(
     private readonly repository: WorkspaceRepository,
-    private readonly frontendHosts: string[] = [],
+    private readonly primaryHost: string = '',
   ) {}
 
   async execute(props: SetCustomDomainProps): Promise<Workspace> {
@@ -34,7 +34,7 @@ export class SetCustomDomain {
       throw new DomainValidationError('Invalid domain format');
     }
 
-    if (this.frontendHosts.some((host) => host === domain)) {
+    if (this.primaryHost && this.primaryHost === domain) {
       throw new DomainValidationError(`"${domain}" is the platform's own URL and cannot be used as a custom domain. Use a different hostname (e.g. helpdesk.yourcompany.com).`);
     }
 

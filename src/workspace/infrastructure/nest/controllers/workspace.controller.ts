@@ -729,10 +729,10 @@ export class WorkspaceController {
     });
 
     const frontendUrl = this.config.get<string>('FRONTEND_URL', '');
-    const frontendHosts = frontendUrl.split(',').map((u) => {
-      try { return new URL(u.trim()).hostname; } catch { return ''; }
-    }).filter(Boolean);
-    const service = new SetCustomDomain(this.workspaceRepository, frontendHosts);
+    const primaryUrl = frontendUrl.split(',')[0]?.trim() || '';
+    let primaryHost = '';
+    try { primaryHost = new URL(primaryUrl).hostname; } catch {}
+    const service = new SetCustomDomain(this.workspaceRepository, primaryHost);
     const workspace = await service.execute({ workspaceId, domain: body.domain, autoVerify: body.autoVerify });
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
