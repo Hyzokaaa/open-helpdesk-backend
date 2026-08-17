@@ -4,13 +4,16 @@ import { SharedModule } from '../shared/shared.module';
 import { AuditLogModule } from '../audit-log/audit-log.module';
 import { CoreConfigController } from './infrastructure/nest/controllers/core-config.controller';
 import { SystemEmailSettingsController } from './infrastructure/nest/controllers/system-email-settings.controller';
+import { SystemBrandingController } from './infrastructure/nest/controllers/system-branding.controller';
 import { SystemEmailSettingsModel } from './infrastructure/typeorm/models/system-email-settings.model';
+import { SystemBrandingModel } from './infrastructure/typeorm/models/system-branding.model';
 import { TypeOrmSystemEmailSettingsRepository } from './infrastructure/typeorm/repositories/typeorm-system-email-settings.repository';
+import { TypeOrmSystemBrandingRepository } from './infrastructure/typeorm/repositories/typeorm-system-branding.repository';
 
 @Module({
-  imports: [SharedModule, AuditLogModule, TypeOrmModule.forFeature([SystemEmailSettingsModel])],
-  controllers: [CoreConfigController, SystemEmailSettingsController],
-  providers: [TypeOrmSystemEmailSettingsRepository],
-  exports: [TypeOrmSystemEmailSettingsRepository],
+  imports: [SharedModule, AuditLogModule, TypeOrmModule.forFeature([SystemEmailSettingsModel, SystemBrandingModel])],
+  controllers: [CoreConfigController, SystemEmailSettingsController, SystemBrandingController],
+  providers: [TypeOrmSystemEmailSettingsRepository, TypeOrmSystemBrandingRepository],
+  exports: [TypeOrmSystemEmailSettingsRepository, TypeOrmSystemBrandingRepository],
 })
 export class CoreConfigModule {}

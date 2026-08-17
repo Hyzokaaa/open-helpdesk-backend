@@ -10,7 +10,10 @@ import {
   Post,
   Query,
   Res,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { DataSource } from 'typeorm';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
@@ -31,6 +34,9 @@ import { UpdateWorkspaceCommand } from '../../../application/commands/update-wor
 import { UpdateWorkspacePalette } from '../../../domain/services/workspace-update-palette';
 import { SetCustomDomain } from '../../../domain/services/workspace-set-custom-domain';
 import { VerifyCustomDomain } from '../../../domain/services/workspace-verify-custom-domain';
+import { SetBranding } from '../../../domain/services/workspace-set-branding';
+import { SetBrandingCommand } from '../../../application/commands/set-branding.command';
+import { S3StorageService } from '../../../../shared/infrastructure/s3-storage.service';
 import { UpdateWorkspacePaletteCommand } from '../../../application/commands/update-workspace-palette.command';
 import { UpdateWorkspaceSlaPolicy } from '../../../domain/services/workspace-update-sla-policy';
 import { UpdateSlaPolicyCommand } from '../../../application/commands/update-sla-policy.command';
@@ -76,6 +82,7 @@ export class WorkspaceController {
     @Inject() private readonly mailboxRepository: TypeOrmMailboxRepository,
     @Inject() private readonly config: ConfigService,
     @Inject() private readonly emailSenderRepository: TypeOrmWorkspaceEmailSenderRepository,
+    @Inject() private readonly s3Storage: S3StorageService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -114,6 +121,7 @@ export class WorkspaceController {
     const result = await query.execute({ slug });
     return {
       ...result,
+      logo: result.logo ? await this.s3Storage.getPresignedUrl(result.logo) : null,
       cnameTarget: this.config.get<string>('CUSTOM_DOMAIN_CNAME_TARGET', 'proxy.example.com'),
     };
   }
@@ -720,7 +728,11 @@ export class WorkspaceController {
       isSystemAdmin: user.isSystemAdmin,
     });
 
-    const service = new SetCustomDomain(this.workspaceRepository);
+    const frontendUrl = this.config.get<string>('FRONTEND_URL', '');
+    const frontendHosts = frontendUrl.split(',').map((u) => {
+      try { return new URL(u.trim()).hostname; } catch { return ''; }
+    }).filter(Boolean);
+    const service = new SetCustomDomain(this.workspaceRepository, frontendHosts);
     const workspace = await service.execute({ workspaceId, domain: body.domain, autoVerify: body.autoVerify });
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
@@ -779,6 +791,94 @@ export class WorkspaceController {
     }
 
     return result;
+  }
+
+  @Patch(':slug/branding')
+  async setBranding(
+    @Param('slug') slug: string,
+    @Body() body: { appName?: string | null; appSubtitle?: string | null },
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+
+    const service = new SetBranding(this.workspaceRepository);
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    const command = new SetBrandingCommand(service, auditLog);
+    return command.execute({
+      workspaceId,
+      userId: user.userId,
+      appName: body.appName,
+      appSubtitle: body.appSubtitle,
+    });
+  }
+
+  @Post(':slug/branding/logo')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadLogo(
+    @Param('slug') slug: string,
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: AuthUser,
+  ) {
+    if (!file) throw new BadRequestException('No file uploaded');
+    if (file.size > 1024 * 1024) throw new BadRequestException('Logo must be 1MB or less');
+
+    const allowedMimes = ['image/png', 'image/svg+xml', 'image/jpeg', 'image/webp'];
+    if (!allowedMimes.includes(file.mimetype)) {
+      throw new BadRequestException('Logo must be PNG, SVG, JPEG, or WebP');
+    }
+
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+
+    const key = `workspaces/${workspaceId}/logo`;
+    await this.s3Storage.upload(file.buffer, key, file.mimetype);
+
+    const workspace = await this.workspaceRepository.findById(workspaceId);
+    if (!workspace) throw new EntityNotFoundError('Workspace not found');
+    workspace.logo = key;
+    await this.workspaceRepository.update(workspace);
+
+    const logoUrl = await this.s3Storage.getPresignedUrl(key);
+    return { logo: logoUrl };
+  }
+
+  @Delete(':slug/branding/logo')
+  async deleteLogo(
+    @Param('slug') slug: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+
+    const workspace = await this.workspaceRepository.findById(workspaceId);
+    if (!workspace) throw new EntityNotFoundError('Workspace not found');
+
+    if (workspace.logo) {
+      await this.s3Storage.delete(workspace.logo);
+      workspace.logo = null;
+      await this.workspaceRepository.update(workspace);
+    }
+
+    return { logo: null };
   }
 
   private async resolveWorkspaceId(slug: string): Promise<string> {

@@ -38,6 +38,7 @@ import { TypeOrmAttachmentRepository } from '../../../../attachment/infrastructu
 import { TypeOrmCustomFieldDefinitionRepository } from '../../../../custom-field/infrastructure/typeorm/repositories/typeorm-custom-field-definition.repository';
 import { ValidateCustomFieldValues } from '../../../../custom-field/domain/services/custom-field-validate-values';
 import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
+import { TypeOrmDepartmentRepository } from '../../../../department/infrastructure/typeorm/repositories/typeorm-department.repository';
 import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit-log-create';
 import { AuditAction } from '../../../../audit-log/domain/enums/audit-action.enum';
 import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category.enum';
@@ -61,6 +62,7 @@ export class PortalController {
     @Inject() private readonly customFieldDefinitionRepository: TypeOrmCustomFieldDefinitionRepository,
     @Inject() private readonly commentRepository: TypeOrmCommentRepository,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
+    @Inject() private readonly departmentRepository: TypeOrmDepartmentRepository,
   ) {}
 
   @Get(':slug')
@@ -87,6 +89,18 @@ export class PortalController {
       type: def.type,
       required: def.required,
       options: def.options,
+    }));
+  }
+
+  @Get(':slug/departments')
+  async getDepartments(@Param('slug') slug: string) {
+    const workspace = await this.workspaceRepository.findBySlug(slug);
+    if (!workspace) throw new EntityNotFoundError('Workspace not found');
+
+    const departments = await this.departmentRepository.findByWorkspaceId(workspace.getId());
+    return departments.map((d) => ({
+      id: d.getId(),
+      name: d.name,
     }));
   }
 
@@ -147,6 +161,7 @@ export class PortalController {
       reporterId: user.getId(),
       tagIds: [],
       customFields: validatedCustomFields,
+      departmentId: body.departmentId ?? null,
       source: TicketSource.PORTAL,
       portalToken,
     });

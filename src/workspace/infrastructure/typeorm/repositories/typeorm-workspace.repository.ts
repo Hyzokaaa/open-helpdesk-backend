@@ -96,6 +96,9 @@ export class TypeOrmWorkspaceRepository implements WorkspaceRepository {
       customDomain: model.customDomain ?? null,
       customDomainVerified: model.customDomainVerified ?? false,
       domainVerificationToken: model.domainVerificationToken ?? null,
+      appName: model.appName ?? null,
+      appSubtitle: model.appSubtitle ?? null,
+      logo: model.logo ?? null,
     });
   }
 
@@ -112,6 +115,9 @@ export class TypeOrmWorkspaceRepository implements WorkspaceRepository {
     model.customDomain = workspace.customDomain;
     model.customDomainVerified = workspace.customDomainVerified;
     model.domainVerificationToken = workspace.domainVerificationToken;
+    model.appName = workspace.appName;
+    model.appSubtitle = workspace.appSubtitle;
+    model.logo = workspace.logo;
     return model;
   }
 }
