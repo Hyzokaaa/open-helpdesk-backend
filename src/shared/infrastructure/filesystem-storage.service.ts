@@ -26,7 +26,7 @@ export class FilesystemStorageService implements StorageService {
   async getPresignedUrl(key: string, expiresIn = 3600): Promise<string> {
     const expires = Math.floor(Date.now() / 1000) + expiresIn;
     const signature = this.sign(key, expires);
-    return `${this.baseUrl}/api/storage/files/${encodeURIComponent(key)}?expires=${expires}&signature=${signature}`;
+    return `${this.baseUrl}/api/storage/files/${key}?expires=${expires}&signature=${signature}`;
   }
 
   async delete(key: string): Promise<void> {

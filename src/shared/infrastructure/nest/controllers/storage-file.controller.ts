@@ -1,5 +1,5 @@
-import { Controller, Get, Inject, NotFoundException, Param, Query, Res, ForbiddenException } from '@nestjs/common';
-import { Response } from 'express';
+import { Controller, Get, Inject, NotFoundException, Query, Req, Res, ForbiddenException } from '@nestjs/common';
+import { Request, Response } from 'express';
 import { promises as fs } from 'fs';
 import { extname } from 'path';
 import { Public } from '../../../nest/decorators/public.decorator';
@@ -45,9 +45,9 @@ export class StorageFileController {
     this.isFilesystem = config.get('STORAGE_PROVIDER', 'filesystem') === 'filesystem';
   }
 
-  @Get('files/*key')
+  @Get('files/*')
   async serveFile(
-    @Param('key') key: string,
+    @Req() req: Request,
     @Query('expires') expires: string,
     @Query('signature') signature: string,
     @Res() res: Response,
@@ -55,6 +55,10 @@ export class StorageFileController {
     if (!this.isFilesystem || !this.filesystemStorage) {
       throw new NotFoundException();
     }
+
+    // Extract key from URL path: /storage/files/system/branding/logo -> system/branding/logo
+    const key = decodeURIComponent(req.path.replace('/storage/files/', ''));
+    if (!key) throw new NotFoundException();
 
     const exp = parseInt(expires, 10);
     if (!exp || !signature || !this.filesystemStorage.validateSignature(key, exp, signature)) {
