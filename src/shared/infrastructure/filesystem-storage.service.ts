@@ -26,11 +26,7 @@ export class FilesystemStorageService implements StorageService {
   async getPresignedUrl(key: string, expiresIn = 3600): Promise<string> {
     const expires = Math.floor(Date.now() / 1000) + expiresIn;
     const signature = this.sign(key, expires);
-    const apiUrl = this.config.get('FRONTEND_URL', 'http://localhost:3000').split(',')[0].trim();
-    // Build URL pointing to the backend storage endpoint
-    const backendPort = this.config.get('PORT', '3000');
-    const backendUrl = process.env.VITE_API_URL || `http://localhost:${backendPort}`;
-    return `${backendUrl}/storage/files/${encodeURIComponent(key)}?expires=${expires}&signature=${signature}`;
+    return `${this.baseUrl}/api/storage/files/${encodeURIComponent(key)}?expires=${expires}&signature=${signature}`;
   }
 
   async delete(key: string): Promise<void> {
