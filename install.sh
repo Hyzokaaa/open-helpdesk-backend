@@ -58,11 +58,13 @@ sudo mkdir -p "$INSTALL_DIR"
 # Clone or pull
 if [ -d "$INSTALL_DIR/.git" ]; then
   echo "Updating existing installation..."
+  git config --global --add safe.directory "$INSTALL_DIR" 2>/dev/null || true
   cd "$INSTALL_DIR"
   sudo git pull
 else
   echo "Cloning repository..."
   sudo git clone https://github.com/Hyzokaaa/open-helpdesk-backend.git "$INSTALL_DIR"
+  git config --global --add safe.directory "$INSTALL_DIR" 2>/dev/null || true
 fi
 
 cd "$INSTALL_DIR"
