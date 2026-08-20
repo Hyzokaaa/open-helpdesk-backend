@@ -29,6 +29,13 @@ const APP_NAME_MAX_LENGTH = 50;
 const APP_SUBTITLE_MAX_LENGTH = 30;
 const HTML_REGEX = /<[^>]*>/;
 
+const MIME_TO_EXT: Record<string, string> = {
+  'image/png': '.png',
+  'image/svg+xml': '.svg',
+  'image/jpeg': '.jpg',
+  'image/webp': '.webp',
+};
+
 @Controller('admin')
 export class SystemBrandingController {
   constructor(
@@ -123,7 +130,13 @@ export class SystemBrandingController {
       branding = new SystemBranding({ id: this.idGenerator.create(), appName: null, appSubtitle: null, logo: null });
     }
 
-    const key = 'system/branding/logo';
+    const ext = MIME_TO_EXT[file.mimetype] ?? '.png';
+    const key = `system/branding/logo${ext}`;
+
+    if (branding.logo && branding.logo !== key) {
+      await this.storage.delete(branding.logo);
+    }
+
     await this.storage.upload(file.buffer, key, file.mimetype);
     branding.logo = key;
     await this.repository.save(branding);
