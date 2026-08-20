@@ -38,6 +38,13 @@ import { SetBranding } from '../../../domain/services/workspace-set-branding';
 import { SetBrandingCommand } from '../../../application/commands/set-branding.command';
 import { StorageService } from '../../../../shared/domain/storage-service';
 import { STORAGE_SERVICE } from '../../../../shared/shared.module';
+
+const MIME_TO_EXT: Record<string, string> = {
+  'image/png': '.png',
+  'image/svg+xml': '.svg',
+  'image/jpeg': '.jpg',
+  'image/webp': '.webp',
+};
 import { UpdateWorkspacePaletteCommand } from '../../../application/commands/update-workspace-palette.command';
 import { UpdateWorkspaceSlaPolicy } from '../../../domain/services/workspace-update-sla-policy';
 import { UpdateSlaPolicyCommand } from '../../../application/commands/update-sla-policy.command';
@@ -844,11 +851,17 @@ export class WorkspaceController {
       isSystemAdmin: user.isSystemAdmin,
     });
 
-    const key = `workspaces/${workspaceId}/logo`;
-    await this.storage.upload(file.buffer, key, file.mimetype);
+    const ext = MIME_TO_EXT[file.mimetype] ?? '.png';
+    const key = `workspaces/${workspaceId}/logo${ext}`;
 
     const workspace = await this.workspaceRepository.findById(workspaceId);
     if (!workspace) throw new EntityNotFoundError('Workspace not found');
+
+    if (workspace.logo && workspace.logo !== key) {
+      await this.storage.delete(workspace.logo);
+    }
+
+    await this.storage.upload(file.buffer, key, file.mimetype);
     workspace.logo = key;
     await this.workspaceRepository.update(workspace);
 
