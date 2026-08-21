@@ -35,6 +35,7 @@ import { TypeOrmWorkspaceRepository } from '../../../../workspace/infrastructure
 import { TypeOrmWorkspaceMemberRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
 import { EnsureWorkspacePermission } from '../../../../workspace/domain/services/workspace-ensure-permission';
 import { PERMISSIONS } from '../../../../workspace/domain/permissions';
+import { TypeOrmUserRepository } from '../../../../user/infrastructure/typeorm/repositories/typeorm-user.repository';
 import { CreateOrganizationRequest } from '../dto/create-organization.request';
 import { UpdateOrganizationRequest } from '../dto/update-organization.request';
 
@@ -54,6 +55,7 @@ export class OrganizationController {
     @Inject() private readonly idGenerator: UlidGenerator,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
     @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
+    @Inject() private readonly userRepository: TypeOrmUserRepository,
   ) {}
 
   @Post()
@@ -266,6 +268,91 @@ export class OrganizationController {
     }
 
     return { logo: null };
+  }
+
+  @Get(':id/members')
+  async listMembers(
+    @Param('slug') slug: string,
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.ORGANIZATION_VIEW,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+
+    const org = await this.organizationRepository.findById(id);
+    if (!org || org.workspaceId !== workspaceId) throw new EntityNotFoundError('Organization not found');
+
+    const members = await this.memberRepository.findByOrganizationId(id);
+    const userIds = members.map((m) => m.userId);
+    const users = await Promise.all(userIds.map((uid) => this.userRepository.findById(uid)));
+
+    return members.map((m, i) => ({
+      userId: m.userId,
+      firstName: users[i]?.firstName ?? '',
+      lastName: users[i]?.lastName ?? '',
+      email: users[i]?.email ?? '',
+    }));
+  }
+
+  @Post(':id/members')
+  async addMember(
+    @Param('slug') slug: string,
+    @Param('id') id: string,
+    @Body() body: { userId: string },
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.ORGANIZATION_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+
+    const org = await this.organizationRepository.findById(id);
+    if (!org || org.workspaceId !== workspaceId) throw new EntityNotFoundError('Organization not found');
+
+    const member = await this.memberRepository.findByWorkspaceAndUser(workspaceId, body.userId);
+    if (!member) throw new EntityNotFoundError('Member not found in workspace');
+
+    member.organizationId = id;
+    await this.memberRepository.update(member);
+
+    return { success: true };
+  }
+
+  @Delete(':id/members/:userId')
+  async removeMember(
+    @Param('slug') slug: string,
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.ORGANIZATION_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+
+    const member = await this.memberRepository.findByWorkspaceAndUser(workspaceId, userId);
+    if (!member) throw new EntityNotFoundError('Member not found');
+
+    if (member.organizationId === id) {
+      member.organizationId = null;
+      await this.memberRepository.update(member);
+    }
+
+    return { success: true };
   }
 
   private async resolveWorkspaceId(slug: string): Promise<string> {
