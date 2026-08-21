@@ -46,6 +46,8 @@ import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category
 import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
 import { CreatePortalTicketRequest } from '../dto/create-portal-ticket.request';
 import { CreatePortalCommentRequest } from '../dto/create-portal-comment.request';
+import { TypeOrmOrganizationRepository } from '../../../../organization/infrastructure/typeorm/repositories/typeorm-organization.repository';
+import { AutoEnrollOrganization } from '../../../../organization/domain/services/organization-auto-enroll';
 
 @Public()
 @Controller('portal')
@@ -64,6 +66,7 @@ export class PortalController {
     @Inject() private readonly commentRepository: TypeOrmCommentRepository,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
     @Inject() private readonly departmentRepository: TypeOrmDepartmentRepository,
+    @Inject() private readonly organizationRepository: TypeOrmOrganizationRepository,
   ) {}
 
   @Get(':slug')
@@ -150,6 +153,18 @@ export class PortalController {
       });
     }
 
+    // Auto-enroll organization by reporter email domain
+    const autoEnroll = new AutoEnrollOrganization(this.organizationRepository);
+    const { organizationId } = await autoEnroll.execute(body.email, workspace.getId());
+
+    if (organizationId) {
+      const member = await this.memberRepository.findByWorkspaceAndUser(workspace.getId(), user.getId());
+      if (member && !member.organizationId) {
+        member.organizationId = organizationId;
+        await this.memberRepository.update(member);
+      }
+    }
+
     // Create ticket
     const portalToken = randomUUID();
     const createTicketService = new CreateTicket(this.idGenerator, this.ticketRepository);
@@ -163,6 +178,7 @@ export class PortalController {
       tagIds: [],
       customFields: validatedCustomFields,
       departmentId: body.departmentId ?? null,
+      organizationId,
       source: TicketSource.PORTAL,
       portalToken,
     });

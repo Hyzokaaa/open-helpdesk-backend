@@ -10,6 +10,7 @@ export interface TicketFilters {
   priority?: TicketPriority;
   tagIds?: string[];
   departmentId?: string;
+  organizationId?: string;
   assigneeId?: string;
   reporterId?: string;
   registeredById?: string;

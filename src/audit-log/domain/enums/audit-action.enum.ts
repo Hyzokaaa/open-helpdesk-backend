@@ -109,6 +109,11 @@ export enum AuditAction {
   DEPARTMENT_MEMBER_ADDED = 'department-member-added',
   DEPARTMENT_MEMBER_REMOVED = 'department-member-removed',
 
+  // Organizations
+  ORGANIZATION_CREATED = 'organization-created',
+  ORGANIZATION_UPDATED = 'organization-updated',
+  ORGANIZATION_DELETED = 'organization-deleted',
+
   // Canned responses
   CANNED_RESPONSE_CREATED = 'canned-response-created',
   CANNED_RESPONSE_UPDATED = 'canned-response-updated',

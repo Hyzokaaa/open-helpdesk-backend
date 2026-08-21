@@ -18,6 +18,8 @@ import { WorkspaceRole } from '../../../workspace/domain/enums/workspace-role.en
 import { TicketCreatedEvent, NewCommentEvent } from '../../../email/domain/events';
 import { ParsedInboundEmail } from '../../infrastructure/imap/imap-email-parser';
 import { EvaluateEmailRules } from '../../../email-rule/domain/services/email-rule-evaluate';
+import { OrganizationRepository } from '../../../organization/domain/repositories/organization.repository';
+import { AutoEnrollOrganization } from '../../../organization/domain/services/organization-auto-enroll';
 
 export interface RouteInboundEmailResult {
   action: 'ticket-created' | 'comment-added' | 'rejected';
@@ -41,6 +43,7 @@ export class RouteInboundEmail {
     private readonly eventPublisher: EventPublisher,
     private readonly createAttachment?: CreateAttachment,
     private readonly evaluateRules?: EvaluateEmailRules,
+    private readonly organizationRepository?: OrganizationRepository,
   ) {}
 
   async execute(parsed: ParsedInboundEmail): Promise<RouteInboundEmailResult> {
@@ -180,6 +183,21 @@ export class RouteInboundEmail {
       return { action: 'rejected', reason: 'workspace-not-found' };
     }
 
+    // Resolve organization: email rule takes priority, fallback to auto-enroll by domain
+    let organizationId: string | null = ruleResult.organizationId ?? null;
+    if (!organizationId && this.organizationRepository) {
+      const autoEnroll = new AutoEnrollOrganization(this.organizationRepository);
+      const result = await autoEnroll.execute(parsed.fromAddress, workspaceId);
+      organizationId = result.organizationId;
+    }
+    if (organizationId) {
+      const member = await this.memberRepository.findByWorkspaceAndUser(workspaceId, user.getId());
+      if (member && !member.organizationId) {
+        member.organizationId = organizationId;
+        await this.memberRepository.update(member);
+      }
+    }
+
     const ticket = await this.createTicket.execute({
       name: parsed.subject,
       description: parsed.body,
@@ -193,6 +211,7 @@ export class RouteInboundEmail {
       mailboxId: mailbox.getId(),
       originDate: parsed.date ?? null,
       departmentId: ruleResult.departmentId ?? null,
+      organizationId,
     });
 
     const ticketEvent: TicketCreatedEvent = {

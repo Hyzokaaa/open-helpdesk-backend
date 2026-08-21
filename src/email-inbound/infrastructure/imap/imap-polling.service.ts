@@ -28,6 +28,7 @@ import { Mailbox } from '../../../mailbox/domain/entities/mailbox';
 import { ImapEmailParser, ImapEnvelope } from './imap-email-parser';
 import { ProcessedEmailRepository } from '../typeorm/repositories/processed-email.repository';
 import { TypeOrmEmailRuleRepository } from '../../../email-rule/infrastructure/typeorm/repositories/typeorm-email-rule.repository';
+import { TypeOrmOrganizationRepository } from '../../../organization/infrastructure/typeorm/repositories/typeorm-organization.repository';
 import { EvaluateEmailRules } from '../../../email-rule/domain/services/email-rule-evaluate';
 
 const REFRESH_INTERVAL = 60000;
@@ -63,6 +64,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
     @Inject() private readonly emailRuleRepository: TypeOrmEmailRuleRepository,
+    @Inject() private readonly organizationRepository: TypeOrmOrganizationRepository,
   ) {}
 
   async onModuleInit() {
@@ -448,6 +450,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       this.eventPublisher,
       createAttachment,
       evaluateRules,
+      this.organizationRepository,
     );
   }
 }

@@ -117,6 +117,11 @@ export class TypeOrmTicketRepository implements TicketRepository {
         departmentId: filters.departmentId,
       });
     }
+    if (filters.organizationId) {
+      qb.andWhere('ticket.organizationId = :organizationId', {
+        organizationId: filters.organizationId,
+      });
+    }
     if (filters.tagIds && filters.tagIds.length > 0) {
       qb.andWhere(
         'ticket.id IN ' +
@@ -213,6 +218,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
       resolutionBreached: model.resolutionBreached ?? false,
       aiCache: model.aiCache ?? {},
       departmentId: model.departmentId ?? null,
+      organizationId: model.organizationId ?? null,
       source: model.source as TicketSource,
       registeredById: model.registeredById ?? null,
       mailboxId: model.mailboxId ?? null,
@@ -242,6 +248,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
     model.resolutionBreached = ticket.resolutionBreached;
     model.aiCache = ticket.aiCache;
     model.departmentId = ticket.departmentId;
+    model.organizationId = ticket.organizationId;
     model.source = ticket.source;
     model.registeredById = ticket.registeredById;
     model.mailboxId = ticket.mailboxId;

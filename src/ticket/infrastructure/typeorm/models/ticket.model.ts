@@ -13,6 +13,7 @@ import { UserModel } from '../../../../user/infrastructure/typeorm/models/user.m
 import { WorkspaceModel } from '../../../../workspace/infrastructure/typeorm/models/workspace.model';
 import { TagModel } from '../../../../tag/infrastructure/typeorm/models/tag.model';
 import { DepartmentModel } from '../../../../department/infrastructure/typeorm/models/department.model';
+import { OrganizationModel } from '../../../../organization/infrastructure/typeorm/models/organization.model';
 
 @Entity('tickets')
 export class TicketModel {
@@ -102,6 +103,12 @@ export class TicketModel {
 
   @Column({ type: 'varchar', nullable: true })
   departmentId!: string | null;
+
+  @ManyToOne(() => OrganizationModel, { nullable: true, onDelete: 'SET NULL' })
+  organization!: OrganizationModel | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  organizationId!: string | null;
 
   @ManyToMany(() => TagModel)
   @JoinTable({ name: 'ticket_tag' })
