@@ -53,6 +53,11 @@ export class TypeOrmWorkspaceMemberRepository implements WorkspaceMemberReposito
     return models.map((m) => this.toDomain(m));
   }
 
+  async findByOrganizationId(organizationId: string): Promise<WorkspaceMember[]> {
+    const models = await this.repository.findBy({ organizationId });
+    return models.map((m) => this.toDomain(m));
+  }
+
   private toDomain(model: WorkspaceMemberModel): WorkspaceMember {
     return new WorkspaceMember({
       id: model.id,
