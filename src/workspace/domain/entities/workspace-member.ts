@@ -6,6 +6,7 @@ interface Props {
   workspaceId: string;
   userId: string;
   role: WorkspaceRole;
+  organizationId?: string | null;
 }
 
 export class WorkspaceMember {
@@ -13,12 +14,14 @@ export class WorkspaceMember {
   workspaceId: string;
   userId: string;
   role: WorkspaceRole;
+  organizationId: string | null;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
     this.workspaceId = props.workspaceId;
     this.userId = props.userId;
     this.role = props.role;
+    this.organizationId = props.organizationId ?? null;
   }
 
   getId(): string {

@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 import { WorkspaceModel } from './workspace.model';
 import { UserModel } from '../../../../user/infrastructure/typeorm/models/user.model';
+import { OrganizationModel } from '../../../../organization/infrastructure/typeorm/models/organization.model';
 
 @Entity('workspace_members')
 @Unique(['workspaceId', 'userId'])
@@ -29,6 +30,12 @@ export class WorkspaceMemberModel {
 
   @Column()
   role!: string;
+
+  @ManyToOne(() => OrganizationModel, { nullable: true, onDelete: 'SET NULL' })
+  organization!: OrganizationModel | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  organizationId!: string | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;

@@ -30,6 +30,7 @@ interface Props {
   aiCache?: Record<string, { source: string; result: string }>;
   source?: TicketSource;
   departmentId?: string | null;
+  organizationId?: string | null;
   registeredById?: string | null;
   mailboxId?: string | null;
   originDate?: Date | null;
@@ -59,6 +60,7 @@ export class Ticket {
   resolutionBreached: boolean;
   aiCache: Record<string, { source: string; result: string }>;
   departmentId: string | null;
+  organizationId: string | null;
   source: TicketSource;
   registeredById: string | null;
   mailboxId: string | null;
@@ -88,6 +90,7 @@ export class Ticket {
     this.resolutionBreached = props.resolutionBreached ?? false;
     this.aiCache = props.aiCache ?? {};
     this.departmentId = props.departmentId ?? null;
+    this.organizationId = props.organizationId ?? null;
     this.source = props.source ?? TicketSource.UI;
     this.registeredById = props.registeredById ?? null;
     this.mailboxId = props.mailboxId ?? null;

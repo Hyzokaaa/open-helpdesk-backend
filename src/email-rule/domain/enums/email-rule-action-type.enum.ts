@@ -5,4 +5,5 @@ export enum EmailRuleActionType {
   SET_CATEGORY = 'set-category',
   ADD_TAGS = 'add-tags',
   ASSIGN_TO = 'assign-to',
+  SET_ORGANIZATION = 'set-organization',
 }

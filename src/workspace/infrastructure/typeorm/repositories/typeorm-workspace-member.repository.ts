@@ -59,6 +59,7 @@ export class TypeOrmWorkspaceMemberRepository implements WorkspaceMemberReposito
       workspaceId: model.workspaceId,
       userId: model.userId,
       role: model.role as WorkspaceRole,
+      organizationId: model.organizationId ?? null,
     });
   }
 
@@ -68,6 +69,7 @@ export class TypeOrmWorkspaceMemberRepository implements WorkspaceMemberReposito
     model.workspaceId = member.workspaceId;
     model.userId = member.userId;
     model.role = member.role;
+    model.organizationId = member.organizationId;
     return model;
   }
 }

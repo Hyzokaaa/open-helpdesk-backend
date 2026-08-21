@@ -29,6 +29,7 @@ interface Props {
   customFields?: Record<string, unknown>;
   uploadTokens?: string[];
   departmentId?: string;
+  organizationId?: string | null;
   source?: TicketSource;
   registeredById?: string | null;
   isSystemAdmin: boolean;
@@ -75,6 +76,7 @@ export class CreateTicketCommand implements Command<Props, CreateTicketResponse>
       tagIds: props.tagIds,
       customFields: validatedCustomFields,
       departmentId: props.departmentId,
+      organizationId: props.organizationId,
       source: props.source,
       registeredById: props.registeredById,
     });

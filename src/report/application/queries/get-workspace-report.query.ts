@@ -27,6 +27,7 @@ export interface ReportResult {
   ticketsByPriority: { priority: string; count: number }[];
   ticketsByCategory: { category: string; count: number }[];
   topAgents: { resolvedById: string; name: string; resolved: number }[];
+  ticketsByOrganization: { organizationId: string; name: string; count: number }[];
   csatBreakdown: { rating: string; count: number }[];
 }
 
@@ -52,6 +53,7 @@ export class GetWorkspaceReportQuery {
       ticketsByPriority,
       ticketsByCategory,
       topAgents,
+      ticketsByOrganization,
       csatData,
       slaMetrics,
     ] = await Promise.all([
@@ -61,6 +63,7 @@ export class GetWorkspaceReportQuery {
       this.getTicketsByField(props, 'priority'),
       this.getTicketsByField(props, 'category'),
       this.getTopAgents(props),
+      this.getTicketsByOrganization(props),
       this.getCsatData(props),
       this.getSlaMetrics(props),
     ]);
@@ -73,7 +76,7 @@ export class GetWorkspaceReportQuery {
         slaFirstResponseMet: slaMetrics.firstResponseMet,
         slaResolutionMet: slaMetrics.resolutionMet,
       },
-      ticketsOverTime, ticketsByStatus, ticketsByPriority, ticketsByCategory, topAgents,
+      ticketsOverTime, ticketsByStatus, ticketsByPriority, ticketsByCategory, topAgents, ticketsByOrganization,
       csatBreakdown: csatData.breakdown,
     };
   }
@@ -200,6 +203,23 @@ export class GetWorkspaceReportQuery {
       resolvedById: r.resolvedById,
       name: r.name,
       resolved: parseInt(r.resolved, 10),
+    }));
+  }
+
+  private async getTicketsByOrganization(props: Props) {
+    const dc = this.dateClause('t."createdAt"', 2, props);
+    const rows = await this.dataSource.query(
+      `SELECT o.id as "organizationId", o.name, COUNT(*) as count
+       FROM tickets t
+       INNER JOIN organizations o ON o.id = t."organizationId" AND o."deletedAt" IS NULL
+       WHERE t."workspaceId" = $1${dc.sql} AND t."deletedAt" IS NULL
+       GROUP BY o.id, o.name ORDER BY count DESC`,
+      [props.workspaceId, ...dc.params],
+    );
+    return rows.map((r: any) => ({
+      organizationId: r.organizationId,
+      name: r.name,
+      count: parseInt(r.count, 10),
     }));
   }
 

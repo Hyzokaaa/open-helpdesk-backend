@@ -67,6 +67,8 @@ import { BulkChangeStatusRequest } from '../dto/bulk-change-status.request';
 import { BulkDeleteRequest } from '../dto/bulk-delete.request';
 import { AssignTicketRequest } from '../dto/assign-ticket.request';
 import { TicketFilterDto } from '../dto/ticket-filter.dto';
+import { TypeOrmOrganizationRepository } from '../../../../organization/infrastructure/typeorm/repositories/typeorm-organization.repository';
+import { AutoEnrollOrganization } from '../../../../organization/domain/services/organization-auto-enroll';
 
 @Controller('workspaces/:slug/tickets')
 export class TicketController {
@@ -82,6 +84,7 @@ export class TicketController {
     @Inject() private readonly attachmentRepository: TypeOrmAttachmentRepository,
     @Inject() private readonly participantRepository: TypeOrmTicketParticipantRepository,
     @Inject() private readonly transferRequestRepository: TypeOrmTransferRequestRepository,
+    @Inject() private readonly organizationRepository: TypeOrmOrganizationRepository,
   ) {}
 
   @Post()
@@ -106,8 +109,12 @@ export class TicketController {
       reporterEmail = resolved.email;
     }
 
+    // Auto-enroll organization by reporter email domain
+    const autoEnroll = new AutoEnrollOrganization(this.organizationRepository);
+    const { organizationId } = await autoEnroll.execute(reporterEmail, workspace.getId());
+
     const command = new CreateTicketCommand(service, ensurePermission, this.userRepository, this.eventPublisher, auditLog, validateCustomFields, claimAttachments);
-    return command.execute({
+    const result = await command.execute({
       name: body.name,
       description: body.description,
       priority: body.priority,
@@ -121,10 +128,22 @@ export class TicketController {
       customFields: body.customFields,
       uploadTokens: body.uploadTokens,
       departmentId: body.departmentId,
+      organizationId,
       source: TicketSource.UI,
       registeredById: body.onBehalfOf ? user.userId : null,
       isSystemAdmin: user.isSystemAdmin,
     });
+
+    // Update contact's organizationId if auto-enrolled
+    if (organizationId) {
+      const member = await this.memberRepository.findByWorkspaceAndUser(workspace.getId(), reporterId);
+      if (member && !member.organizationId) {
+        member.organizationId = organizationId;
+        await this.memberRepository.update(member);
+      }
+    }
+
+    return result;
   }
 
   @Get()

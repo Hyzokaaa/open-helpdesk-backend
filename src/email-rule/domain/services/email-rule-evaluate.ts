@@ -17,6 +17,7 @@ export interface EmailRuleResult {
   priority?: TicketPriority;
   category?: TicketCategory;
   departmentId?: string;
+  organizationId?: string;
   tagIds?: string[];
   assigneeId?: string;
   matchedRuleName?: string;
@@ -106,6 +107,9 @@ export class EvaluateEmailRules {
           break;
         case EmailRuleActionType.ASSIGN_TO:
           result.assigneeId = action.value;
+          break;
+        case EmailRuleActionType.SET_ORGANIZATION:
+          result.organizationId = action.value;
           break;
       }
     }
