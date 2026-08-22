@@ -15,6 +15,7 @@ export interface MemberListItem {
   lastName: string;
   role: string;
   autoCreated: boolean;
+  organizationId: string | null;
 }
 
 export class ListWorkspaceMembersQuery implements Query<Props, MemberListItem[]> {
@@ -40,6 +41,7 @@ export class ListWorkspaceMembersQuery implements Query<Props, MemberListItem[]>
         lastName: user?.lastName ?? '',
         role: member.role,
         autoCreated: user?.autoCreated ?? false,
+        organizationId: member.organizationId,
       };
     });
 

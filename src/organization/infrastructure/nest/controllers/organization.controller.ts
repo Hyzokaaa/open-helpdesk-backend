@@ -106,6 +106,7 @@ export class OrganizationController {
     return Promise.all(orgs.map(async (org) => ({
       ...org,
       logo: org.logo ? await this.storage.getPresignedUrl(org.logo) : null,
+      memberCount: await this.memberRepository.countByOrganizationId(org.id),
     })));
   }
 
@@ -152,6 +153,7 @@ export class OrganizationController {
       id,
       name: body.name,
       description: body.description,
+      notes: body.notes,
       domains: body.domains,
       workspaceId,
       userId: user.userId,

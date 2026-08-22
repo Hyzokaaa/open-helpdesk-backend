@@ -36,6 +36,7 @@ export class ListOrganizationsQuery implements Query<Props, OrganizationListItem
       id: org.getId(),
       name: org.name,
       description: org.description,
+      notes: org.notes,
       domains: org.domains,
       logo: org.logo,
     }));

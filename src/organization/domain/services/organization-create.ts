@@ -20,6 +20,7 @@ export class CreateOrganization {
       id: this.idGenerator.create(),
       name: props.name,
       description: props.description,
+      notes: null,
       logo: null,
       domains: props.domains.map((d) => d.toLowerCase().trim()).filter(Boolean),
       workspaceId: props.workspaceId,
