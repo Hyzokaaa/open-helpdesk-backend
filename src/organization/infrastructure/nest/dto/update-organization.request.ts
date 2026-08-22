@@ -9,6 +9,10 @@ export class UpdateOrganizationRequest {
   @IsOptional()
   description?: string | null;
 
+  @IsString()
+  @IsOptional()
+  notes?: string | null;
+
   @IsArray()
   @IsString({ each: true })
   @IsOptional()

@@ -19,6 +19,9 @@ export class OrganizationModel {
   @Column({ type: 'varchar', nullable: true })
   description!: string | null;
 
+  @Column({ type: 'text', nullable: true })
+  notes!: string | null;
+
   @Column({ type: 'varchar', nullable: true })
   logo!: string | null;
 

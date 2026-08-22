@@ -51,6 +51,7 @@ export class TypeOrmOrganizationRepository implements OrganizationRepository {
       id: model.id,
       name: model.name,
       description: model.description,
+      notes: model.notes,
       logo: model.logo,
       domains: model.domains,
       workspaceId: model.workspaceId,
@@ -62,6 +63,7 @@ export class TypeOrmOrganizationRepository implements OrganizationRepository {
     model.id = org.getId();
     model.name = org.name;
     model.description = org.description;
+    model.notes = org.notes;
     model.logo = org.logo;
     model.domains = org.domains;
     model.workspaceId = org.workspaceId;

@@ -7,6 +7,7 @@ interface Props {
   id: string;
   name?: string;
   description?: string | null;
+  notes?: string | null;
   domains?: string[];
   workspaceId: string;
   userId: string;
@@ -38,6 +39,7 @@ export class UpdateOrganizationCommand implements Command<Props, UpdateOrganizat
       id: props.id,
       name: props.name,
       description: props.description,
+      notes: props.notes,
       domains: props.domains,
     });
 

@@ -289,6 +289,31 @@ export class WorkspaceController {
     return { firstName: targetUser.firstName, lastName: targetUser.lastName };
   }
 
+  @Patch(':slug/members/:userId/organization')
+  async updateMemberOrganization(
+    @Param('slug') slug: string,
+    @Param('userId') userId: string,
+    @Body() body: { organizationId: string | null },
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_MEMBERS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+
+    const member = await this.memberRepository.findByWorkspaceAndUser(workspaceId, userId);
+    if (!member) throw new EntityNotFoundError('Member not found');
+
+    member.organizationId = body.organizationId;
+    await this.memberRepository.update(member);
+
+    return { organizationId: member.organizationId };
+  }
+
   @Delete(':slug/members/:userId')
   async removeMember(
     @Param('slug') slug: string,
