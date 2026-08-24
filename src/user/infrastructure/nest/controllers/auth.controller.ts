@@ -39,12 +39,12 @@ import { TypeOrmAccountRepository } from '../../../../account/infrastructure/typ
 import { TypeOrmWorkspaceInvitationRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-invitation.repository';
 import { TypeOrmWorkspaceMemberRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
 import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
+import { TypeOrmWorkspaceRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository';
 import { resolveFrontendUrl } from '../../../../shared/infrastructure/resolve-frontend-url';
 
 @Controller('auth')
 export class AuthController {
   private readonly frontendUrl: string;
-  private readonly allowedFrontendUrls: string[];
   private readonly googleEnabled: boolean;
   private readonly microsoftEnabled: boolean;
 
@@ -58,13 +58,17 @@ export class AuthController {
     @Inject() private readonly invitationRepository: TypeOrmWorkspaceInvitationRepository,
     @Inject() private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
+    @Inject() private readonly workspaceRepository: TypeOrmWorkspaceRepository,
     private readonly config: ConfigService,
   ) {
     this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
-    const corsOrigins = config.get('CORS_ORIGINS', this.frontendUrl);
-    this.allowedFrontendUrls = corsOrigins.split(',').map((u: string) => u.trim());
     this.googleEnabled = !!config.get('GOOGLE_CLIENT_ID');
     this.microsoftEnabled = !!config.get('MICROSOFT_CLIENT_ID');
+  }
+
+  private async isVerifiedDomain(hostname: string): Promise<boolean> {
+    const workspaces = await this.workspaceRepository.findByCustomDomain(hostname);
+    return workspaces.some((w) => w.customDomainVerified);
   }
 
   @Public()
@@ -131,7 +135,7 @@ export class AuthController {
   @Throttle({ default: { ttl: 60000, limit: 3 } })
   @Post('forgot-password')
   async forgotPassword(@Body() body: { email: string }, @Req() req: Request) {
-    const frontendUrl = resolveFrontendUrl(req, this.allowedFrontendUrls, this.frontendUrl);
+    const frontendUrl = await resolveFrontendUrl(req, this.frontendUrl, (h) => this.isVerifiedDomain(h));
     const service = new RequestPasswordReset(this.userRepository);
     const command = new RequestPasswordResetCommand(service, this.tokenService, this.emailService);
     await command.execute({ email: body.email, frontendUrl });
@@ -221,7 +225,7 @@ export class AuthController {
   @Throttle({ default: { ttl: 3600000, limit: 3 } })
   @Post('resend-verification')
   async resendVerification(@CurrentUser() user: AuthUser, @Req() req: Request) {
-    const frontendUrl = resolveFrontendUrl(req, this.allowedFrontendUrls, this.frontendUrl);
+    const frontendUrl = await resolveFrontendUrl(req, this.frontendUrl, (h) => this.isVerifiedDomain(h));
     const command = new ResendVerificationCommand(
       this.userRepository,
       this.tokenService,
@@ -275,7 +279,7 @@ export class AuthController {
 
   private async handleOAuthCallback(req: Request, res: Response) {
     const oauthUser = req.user as { email: string; firstName: string; lastName: string; authProvider: string };
-    const redirectUrl = this.resolveRedirectUrl(req.query?.state as string);
+    const redirectUrl = await this.resolveRedirectUrl(req.query?.state as string);
 
     try {
       const service = new AuthenticateOAuth(this.idGenerator, this.userRepository, this.passwordHasher);
@@ -309,10 +313,12 @@ export class AuthController {
     }
   }
 
-  private resolveRedirectUrl(state?: string): string {
-    if (state && this.allowedFrontendUrls.includes(state)) {
-      return state;
-    }
+  private async resolveRedirectUrl(state?: string): Promise<string> {
+    if (!state || state === this.frontendUrl) return this.frontendUrl;
+    try {
+      const hostname = new URL(state).hostname;
+      if (await this.isVerifiedDomain(hostname)) return state;
+    } catch {}
     return this.frontendUrl;
   }
 }
