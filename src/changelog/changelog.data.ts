@@ -16,6 +16,121 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.16.0',
+    date: '2026-08-24',
+    categories: [
+      {
+        title: { en: 'Organizations', es: 'Organizaciones' },
+        features: [
+          { en: 'Create and manage organizations — group related contacts under one company', es: 'Crea y gestiona organizaciones — agrupa contactos relacionados bajo una empresa' },
+          { en: 'Add and remove members from organizations', es: 'Agrega y elimina miembros de organizaciones' },
+          { en: 'Notes field to keep context about each organization', es: 'Campo de notas para mantener contexto sobre cada organización' },
+          { en: 'Auto-enroll contacts by email domain — new contacts are matched to their organization automatically', es: 'Inscripción automática por dominio de email — los nuevos contactos se asocian a su organización automáticamente' },
+        ],
+      },
+      {
+        title: { en: 'Departments', es: 'Departamentos' },
+        features: [
+          { en: 'Create departments to organize your team — assign agents and route tickets by area', es: 'Crea departamentos para organizar tu equipo — asigna agentes y dirige tickets por área' },
+          { en: 'Filter tickets by department in list and board view', es: 'Filtra tickets por departamento en la lista y el tablero' },
+          { en: 'Department tabs for quick switching between team areas', es: 'Pestañas de departamento para cambiar rápidamente entre áreas del equipo' },
+          { en: 'Assign tickets to a department from the ticket detail view', es: 'Asigna tickets a un departamento desde la vista de detalle del ticket' },
+        ],
+      },
+      {
+        title: { en: 'Rich Text Editor', es: 'Editor de Texto Enriquecido' },
+        features: [
+          { en: 'Format comments with bold, italic, strikethrough, code, and lists', es: 'Formatea comentarios con negrita, cursiva, tachado, código y listas' },
+          { en: 'Format ticket descriptions with the same rich text editor', es: 'Formatea descripciones de tickets con el mismo editor de texto enriquecido' },
+          { en: '@mentions and canned responses (/slash) work inside the rich text editor', es: 'Las @menciones y respuestas predefinidas (/slash) funcionan dentro del editor' },
+          { en: 'Contextual hints appear when using lists or code blocks', es: 'Sugerencias contextuales aparecen al usar listas o bloques de código' },
+        ],
+      },
+      {
+        title: { en: 'Custom Domains', es: 'Dominios Personalizados' },
+        features: [
+          { en: 'Connect your own domain to any workspace — your customers see your brand, not ours', es: 'Conecta tu propio dominio a cualquier workspace — tus clientes ven tu marca, no la nuestra' },
+          { en: 'DNS verification with CNAME or A record support', es: 'Verificación DNS con soporte para registros CNAME o A' },
+          { en: 'Automatic CORS configuration for verified domains', es: 'Configuración CORS automática para dominios verificados' },
+          { en: 'Portal accessible at your custom domain root', es: 'Portal accesible desde la raíz de tu dominio personalizado' },
+          { en: 'Multi-workspace support on a single custom domain', es: 'Soporte multi-workspace en un solo dominio personalizado' },
+        ],
+      },
+      {
+        title: { en: 'System & Workspace Branding', es: 'Marca del Sistema y Workspace' },
+        features: [
+          { en: 'Upload a logo and customize app name at the system level', es: 'Sube un logo y personaliza el nombre de la app a nivel de sistema' },
+          { en: 'Each workspace can override branding with its own logo, name, and subtitle', es: 'Cada workspace puede personalizar su marca con su propio logo, nombre y subtítulo' },
+          { en: 'Branding applies across dashboard, login, and portal', es: 'La marca se aplica en el dashboard, login y portal' },
+        ],
+      },
+      {
+        title: { en: 'Ticket Improvements', es: 'Mejoras en Tickets' },
+        features: [
+          { en: 'Create tickets on behalf of a contact — search by email, auto-creates the contact if new', es: 'Crea tickets en nombre de un contacto — busca por email, crea el contacto automáticamente si es nuevo' },
+          { en: '"Reported by" and "Registered by" shown separately in ticket detail', es: '"Reportado por" y "Registrado por" mostrados por separado en el detalle del ticket' },
+          { en: 'Send & Resolve — reply and close a ticket in one click', es: 'Enviar y Resolver — responde y cierra un ticket en un click' },
+          { en: 'Ticket source badge shows where the ticket came from (UI, email, portal, or API)', es: 'Insignia de origen del ticket muestra de dónde vino (UI, email, portal o API)' },
+          { en: 'Original email date preserved and shown when tickets come from email import', es: 'Fecha original del email preservada y visible cuando los tickets vienen de importación de email' },
+          { en: 'Sequential ticket search matches partial numbers', es: 'La búsqueda de tickets por número acepta coincidencias parciales' },
+        ],
+      },
+      {
+        title: { en: 'Email Rules', es: 'Reglas de Email' },
+        features: [
+          { en: 'Create rules to filter inbound emails — skip, assign, or route based on sender, subject, or domain', es: 'Crea reglas para filtrar emails entrantes — omitir, asignar o dirigir según remitente, asunto o dominio' },
+          { en: 'Rules are evaluated before creating tickets from email', es: 'Las reglas se evalúan antes de crear tickets desde email' },
+          { en: 'Drag to reorder rules by priority', es: 'Arrastra para reordenar reglas por prioridad' },
+        ],
+      },
+      {
+        title: { en: 'Portal Improvements', es: 'Mejoras del Portal' },
+        features: [
+          { en: 'Department selector in the portal ticket submission form', es: 'Selector de departamento en el formulario de envío de tickets del portal' },
+          { en: 'Portal language toggle', es: 'Selector de idioma en el portal' },
+        ],
+      },
+      {
+        title: { en: 'Members & Contacts', es: 'Miembros y Contactos' },
+        features: [
+          { en: 'Separate tabs for team members and contacts', es: 'Pestañas separadas para miembros del equipo y contactos' },
+          { en: 'Contact origin badge — see who was auto-created from email', es: 'Insignia de origen del contacto — ve quién fue creado automáticamente desde email' },
+          { en: 'Promote contacts to team members with one click', es: 'Promueve contactos a miembros del equipo con un click' },
+        ],
+      },
+      {
+        title: { en: 'Workspace Setup Wizard', es: 'Asistente de Configuración del Workspace' },
+        features: [
+          { en: 'Multi-step workspace creation with guided setup', es: 'Creación de workspace en múltiples pasos con configuración guiada' },
+        ],
+      },
+      {
+        title: { en: 'Filesystem Storage', es: 'Almacenamiento en Disco' },
+        features: [
+          { en: 'Store files on disk instead of S3 — no cloud storage required for selfhosted deployments', es: 'Almacena archivos en disco en vez de S3 — sin necesidad de almacenamiento en la nube para instalaciones selfhosted' },
+        ],
+      },
+      {
+        title: { en: 'Install Script', es: 'Script de Instalación' },
+        features: [
+          { en: 'Interactive installer asks to install prerequisites (Node.js, PostgreSQL, nginx)', es: 'Instalador interactivo que ofrece instalar prerrequisitos (Node.js, PostgreSQL, nginx)' },
+          { en: 'Automatic database creation and password setup', es: 'Creación automática de base de datos y configuración de contraseña' },
+          { en: 'Step-by-step progress indicator', es: 'Indicador de progreso paso a paso' },
+        ],
+      },
+      {
+        title: { en: 'Improvements', es: 'Mejoras' },
+        features: [
+          { en: 'User avatar dropdown menu in navbar', es: 'Menú desplegable con avatar de usuario en la barra de navegación' },
+          { en: 'Report date perspective toggle — view stats by import date or original email date', es: 'Selector de perspectiva de fecha en reportes — ve estadísticas por fecha de importación o fecha original del email' },
+          { en: 'Date range preset "All" to see complete history', es: 'Preselección "Todo" en rango de fechas para ver el historial completo' },
+          { en: 'Ticket detail layout reordered — comments before attachments', es: 'Diseño del detalle de ticket reordenado — comentarios antes que adjuntos' },
+          { en: 'Details and Activity in separate tabs', es: 'Detalles y Actividad en pestañas separadas' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.15.0',
     date: '2026-08-04',
     categories: [
