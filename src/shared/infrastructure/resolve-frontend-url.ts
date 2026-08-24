@@ -3,21 +3,27 @@ import { Request } from 'express';
 
 const logger = new Logger('ResolveFrontendUrl');
 
-export function resolveFrontendUrl(
+export async function resolveFrontendUrl(
   req: Request,
-  allowedUrls: string[],
   defaultUrl: string,
-): string {
+  isVerifiedDomain?: (hostname: string) => Promise<boolean>,
+): Promise<string> {
   const header = req.headers['x-frontend-url'];
   const candidate = Array.isArray(header) ? header[0] : header;
 
-  if (candidate && allowedUrls.includes(candidate)) {
-    return candidate;
+  if (!candidate || candidate === defaultUrl) {
+    return defaultUrl;
   }
 
-  if (candidate) {
-    logger.warn(`Unrecognized X-Frontend-URL: ${candidate} — add it to CORS_ORIGINS if this is a valid origin`);
+  if (isVerifiedDomain) {
+    try {
+      const hostname = new URL(candidate).hostname;
+      if (await isVerifiedDomain(hostname)) {
+        return candidate;
+      }
+    } catch {}
   }
 
+  logger.warn(`Unrecognized X-Frontend-URL: ${candidate}`);
   return defaultUrl;
 }

@@ -1,6 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { ConfigService } from '@nestjs/config';
 import { EmailService } from '../domain/email.service';
 import { EMAIL_SERVICE } from '../email.constants';
 import { StatusChangedTemplate } from '../templates/status-changed.template';
@@ -22,11 +21,11 @@ import { AuditLevel } from '../../audit-log/domain/enums/audit-level.enum';
 import { ResolveTicketStakeholders } from '../../notification/domain/services/notification-resolve-ticket-stakeholders';
 import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
+import { WorkspaceFrontendResolver } from '../../shared/infrastructure/workspace-frontend-resolver';
 
 @Injectable()
 export class StatusChangedHandler {
   private readonly logger = new Logger(StatusChangedHandler.name);
-  private readonly frontendUrl: string;
 
   constructor(
     @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
@@ -39,10 +38,8 @@ export class StatusChangedHandler {
     private readonly participantRepository: TypeOrmTicketParticipantRepository,
     private readonly emailSenderRepository: TypeOrmWorkspaceEmailSenderRepository,
     private readonly auditLogRepository: TypeOrmAuditLogRepository,
-    private readonly config: ConfigService,
-  ) {
-    this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
-  }
+    private readonly frontendResolver: WorkspaceFrontendResolver,
+  ) {}
 
   @OnEvent('ticket.statusChanged')
   async handle(event: StatusChangedEvent): Promise<void> {
@@ -67,7 +64,8 @@ export class StatusChangedHandler {
     if (emailRecipients.size === 0) return;
 
     const template = new StatusChangedTemplate();
-    const ticketUrl = `${this.frontendUrl}/dashboard/workspaces/${event.workspaceSlug}/tickets/${event.ticketId}`;
+    const frontendUrl = await this.frontendResolver.resolve(event.workspaceId);
+    const ticketUrl = `${frontendUrl}/dashboard/workspaces/${event.workspaceSlug}/tickets/${event.ticketId}`;
     const ticket = await this.ticketRepository.findById(event.ticketId);
     const mailbox = ticket?.mailboxId
       ? await this.mailboxRepository.findById(ticket.mailboxId)

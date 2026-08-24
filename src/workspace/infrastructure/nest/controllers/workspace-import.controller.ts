@@ -5,15 +5,13 @@ import {
   Inject,
   Param,
   Post,
-  Req,
   Res,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
-import { ConfigService } from '@nestjs/config';
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
@@ -37,13 +35,10 @@ import { AuditAction } from '../../../../audit-log/domain/enums/audit-action.enu
 import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
 import { importWelcomeEmail } from '../../../../email/templates/import-welcome.template';
-import { resolveFrontendUrl } from '../../../../shared/infrastructure/resolve-frontend-url';
+import { WorkspaceFrontendResolver } from '../../../../shared/infrastructure/workspace-frontend-resolver';
 
 @Controller('workspaces')
 export class WorkspaceImportController {
-  private readonly frontendUrl: string;
-  private readonly allowedFrontendUrls: string[];
-
   constructor(
     @Inject() private readonly workspaceRepository: TypeOrmWorkspaceRepository,
     @Inject() private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
@@ -53,12 +48,8 @@ export class WorkspaceImportController {
     @Inject() private readonly tokenService: JwtTokenService,
     @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
-    private readonly config: ConfigService,
-  ) {
-    this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
-    const corsOrigins = config.get('CORS_ORIGINS', this.frontendUrl);
-    this.allowedFrontendUrls = corsOrigins.split(',').map((u: string) => u.trim());
-  }
+    @Inject() private readonly frontendResolver: WorkspaceFrontendResolver,
+  ) {}
 
   @Get(':slug/members/import/template')
   async downloadTemplate(
@@ -116,10 +107,9 @@ export class WorkspaceImportController {
     @Param('slug') slug: string,
     @Body() body: { rows: Array<{ email: string; firstName: string; lastName: string; role: string }>; skipVerification?: boolean },
     @CurrentUser() user: AuthUser,
-    @Req() req: Request,
   ) {
-    const frontendUrl = resolveFrontendUrl(req, this.allowedFrontendUrls, this.frontendUrl);
     const workspace = await this.resolveWorkspace(slug);
+    const frontendUrl = await this.frontendResolver.resolve(workspace.getId());
 
     const confirmService = new ConfirmImportMembers(
       this.idGenerator,

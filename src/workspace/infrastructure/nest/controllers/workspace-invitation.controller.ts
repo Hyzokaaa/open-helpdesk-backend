@@ -6,10 +6,7 @@ import {
   Inject,
   Param,
   Post,
-  Req,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Request } from 'express';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
@@ -40,13 +37,10 @@ import { BatchInvitationRequest } from '../dto/batch-invitation.request';
 import { BatchInvitationCommand } from '../../../application/commands/batch-invitation.command';
 import { invitationEmail } from '../../../../email/templates/workspace-invitation.template';
 import { sendWorkspaceEmail } from '../../../../email/domain/resolve-email-sender';
-import { resolveFrontendUrl } from '../../../../shared/infrastructure/resolve-frontend-url';
+import { WorkspaceFrontendResolver } from '../../../../shared/infrastructure/workspace-frontend-resolver';
 
 @Controller('workspaces')
 export class WorkspaceInvitationController {
-  private readonly frontendUrl: string;
-  private readonly allowedFrontendUrls: string[];
-
   constructor(
     @Inject() private readonly workspaceRepository: TypeOrmWorkspaceRepository,
     @Inject() private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
@@ -57,22 +51,17 @@ export class WorkspaceInvitationController {
     @Inject() private readonly tokenService: JwtTokenService,
     @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
-    private readonly config: ConfigService,
-  ) {
-    this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
-    const corsOrigins = config.get('CORS_ORIGINS', this.frontendUrl);
-    this.allowedFrontendUrls = corsOrigins.split(',').map((u: string) => u.trim());
-  }
+    @Inject() private readonly frontendResolver: WorkspaceFrontendResolver,
+  ) {}
 
   @Post(':slug/invitations')
   async create(
     @Param('slug') slug: string,
     @Body() body: CreateInvitationRequest,
     @CurrentUser() user: AuthUser,
-    @Req() req: Request,
   ) {
-    const frontendUrl = resolveFrontendUrl(req, this.allowedFrontendUrls, this.frontendUrl);
     const workspace = await this.resolveWorkspace(slug);
+    const frontendUrl = await this.frontendResolver.resolve(workspace.getId());
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new CreateInvitation(
       this.idGenerator,
@@ -128,10 +117,9 @@ export class WorkspaceInvitationController {
     @Param('slug') slug: string,
     @Body() body: BatchInvitationRequest,
     @CurrentUser() user: AuthUser,
-    @Req() req: Request,
   ) {
-    const frontendUrl = resolveFrontendUrl(req, this.allowedFrontendUrls, this.frontendUrl);
     const workspace = await this.resolveWorkspace(slug);
+    const frontendUrl = await this.frontendResolver.resolve(workspace.getId());
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new CreateInvitation(
       this.idGenerator,
@@ -211,7 +199,6 @@ export class WorkspaceInvitationController {
     @Param('slug') slug: string,
     @Param('id') id: string,
     @CurrentUser() user: AuthUser,
-    @Req() req: Request,
   ) {
     const workspace = await this.resolveWorkspace(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
@@ -225,7 +212,7 @@ export class WorkspaceInvitationController {
     if (!invitation || invitation.workspaceId !== workspace.getId()) {
       throw new EntityNotFoundError('Invitation not found');
     }
-    const frontendUrl = resolveFrontendUrl(req, this.allowedFrontendUrls, this.frontendUrl);
+    const frontendUrl = await this.frontendResolver.resolve(workspace.getId());
     return { link: `${frontendUrl}/invite/${invitation.token}` };
   }
 
@@ -234,10 +221,9 @@ export class WorkspaceInvitationController {
     @Param('slug') slug: string,
     @Param('id') id: string,
     @CurrentUser() user: AuthUser,
-    @Req() req: Request,
   ) {
-    const frontendUrl = resolveFrontendUrl(req, this.allowedFrontendUrls, this.frontendUrl);
     const workspace = await this.resolveWorkspace(slug);
+    const frontendUrl = await this.frontendResolver.resolve(workspace.getId());
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     await ensurePermission.execute({
       workspaceId: workspace.getId(),

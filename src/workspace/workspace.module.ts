@@ -19,6 +19,7 @@ import { WorkspaceInvitationController } from './infrastructure/nest/controllers
 import { WorkspaceImportController } from './infrastructure/nest/controllers/workspace-import.controller';
 import { InvitationPublicController } from './infrastructure/nest/controllers/invitation-public.controller';
 import { DomainCheckController } from './infrastructure/nest/controllers/domain-check.controller';
+import { WorkspaceFrontendResolver } from '../shared/infrastructure/workspace-frontend-resolver';
 
 @Module({
   imports: [
@@ -30,7 +31,7 @@ import { DomainCheckController } from './infrastructure/nest/controllers/domain-
     TypeOrmModule.forFeature([WorkspaceModel, WorkspaceMemberModel, WorkspaceInvitationModel, WorkspaceEmailSenderModel]),
   ],
   controllers: [WorkspaceController, WorkspaceInvitationController, WorkspaceImportController, InvitationPublicController, DomainCheckController],
-  providers: [TypeOrmWorkspaceRepository, TypeOrmWorkspaceMemberRepository, TypeOrmWorkspaceInvitationRepository, TypeOrmWorkspaceEmailSenderRepository],
-  exports: [TypeOrmWorkspaceRepository, TypeOrmWorkspaceMemberRepository, TypeOrmWorkspaceInvitationRepository, TypeOrmWorkspaceEmailSenderRepository],
+  providers: [TypeOrmWorkspaceRepository, TypeOrmWorkspaceMemberRepository, TypeOrmWorkspaceInvitationRepository, TypeOrmWorkspaceEmailSenderRepository, WorkspaceFrontendResolver],
+  exports: [TypeOrmWorkspaceRepository, TypeOrmWorkspaceMemberRepository, TypeOrmWorkspaceInvitationRepository, TypeOrmWorkspaceEmailSenderRepository, WorkspaceFrontendResolver],
 })
 export class WorkspaceModule {}

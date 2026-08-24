@@ -1,6 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { ConfigService } from '@nestjs/config';
 import { EmailService } from '../domain/email.service';
 import { EMAIL_SERVICE } from '../email.constants';
 import { TransferRequestTemplate } from '../templates/transfer-request.template';
@@ -20,11 +19,11 @@ import { AuditCategory } from '../../audit-log/domain/enums/audit-category.enum'
 import { AuditLevel } from '../../audit-log/domain/enums/audit-level.enum';
 import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
+import { WorkspaceFrontendResolver } from '../../shared/infrastructure/workspace-frontend-resolver';
 
 @Injectable()
 export class TransferRequestHandler {
   private readonly logger = new Logger(TransferRequestHandler.name);
-  private readonly frontendUrl: string;
 
   constructor(
     @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
@@ -36,10 +35,8 @@ export class TransferRequestHandler {
     private readonly ticketRepository: TypeOrmTicketRepository,
     private readonly emailSenderRepository: TypeOrmWorkspaceEmailSenderRepository,
     private readonly auditLogRepository: TypeOrmAuditLogRepository,
-    private readonly config: ConfigService,
-  ) {
-    this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
-  }
+    private readonly frontendResolver: WorkspaceFrontendResolver,
+  ) {}
 
   @OnEvent('transfer-request.created')
   async handleCreated(event: TransferRequestCreatedEvent): Promise<void> {
@@ -60,7 +57,8 @@ export class TransferRequestHandler {
     if (emailRecipients.size === 0) return;
 
     const template = new TransferRequestTemplate();
-    const ticketUrl = `${this.frontendUrl}/dashboard/workspaces/${event.workspaceSlug}/tickets/${event.ticketId}`;
+    const frontendUrl = await this.frontendResolver.resolve(event.workspaceId);
+    const ticketUrl = `${frontendUrl}/dashboard/workspaces/${event.workspaceSlug}/tickets/${event.ticketId}`;
     const ticket = await this.ticketRepository.findById(event.ticketId);
     const mailbox = ticket?.mailboxId
       ? await this.mailboxRepository.findById(ticket.mailboxId)
@@ -131,7 +129,8 @@ export class TransferRequestHandler {
     if (emailRecipients.size === 0) return;
 
     const template = new TransferRequestTemplate();
-    const ticketUrl = `${this.frontendUrl}/dashboard/workspaces/${event.workspaceSlug}/tickets/${event.ticketId}`;
+    const frontendUrl = await this.frontendResolver.resolve(event.workspaceId);
+    const ticketUrl = `${frontendUrl}/dashboard/workspaces/${event.workspaceSlug}/tickets/${event.ticketId}`;
     const ticket = await this.ticketRepository.findById(event.ticketId);
     const mailbox = ticket?.mailboxId
       ? await this.mailboxRepository.findById(ticket.mailboxId)
