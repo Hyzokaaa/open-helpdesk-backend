@@ -16,7 +16,7 @@ export function resolveFrontendUrl(
   }
 
   if (candidate) {
-    logger.warn(`Unrecognized X-Frontend-URL: ${candidate} — add it to FRONTEND_URL if this is a valid origin`);
+    logger.warn(`Unrecognized X-Frontend-URL: ${candidate} — add it to CORS_ORIGINS if this is a valid origin`);
   }
 
   return defaultUrl;

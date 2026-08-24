@@ -9,7 +9,7 @@ export class WidgetController {
   private readonly frontendUrl: string;
 
   constructor(private readonly config: ConfigService) {
-    this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173').split(',')[0].trim();
+    this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
   }
 
   @Get('widget.js')

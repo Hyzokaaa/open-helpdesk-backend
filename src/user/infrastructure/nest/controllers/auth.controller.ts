@@ -60,9 +60,9 @@ export class AuthController {
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
     private readonly config: ConfigService,
   ) {
-    const rawFrontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
-    this.allowedFrontendUrls = rawFrontendUrl.split(',').map((u: string) => u.trim());
-    this.frontendUrl = this.allowedFrontendUrls[0];
+    this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
+    const corsOrigins = config.get('CORS_ORIGINS', this.frontendUrl);
+    this.allowedFrontendUrls = corsOrigins.split(',').map((u: string) => u.trim());
     this.googleEnabled = !!config.get('GOOGLE_CLIENT_ID');
     this.microsoftEnabled = !!config.get('MICROSOFT_CLIENT_ID');
   }

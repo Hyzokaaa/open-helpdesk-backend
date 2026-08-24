@@ -45,7 +45,7 @@ export class TicketCreatedHandler {
     private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
     private readonly config: ConfigService,
   ) {
-    this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173').split(',')[0].trim();
+    this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
   }
 
   @OnEvent('ticket.created')

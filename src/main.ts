@@ -23,9 +23,9 @@ async function bootstrap() {
 
   app.useGlobalFilters(new DomainExceptionFilter());
 
-  const frontendUrl = process.env.FRONTEND_URL;
-  const allowedOrigins = frontendUrl
-    ? frontendUrl.split(",").map((u) => u.trim())
+  const corsOrigins = process.env.CORS_ORIGINS || process.env.FRONTEND_URL;
+  const allowedOrigins = corsOrigins
+    ? corsOrigins.split(",").map((u) => u.trim())
     : ["http://localhost:5173"];
 
   const verifiedDomainCache = new Map<string, boolean>();

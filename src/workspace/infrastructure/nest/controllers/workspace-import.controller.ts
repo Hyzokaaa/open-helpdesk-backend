@@ -55,9 +55,9 @@ export class WorkspaceImportController {
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
     private readonly config: ConfigService,
   ) {
-    const rawFrontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
-    this.allowedFrontendUrls = rawFrontendUrl.split(',').map((u: string) => u.trim());
-    this.frontendUrl = this.allowedFrontendUrls[0];
+    this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
+    const corsOrigins = config.get('CORS_ORIGINS', this.frontendUrl);
+    this.allowedFrontendUrls = corsOrigins.split(',').map((u: string) => u.trim());
   }
 
   @Get(':slug/members/import/template')
