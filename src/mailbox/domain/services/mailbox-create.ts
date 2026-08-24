@@ -26,7 +26,7 @@ export class CreateMailbox {
       id: this.idGenerator.create(),
       address,
       workspaceId: props.workspaceId,
-      isActive: false,
+      isActive: true,
     });
 
     await this.repository.create(mailbox);
