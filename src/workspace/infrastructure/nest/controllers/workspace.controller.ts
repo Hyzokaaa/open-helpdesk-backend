@@ -762,9 +762,8 @@ export class WorkspaceController {
     });
 
     const frontendUrl = this.config.get<string>('FRONTEND_URL', '');
-    const primaryUrl = frontendUrl.split(',')[0]?.trim() || '';
     let primaryHost = '';
-    try { primaryHost = new URL(primaryUrl).hostname; } catch {}
+    try { primaryHost = new URL(frontendUrl).hostname; } catch {}
     const service = new SetCustomDomain(this.workspaceRepository, primaryHost);
     const workspace = await service.execute({ workspaceId, domain: body.domain, autoVerify: body.autoVerify });
 

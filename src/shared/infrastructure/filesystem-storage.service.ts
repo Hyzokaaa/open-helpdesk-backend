@@ -13,7 +13,7 @@ export class FilesystemStorageService implements StorageService {
 
   constructor(private readonly config: ConfigService) {
     this.basePath = config.get('STORAGE_PATH', './data/storage');
-    this.baseUrl = config.get('FRONTEND_URL', 'http://localhost').split(',')[0].trim();
+    this.baseUrl = config.get('FRONTEND_URL', 'http://localhost');
     this.secret = config.getOrThrow('JWT_SECRET');
   }
 

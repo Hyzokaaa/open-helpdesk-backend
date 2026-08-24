@@ -38,7 +38,7 @@ export class TransferRequestHandler {
     private readonly auditLogRepository: TypeOrmAuditLogRepository,
     private readonly config: ConfigService,
   ) {
-    this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173').split(',')[0].trim();
+    this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
   }
 
   @OnEvent('transfer-request.created')
