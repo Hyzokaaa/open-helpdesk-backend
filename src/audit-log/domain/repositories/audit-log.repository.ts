@@ -4,6 +4,7 @@ import { AuditLogEntry } from '../entities/audit-log-entry';
 export interface AuditLogFilters {
   userId?: string;
   action?: string;
+  excludeActions?: string[];
   entityType?: string;
   entityId?: string;
   category?: string;
