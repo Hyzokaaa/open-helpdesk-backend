@@ -6,7 +6,7 @@ import { Strategy, VerifyCallback } from 'passport-google-oauth20';
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   constructor(config: ConfigService) {
-    const backendUrl = config.get('BACKEND_URL', 'http://localhost:3000');
+    const backendUrl = config.get('API_URL') || config.get('BACKEND_URL', 'http://localhost:3000');
 
     super({
       clientID: config.getOrThrow('GOOGLE_CLIENT_ID'),
