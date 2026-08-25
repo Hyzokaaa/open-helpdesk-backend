@@ -53,16 +53,17 @@ export class RouteInboundEmail {
     if (parsed.mailboxId) {
       const pollerMailbox = await this.mailboxRepository.findById(parsed.mailboxId);
       if (pollerMailbox?.isActive) {
-        if (pollerMailbox.addressMode === 'all') {
-          // Accept any email in this mailbox regardless of To/CC
+        if (pollerMailbox.addressMode === 'all' && pollerMailbox.workspaceId) {
+          // Workspace mailbox in catch-all mode: accept any email
           mailbox = pollerMailbox;
+        } else if (pollerMailbox.workspaceId === null) {
+          // System/platform mailbox: always delegate to TO-based lookup
+          viaSystemMailbox = true;
         } else {
           // Check if the email was actually sent TO this mailbox's address
           const recipients = parsed.toAddresses.map(a => a.toLowerCase());
           if (recipients.includes(pollerMailbox.address.toLowerCase())) {
             mailbox = pollerMailbox;
-          } else if (pollerMailbox.workspaceId === null) {
-            viaSystemMailbox = true;
           }
         }
       }
