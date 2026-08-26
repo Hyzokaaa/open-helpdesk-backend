@@ -752,6 +752,88 @@ export class WorkspaceController {
     }
   }
 
+  @Post(':slug/resolve-mail-server')
+  async resolveMailServer(
+    @Param('slug') slug: string,
+    @Body() body: { domain: string },
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId, userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+
+    if (!body.domain) throw new BadRequestException('Domain is required');
+
+    const dns = require('dns').promises;
+    const result: { smtp?: { host: string; port: number }; imap?: { host: string; port: number } } = {};
+
+    // 1. Try SRV records (RFC 6186)
+    try {
+      const records = await dns.resolveSrv(`_submission._tcp.${body.domain}`);
+      if (records.length > 0) result.smtp = { host: records[0].name, port: records[0].port };
+    } catch {}
+
+    try {
+      const records = await dns.resolveSrv(`_imaps._tcp.${body.domain}`);
+      if (records.length > 0) result.imap = { host: records[0].name, port: records[0].port };
+    } catch {}
+
+    if (!result.imap) {
+      try {
+        const records = await dns.resolveSrv(`_imap._tcp.${body.domain}`);
+        if (records.length > 0) result.imap = { host: records[0].name, port: records[0].port };
+      } catch {}
+    }
+
+    // 2. Fallback: try MX record (most reliable — almost every mail domain has one)
+    if (!result.smtp || !result.imap) {
+      try {
+        const mxRecords = await dns.resolveMx(body.domain);
+        if (mxRecords.length > 0) {
+          const mxHost = mxRecords.sort((a: any, b: any) => a.priority - b.priority)[0].exchange;
+          if (!result.smtp) result.smtp = { host: mxHost, port: 587 };
+          if (!result.imap) result.imap = { host: mxHost, port: 993 };
+        }
+      } catch {}
+    }
+
+    // 3. Fallback: try common hostnames via DNS A/AAAA resolution
+    const tryResolve = async (hostname: string): Promise<boolean> => {
+      try {
+        await dns.resolve(hostname);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    if (!result.smtp) {
+      for (const prefix of ['mail', 'smtp']) {
+        const candidate = `${prefix}.${body.domain}`;
+        if (await tryResolve(candidate)) {
+          result.smtp = { host: candidate, port: 587 };
+          break;
+        }
+      }
+    }
+
+    if (!result.imap) {
+      for (const prefix of ['mail', 'imap']) {
+        const candidate = `${prefix}.${body.domain}`;
+        if (await tryResolve(candidate)) {
+          result.imap = { host: candidate, port: 993 };
+          break;
+        }
+      }
+    }
+
+    return result;
+  }
+
   @Patch(':slug/custom-domain')
   async setCustomDomain(
     @Param('slug') slug: string,
