@@ -594,13 +594,15 @@ export class WorkspaceController {
       hasPassword: true,
       smtpFrom: sender.smtpFrom,
       encryption: sender.encryption,
+      fromName: sender.fromName,
+      fromEmail: sender.fromEmail,
     };
   }
 
   @Post(':slug/email-sender')
   async createEmailSender(
     @Param('slug') slug: string,
-    @Body() body: { smtpHost: string; smtpPort: number; smtpUser: string; smtpPass: string; smtpFrom: string; encryption?: string },
+    @Body() body: { smtpHost: string; smtpPort: number; smtpUser: string; smtpPass: string; smtpFrom: string; encryption?: string; fromName?: string | null; fromEmail?: string | null },
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
@@ -620,6 +622,8 @@ export class WorkspaceController {
       if (body.smtpPass) existing.smtpPass = body.smtpPass;
       existing.smtpFrom = body.smtpFrom;
       if (body.encryption) existing.encryption = body.encryption;
+      if (body.fromName !== undefined) existing.fromName = body.fromName || null;
+      if (body.fromEmail !== undefined) existing.fromEmail = body.fromEmail || null;
       await this.emailSenderRepository.update(existing);
       resultId = existing.getId();
     } else {
@@ -632,6 +636,8 @@ export class WorkspaceController {
         smtpPass: body.smtpPass,
         smtpFrom: body.smtpFrom,
         encryption: body.encryption,
+        fromName: body.fromName,
+        fromEmail: body.fromEmail,
       });
       await this.emailSenderRepository.create(sender);
       resultId = sender.getId();
@@ -744,6 +750,45 @@ export class WorkspaceController {
 
       return { success: false, error: msg };
     }
+  }
+
+  @Post(':slug/resolve-mail-server')
+  async resolveMailServer(
+    @Param('slug') slug: string,
+    @Body() body: { domain: string },
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    await ensurePermission.execute({
+      workspaceId, userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+
+    if (!body.domain) throw new BadRequestException('Domain is required');
+
+    const dns = require('dns').promises;
+    const result: { smtp?: { host: string; port: number }; imap?: { host: string; port: number } } = {};
+
+    try {
+      const records = await dns.resolveSrv(`_submission._tcp.${body.domain}`);
+      if (records.length > 0) result.smtp = { host: records[0].name, port: records[0].port };
+    } catch {}
+
+    try {
+      const records = await dns.resolveSrv(`_imaps._tcp.${body.domain}`);
+      if (records.length > 0) result.imap = { host: records[0].name, port: records[0].port };
+    } catch {}
+
+    if (!result.imap) {
+      try {
+        const records = await dns.resolveSrv(`_imap._tcp.${body.domain}`);
+        if (records.length > 0) result.imap = { host: records[0].name, port: records[0].port };
+      } catch {}
+    }
+
+    return result;
   }
 
   @Patch(':slug/custom-domain')

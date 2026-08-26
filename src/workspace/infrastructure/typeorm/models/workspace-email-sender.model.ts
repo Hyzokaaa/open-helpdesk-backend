@@ -39,6 +39,12 @@ export class WorkspaceEmailSenderModel {
   @Column({ default: 'tls' })
   encryption!: string;
 
+  @Column({ type: 'varchar', nullable: true })
+  fromName!: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  fromEmail!: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
