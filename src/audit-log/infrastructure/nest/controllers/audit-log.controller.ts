@@ -33,6 +33,7 @@ export class AuditLogController {
       filters: {
         userId: filters.userId,
         action: filters.action,
+        excludeActions: filters.excludeActions,
         entityType: filters.entityType,
         entityId: filters.entityId,
         category: filters.category,
