@@ -9,6 +9,8 @@ interface Props {
   smtpPass: string;
   smtpFrom: string;
   encryption?: string;
+  fromName?: string | null;
+  fromEmail?: string | null;
 }
 
 export interface SmtpConfig {
@@ -30,6 +32,8 @@ export class WorkspaceEmailSender {
   smtpPass: string;
   smtpFrom: string;
   encryption: string;
+  fromName: string | null;
+  fromEmail: string | null;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -40,6 +44,8 @@ export class WorkspaceEmailSender {
     this.smtpPass = props.smtpPass;
     this.smtpFrom = props.smtpFrom;
     this.encryption = props.encryption ?? 'tls';
+    this.fromName = props.fromName ?? null;
+    this.fromEmail = props.fromEmail ?? null;
   }
 
   getId(): string {
@@ -47,12 +53,15 @@ export class WorkspaceEmailSender {
   }
 
   getSmtpConfig(): SmtpConfig {
+    const email = this.fromEmail || this.smtpFrom;
+    const from = this.fromName ? `${this.fromName} <${email}>` : email;
+
     return {
       host: this.smtpHost,
       port: this.smtpPort,
       user: this.smtpUser,
       pass: this.smtpPass,
-      from: this.smtpFrom,
+      from,
       secure: this.smtpPort === 465,
       encryption: this.encryption,
     };

@@ -594,13 +594,15 @@ export class WorkspaceController {
       hasPassword: true,
       smtpFrom: sender.smtpFrom,
       encryption: sender.encryption,
+      fromName: sender.fromName,
+      fromEmail: sender.fromEmail,
     };
   }
 
   @Post(':slug/email-sender')
   async createEmailSender(
     @Param('slug') slug: string,
-    @Body() body: { smtpHost: string; smtpPort: number; smtpUser: string; smtpPass: string; smtpFrom: string; encryption?: string },
+    @Body() body: { smtpHost: string; smtpPort: number; smtpUser: string; smtpPass: string; smtpFrom: string; encryption?: string; fromName?: string | null; fromEmail?: string | null },
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
@@ -620,6 +622,8 @@ export class WorkspaceController {
       if (body.smtpPass) existing.smtpPass = body.smtpPass;
       existing.smtpFrom = body.smtpFrom;
       if (body.encryption) existing.encryption = body.encryption;
+      if (body.fromName !== undefined) existing.fromName = body.fromName || null;
+      if (body.fromEmail !== undefined) existing.fromEmail = body.fromEmail || null;
       await this.emailSenderRepository.update(existing);
       resultId = existing.getId();
     } else {
@@ -632,6 +636,8 @@ export class WorkspaceController {
         smtpPass: body.smtpPass,
         smtpFrom: body.smtpFrom,
         encryption: body.encryption,
+        fromName: body.fromName,
+        fromEmail: body.fromEmail,
       });
       await this.emailSenderRepository.create(sender);
       resultId = sender.getId();
