@@ -81,6 +81,7 @@ export class SignupUserCommand implements Command<Props, SignupResponse> {
       sub: user.getId(),
       email: user.email,
       isSystemAdmin: user.isSystemAdmin,
+      isEmailVerified: true,
     });
 
     await this.createAuditLog.execute({
