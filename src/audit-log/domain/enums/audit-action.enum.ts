@@ -114,6 +114,16 @@ export enum AuditAction {
   ORGANIZATION_UPDATED = 'organization-updated',
   ORGANIZATION_DELETED = 'organization-deleted',
 
+  // Projects
+  PROJECT_CREATED = 'project-created',
+  PROJECT_UPDATED = 'project-updated',
+  PROJECT_DELETED = 'project-deleted',
+
+  // Ticket Categories
+  TICKET_CATEGORY_CREATED = 'ticket-category-created',
+  TICKET_CATEGORY_UPDATED = 'ticket-category-updated',
+  TICKET_CATEGORY_DELETED = 'ticket-category-deleted',
+
   // Canned responses
   CANNED_RESPONSE_CREATED = 'canned-response-created',
   CANNED_RESPONSE_UPDATED = 'canned-response-updated',
