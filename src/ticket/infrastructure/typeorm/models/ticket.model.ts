@@ -14,6 +14,8 @@ import { WorkspaceModel } from '../../../../workspace/infrastructure/typeorm/mod
 import { TagModel } from '../../../../tag/infrastructure/typeorm/models/tag.model';
 import { DepartmentModel } from '../../../../department/infrastructure/typeorm/models/department.model';
 import { OrganizationModel } from '../../../../organization/infrastructure/typeorm/models/organization.model';
+import { ProjectModel } from '../../../../project/infrastructure/typeorm/models/project.model';
+import { TicketCategoryModel } from '../../../../project/infrastructure/typeorm/models/ticket-category.model';
 
 @Entity('tickets')
 export class TicketModel {
@@ -32,8 +34,11 @@ export class TicketModel {
   @Column()
   status!: string;
 
-  @Column()
-  category!: string;
+  @ManyToOne(() => TicketCategoryModel, { nullable: true, onDelete: 'SET NULL' })
+  ticketCategory!: TicketCategoryModel | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  categoryId!: string | null;
 
   @ManyToOne(() => WorkspaceModel, { onDelete: 'CASCADE' })
   workspace!: WorkspaceModel;
@@ -103,6 +108,12 @@ export class TicketModel {
 
   @Column({ type: 'varchar', nullable: true })
   departmentId!: string | null;
+
+  @ManyToOne(() => ProjectModel, { nullable: true, onDelete: 'SET NULL' })
+  project!: ProjectModel | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  projectId!: string | null;
 
   @ManyToOne(() => OrganizationModel, { nullable: true, onDelete: 'SET NULL' })
   organization!: OrganizationModel | null;

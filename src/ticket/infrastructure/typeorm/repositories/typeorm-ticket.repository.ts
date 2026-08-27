@@ -122,6 +122,16 @@ export class TypeOrmTicketRepository implements TicketRepository {
         organizationId: filters.organizationId,
       });
     }
+    if (filters.projectId) {
+      qb.andWhere('ticket.projectId = :projectId', {
+        projectId: filters.projectId,
+      });
+    }
+    if (filters.categoryId) {
+      qb.andWhere('ticket.categoryId = :categoryId', {
+        categoryId: filters.categoryId,
+      });
+    }
     if (filters.tagIds && filters.tagIds.length > 0) {
       qb.andWhere(
         'ticket.id IN ' +
@@ -140,7 +150,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
       name: { col: 'ticket.name', lower: true },
       priority: { col: 'ticket.priority', lower: false },
       status: { col: 'ticket.status', lower: false },
-      category: { col: 'ticket.category', lower: false },
+      categoryId: { col: 'ticket.categoryId', lower: false },
       createdAt: { col: 'ticket.createdAt', lower: false },
     };
 
@@ -200,7 +210,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
       description: model.description,
       priority: model.priority as TicketPriority,
       status: model.status as TicketStatus,
-      category: model.category as TicketCategory,
+      categoryId: model.categoryId ?? '',
       workspaceId: model.workspaceId,
       reporterId: model.reporterId,
       assigneeId: model.assigneeId,
@@ -219,6 +229,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
       aiCache: model.aiCache ?? {},
       departmentId: model.departmentId ?? null,
       organizationId: model.organizationId ?? null,
+      projectId: model.projectId ?? null,
       source: model.source as TicketSource,
       registeredById: model.registeredById ?? null,
       mailboxId: model.mailboxId ?? null,
@@ -233,7 +244,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
     model.description = ticket.description;
     model.priority = ticket.priority;
     model.status = ticket.status;
-    model.category = ticket.category;
+    model.categoryId = ticket.categoryId;
     model.workspaceId = ticket.workspaceId;
     model.reporterId = ticket.reporterId;
     model.assigneeId = ticket.assigneeId;
@@ -249,6 +260,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
     model.aiCache = ticket.aiCache;
     model.departmentId = ticket.departmentId;
     model.organizationId = ticket.organizationId;
+    model.projectId = ticket.projectId;
     model.source = ticket.source;
     model.registeredById = ticket.registeredById;
     model.mailboxId = ticket.mailboxId;

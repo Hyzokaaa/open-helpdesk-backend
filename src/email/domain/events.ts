@@ -2,7 +2,7 @@ export interface TicketCreatedEvent {
   ticketId: string;
   ticketName: string;
   priority: string;
-  category: string;
+  categoryId: string;
   reporterId: string;
   reporterName: string;
   workspaceId: string;

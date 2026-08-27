@@ -1,5 +1,4 @@
 import { Id } from '../../../shared/domain/id';
-import { TicketCategory } from '../enums/ticket-category.enum';
 import { TicketPriority } from '../enums/ticket-priority.enum';
 import { TicketDiscardReason } from '../enums/ticket-discard-reason.enum';
 import { TicketSource } from '../enums/ticket-source.enum';
@@ -11,7 +10,7 @@ interface Props {
   description: string;
   priority: TicketPriority;
   status: TicketStatus;
-  category: TicketCategory;
+  categoryId: string;
   workspaceId: string;
   reporterId: string;
   assigneeId: string | null;
@@ -31,6 +30,7 @@ interface Props {
   source?: TicketSource;
   departmentId?: string | null;
   organizationId?: string | null;
+  projectId?: string | null;
   registeredById?: string | null;
   mailboxId?: string | null;
   originDate?: Date | null;
@@ -42,7 +42,7 @@ export class Ticket {
   description: string;
   priority: TicketPriority;
   status: TicketStatus;
-  category: TicketCategory;
+  categoryId: string;
   workspaceId: string;
   reporterId: string;
   assigneeId: string | null;
@@ -61,6 +61,7 @@ export class Ticket {
   aiCache: Record<string, { source: string; result: string }>;
   departmentId: string | null;
   organizationId: string | null;
+  projectId: string | null;
   source: TicketSource;
   registeredById: string | null;
   mailboxId: string | null;
@@ -72,7 +73,7 @@ export class Ticket {
     this.description = props.description;
     this.priority = props.priority;
     this.status = props.status;
-    this.category = props.category;
+    this.categoryId = props.categoryId;
     this.workspaceId = props.workspaceId;
     this.reporterId = props.reporterId;
     this.assigneeId = props.assigneeId;
@@ -91,6 +92,7 @@ export class Ticket {
     this.aiCache = props.aiCache ?? {};
     this.departmentId = props.departmentId ?? null;
     this.organizationId = props.organizationId ?? null;
+    this.projectId = props.projectId ?? null;
     this.source = props.source ?? TicketSource.UI;
     this.registeredById = props.registeredById ?? null;
     this.mailboxId = props.mailboxId ?? null;

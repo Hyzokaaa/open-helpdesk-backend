@@ -57,7 +57,7 @@ export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
       description: ticket.description,
       priority: ticket.priority,
       status: ticket.status,
-      category: ticket.category,
+      category: ticket.categoryId,
       workspaceId: ticket.workspaceId,
       reporterId: ticket.reporterId,
       source: ticket.source,

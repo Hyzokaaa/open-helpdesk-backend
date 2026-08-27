@@ -72,7 +72,7 @@ export class ListTicketsQuery
         name: ticket.name,
         priority: ticket.priority,
         status: ticket.status,
-        category: ticket.category,
+        category: ticket.categoryId,
         reporterId: ticket.reporterId,
         assigneeId: ticket.assigneeId,
         ticketNumber: ticket.ticketNumber,
