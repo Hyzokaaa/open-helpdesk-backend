@@ -26,15 +26,14 @@ git config --global --add safe.directory "$INSTALL_DIR" 2>/dev/null || true
 
 # ── Version check ──
 
+CURRENT_VERSION=$(node -p "require('./package.json').version" 2>/dev/null || echo "unknown")
 CURRENT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null)
-CURRENT_VERSION=$(node -e "try{const c=require('./src/changelog/changelog.data');console.log(c.coreChangelog[0].version)}catch{console.log('unknown')}" 2>/dev/null || echo "unknown")
 
-sudo git fetch origin &>/dev/null
-LATEST_COMMIT=$(git rev-parse --short origin/main 2>/dev/null)
-LATEST_VERSION=$(git show origin/main:src/changelog/changelog.data.ts 2>/dev/null | node -e "
-  let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
-    const m=d.match(/version:\s*'([^']+)'/);console.log(m?m[1]:'unknown')
-  })" 2>/dev/null || echo "unknown")
+BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
+sudo git fetch origin --quiet &>/dev/null
+
+LATEST_VERSION=$(git show "origin/$BRANCH:package.json" 2>/dev/null | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin','utf-8')).version" 2>/dev/null || echo "unknown")
+LATEST_COMMIT=$(git rev-parse --short "origin/$BRANCH" 2>/dev/null)
 
 echo "  Current:   v$CURRENT_VERSION ($CURRENT_COMMIT)"
 echo "  Available: v$LATEST_VERSION ($LATEST_COMMIT)"
@@ -46,7 +45,7 @@ if [ "$CURRENT_COMMIT" = "$LATEST_COMMIT" ]; then
   exit 0
 fi
 
-CHANGES=$(git log --oneline "$CURRENT_COMMIT..origin/main" 2>/dev/null)
+CHANGES=$(git log --oneline "$CURRENT_COMMIT..origin/$BRANCH" 2>/dev/null)
 if [ -n "$CHANGES" ]; then
   CHANGE_COUNT=$(echo "$CHANGES" | wc -l)
   echo "  $CHANGE_COUNT new commit(s):"
