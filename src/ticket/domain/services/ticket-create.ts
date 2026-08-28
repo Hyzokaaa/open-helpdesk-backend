@@ -1,6 +1,5 @@
 import { IdGenerator } from '../../../shared/domain/id-generator';
 import { Ticket } from '../entities/ticket';
-import { TicketCategory } from '../enums/ticket-category.enum';
 import { TicketPriority } from '../enums/ticket-priority.enum';
 import { TicketStatus } from '../enums/ticket-status.enum';
 import { TicketSource } from '../enums/ticket-source.enum';
@@ -10,13 +9,14 @@ interface CreateTicketProps {
   name: string;
   description: string;
   priority: TicketPriority;
-  category: TicketCategory;
+  categoryId: string;
   workspaceId: string;
   reporterId: string;
   tagIds: string[];
   customFields?: Record<string, unknown>;
   departmentId?: string | null;
   organizationId?: string | null;
+  projectId?: string | null;
   source?: TicketSource;
   registeredById?: string | null;
   portalToken?: string | null;
@@ -37,7 +37,7 @@ export class CreateTicket {
       description: props.description,
       priority: props.priority,
       status: TicketStatus.OPEN,
-      category: props.category,
+      categoryId: props.categoryId,
       workspaceId: props.workspaceId,
       reporterId: props.reporterId,
       assigneeId: null,
@@ -51,6 +51,7 @@ export class CreateTicket {
       discardReason: null,
       departmentId: props.departmentId ?? null,
       organizationId: props.organizationId ?? null,
+      projectId: props.projectId ?? null,
       source: props.source,
       registeredById: props.registeredById ?? null,
       portalToken: props.portalToken ?? null,

@@ -2,7 +2,7 @@ import { TransferTicket } from '../../../../src/ticket/domain/services/ticket-tr
 import { Ticket } from '../../../../src/ticket/domain/entities/ticket';
 import { TicketStatus } from '../../../../src/ticket/domain/enums/ticket-status.enum';
 import { TicketPriority } from '../../../../src/ticket/domain/enums/ticket-priority.enum';
-import { TicketCategory } from '../../../../src/ticket/domain/enums/ticket-category.enum';
+
 import { AccessDeniedError } from '../../../../src/shared/domain/errors';
 import { MockTicketRepository } from '../../../mocks/mock-ticket.repository';
 
@@ -13,7 +13,7 @@ function makeTicket(overrides: Partial<{ assigneeId: string | null; reporterId: 
     description: '',
     priority: TicketPriority.MEDIUM,
     status: TicketStatus.IN_PROGRESS,
-    category: TicketCategory.ISSUE,
+    categoryId: 'cat-issue',
     workspaceId: 'ws-1',
     reporterId: overrides.reporterId ?? 'creator-1',
     assigneeId: overrides.assigneeId ?? 'agent-1',

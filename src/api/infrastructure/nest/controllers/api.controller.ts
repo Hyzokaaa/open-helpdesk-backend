@@ -144,7 +144,7 @@ export class ApiController {
       name: body.name,
       description: body.description,
       priority: body.priority,
-      category: body.category,
+      categoryId: body.categoryId,
       workspaceId: workspace.getId(),
       workspaceName: workspace.name,
       workspaceSlug: workspace.slug,
@@ -210,7 +210,7 @@ export class ApiController {
 
     // Handle field updates
     const hasFieldUpdates = body.name !== undefined || body.description !== undefined ||
-      body.priority !== undefined || body.category !== undefined ||
+      body.priority !== undefined || body.categoryId !== undefined ||
       body.tagIds !== undefined || body.customFields !== undefined;
 
     if (hasFieldUpdates) {
@@ -225,7 +225,7 @@ export class ApiController {
         name: body.name,
         description: body.description,
         priority: body.priority,
-        category: body.category,
+        categoryId: body.categoryId,
         tagIds: body.tagIds,
         customFields: body.customFields,
         isSystemAdmin: user.isSystemAdmin,

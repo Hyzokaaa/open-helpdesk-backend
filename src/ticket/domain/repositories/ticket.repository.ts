@@ -11,6 +11,8 @@ export interface TicketFilters {
   tagIds?: string[];
   departmentId?: string;
   organizationId?: string;
+  projectId?: string;
+  categoryId?: string;
   assigneeId?: string;
   reporterId?: string;
   registeredById?: string;

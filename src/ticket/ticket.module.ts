@@ -8,6 +8,7 @@ import { CustomFieldModule } from '../custom-field/custom-field.module';
 import { AttachmentModule } from '../attachment/attachment.module';
 import { DepartmentModule } from '../department/department.module';
 import { OrganizationModule } from '../organization/organization.module';
+import { ProjectModule } from '../project/project.module';
 import { TicketModel } from './infrastructure/typeorm/models/ticket.model';
 import { TicketParticipantModel } from './infrastructure/typeorm/models/ticket-participant.model';
 import { TransferRequestModel } from './infrastructure/typeorm/models/transfer-request.model';
@@ -22,7 +23,7 @@ import { SlaBreachCheckerService } from './infrastructure/nest/services/sla-brea
 import { TransferRequestExpiryService } from './infrastructure/nest/services/transfer-request-expiry.service';
 
 @Module({
-  imports: [SharedModule, UserModule, WorkspaceModule, AuditLogModule, CustomFieldModule, AttachmentModule, DepartmentModule, OrganizationModule, TypeOrmModule.forFeature([TicketModel, TicketParticipantModel, TransferRequestModel, CommentModel])],
+  imports: [SharedModule, UserModule, WorkspaceModule, AuditLogModule, CustomFieldModule, AttachmentModule, DepartmentModule, OrganizationModule, ProjectModule, TypeOrmModule.forFeature([TicketModel, TicketParticipantModel, TransferRequestModel, CommentModel])],
   controllers: [TicketController, PortalController],
   providers: [TypeOrmTicketRepository, TypeOrmTicketParticipantRepository, TypeOrmTransferRequestRepository, TypeOrmCommentRepository, SlaBreachCheckerService, TransferRequestExpiryService],
   exports: [TypeOrmTicketRepository, TypeOrmTicketParticipantRepository, TypeOrmTransferRequestRepository],

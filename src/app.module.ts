@@ -13,6 +13,7 @@ import { WorkspaceModule } from "./workspace/workspace.module";
 import { TagModule } from "./tag/tag.module";
 import { DepartmentModule } from "./department/department.module";
 import { OrganizationModule } from "./organization/organization.module";
+import { ProjectModule } from "./project/project.module";
 import { TicketModule } from "./ticket/ticket.module";
 import { CommentModule } from "./comment/comment.module";
 import { AttachmentModule } from "./attachment/attachment.module";
@@ -72,6 +73,7 @@ import { SystemMailboxController } from "./mailbox/infrastructure/nest/controlle
     TagModule,
     DepartmentModule,
     OrganizationModule,
+    ProjectModule,
     TicketModule,
     CommentModule,
     AttachmentModule,

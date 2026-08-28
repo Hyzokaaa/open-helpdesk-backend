@@ -1,6 +1,5 @@
 import { EventPublisher } from '../../../shared/domain/event-publisher';
 import { Command } from '../../../shared/domain/command';
-import { TicketCategory } from '../../domain/enums/ticket-category.enum';
 import { TicketPriority } from '../../domain/enums/ticket-priority.enum';
 import { CreateTicket } from '../../domain/services/ticket-create';
 import { EnsureWorkspacePermission } from '../../../workspace/domain/services/workspace-ensure-permission';
@@ -19,7 +18,7 @@ interface Props {
   name: string;
   description: string;
   priority: TicketPriority;
-  category: TicketCategory;
+  categoryId: string;
   workspaceId: string;
   workspaceName: string;
   workspaceSlug: string;
@@ -30,6 +29,7 @@ interface Props {
   uploadTokens?: string[];
   departmentId?: string;
   organizationId?: string | null;
+  projectId?: string | null;
   source?: TicketSource;
   registeredById?: string | null;
   isSystemAdmin: boolean;
@@ -70,7 +70,7 @@ export class CreateTicketCommand implements Command<Props, CreateTicketResponse>
       name: props.name,
       description: props.description,
       priority: props.priority,
-      category: props.category,
+      categoryId: props.categoryId,
       workspaceId: props.workspaceId,
       reporterId: props.userId,
       tagIds: props.tagIds,
@@ -93,7 +93,7 @@ export class CreateTicketCommand implements Command<Props, CreateTicketResponse>
       ticketId: ticket.getId(),
       ticketName: props.name,
       priority: props.priority,
-      category: props.category,
+      categoryId: props.categoryId,
       reporterId: props.userId,
       reporterName: creator ? `${creator.firstName} ${creator.lastName}` : props.userEmail,
       workspaceId: props.workspaceId,
@@ -112,7 +112,7 @@ export class CreateTicketCommand implements Command<Props, CreateTicketResponse>
       entityId: ticket.getId(),
       userId: props.userId,
       workspaceId: props.workspaceId,
-      metadata: { name: props.name, priority: props.priority, category: props.category },
+      metadata: { name: props.name, priority: props.priority, categoryId: props.categoryId },
     });
 
     return {

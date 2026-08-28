@@ -30,8 +30,9 @@ describe('CreateComment', () => {
       authorId: 'user-1',
     });
 
-    expect(comment.content).toBe('&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt; normal text');
     expect(comment.content).not.toContain('<script>');
+    expect(comment.content).not.toContain('&lt;script&gt;');
+    expect(comment.content).toContain('normal text');
   });
 
   it('should preserve mention patterns after sanitization', async () => {

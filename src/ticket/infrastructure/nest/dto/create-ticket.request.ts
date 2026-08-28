@@ -7,7 +7,6 @@ import {
   IsOptional,
   IsString,
 } from 'class-validator';
-import { TicketCategory } from '../../../domain/enums/ticket-category.enum';
 import { TicketPriority } from '../../../domain/enums/ticket-priority.enum';
 
 export class CreateTicketRequest {
@@ -22,8 +21,9 @@ export class CreateTicketRequest {
   @IsEnum(TicketPriority)
   priority!: TicketPriority;
 
-  @IsEnum(TicketCategory)
-  category!: TicketCategory;
+  @IsString()
+  @IsNotEmpty()
+  categoryId!: string;
 
   @IsArray()
   @IsString({ each: true })
@@ -37,6 +37,10 @@ export class CreateTicketRequest {
   @IsString()
   @IsOptional()
   departmentId?: string;
+
+  @IsString()
+  @IsOptional()
+  projectId?: string;
 
   @IsArray()
   @IsString({ each: true })

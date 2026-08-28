@@ -16,7 +16,8 @@ export interface TicketDetailResponse {
   description: string;
   priority: string;
   status: string;
-  category: string;
+  categoryId: string | null;
+  projectId: string | null;
   workspaceId: string;
   reporterId: string;
   source: string;
@@ -31,6 +32,7 @@ export interface TicketDetailResponse {
   customFields: Record<string, unknown>;
   discardReason: string | null;
   departmentId: string | null;
+  organizationId: string | null;
   firstResponseBreached: boolean;
   resolutionBreached: boolean;
   accessLevel: TicketAccessLevel;
@@ -57,7 +59,8 @@ export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
       description: ticket.description,
       priority: ticket.priority,
       status: ticket.status,
-      category: ticket.category,
+      categoryId: ticket.categoryId,
+      projectId: ticket.projectId,
       workspaceId: ticket.workspaceId,
       reporterId: ticket.reporterId,
       source: ticket.source,
@@ -72,6 +75,7 @@ export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
       customFields: ticket.customFields,
       discardReason: ticket.discardReason,
       departmentId: ticket.departmentId,
+      organizationId: ticket.organizationId,
       firstResponseBreached: ticket.firstResponseBreached,
       resolutionBreached: ticket.resolutionBreached,
       accessLevel,

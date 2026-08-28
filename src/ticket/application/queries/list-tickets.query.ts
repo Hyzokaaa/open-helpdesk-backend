@@ -22,7 +22,8 @@ export interface TicketListItem {
   name: string;
   priority: string;
   status: string;
-  category: string;
+  categoryId: string | null;
+  projectId: string | null;
   reporterId: string;
   assigneeId: string | null;
   ticketNumber: number;
@@ -30,6 +31,7 @@ export interface TicketListItem {
   tagIds: string[];
   customFields: Record<string, unknown>;
   departmentId: string | null;
+  organizationId: string | null;
   firstResponseBreached: boolean;
   resolutionBreached: boolean;
 }
@@ -72,7 +74,8 @@ export class ListTicketsQuery
         name: ticket.name,
         priority: ticket.priority,
         status: ticket.status,
-        category: ticket.category,
+        categoryId: ticket.categoryId,
+        projectId: ticket.projectId,
         reporterId: ticket.reporterId,
         assigneeId: ticket.assigneeId,
         ticketNumber: ticket.ticketNumber,
@@ -80,6 +83,7 @@ export class ListTicketsQuery
         tagIds: ticket.tagIds,
         customFields: ticket.customFields,
         departmentId: ticket.departmentId,
+        organizationId: ticket.organizationId,
         firstResponseBreached: ticket.firstResponseBreached,
         resolutionBreached: ticket.resolutionBreached,
       })),

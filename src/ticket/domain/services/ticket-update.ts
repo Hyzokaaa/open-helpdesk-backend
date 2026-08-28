@@ -1,6 +1,5 @@
 import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { Ticket } from '../entities/ticket';
-import { TicketCategory } from '../enums/ticket-category.enum';
 import { TicketPriority } from '../enums/ticket-priority.enum';
 import { TicketRepository } from '../repositories/ticket.repository';
 
@@ -9,10 +8,11 @@ interface UpdateTicketProps {
   name?: string;
   description?: string;
   priority?: TicketPriority;
-  category?: TicketCategory;
+  categoryId?: string;
   tagIds?: string[];
   departmentId?: string | null;
   organizationId?: string | null;
+  projectId?: string | null;
   customFields?: Record<string, unknown>;
 }
 
@@ -28,10 +28,11 @@ export class UpdateTicket {
     if (props.name !== undefined) ticket.name = props.name;
     if (props.description !== undefined) ticket.description = props.description;
     if (props.priority !== undefined) ticket.priority = props.priority;
-    if (props.category !== undefined) ticket.category = props.category;
+    if (props.categoryId !== undefined) ticket.categoryId = props.categoryId;
     if (props.tagIds !== undefined) ticket.tagIds = props.tagIds;
     if (props.departmentId !== undefined) ticket.departmentId = props.departmentId;
     if (props.organizationId !== undefined) ticket.organizationId = props.organizationId;
+    if (props.projectId !== undefined) ticket.projectId = props.projectId;
     if (props.customFields !== undefined) ticket.customFields = { ...ticket.customFields, ...props.customFields };
 
     await this.repository.update(ticket);

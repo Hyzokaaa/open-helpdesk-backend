@@ -2,7 +2,7 @@ import { PickupTicket } from '../../../../src/ticket/domain/services/ticket-pick
 import { Ticket } from '../../../../src/ticket/domain/entities/ticket';
 import { TicketStatus } from '../../../../src/ticket/domain/enums/ticket-status.enum';
 import { TicketPriority } from '../../../../src/ticket/domain/enums/ticket-priority.enum';
-import { TicketCategory } from '../../../../src/ticket/domain/enums/ticket-category.enum';
+
 import { DomainValidationError } from '../../../../src/shared/domain/errors';
 import { MockTicketRepository } from '../../../mocks/mock-ticket.repository';
 
@@ -13,7 +13,7 @@ function makeTicket(overrides: Partial<{ status: TicketStatus; assigneeId: strin
     description: '',
     priority: TicketPriority.MEDIUM,
     status: overrides.status ?? TicketStatus.OPEN,
-    category: TicketCategory.ISSUE,
+    categoryId: 'cat-issue',
     workspaceId: 'ws-1',
     reporterId: 'creator-1',
     assigneeId: overrides.assigneeId ?? null,

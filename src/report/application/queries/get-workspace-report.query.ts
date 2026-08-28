@@ -61,7 +61,7 @@ export class GetWorkspaceReportQuery {
       this.getTicketsOverTime(props),
       this.getTicketsByField(props, 'status'),
       this.getTicketsByField(props, 'priority'),
-      this.getTicketsByField(props, 'category'),
+      this.getTicketsByCategory(props),
       this.getTopAgents(props),
       this.getTicketsByOrganization(props),
       this.getCsatData(props),
@@ -183,6 +183,19 @@ export class GetWorkspaceReportQuery {
     );
 
     return rows.map((r: any) => ({ [field]: r.value, count: parseInt(r.count, 10) }));
+  }
+
+  private async getTicketsByCategory(props: Props) {
+    const dc = this.dateClause('t."createdAt"', 2, props);
+    const rows = await this.dataSource.query(
+      `SELECT c."name" as category, COUNT(*) as count
+       FROM tickets t
+       LEFT JOIN ticket_categories c ON c."id" = t."categoryId"
+       WHERE t."workspaceId" = $1${dc.sql} AND t."deletedAt" IS NULL
+       GROUP BY c."name" ORDER BY count DESC`,
+      [props.workspaceId, ...dc.params],
+    );
+    return rows.map((r: any) => ({ category: r.category ?? 'Unknown', count: parseInt(r.count, 10) }));
   }
 
   private async getTopAgents(props: Props) {

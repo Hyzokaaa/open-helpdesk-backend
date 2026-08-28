@@ -6,7 +6,7 @@ import { CreateTicket } from '../../../../src/ticket/domain/services/ticket-crea
 import { CreateComment } from '../../../../src/comment/domain/services/comment-create';
 import { TicketStatus } from '../../../../src/ticket/domain/enums/ticket-status.enum';
 import { TicketPriority } from '../../../../src/ticket/domain/enums/ticket-priority.enum';
-import { TicketCategory } from '../../../../src/ticket/domain/enums/ticket-category.enum';
+
 import { WorkspaceRole } from '../../../../src/workspace/domain/enums/workspace-role.enum';
 import { User } from '../../../../src/user/domain/entities/user';
 import { Mailbox } from '../../../../src/mailbox/domain/entities/mailbox';
@@ -152,7 +152,7 @@ describe('RouteInboundEmail', () => {
       description: 'desc',
       priority: TicketPriority.MEDIUM,
       status: TicketStatus.OPEN,
-      category: TicketCategory.ISSUE,
+      categoryId: 'cat-issue',
       workspaceId: 'ws-1',
       reporterId: 'u-existing',
       assigneeId: null,
@@ -246,7 +246,7 @@ describe('RouteInboundEmail', () => {
       description: 'desc',
       priority: TicketPriority.MEDIUM,
       status: TicketStatus.OPEN,
-      category: TicketCategory.ISSUE,
+      categoryId: 'cat-issue',
       workspaceId: 'ws-1',
       reporterId: 'u-existing',
       assigneeId: null,

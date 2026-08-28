@@ -1,5 +1,4 @@
 import { TicketPriority } from '../../../ticket/domain/enums/ticket-priority.enum';
-import { TicketCategory } from '../../../ticket/domain/enums/ticket-category.enum';
 import { EmailRuleRepository } from '../repositories/email-rule.repository';
 import { EmailRule, RuleCondition } from '../entities/email-rule';
 import { EmailRuleConditionField } from '../enums/email-rule-condition-field.enum';
@@ -15,7 +14,7 @@ export interface EmailRuleContext {
 export interface EmailRuleResult {
   action: 'proceed' | 'reject';
   priority?: TicketPriority;
-  category?: TicketCategory;
+  category?: string;
   departmentId?: string;
   organizationId?: string;
   tagIds?: string[];
@@ -100,7 +99,7 @@ export class EvaluateEmailRules {
           result.priority = action.value as TicketPriority;
           break;
         case EmailRuleActionType.SET_CATEGORY:
-          result.category = action.value as TicketCategory;
+          result.category = action.value;
           break;
         case EmailRuleActionType.ADD_TAGS:
           result.tagIds = action.value?.split(',') ?? [];

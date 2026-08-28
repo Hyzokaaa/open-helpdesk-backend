@@ -1,5 +1,5 @@
 import { Command } from '../../../shared/domain/command';
-import { TicketCategory } from '../../domain/enums/ticket-category.enum';
+
 import { TicketPriority } from '../../domain/enums/ticket-priority.enum';
 import { TicketRepository } from '../../domain/repositories/ticket.repository';
 import { UpdateTicket } from '../../domain/services/ticket-update';
@@ -20,7 +20,7 @@ interface Props {
   name?: string;
   description?: string;
   priority?: TicketPriority;
-  category?: TicketCategory;
+  categoryId?: string;
   tagIds?: string[];
   departmentId?: string | null;
   customFields?: Record<string, unknown>;
@@ -30,7 +30,7 @@ export interface UpdateTicketResponse {
   id: string;
   name: string;
   priority: string;
-  category: string;
+  categoryId: string;
 }
 
 export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse> {
@@ -68,7 +68,7 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
     const canEditTags = hasPermission(ctx.role, PERMISSIONS.TICKET_EDIT_TAGS);
     const canEditCustomFields = hasPermission(ctx.role, PERMISSIONS.TICKET_EDIT_DESCRIPTION);
 
-    const before = { name: ticket.name, priority: ticket.priority, category: ticket.category };
+    const before = { name: ticket.name, priority: ticket.priority, categoryId: ticket.categoryId };
 
     let validatedCustomFields: Record<string, unknown> | undefined;
     if (props.customFields && canEditCustomFields) {
@@ -84,13 +84,13 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
       name: canEditName ? props.name : undefined,
       description: props.description,
       priority: canEditPriority ? props.priority : undefined,
-      category: canEditCategory ? props.category : undefined,
+      categoryId: canEditCategory ? props.categoryId : undefined,
       tagIds: canEditTags ? props.tagIds : undefined,
       departmentId: props.departmentId,
       customFields: validatedCustomFields,
     });
 
-    const after = { name: updated.name, priority: updated.priority, category: updated.category };
+    const after = { name: updated.name, priority: updated.priority, categoryId: updated.categoryId };
     await this.createAuditLog.execute({
       action: AuditAction.TICKET_UPDATED,
       category: AuditCategory.TICKET,
@@ -107,7 +107,7 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
       id: updated.getId(),
       name: updated.name,
       priority: updated.priority,
-      category: updated.category,
+      categoryId: updated.categoryId,
     };
   }
 }

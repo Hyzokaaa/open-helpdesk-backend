@@ -2,7 +2,7 @@ import { AssignTicket } from '../../../../src/ticket/domain/services/ticket-assi
 import { Ticket } from '../../../../src/ticket/domain/entities/ticket';
 import { TicketStatus } from '../../../../src/ticket/domain/enums/ticket-status.enum';
 import { TicketPriority } from '../../../../src/ticket/domain/enums/ticket-priority.enum';
-import { TicketCategory } from '../../../../src/ticket/domain/enums/ticket-category.enum';
+
 import { MockTicketRepository } from '../../../mocks/mock-ticket.repository';
 import { EntityNotFoundError } from '../../../../src/shared/domain/errors';
 
@@ -16,7 +16,7 @@ describe('AssignTicket', () => {
 
     repository.create(new Ticket({
       id: 'ticket-1', name: 'T', description: '', priority: TicketPriority.LOW,
-      status: TicketStatus.PENDING, category: TicketCategory.BUG, workspaceId: 'ws-1',
+      status: TicketStatus.PENDING, categoryId: 'cat-bug', workspaceId: 'ws-1',
       reporterId: 'u-1', assigneeId: null, resolvedAt: null, resolvedById: null, createdAt: new Date(), deletedAt: null, tagIds: [],
       customFields: {}, discardReason: null,
     }));

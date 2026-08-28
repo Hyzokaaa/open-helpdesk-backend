@@ -80,6 +80,8 @@ import { Public } from "../../../../shared/nest/decorators/public.decorator";
 import { TypeOrmWorkspaceEmailSenderRepository } from "../../typeorm/repositories/typeorm-workspace-email-sender.repository";
 import { WorkspaceEmailSender } from "../../../domain/entities/workspace-email-sender";
 import * as nodemailer from "nodemailer";
+import { TypeOrmTicketCategoryRepository } from "../../../../project/infrastructure/typeorm/repositories/typeorm-ticket-category.repository";
+import { SeedDefaultCategories } from "../../../../project/domain/services/ticket-category-seed";
 
 @Controller("workspaces")
 export class WorkspaceController {
@@ -97,6 +99,7 @@ export class WorkspaceController {
     private readonly emailSenderRepository: TypeOrmWorkspaceEmailSenderRepository,
     @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
     private readonly dataSource: DataSource,
+    @Inject() private readonly ticketCategoryRepository: TypeOrmTicketCategoryRepository,
   ) {}
 
   @Post()
@@ -124,10 +127,15 @@ export class WorkspaceController {
     const createMailbox = supportEmailDomain
       ? new CreateMailbox(this.idGenerator, this.mailboxRepository)
       : undefined;
+    const seedCategories = new SeedDefaultCategories(
+      this.idGenerator,
+      this.ticketCategoryRepository,
+    );
     const command = new CreateWorkspaceCommand(
       createService,
       addMemberService,
       auditLog,
+      seedCategories,
       createMailbox,
     );
     return command.execute({

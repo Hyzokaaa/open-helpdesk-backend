@@ -16,6 +16,10 @@ export class MockWorkspaceRepository implements WorkspaceRepository {
     return this.workspaces.find((w) => w.slug === slug) ?? null;
   }
 
+  async findByCustomDomain(domain: string): Promise<Workspace[]> {
+    return this.workspaces.filter((w) => w.customDomain === domain);
+  }
+
   async findAll(): Promise<Workspace[]> {
     return this.workspaces;
   }

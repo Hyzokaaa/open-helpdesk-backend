@@ -16,6 +16,46 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.20.0',
+    date: '2026-08-28',
+    categories: [
+      {
+        title: { en: 'Projects', es: 'Proyectos' },
+        features: [
+          { en: 'Create projects to organize tickets by area of work within a workspace', es: 'Crea proyectos para organizar tickets por área de trabajo dentro de un workspace' },
+          { en: 'Each project selects which categories are available for its tickets', es: 'Cada proyecto selecciona qué categorías están disponibles para sus tickets' },
+          { en: 'Project filter in ticket list for quick switching between projects', es: 'Filtro de proyectos en la lista de tickets para cambiar rápidamente entre proyectos' },
+          { en: 'Assign tickets to a project from the create form and detail view', es: 'Asigna tickets a un proyecto desde el formulario de creación y la vista de detalle' },
+        ],
+      },
+      {
+        title: { en: 'Dynamic Categories', es: 'Categorías Dinámicas' },
+        features: [
+          { en: 'Create custom ticket categories with name, slug, and color', es: 'Crea categorías de tickets personalizadas con nombre, slug y color' },
+          { en: 'Categories are shared across the workspace — projects select which ones they use', es: 'Las categorías se comparten en todo el workspace — los proyectos seleccionan cuáles usan' },
+          { en: 'Default categories (Bug, Feature Request, Issue, Task) are created automatically', es: 'Las categorías por defecto (Bug, Solicitud, Incidencia, Tarea) se crean automáticamente' },
+          { en: 'Category management page with color picker', es: 'Página de gestión de categorías con selector de colores' },
+        ],
+      },
+      {
+        title: { en: 'Email Configuration', es: 'Configuración de Email' },
+        features: [
+          { en: 'From Name and From Email fields — control how your emails appear to recipients', es: 'Campos Nombre y Email del Remitente — controla cómo se muestran tus emails a los destinatarios' },
+          { en: 'Auto-detect mail server via DNS (SRV records, MX, common hostnames)', es: 'Auto-detección del servidor de correo vía DNS (registros SRV, MX, hostnames comunes)' },
+          { en: 'Email settings reorganized into clear sections: Identity, Authentication, Server', es: 'Configuración de email reorganizada en secciones claras: Identidad, Autenticación, Servidor' },
+          { en: 'All email forms now open in a side panel for a cleaner experience', es: 'Todos los formularios de email ahora se abren en un panel lateral para una experiencia más limpia' },
+        ],
+      },
+      {
+        title: { en: 'Onboarding & Invitations', es: 'Onboarding e Invitaciones' },
+        features: [
+          { en: 'Invited users go directly to the dashboard — no email verification needed', es: 'Los usuarios invitados van directo al dashboard — sin verificación de email' },
+          { en: '"Sign in" link on signup page preserves invitation context', es: 'El enlace "Iniciar sesión" en la página de registro preserva el contexto de la invitación' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.16.0',
     date: '2026-08-24',
     categories: [
