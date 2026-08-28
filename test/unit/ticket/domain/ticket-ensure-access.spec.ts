@@ -8,7 +8,7 @@ import { ParticipantRole } from '../../../../src/ticket/domain/enums/participant
 import { AccessDeniedError } from '../../../../src/shared/domain/errors';
 import { TicketPriority } from '../../../../src/ticket/domain/enums/ticket-priority.enum';
 import { TicketStatus } from '../../../../src/ticket/domain/enums/ticket-status.enum';
-import { TicketCategory } from '../../../../src/ticket/domain/enums/ticket-category.enum';
+
 import { MockTicketRepository } from '../../../mocks/mock-ticket.repository';
 import { MockTicketParticipantRepository } from '../../../mocks/mock-ticket-participant.repository';
 import { MockWorkspaceMemberRepository } from '../../../mocks/mock-workspace-member.repository';
@@ -20,7 +20,7 @@ function makeTicket(overrides: Partial<{ id: string; workspaceId: string; report
     description: '',
     priority: TicketPriority.MEDIUM,
     status: (overrides.status as TicketStatus) ?? TicketStatus.PENDING,
-    category: TicketCategory.ISSUE,
+    categoryId: 'cat-issue',
     workspaceId: overrides.workspaceId ?? 'ws-1',
     reporterId: overrides.reporterId ?? 'creator-1',
     assigneeId: overrides.assigneeId ?? null,

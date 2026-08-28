@@ -33,6 +33,10 @@ export class MockWorkspaceMemberRepository implements WorkspaceMemberRepository 
     return this.members.filter((m) => m.workspaceId === workspaceId);
   }
 
+  async findByOrganizationId(organizationId: string): Promise<WorkspaceMember[]> {
+    return this.members.filter((m) => m.organizationId === organizationId);
+  }
+
   seed(member: WorkspaceMember): void {
     this.members.push(member);
   }

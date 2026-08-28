@@ -1,6 +1,6 @@
 import { CreateTicket } from '../../../../src/ticket/domain/services/ticket-create';
 import { TicketPriority } from '../../../../src/ticket/domain/enums/ticket-priority.enum';
-import { TicketCategory } from '../../../../src/ticket/domain/enums/ticket-category.enum';
+
 import { TicketStatus } from '../../../../src/ticket/domain/enums/ticket-status.enum';
 import { FakeIdGenerator } from '../../../mocks/fake-id-generator';
 import { MockTicketRepository } from '../../../mocks/mock-ticket.repository';
@@ -21,7 +21,7 @@ describe('CreateTicket', () => {
       name: 'Test ticket',
       description: 'A description',
       priority: TicketPriority.HIGH,
-      category: TicketCategory.BUG,
+      categoryId: 'cat-bug',
       workspaceId: 'ws-1',
       reporterId: 'user-1',
       tagIds: ['tag-1'],
@@ -41,7 +41,7 @@ describe('CreateTicket', () => {
       name: 'Persisted',
       description: 'desc',
       priority: TicketPriority.LOW,
-      category: TicketCategory.ISSUE,
+      categoryId: 'cat-issue',
       workspaceId: 'ws-1',
       reporterId: 'user-1',
       tagIds: [],

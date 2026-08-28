@@ -2,7 +2,7 @@ import { UpdateTicket } from '../../../../src/ticket/domain/services/ticket-upda
 import { Ticket } from '../../../../src/ticket/domain/entities/ticket';
 import { TicketStatus } from '../../../../src/ticket/domain/enums/ticket-status.enum';
 import { TicketPriority } from '../../../../src/ticket/domain/enums/ticket-priority.enum';
-import { TicketCategory } from '../../../../src/ticket/domain/enums/ticket-category.enum';
+
 import { MockTicketRepository } from '../../../mocks/mock-ticket.repository';
 import { EntityNotFoundError } from '../../../../src/shared/domain/errors';
 
@@ -17,7 +17,7 @@ describe('UpdateTicket', () => {
       description: 'Original desc',
       priority: TicketPriority.LOW,
       status: TicketStatus.PENDING,
-      category: TicketCategory.BUG,
+      categoryId: 'cat-bug',
       workspaceId: 'ws-1',
       reporterId: 'user-1',
       assigneeId: null,
@@ -53,12 +53,12 @@ describe('UpdateTicket', () => {
     const result = await service.execute({
       ticketId: 'ticket-1',
       priority: TicketPriority.CRITICAL,
-      category: TicketCategory.TASK,
+      categoryId: 'cat-task',
       tagIds: ['tag-2', 'tag-3'],
     });
 
     expect(result.priority).toBe(TicketPriority.CRITICAL);
-    expect(result.category).toBe(TicketCategory.TASK);
+    expect(result.categoryId).toBe('cat-task');
     expect(result.tagIds).toEqual(['tag-2', 'tag-3']);
   });
 

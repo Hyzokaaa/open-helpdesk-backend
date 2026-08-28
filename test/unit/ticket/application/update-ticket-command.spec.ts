@@ -4,7 +4,7 @@ import { EnsureWorkspacePermission } from '../../../../src/workspace/domain/serv
 import { Ticket } from '../../../../src/ticket/domain/entities/ticket';
 import { TicketStatus } from '../../../../src/ticket/domain/enums/ticket-status.enum';
 import { TicketPriority } from '../../../../src/ticket/domain/enums/ticket-priority.enum';
-import { TicketCategory } from '../../../../src/ticket/domain/enums/ticket-category.enum';
+
 import { WorkspaceMember } from '../../../../src/workspace/domain/entities/workspace-member';
 import { WorkspaceRole } from '../../../../src/workspace/domain/enums/workspace-role.enum';
 import { MockTicketRepository } from '../../../mocks/mock-ticket.repository';
@@ -26,7 +26,7 @@ describe('UpdateTicketCommand', () => {
       description: 'Original desc',
       priority: TicketPriority.LOW,
       status: TicketStatus.PENDING,
-      category: TicketCategory.BUG,
+      categoryId: 'cat-bug',
       workspaceId: 'ws-1',
       reporterId: 'creator-1',
       assigneeId: null,

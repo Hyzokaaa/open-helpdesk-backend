@@ -2,7 +2,7 @@ import { ChangeTicketStatus } from '../../../../src/ticket/domain/services/ticke
 import { Ticket } from '../../../../src/ticket/domain/entities/ticket';
 import { TicketStatus } from '../../../../src/ticket/domain/enums/ticket-status.enum';
 import { TicketPriority } from '../../../../src/ticket/domain/enums/ticket-priority.enum';
-import { TicketCategory } from '../../../../src/ticket/domain/enums/ticket-category.enum';
+
 import { MockTicketRepository } from '../../../mocks/mock-ticket.repository';
 import { TicketDiscardReason } from '../../../../src/ticket/domain/enums/ticket-discard-reason.enum';
 import { DomainValidationError, EntityNotFoundError } from '../../../../src/shared/domain/errors';
@@ -18,7 +18,7 @@ describe('ChangeTicketStatus', () => {
       description: 'desc',
       priority: TicketPriority.MEDIUM,
       status: TicketStatus.PENDING,
-      category: TicketCategory.BUG,
+      categoryId: 'cat-bug',
       workspaceId: 'ws-1',
       reporterId: 'user-1',
       assigneeId: null,
