@@ -1,6 +1,6 @@
 {
   "name": "open-helpdesk-core",
-  "version": "1.20.1",
+  "version": "1.20.2",
   "description": "Open Helpdesk - Multi-tenant ticket system",
   "license": "AGPL-3.0",
   "main": "dist/app.module.js",
