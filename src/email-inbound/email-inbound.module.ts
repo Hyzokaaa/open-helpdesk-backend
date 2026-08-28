@@ -10,13 +10,14 @@ import { CommentModule } from '../comment/comment.module';
 import { AttachmentModule } from '../attachment/attachment.module';
 import { EmailRuleModule } from '../email-rule/email-rule.module';
 import { OrganizationModule } from '../organization/organization.module';
+import { ProjectModule } from '../project/project.module';
 import { MailboxImportController } from './infrastructure/nest/controllers/mailbox-import.controller';
 import { ImapPollingService } from './infrastructure/imap/imap-polling.service';
 import { ProcessedEmailModel } from './infrastructure/typeorm/models/processed-email.model';
 import { ProcessedEmailRepository } from './infrastructure/typeorm/repositories/processed-email.repository';
 
 @Module({
-  imports: [SharedModule, AuditLogModule, MailboxModule, UserModule, WorkspaceModule, TicketModule, CommentModule, AttachmentModule, EmailRuleModule, OrganizationModule, TypeOrmModule.forFeature([ProcessedEmailModel])],
+  imports: [SharedModule, AuditLogModule, MailboxModule, UserModule, WorkspaceModule, TicketModule, CommentModule, AttachmentModule, EmailRuleModule, OrganizationModule, ProjectModule, TypeOrmModule.forFeature([ProcessedEmailModel])],
   controllers: [MailboxImportController],
   providers: [ImapPollingService, ProcessedEmailRepository],
 })

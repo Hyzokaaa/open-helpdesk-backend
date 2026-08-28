@@ -13,7 +13,7 @@ import { CreateComment } from '../../../comment/domain/services/comment-create';
 import { CreateAttachment } from '../../../attachment/domain/services/attachment-create';
 import { TicketPriority } from '../../../ticket/domain/enums/ticket-priority.enum';
 import { TicketSource } from '../../../ticket/domain/enums/ticket-source.enum';
-import { TicketCategory } from '../../../ticket/domain/enums/ticket-category.enum';
+import { TicketCategoryRepository } from '../../../project/domain/repositories/ticket-category.repository';
 import { WorkspaceRole } from '../../../workspace/domain/enums/workspace-role.enum';
 import { TicketCreatedEvent, NewCommentEvent } from '../../../email/domain/events';
 import { ParsedInboundEmail } from '../../infrastructure/imap/imap-email-parser';
@@ -44,6 +44,7 @@ export class RouteInboundEmail {
     private readonly createAttachment?: CreateAttachment,
     private readonly evaluateRules?: EvaluateEmailRules,
     private readonly organizationRepository?: OrganizationRepository,
+    private readonly ticketCategoryRepository?: TicketCategoryRepository,
   ) {}
 
   async execute(parsed: ParsedInboundEmail): Promise<RouteInboundEmailResult> {
@@ -203,7 +204,7 @@ export class RouteInboundEmail {
       name: parsed.subject,
       description: parsed.body,
       priority: ruleResult.priority ?? TicketPriority.MEDIUM,
-      categoryId: ruleResult.category ?? 'issue',
+      categoryId: ruleResult.category ?? (this.ticketCategoryRepository ? (await this.ticketCategoryRepository.findBySlugAndWorkspace('issue', workspaceId))?.getId() ?? '' : ''),
       workspaceId: workspaceId,
       reporterId: user.getId(),
       tagIds: ruleResult.tagIds ?? [],

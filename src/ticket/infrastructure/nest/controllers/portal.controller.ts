@@ -27,7 +27,6 @@ import { StageAttachment } from '../../../../attachment/domain/services/attachme
 import { StageUploadCommand, StageUploadResponse } from '../../.././../attachment/application/commands/stage-upload.command';
 import { TicketPriority } from '../../../domain/enums/ticket-priority.enum';
 import { TicketSource } from '../../../domain/enums/ticket-source.enum';
-import { TicketCategory } from '../../../domain/enums/ticket-category.enum';
 import { WorkspaceRole } from '../../../../workspace/domain/enums/workspace-role.enum';
 import { TicketCreatedEvent } from '../../../../email/domain/events';
 import { TypeOrmWorkspaceRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository';
@@ -47,6 +46,7 @@ import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum'
 import { CreatePortalTicketRequest } from '../dto/create-portal-ticket.request';
 import { CreatePortalCommentRequest } from '../dto/create-portal-comment.request';
 import { TypeOrmOrganizationRepository } from '../../../../organization/infrastructure/typeorm/repositories/typeorm-organization.repository';
+import { TypeOrmTicketCategoryRepository } from '../../../../project/infrastructure/typeorm/repositories/typeorm-ticket-category.repository';
 import { AutoEnrollOrganization } from '../../../../organization/domain/services/organization-auto-enroll';
 
 @Public()
@@ -67,6 +67,7 @@ export class PortalController {
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
     @Inject() private readonly departmentRepository: TypeOrmDepartmentRepository,
     @Inject() private readonly organizationRepository: TypeOrmOrganizationRepository,
+    @Inject() private readonly ticketCategoryRepository: TypeOrmTicketCategoryRepository,
   ) {}
 
   @Get(':slug')
@@ -167,12 +168,15 @@ export class PortalController {
 
     // Create ticket
     const portalToken = randomUUID();
+    const defaultCategory = await this.ticketCategoryRepository.findBySlugAndWorkspace('issue', workspace.getId());
+    const allCategories = defaultCategory ? null : await this.ticketCategoryRepository.findByWorkspaceId(workspace.getId());
+    const categoryId = defaultCategory?.getId() ?? allCategories?.[0]?.getId() ?? '';
     const createTicketService = new CreateTicket(this.idGenerator, this.ticketRepository);
     const ticket = await createTicketService.execute({
       name: body.subject,
       description: body.description,
       priority: TicketPriority.MEDIUM,
-      categoryId: 'issue',
+      categoryId,
       workspaceId: workspace.getId(),
       reporterId: user.getId(),
       tagIds: [],
@@ -259,13 +263,17 @@ export class PortalController {
       })),
     );
 
+    const category = ticket.categoryId
+      ? await this.ticketCategoryRepository.findById(ticket.categoryId)
+      : null;
+
     return {
       ticketNumber: ticket.ticketNumber,
       name: ticket.name,
       description: ticket.description,
       status: ticket.status,
       priority: ticket.priority,
-      categoryId: ticket.categoryId,
+      categoryName: category?.name ?? null,
       customFields: ticket.customFields,
       createdAt: ticket.createdAt,
       reporterName: creator ? `${creator.firstName} ${creator.lastName}`.trim() : '',

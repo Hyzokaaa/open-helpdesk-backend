@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThanOrEqual, Repository } from 'typeorm';
 import { PaginatedResult } from '../../../../shared/domain/paginated-result';
 import { Ticket } from '../../../domain/entities/ticket';
-import { TicketCategory } from '../../../domain/enums/ticket-category.enum';
 import { TicketPriority } from '../../../domain/enums/ticket-priority.enum';
 import { TicketDiscardReason } from '../../../domain/enums/ticket-discard-reason.enum';
 import { TicketSource } from '../../../domain/enums/ticket-source.enum';

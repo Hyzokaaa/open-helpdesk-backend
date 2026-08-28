@@ -29,6 +29,7 @@ import { ImapEmailParser, ImapEnvelope } from './imap-email-parser';
 import { ProcessedEmailRepository } from '../typeorm/repositories/processed-email.repository';
 import { TypeOrmEmailRuleRepository } from '../../../email-rule/infrastructure/typeorm/repositories/typeorm-email-rule.repository';
 import { TypeOrmOrganizationRepository } from '../../../organization/infrastructure/typeorm/repositories/typeorm-organization.repository';
+import { TypeOrmTicketCategoryRepository } from '../../../project/infrastructure/typeorm/repositories/typeorm-ticket-category.repository';
 import { EvaluateEmailRules } from '../../../email-rule/domain/services/email-rule-evaluate';
 
 const REFRESH_INTERVAL = 60000;
@@ -65,6 +66,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
     @Inject() private readonly emailRuleRepository: TypeOrmEmailRuleRepository,
     @Inject() private readonly organizationRepository: TypeOrmOrganizationRepository,
+    @Inject() private readonly ticketCategoryRepository: TypeOrmTicketCategoryRepository,
   ) {}
 
   async onModuleInit() {
@@ -451,6 +453,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       createAttachment,
       evaluateRules,
       this.organizationRepository,
+      this.ticketCategoryRepository,
     );
   }
 }
