@@ -35,7 +35,7 @@ export class TicketModel {
   status!: string;
 
   @ManyToOne(() => TicketCategoryModel, { nullable: true, onDelete: 'SET NULL' })
-  ticketCategory!: TicketCategoryModel | null;
+  category!: TicketCategoryModel | null;
 
   @Column({ type: 'varchar', nullable: true })
   categoryId!: string | null;

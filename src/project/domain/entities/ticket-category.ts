@@ -5,7 +5,6 @@ interface Props {
   name: string;
   slug: string;
   color: string;
-  projectId: string | null;
   workspaceId: string;
 }
 
@@ -14,7 +13,6 @@ export class TicketCategory {
   name: string;
   slug: string;
   color: string;
-  projectId: string | null;
   workspaceId: string;
 
   constructor(props: Props) {
@@ -22,7 +20,6 @@ export class TicketCategory {
     this.name = props.name;
     this.slug = props.slug;
     this.color = props.color;
-    this.projectId = props.projectId;
     this.workspaceId = props.workspaceId;
   }
 

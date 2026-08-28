@@ -36,17 +36,17 @@ export class TicketCategoryController {
     const workspaceId = await this.resolveWorkspaceId(slug);
     await this.ensurePermission(workspaceId, user, PERMISSIONS.PROJECT_VIEW);
 
-    const global = await this.categoryRepository.findGlobalByWorkspaceId(workspaceId);
-    const projectCategories = projectId
-      ? await this.categoryRepository.findByProjectId(projectId)
-      : [];
+    const all = await this.categoryRepository.findByWorkspaceId(workspaceId);
+    const projectCategoryIds = projectId
+      ? await this.categoryRepository.findProjectCategoryIds(projectId)
+      : null;
 
-    return [...global, ...projectCategories].map((c) => ({
+    return all.map((c) => ({
       id: c.getId(),
       name: c.name,
       slug: c.slug,
       color: c.color,
-      projectId: c.projectId,
+      inProject: projectCategoryIds ? projectCategoryIds.includes(c.getId()) : null,
     }));
   }
 
@@ -64,7 +64,6 @@ export class TicketCategoryController {
       name: body.name,
       slug: body.slug,
       color: body.color,
-      projectId: null,
       workspaceId,
     });
 

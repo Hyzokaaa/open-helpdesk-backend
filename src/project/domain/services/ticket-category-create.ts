@@ -6,7 +6,6 @@ interface CreateTicketCategoryProps {
   name: string;
   slug: string;
   color?: string;
-  projectId?: string | null;
   workspaceId: string;
 }
 
@@ -22,7 +21,6 @@ export class CreateTicketCategory {
       name: props.name,
       slug: props.slug,
       color: props.color ?? 'blue',
-      projectId: props.projectId ?? null,
       workspaceId: props.workspaceId,
     });
     await this.repository.create(category);

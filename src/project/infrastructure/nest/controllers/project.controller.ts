@@ -17,9 +17,6 @@ import { TypeOrmTicketCategoryRepository } from '../../typeorm/repositories/type
 import { CreateProject } from '../../../domain/services/project-create';
 import { UpdateProject } from '../../../domain/services/project-update';
 import { DeleteProject } from '../../../domain/services/project-delete';
-import { CreateTicketCategory } from '../../../domain/services/ticket-category-create';
-import { UpdateTicketCategory } from '../../../domain/services/ticket-category-update';
-import { DeleteTicketCategory } from '../../../domain/services/ticket-category-delete';
 import { CreateProjectRequest } from '../dto/create-project.request';
 import { UpdateProjectRequest } from '../dto/update-project.request';
 
@@ -72,14 +69,18 @@ export class ProjectController {
     await this.ensurePermission(workspaceId, user, PERMISSIONS.PROJECT_VIEW);
 
     const projects = await this.projectRepository.findByWorkspaceId(workspaceId);
-    const categories = await this.categoryRepository.findByWorkspaceId(workspaceId);
 
-    return projects.map((p) => ({
-      id: p.getId(),
-      name: p.name,
-      description: p.description,
-      categoryCount: categories.filter((c) => c.projectId === p.getId()).length,
-    }));
+    const result = [];
+    for (const p of projects) {
+      const categoryIds = await this.categoryRepository.findProjectCategoryIds(p.getId());
+      result.push({
+        id: p.getId(),
+        name: p.name,
+        description: p.description,
+        categoryCount: categoryIds.length,
+      });
+    }
+    return result;
   }
 
   @Get(':id')
@@ -176,13 +177,13 @@ export class ProjectController {
     });
   }
 
-  // ── Categories ──
+  // ── Project Categories (join table) ──
 
   @Post(':id/categories')
-  async createCategory(
+  async addCategory(
     @Param('slug') slug: string,
     @Param('id') projectId: string,
-    @Body() body: { name: string; slug: string; color?: string },
+    @Body() body: { categoryId: string },
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
@@ -193,59 +194,8 @@ export class ProjectController {
       throw new EntityNotFoundError('Project not found');
     }
 
-    const service = new CreateTicketCategory(this.idGenerator, this.categoryRepository);
-    const category = await service.execute({
-      name: body.name,
-      slug: body.slug,
-      color: body.color,
-      projectId,
-      workspaceId,
-    });
-
-    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-    await auditLog.execute({
-      action: AuditAction.TICKET_CATEGORY_CREATED,
-      entityType: 'ticket-category',
-      entityId: category.getId(),
-      userId: user.userId,
-      workspaceId,
-      metadata: { name: category.name, projectId, projectName: project.name },
-      category: AuditCategory.CONFIG,
-      level: AuditLevel.INFO,
-      source: 'ui',
-    });
-
-    return { id: category.getId(), name: category.name, slug: category.slug, color: category.color };
-  }
-
-  @Patch(':id/categories/:categoryId')
-  async updateCategory(
-    @Param('slug') slug: string,
-    @Param('id') projectId: string,
-    @Param('categoryId') categoryId: string,
-    @Body() body: { name?: string; slug?: string; color?: string },
-    @CurrentUser() user: AuthUser,
-  ) {
-    const workspaceId = await this.resolveWorkspaceId(slug);
-    await this.ensurePermission(workspaceId, user, PERMISSIONS.PROJECT_MANAGE);
-
-    const service = new UpdateTicketCategory(this.categoryRepository);
-    const category = await service.execute({ id: categoryId, ...body });
-
-    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-    await auditLog.execute({
-      action: AuditAction.TICKET_CATEGORY_UPDATED,
-      entityType: 'ticket-category',
-      entityId: categoryId,
-      userId: user.userId,
-      workspaceId,
-      metadata: { name: category.name },
-      category: AuditCategory.CONFIG,
-      level: AuditLevel.INFO,
-      source: 'ui',
-    });
-
-    return { id: category.getId(), name: category.name, slug: category.slug, color: category.color };
+    await this.categoryRepository.addToProject(projectId, body.categoryId);
+    return { projectId, categoryId: body.categoryId };
   }
 
   @Delete(':id/categories/:categoryId')
@@ -258,24 +208,25 @@ export class ProjectController {
     const workspaceId = await this.resolveWorkspaceId(slug);
     await this.ensurePermission(workspaceId, user, PERMISSIONS.PROJECT_MANAGE);
 
-    const existing = await this.categoryRepository.findById(categoryId);
-    if (!existing) throw new EntityNotFoundError('Category not found');
+    await this.categoryRepository.removeFromProject(projectId, categoryId);
+  }
 
-    const service = new DeleteTicketCategory(this.categoryRepository);
-    await service.execute(categoryId);
+  @Get(':id/categories')
+  async listProjectCategories(
+    @Param('slug') slug: string,
+    @Param('id') projectId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    await this.ensurePermission(workspaceId, user, PERMISSIONS.PROJECT_VIEW);
 
-    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-    await auditLog.execute({
-      action: AuditAction.TICKET_CATEGORY_DELETED,
-      entityType: 'ticket-category',
-      entityId: categoryId,
-      userId: user.userId,
-      workspaceId,
-      metadata: { name: existing.name },
-      category: AuditCategory.CONFIG,
-      level: AuditLevel.INFO,
-      source: 'ui',
-    });
+    const categories = await this.categoryRepository.findByProjectId(projectId);
+    return categories.map((c) => ({
+      id: c.getId(),
+      name: c.name,
+      slug: c.slug,
+      color: c.color,
+    }));
   }
 
   private async resolveWorkspaceId(slug: string): Promise<string> {
