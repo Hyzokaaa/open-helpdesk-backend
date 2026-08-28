@@ -6,6 +6,7 @@ import { UserModule } from '../user/user.module';
 import { AccountModule } from '../account/account.module';
 import { AuditLogModule } from '../audit-log/audit-log.module';
 import { MailboxModule } from '../mailbox/mailbox.module';
+import { ProjectModule } from '../project/project.module';
 import { WorkspaceModel } from './infrastructure/typeorm/models/workspace.model';
 import { WorkspaceMemberModel } from './infrastructure/typeorm/models/workspace-member.model';
 import { WorkspaceInvitationModel } from './infrastructure/typeorm/models/workspace-invitation.model';
@@ -28,6 +29,7 @@ import { WorkspaceFrontendResolver } from '../shared/infrastructure/workspace-fr
     AccountModule,
     AuditLogModule,
     MailboxModule,
+    forwardRef(() => ProjectModule),
     TypeOrmModule.forFeature([WorkspaceModel, WorkspaceMemberModel, WorkspaceInvitationModel, WorkspaceEmailSenderModel]),
   ],
   controllers: [WorkspaceController, WorkspaceInvitationController, WorkspaceImportController, InvitationPublicController, DomainCheckController],

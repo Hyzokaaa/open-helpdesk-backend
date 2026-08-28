@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SharedModule } from '../shared/shared.module';
 import { WorkspaceModule } from '../workspace/workspace.module';
@@ -14,7 +14,7 @@ import { TicketCategoryController } from './infrastructure/nest/controllers/tick
 @Module({
   imports: [
     SharedModule,
-    WorkspaceModule,
+    forwardRef(() => WorkspaceModule),
     AuditLogModule,
     TypeOrmModule.forFeature([ProjectModel, TicketCategoryModel, ProjectCategoryModel]),
   ],

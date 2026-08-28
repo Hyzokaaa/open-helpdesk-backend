@@ -7,6 +7,7 @@ import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
 import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 import { CreateMailbox } from '../../../mailbox/domain/services/mailbox-create';
+import { SeedDefaultCategories } from '../../../project/domain/services/ticket-category-seed';
 
 interface Props {
   name: string;
@@ -28,6 +29,7 @@ export class CreateWorkspaceCommand implements Command<Props, CreateWorkspaceRes
     private readonly createWorkspace: CreateWorkspace,
     private readonly addMember: AddWorkspaceMember,
     private readonly createAuditLog: CreateAuditLogEntry,
+    private readonly seedCategories?: SeedDefaultCategories,
     private readonly createMailbox?: CreateMailbox,
   ) {}
 
@@ -43,6 +45,10 @@ export class CreateWorkspaceCommand implements Command<Props, CreateWorkspaceRes
       userId: props.creatorUserId,
       role: WorkspaceRole.ADMIN,
     });
+
+    if (this.seedCategories) {
+      await this.seedCategories.execute(workspace.getId());
+    }
 
     let supportEmail: string | null = null;
     if (this.createMailbox && props.supportEmailDomain) {
