@@ -5,17 +5,19 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  MinLength,
 } from 'class-validator';
 import { TicketPriority } from '../../../../ticket/domain/enums/ticket-priority.enum';
 
 export class CreateApiTicketRequest {
   @IsString()
   @IsNotEmpty()
+  @MinLength(3)
   name!: string;
 
   @IsString()
-  @IsNotEmpty()
-  description!: string;
+  @IsOptional()
+  description?: string;
 
   @IsEnum(TicketPriority)
   priority!: TicketPriority;

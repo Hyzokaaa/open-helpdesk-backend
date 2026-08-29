@@ -6,12 +6,14 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  MinLength,
 } from 'class-validator';
 import { TicketPriority } from '../../../domain/enums/ticket-priority.enum';
 
 export class CreateTicketRequest {
   @IsString()
   @IsNotEmpty()
+  @MinLength(3)
   name!: string;
 
   @IsString()
