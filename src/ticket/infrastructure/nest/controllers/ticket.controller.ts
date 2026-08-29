@@ -69,6 +69,8 @@ import { AssignTicketRequest } from '../dto/assign-ticket.request';
 import { TicketFilterDto } from '../dto/ticket-filter.dto';
 import { TypeOrmOrganizationRepository } from '../../../../organization/infrastructure/typeorm/repositories/typeorm-organization.repository';
 import { AutoEnrollOrganization } from '../../../../organization/domain/services/organization-auto-enroll';
+import { EditTicketDescription } from '../../../domain/services/ticket-edit-description';
+import { TypeOrmTicketDescriptionEditRepository } from '../../typeorm/repositories/typeorm-ticket-description-edit.repository';
 
 @Controller('workspaces/:slug/tickets')
 export class TicketController {
@@ -85,6 +87,7 @@ export class TicketController {
     @Inject() private readonly participantRepository: TypeOrmTicketParticipantRepository,
     @Inject() private readonly transferRequestRepository: TypeOrmTransferRequestRepository,
     @Inject() private readonly organizationRepository: TypeOrmOrganizationRepository,
+    @Inject() private readonly ticketDescriptionEditRepository: TypeOrmTicketDescriptionEditRepository,
   ) {}
 
   @Post()
@@ -245,7 +248,8 @@ export class TicketController {
     const workspace = await this.resolveWorkspace(slug);
     await this.createEnsureTicketAccess().ensureFull({ ticketId: id, userId: user.userId, workspaceId: workspace.getId(), isSystemAdmin: user.isSystemAdmin });
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
-    const service = new UpdateTicket(this.ticketRepository);
+    const editDescription = new EditTicketDescription(this.idGenerator, this.ticketDescriptionEditRepository);
+    const service = new UpdateTicket(this.ticketRepository, editDescription);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     const validateCustomFields = new ValidateCustomFieldValues(this.customFieldDefinitionRepository);
     const command = new UpdateTicketCommand(service, this.ticketRepository, ensurePermission, auditLog, validateCustomFields);
@@ -686,6 +690,25 @@ export class TicketController {
     });
 
     return { removed: true };
+  }
+
+  @Get(':id/description/history')
+  async descriptionHistory(
+    @Param('slug') slug: string,
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspace = await this.resolveWorkspace(slug);
+    const ticket = await this.ticketRepository.findById(id);
+    if (!ticket || ticket.workspaceId !== workspace.getId()) throw new EntityNotFoundError('Ticket not found');
+
+    const edits = await this.ticketDescriptionEditRepository.findByTicketId(id);
+    return edits.map((edit) => ({
+      id: edit.getId(),
+      content: edit.content,
+      editedById: edit.editedById,
+      createdAt: edit.createdAt,
+    }));
   }
 
   @Patch(':id/ai-cache')

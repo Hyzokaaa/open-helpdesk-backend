@@ -56,6 +56,11 @@ export class TypeOrmCommentRepository implements CommentRepository {
     }));
   }
 
+  async update(comment: Comment): Promise<void> {
+    const model = this.toModel(comment);
+    await this.repository.save(model);
+  }
+
   private toDomain(model: CommentModel): Comment {
     return new Comment({
       id: model.id,
@@ -64,6 +69,7 @@ export class TypeOrmCommentRepository implements CommentRepository {
       authorId: model.authorId,
       mentionedUserIds: model.mentionedUserIds?.filter(Boolean) ?? [],
       createdAt: model.createdAt,
+      editedAt: model.editedAt ?? null,
     });
   }
 
@@ -74,6 +80,7 @@ export class TypeOrmCommentRepository implements CommentRepository {
     model.ticketId = comment.ticketId;
     model.authorId = comment.authorId;
     model.mentionedUserIds = comment.mentionedUserIds;
+    model.editedAt = comment.editedAt;
     return model;
   }
 }

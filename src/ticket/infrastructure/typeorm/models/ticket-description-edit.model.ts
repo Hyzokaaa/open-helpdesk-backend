@@ -4,13 +4,12 @@ import {
   Entity,
   ManyToOne,
   PrimaryColumn,
-  UpdateDateColumn,
 } from 'typeorm';
-import { TicketModel } from '../../../../ticket/infrastructure/typeorm/models/ticket.model';
+import { TicketModel } from './ticket.model';
 import { UserModel } from '../../../../user/infrastructure/typeorm/models/user.model';
 
-@Entity('comments')
-export class CommentModel {
+@Entity('ticket_description_edits')
+export class TicketDescriptionEditModel {
   @PrimaryColumn()
   id!: string;
 
@@ -24,20 +23,11 @@ export class CommentModel {
   ticketId!: string;
 
   @ManyToOne(() => UserModel)
-  author!: UserModel;
+  editedBy!: UserModel;
 
   @Column()
-  authorId!: string;
-
-  @Column('simple-array', { default: '' })
-  mentionedUserIds!: string[];
-
-  @Column({ type: 'timestamptz', nullable: true })
-  editedAt!: Date | null;
+  editedById!: string;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
-
-  @UpdateDateColumn({ type: 'timestamptz' })
-  updatedAt!: Date;
 }

@@ -14,6 +14,7 @@ export interface CommentListItem {
   authorId: string;
   mentionedUserIds: string[];
   createdAt: Date | null;
+  editedAt: Date | null;
 }
 
 export class ListTicketCommentsQuery
@@ -35,6 +36,7 @@ export class ListTicketCommentsQuery
         authorId: comment.authorId,
         mentionedUserIds: comment.mentionedUserIds,
         createdAt: comment.createdAt,
+        editedAt: comment.editedAt,
       })),
       total: result.total,
       page: result.page,

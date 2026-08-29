@@ -4,6 +4,7 @@ import {
   Get,
   Inject,
   Param,
+  Patch,
   Post,
   Query,
 } from "@nestjs/common";
@@ -13,9 +14,12 @@ import { AuthUser } from "../../../../shared/nest/strategies/jwt.strategy";
 import { UlidGenerator } from "../../../../shared/infrastructure/ulid-generator";
 import { PaginationDto } from "../../../../shared/nest/dto/pagination.dto";
 import { CreateComment } from "../../../domain/services/comment-create";
+import { EditComment } from "../../../domain/services/comment-edit";
 import { CreateCommentCommand } from "../../../application/commands/create-comment.command";
+import { EditCommentCommand } from "../../../application/commands/edit-comment.command";
 import { ListTicketCommentsQuery } from "../../../application/queries/list-ticket-comments.query";
 import { TypeOrmCommentRepository } from "../../typeorm/repositories/typeorm-comment.repository";
+import { TypeOrmCommentEditRepository } from "../../typeorm/repositories/typeorm-comment-edit.repository";
 import { TypeOrmTicketRepository } from "../../../../ticket/infrastructure/typeorm/repositories/typeorm-ticket.repository";
 import { TypeOrmWorkspaceRepository } from "../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository";
 import { TypeOrmWorkspaceMemberRepository } from "../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository";
@@ -40,6 +44,7 @@ export class CommentController {
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
     @Inject() private readonly participantRepository: TypeOrmTicketParticipantRepository,
     @Inject() private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
+    @Inject() private readonly commentEditRepository: TypeOrmCommentEditRepository,
   ) {}
 
   @Post()
@@ -87,5 +92,46 @@ export class CommentController {
       page: pagination.page,
       limit: pagination.limit,
     });
+  }
+
+  @Patch(":commentId")
+  async edit(
+    @Param("slug") slug: string,
+    @Param("ticketId") ticketId: string,
+    @Param("commentId") commentId: string,
+    @Body() body: CreateCommentRequest,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspace = await this.workspaceRepository.findBySlug(slug);
+    if (workspace) {
+      const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+      const ensureAccess = new EnsureTicketAccess(this.ticketRepository, ensurePermission, this.participantRepository);
+      await ensureAccess.ensureFull({ ticketId, userId: user.userId, workspaceId: workspace.getId(), isSystemAdmin: user.isSystemAdmin });
+    }
+
+    const service = new EditComment(this.idGenerator, this.commentRepository, this.commentEditRepository);
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    const command = new EditCommentCommand(service, auditLog);
+    return command.execute({
+      commentId,
+      content: body.content,
+      userId: user.userId,
+      isAdmin: user.isSystemAdmin,
+      workspaceId: workspace?.getId() ?? '',
+      ticketId,
+    });
+  }
+
+  @Get(":commentId/history")
+  async history(
+    @Param("commentId") commentId: string,
+  ) {
+    const edits = await this.commentEditRepository.findByCommentId(commentId);
+    return edits.map((edit) => ({
+      id: edit.getId(),
+      content: edit.content,
+      editedById: edit.editedById,
+      createdAt: edit.createdAt,
+    }));
   }
 }

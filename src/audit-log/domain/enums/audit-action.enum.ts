@@ -17,6 +17,7 @@ export enum AuditAction {
 
   // Comment
   COMMENT_CREATED = 'comment-created',
+  COMMENT_EDITED = 'comment-edited',
 
   // Workspace
   WORKSPACE_CREATED = 'workspace-created',
