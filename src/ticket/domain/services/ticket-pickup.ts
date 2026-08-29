@@ -3,9 +3,12 @@ import { Ticket } from '../entities/ticket';
 import { TicketStatus } from '../enums/ticket-status.enum';
 import { TicketRepository } from '../repositories/ticket.repository';
 
+const VALID_PICKUP_STATUSES = [TicketStatus.PENDING, TicketStatus.IN_PROGRESS, TicketStatus.RESOLVED];
+
 interface PickupTicketProps {
   ticketId: string;
   userId: string;
+  status?: TicketStatus;
 }
 
 export class PickupTicket {
@@ -19,8 +22,13 @@ export class PickupTicket {
       throw new DomainValidationError('Only open tickets can be picked up');
     }
 
+    const targetStatus = props.status ?? TicketStatus.PENDING;
+    if (!VALID_PICKUP_STATUSES.includes(targetStatus)) {
+      throw new DomainValidationError('Invalid pickup status');
+    }
+
     ticket.assigneeId = props.userId;
-    ticket.status = TicketStatus.PENDING;
+    ticket.status = targetStatus;
 
     await this.repository.update(ticket);
     return ticket;

@@ -342,6 +342,7 @@ export class TicketController {
   async pickup(
     @Param('slug') slug: string,
     @Param('id') id: string,
+    @Body() body: { status?: string },
     @CurrentUser() user: AuthUser,
   ) {
     const workspace = await this.resolveWorkspace(slug);
@@ -353,7 +354,7 @@ export class TicketController {
       isSystemAdmin: user.isSystemAdmin,
     });
     const service = new PickupTicket(this.ticketRepository);
-    const ticket = await service.execute({ ticketId: id, userId: user.userId });
+    const ticket = await service.execute({ ticketId: id, userId: user.userId, status: body.status as any });
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({
       action: AuditAction.TICKET_PICKED_UP,
