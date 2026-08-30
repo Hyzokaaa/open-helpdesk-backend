@@ -3,6 +3,13 @@ import { slugify } from '../../../shared/domain/slugify';
 import { KbArticle } from '../entities/kb-article';
 import { KbArticleStatus } from '../enums/kb-article-status.enum';
 import { KbArticleRepository } from '../repositories/kb-article.repository';
+import { sanitizeHtml } from '../../../shared/domain/sanitize-html';
+
+const KB_SANITIZE_OPTIONS = {
+  extraTags: ['h2', 'h3', 'img'],
+  extraAttrs: { img: ['src', 'alt'] },
+  extraSelfClosing: ['img'],
+};
 
 interface Props {
   id: string;
@@ -23,7 +30,7 @@ export class UpdateKbArticle {
       article.title = props.title;
       article.slug = slugify(props.title);
     }
-    if (props.content !== undefined) article.content = props.content;
+    if (props.content !== undefined) article.content = sanitizeHtml(props.content, KB_SANITIZE_OPTIONS);
     if (props.status !== undefined) article.status = props.status;
     if (props.categoryId !== undefined) article.categoryId = props.categoryId;
 

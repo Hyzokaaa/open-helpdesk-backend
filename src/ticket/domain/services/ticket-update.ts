@@ -2,6 +2,7 @@ import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { Ticket } from '../entities/ticket';
 import { TicketPriority } from '../enums/ticket-priority.enum';
 import { TicketRepository } from '../repositories/ticket.repository';
+import { sanitizeHtml } from '../../../shared/domain/sanitize-html';
 import { EditTicketDescription } from './ticket-edit-description';
 
 interface UpdateTicketProps {
@@ -35,7 +36,7 @@ export class UpdateTicket {
       if (this.editDescription && props.editedById) {
         await this.editDescription.execute({ ticket, editedById: props.editedById });
       }
-      ticket.description = props.description;
+      ticket.description = sanitizeHtml(props.description);
     }
     if (props.priority !== undefined) ticket.priority = props.priority;
     if (props.categoryId !== undefined) ticket.categoryId = props.categoryId;
