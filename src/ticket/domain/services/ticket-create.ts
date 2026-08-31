@@ -4,6 +4,7 @@ import { TicketPriority } from '../enums/ticket-priority.enum';
 import { TicketStatus } from '../enums/ticket-status.enum';
 import { TicketSource } from '../enums/ticket-source.enum';
 import { TicketRepository } from '../repositories/ticket.repository';
+import { sanitizeHtml } from '../../../shared/domain/sanitize-html';
 
 interface CreateTicketProps {
   name: string;
@@ -34,7 +35,7 @@ export class CreateTicket {
     const ticket = new Ticket({
       id: this.idGenerator.create(),
       name: props.name,
-      description: props.description,
+      description: sanitizeHtml(props.description),
       priority: props.priority,
       status: TicketStatus.OPEN,
       categoryId: props.categoryId,

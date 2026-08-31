@@ -12,10 +12,12 @@ import { ProjectModule } from '../project/project.module';
 import { TicketModel } from './infrastructure/typeorm/models/ticket.model';
 import { TicketParticipantModel } from './infrastructure/typeorm/models/ticket-participant.model';
 import { TransferRequestModel } from './infrastructure/typeorm/models/transfer-request.model';
+import { TicketDescriptionEditModel } from './infrastructure/typeorm/models/ticket-description-edit.model';
 import { CommentModel } from '../comment/infrastructure/typeorm/models/comment.model';
 import { TypeOrmTicketRepository } from './infrastructure/typeorm/repositories/typeorm-ticket.repository';
 import { TypeOrmTicketParticipantRepository } from './infrastructure/typeorm/repositories/typeorm-ticket-participant.repository';
 import { TypeOrmTransferRequestRepository } from './infrastructure/typeorm/repositories/typeorm-transfer-request.repository';
+import { TypeOrmTicketDescriptionEditRepository } from './infrastructure/typeorm/repositories/typeorm-ticket-description-edit.repository';
 import { TypeOrmCommentRepository } from '../comment/infrastructure/typeorm/repositories/typeorm-comment.repository';
 import { TicketController } from './infrastructure/nest/controllers/ticket.controller';
 import { PortalController } from './infrastructure/nest/controllers/portal.controller';
@@ -23,9 +25,9 @@ import { SlaBreachCheckerService } from './infrastructure/nest/services/sla-brea
 import { TransferRequestExpiryService } from './infrastructure/nest/services/transfer-request-expiry.service';
 
 @Module({
-  imports: [SharedModule, UserModule, WorkspaceModule, AuditLogModule, CustomFieldModule, AttachmentModule, DepartmentModule, OrganizationModule, ProjectModule, TypeOrmModule.forFeature([TicketModel, TicketParticipantModel, TransferRequestModel, CommentModel])],
+  imports: [SharedModule, UserModule, WorkspaceModule, AuditLogModule, CustomFieldModule, AttachmentModule, DepartmentModule, OrganizationModule, ProjectModule, TypeOrmModule.forFeature([TicketModel, TicketParticipantModel, TransferRequestModel, TicketDescriptionEditModel, CommentModel])],
   controllers: [TicketController, PortalController],
-  providers: [TypeOrmTicketRepository, TypeOrmTicketParticipantRepository, TypeOrmTransferRequestRepository, TypeOrmCommentRepository, SlaBreachCheckerService, TransferRequestExpiryService],
-  exports: [TypeOrmTicketRepository, TypeOrmTicketParticipantRepository, TypeOrmTransferRequestRepository],
+  providers: [TypeOrmTicketRepository, TypeOrmTicketParticipantRepository, TypeOrmTransferRequestRepository, TypeOrmTicketDescriptionEditRepository, TypeOrmCommentRepository, SlaBreachCheckerService, TransferRequestExpiryService],
+  exports: [TypeOrmTicketRepository, TypeOrmTicketParticipantRepository, TypeOrmTransferRequestRepository, TypeOrmTicketDescriptionEditRepository],
 })
 export class TicketModule {}

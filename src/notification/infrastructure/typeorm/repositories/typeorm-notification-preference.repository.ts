@@ -53,6 +53,8 @@ export class TypeOrmNotificationPreferenceRepository
       inAppStatusChanged: model.inAppStatusChanged,
       inAppCommentCreated: model.inAppCommentCreated,
       inAppTransferRequest: model.inAppTransferRequest,
+      emailUpgradeAvailable: model.emailUpgradeAvailable,
+      inAppUpgradeAvailable: model.inAppUpgradeAvailable,
       bellUnreadOnly: model.bellUnreadOnly,
     });
   }
@@ -76,6 +78,8 @@ export class TypeOrmNotificationPreferenceRepository
     model.inAppStatusChanged = pref.inAppStatusChanged;
     model.inAppCommentCreated = pref.inAppCommentCreated;
     model.inAppTransferRequest = pref.inAppTransferRequest;
+    model.emailUpgradeAvailable = pref.emailUpgradeAvailable;
+    model.inAppUpgradeAvailable = pref.inAppUpgradeAvailable;
     model.bellUnreadOnly = pref.bellUnreadOnly;
     return model;
   }

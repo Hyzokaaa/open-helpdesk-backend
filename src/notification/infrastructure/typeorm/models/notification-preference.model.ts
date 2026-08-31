@@ -58,6 +58,12 @@ export class NotificationPreferenceModel {
   @Column({ default: true })
   inAppTransferRequest!: boolean;
 
+  @Column({ default: true })
+  emailUpgradeAvailable!: boolean;
+
+  @Column({ default: true })
+  inAppUpgradeAvailable!: boolean;
+
   @Column({ default: false })
   bellUnreadOnly!: boolean;
 

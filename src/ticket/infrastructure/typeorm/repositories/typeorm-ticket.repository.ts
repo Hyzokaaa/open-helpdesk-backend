@@ -233,6 +233,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
       registeredById: model.registeredById ?? null,
       mailboxId: model.mailboxId ?? null,
       originDate: model.originDate ?? null,
+      descriptionEditedAt: model.descriptionEditedAt ?? null,
     });
   }
 
@@ -264,6 +265,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
     model.registeredById = ticket.registeredById;
     model.mailboxId = ticket.mailboxId;
     model.originDate = ticket.originDate;
+    model.descriptionEditedAt = ticket.descriptionEditedAt;
     return model;
   }
 }

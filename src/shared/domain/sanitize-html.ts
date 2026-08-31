@@ -12,15 +12,27 @@ const ALLOWED_ATTRS: Record<string, Set<string>> = {
 
 const SELF_CLOSING = new Set(['br']);
 
+interface SanitizeOptions {
+  extraTags?: string[];
+  extraAttrs?: Record<string, string[]>;
+  extraSelfClosing?: string[];
+}
+
 /**
  * Sanitizes HTML content, allowing only safe tags and attributes.
  * Strips all tags not in the allowlist. Escapes content outside of tags.
  */
-export function sanitizeHtml(input: string): string {
+export function sanitizeHtml(input: string, options?: SanitizeOptions): string {
   // If input has no HTML tags, treat as plain text — escape it
   if (!/<[a-z][\s\S]*>/i.test(input)) {
     return escapeHtml(input);
   }
+
+  const tags = options?.extraTags ? new Set([...ALLOWED_TAGS, ...options.extraTags]) : ALLOWED_TAGS;
+  const attrs = options?.extraAttrs
+    ? { ...ALLOWED_ATTRS, ...Object.fromEntries(Object.entries(options.extraAttrs).map(([k, v]) => [k, new Set([...(ALLOWED_ATTRS[k] ?? []), ...v])])) }
+    : ALLOWED_ATTRS;
+  const selfClosing = options?.extraSelfClosing ? new Set([...SELF_CLOSING, ...options.extraSelfClosing]) : SELF_CLOSING;
 
   let result = '';
   let i = 0;
@@ -38,13 +50,13 @@ export function sanitizeHtml(input: string): string {
       const tagPart = isClosing ? tagContent.substring(1).trim() : tagContent.trim();
       const tagName = tagPart.split(/[\s/]/)[0].toLowerCase();
 
-      if (ALLOWED_TAGS.has(tagName)) {
+      if (tags.has(tagName)) {
         if (isClosing) {
           result += `</${tagName}>`;
         } else {
-          const attrs = extractAllowedAttrs(tagPart, tagName);
-          const selfClose = SELF_CLOSING.has(tagName) ? ' /' : '';
-          result += `<${tagName}${attrs}${selfClose}>`;
+          const tagAttrs = extractAllowedAttrs(tagPart, tagName, attrs);
+          const selfClose = selfClosing.has(tagName) ? ' /' : '';
+          result += `<${tagName}${tagAttrs}${selfClose}>`;
         }
       }
       // else: strip the tag entirely
@@ -61,8 +73,8 @@ export function sanitizeHtml(input: string): string {
   return result;
 }
 
-function extractAllowedAttrs(tagContent: string, tagName: string): string {
-  const allowed = ALLOWED_ATTRS[tagName];
+function extractAllowedAttrs(tagContent: string, tagName: string, attrsMap: Record<string, Set<string>>): string {
+  const allowed = attrsMap[tagName];
   if (!allowed) return '';
 
   const attrs: string[] = [];

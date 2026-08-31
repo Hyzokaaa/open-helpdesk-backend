@@ -16,6 +16,8 @@ interface Props {
   inAppStatusChanged?: boolean;
   inAppCommentCreated?: boolean;
   inAppTransferRequest?: boolean;
+  emailUpgradeAvailable?: boolean;
+  inAppUpgradeAvailable?: boolean;
   bellUnreadOnly?: boolean;
 }
 
@@ -33,6 +35,8 @@ export interface UpdatePreferencesResponse {
   inAppStatusChanged: boolean;
   inAppCommentCreated: boolean;
   inAppTransferRequest: boolean;
+  emailUpgradeAvailable: boolean;
+  inAppUpgradeAvailable: boolean;
   bellUnreadOnly: boolean;
 }
 
@@ -58,6 +62,8 @@ export class UpdatePreferencesCommand implements Command<Props, UpdatePreference
       inAppStatusChanged: pref.inAppStatusChanged,
       inAppCommentCreated: pref.inAppCommentCreated,
       inAppTransferRequest: pref.inAppTransferRequest,
+      emailUpgradeAvailable: pref.emailUpgradeAvailable,
+      inAppUpgradeAvailable: pref.inAppUpgradeAvailable,
       bellUnreadOnly: pref.bellUnreadOnly,
     };
   }

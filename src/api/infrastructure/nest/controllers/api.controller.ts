@@ -142,7 +142,7 @@ export class ApiController {
     const command = new CreateTicketCommand(service, ensurePermission, this.userRepository, this.eventPublisher, auditLog, validateCustomFields);
     return command.execute({
       name: body.name,
-      description: body.description,
+      description: body.description ?? '',
       priority: body.priority,
       categoryId: body.categoryId,
       workspaceId: workspace.getId(),

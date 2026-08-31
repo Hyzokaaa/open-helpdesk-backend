@@ -4,6 +4,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  MinLength,
 } from 'class-validator';
 
 export class CreatePortalTicketRequest {
@@ -16,6 +17,7 @@ export class CreatePortalTicketRequest {
 
   @IsString()
   @IsNotEmpty()
+  @MinLength(3)
   subject!: string;
 
   @IsString()

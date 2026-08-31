@@ -50,6 +50,40 @@ describe('PickupTicket', () => {
     expect(result.status).toBe(TicketStatus.PENDING);
   });
 
+  it('should assign and set status to in-progress when specified', async () => {
+    await repository.create(makeTicket());
+
+    const result = await service.execute({ ticketId: 'ticket-1', userId: 'agent-1', status: TicketStatus.IN_PROGRESS });
+
+    expect(result.assigneeId).toBe('agent-1');
+    expect(result.status).toBe(TicketStatus.IN_PROGRESS);
+  });
+
+  it('should assign and set status to resolved when specified', async () => {
+    await repository.create(makeTicket());
+
+    const result = await service.execute({ ticketId: 'ticket-1', userId: 'agent-1', status: TicketStatus.RESOLVED });
+
+    expect(result.assigneeId).toBe('agent-1');
+    expect(result.status).toBe(TicketStatus.RESOLVED);
+  });
+
+  it('should throw if target status is discarded', async () => {
+    await repository.create(makeTicket());
+
+    await expect(
+      service.execute({ ticketId: 'ticket-1', userId: 'agent-1', status: TicketStatus.DISCARDED }),
+    ).rejects.toThrow(DomainValidationError);
+  });
+
+  it('should throw if target status is open', async () => {
+    await repository.create(makeTicket());
+
+    await expect(
+      service.execute({ ticketId: 'ticket-1', userId: 'agent-1', status: TicketStatus.OPEN }),
+    ).rejects.toThrow(DomainValidationError);
+  });
+
   it('should throw if ticket is not open', async () => {
     await repository.create(makeTicket({ status: TicketStatus.PENDING }));
 

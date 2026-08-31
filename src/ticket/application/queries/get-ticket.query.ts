@@ -37,6 +37,7 @@ export interface TicketDetailResponse {
   resolutionBreached: boolean;
   accessLevel: TicketAccessLevel;
   aiCache: Record<string, { source: string; result: string }>;
+  descriptionEditedAt: Date | null;
 }
 
 export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
@@ -80,6 +81,7 @@ export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
       resolutionBreached: ticket.resolutionBreached,
       accessLevel,
       aiCache: ticket.aiCache ?? {},
+      descriptionEditedAt: ticket.descriptionEditedAt,
     };
   }
 }

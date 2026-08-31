@@ -11,7 +11,6 @@ import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
 import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 import { ValidateCustomFieldValues } from '../../../custom-field/domain/services/custom-field-validate-values';
-
 interface Props {
   ticketId: string;
   workspaceId: string;
@@ -88,6 +87,7 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
       tagIds: canEditTags ? props.tagIds : undefined,
       departmentId: props.departmentId,
       customFields: validatedCustomFields,
+      editedById: props.userId,
     });
 
     const after = { name: updated.name, priority: updated.priority, categoryId: updated.categoryId };

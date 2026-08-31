@@ -2,31 +2,25 @@ import { Id } from '../../../shared/domain/id';
 
 interface Props {
   id: string;
+  commentId: string;
   content: string;
-  ticketId: string;
-  authorId: string;
-  mentionedUserIds?: string[];
+  editedById: string;
   createdAt?: Date | null;
-  editedAt?: Date | null;
 }
 
-export class Comment {
+export class CommentEdit {
   readonly id: Id;
+  commentId: string;
   content: string;
-  ticketId: string;
-  authorId: string;
-  mentionedUserIds: string[];
+  editedById: string;
   createdAt: Date | null;
-  editedAt: Date | null;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
+    this.commentId = props.commentId;
     this.content = props.content;
-    this.ticketId = props.ticketId;
-    this.authorId = props.authorId;
-    this.mentionedUserIds = props.mentionedUserIds ?? [];
+    this.editedById = props.editedById;
     this.createdAt = props.createdAt ?? null;
-    this.editedAt = props.editedAt ?? null;
   }
 
   getId(): string {

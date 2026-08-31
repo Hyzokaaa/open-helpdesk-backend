@@ -9,4 +9,5 @@ export interface CommentRepository {
     page: number,
     limit: number,
   ): Promise<PaginatedResult<Comment>>;
+  update(comment: Comment): Promise<void>;
 }

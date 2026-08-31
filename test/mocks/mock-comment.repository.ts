@@ -13,6 +13,11 @@ export class MockCommentRepository implements CommentRepository {
     return this.comments.find((c) => c.getId() === id) ?? null;
   }
 
+  async update(comment: Comment): Promise<void> {
+    const index = this.comments.findIndex((c) => c.getId() === comment.getId());
+    if (index !== -1) this.comments[index] = comment;
+  }
+
   async findByTicketId(ticketId: string, page: number, limit: number): Promise<PaginatedResult<Comment>> {
     const items = this.comments.filter((c) => c.ticketId === ticketId);
     return { items: items.slice((page - 1) * limit, page * limit), total: items.length, page, limit };

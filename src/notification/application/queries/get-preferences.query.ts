@@ -19,6 +19,8 @@ export interface PreferencesResponse {
   inAppStatusChanged: boolean;
   inAppCommentCreated: boolean;
   inAppTransferRequest: boolean;
+  emailUpgradeAvailable: boolean;
+  inAppUpgradeAvailable: boolean;
   bellUnreadOnly: boolean;
 }
 
@@ -36,6 +38,8 @@ const DEFAULTS: PreferencesResponse = {
   inAppStatusChanged: true,
   inAppCommentCreated: true,
   inAppTransferRequest: true,
+  emailUpgradeAvailable: true,
+  inAppUpgradeAvailable: true,
   bellUnreadOnly: false,
 };
 
@@ -60,6 +64,8 @@ export class GetPreferencesQuery implements Query<Props, PreferencesResponse> {
       inAppStatusChanged: pref.inAppStatusChanged,
       inAppCommentCreated: pref.inAppCommentCreated,
       inAppTransferRequest: pref.inAppTransferRequest,
+      emailUpgradeAvailable: pref.emailUpgradeAvailable,
+      inAppUpgradeAvailable: pref.inAppUpgradeAvailable,
       bellUnreadOnly: pref.bellUnreadOnly,
     };
   }

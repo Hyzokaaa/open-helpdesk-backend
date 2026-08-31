@@ -16,6 +16,8 @@ interface Props {
   inAppStatusChanged: boolean;
   inAppCommentCreated: boolean;
   inAppTransferRequest: boolean;
+  emailUpgradeAvailable: boolean;
+  inAppUpgradeAvailable: boolean;
   bellUnreadOnly: boolean;
 }
 
@@ -35,6 +37,8 @@ export class NotificationPreference {
   inAppStatusChanged: boolean;
   inAppCommentCreated: boolean;
   inAppTransferRequest: boolean;
+  emailUpgradeAvailable: boolean;
+  inAppUpgradeAvailable: boolean;
   bellUnreadOnly: boolean;
 
   constructor(props: Props) {
@@ -53,6 +57,8 @@ export class NotificationPreference {
     this.inAppStatusChanged = props.inAppStatusChanged;
     this.inAppCommentCreated = props.inAppCommentCreated;
     this.inAppTransferRequest = props.inAppTransferRequest;
+    this.emailUpgradeAvailable = props.emailUpgradeAvailable;
+    this.inAppUpgradeAvailable = props.inAppUpgradeAvailable;
     this.bellUnreadOnly = props.bellUnreadOnly;
   }
 

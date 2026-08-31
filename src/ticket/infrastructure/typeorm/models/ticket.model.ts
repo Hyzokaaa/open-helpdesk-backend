@@ -125,6 +125,9 @@ export class TicketModel {
   @JoinTable({ name: 'ticket_tag' })
   tags!: TagModel[];
 
+  @Column({ type: 'timestamptz', nullable: true })
+  descriptionEditedAt!: Date | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
