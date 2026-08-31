@@ -4,4 +4,5 @@ export enum NotificationType {
   STATUS_CHANGED = 'status-changed',
   COMMENT_CREATED = 'comment-created',
   TRANSFER_REQUEST = 'transfer-request',
+  UPGRADE_AVAILABLE = 'upgrade-available',
 }

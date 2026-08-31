@@ -278,6 +278,28 @@ const translations: Translations = {
   'status.resolved': { en: 'Resolved', es: 'Resuelto' },
   'status.discarded': { en: 'Discarded', es: 'Descartado' },
 
+  // Upgrade available
+  'upgradeAvailable.subject': {
+    en: 'Open Helpdesk v{version} is available',
+    es: 'Open Helpdesk v{version} esta disponible',
+  },
+  'upgradeAvailable.title': {
+    en: 'Open Helpdesk v{version} is available',
+    es: 'Open Helpdesk v{version} esta disponible',
+  },
+  'upgradeAvailable.body': {
+    en: 'A new version of Open Helpdesk (v{version}) is available. Check the release notes for details on what\'s new.',
+    es: 'Una nueva version de Open Helpdesk (v{version}) esta disponible. Revisa las notas de la version para mas detalles.',
+  },
+  'upgradeAvailable.button': {
+    en: 'View Release',
+    es: 'Ver Version',
+  },
+  'upgradeAvailable.disable': {
+    en: 'You can disable upgrade notifications in Admin Settings.',
+    es: 'Puedes desactivar las notificaciones de actualizacion en Configuracion de Administrador.',
+  },
+
   // CSAT survey
   'csat.subject': {
     en: 'How was your experience?',
