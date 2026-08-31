@@ -6,7 +6,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-@Entity()
+@Entity('system_notification_settings')
 export class SystemNotificationSettingsModel {
   @PrimaryColumn()
   id!: string;
