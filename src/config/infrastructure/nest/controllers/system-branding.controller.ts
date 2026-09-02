@@ -66,6 +66,7 @@ export class SystemBrandingController {
       appName: branding?.appName ?? null,
       appSubtitle: branding?.appSubtitle ?? null,
       logo: branding?.logo ? await this.storage.getPresignedUrl(branding.logo) : null,
+      icon: branding?.icon ? await this.storage.getPresignedUrl(branding.icon) : null,
     };
   }
 
@@ -78,7 +79,7 @@ export class SystemBrandingController {
 
     let branding = await this.repository.find();
     if (!branding) {
-      branding = new SystemBranding({ id: this.idGenerator.create(), appName: null, appSubtitle: null, logo: null });
+      branding = new SystemBranding({ id: this.idGenerator.create(), appName: null, appSubtitle: null, logo: null, icon: null });
     }
 
     if (body.appName !== undefined) {
@@ -107,6 +108,7 @@ export class SystemBrandingController {
       appName: branding.appName,
       appSubtitle: branding.appSubtitle,
       logo: branding.logo ? await this.storage.getPresignedUrl(branding.logo) : null,
+      icon: branding.icon ? await this.storage.getPresignedUrl(branding.icon) : null,
     };
   }
 
@@ -127,7 +129,7 @@ export class SystemBrandingController {
 
     let branding = await this.repository.find();
     if (!branding) {
-      branding = new SystemBranding({ id: this.idGenerator.create(), appName: null, appSubtitle: null, logo: null });
+      branding = new SystemBranding({ id: this.idGenerator.create(), appName: null, appSubtitle: null, logo: null, icon: null });
     }
 
     const ext = MIME_TO_EXT[file.mimetype] ?? '.png';
@@ -156,5 +158,53 @@ export class SystemBrandingController {
     }
 
     return { logo: null };
+  }
+
+  @Post('branding/icon')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadIcon(
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: AuthUser,
+  ) {
+    this.ensureAdmin(user);
+    if (!file) throw new BadRequestException('No file uploaded');
+    if (file.size > 512 * 1024) throw new BadRequestException('Icon must be 512KB or less');
+
+    const allowedMimes = ['image/png', 'image/svg+xml', 'image/jpeg', 'image/webp'];
+    if (!allowedMimes.includes(file.mimetype)) {
+      throw new BadRequestException('Icon must be PNG, SVG, JPEG, or WebP');
+    }
+
+    let branding = await this.repository.find();
+    if (!branding) {
+      branding = new SystemBranding({ id: this.idGenerator.create(), appName: null, appSubtitle: null, logo: null, icon: null });
+    }
+
+    const ext = MIME_TO_EXT[file.mimetype] ?? '.png';
+    const key = `system/branding/icon${ext}`;
+
+    if (branding.icon && branding.icon !== key) {
+      await this.storage.delete(branding.icon);
+    }
+
+    await this.storage.upload(file.buffer, key, file.mimetype);
+    branding.icon = key;
+    await this.repository.save(branding);
+
+    return { icon: await this.storage.getPresignedUrl(key) };
+  }
+
+  @Delete('branding/icon')
+  async deleteIcon(@CurrentUser() user: AuthUser) {
+    this.ensureAdmin(user);
+
+    const branding = await this.repository.find();
+    if (branding?.icon) {
+      await this.storage.delete(branding.icon);
+      branding.icon = null;
+      await this.repository.save(branding);
+    }
+
+    return { icon: null };
   }
 }

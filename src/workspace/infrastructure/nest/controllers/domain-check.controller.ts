@@ -48,6 +48,7 @@ export class DomainCheckController {
         appName: w.appName,
         appSubtitle: w.appSubtitle,
         logo: w.logo ? await this.storage.getPresignedUrl(w.logo) : null,
+        icon: w.icon ? await this.storage.getPresignedUrl(w.icon) : null,
       })),
     );
 

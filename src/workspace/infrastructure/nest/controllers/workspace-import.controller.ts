@@ -66,7 +66,7 @@ export class WorkspaceImportController {
       isSystemAdmin: user.isSystemAdmin,
     });
 
-    const csv = 'email,firstName,lastName,role\njohn@example.com,John,Doe,agent\njane@example.com,Jane,Smith,reporter\n';
+    const csv = 'email,firstName,lastName,role\njohn@example.com,John,Doe,agent\njane@example.com,Jane,Smith,user\n';
 
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename="import-members-template.csv"');

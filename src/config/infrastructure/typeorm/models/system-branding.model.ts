@@ -20,6 +20,9 @@ export class SystemBrandingModel {
   @Column({ type: 'varchar', nullable: true })
   logo!: string | null;
 
+  @Column({ type: 'varchar', nullable: true })
+  icon!: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 

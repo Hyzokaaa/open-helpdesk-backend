@@ -21,6 +21,7 @@ export interface WorkspaceResponse {
   appName: string | null;
   appSubtitle: string | null;
   logo: string | null;
+  icon: string | null;
 }
 
 export class GetWorkspaceQuery implements Query<Props, WorkspaceResponse> {
@@ -53,6 +54,7 @@ export class GetWorkspaceQuery implements Query<Props, WorkspaceResponse> {
       appName: workspace.appName,
       appSubtitle: workspace.appSubtitle,
       logo: workspace.logo,
+      icon: workspace.icon,
     };
   }
 }

@@ -20,6 +20,7 @@ export class TypeOrmSystemBrandingRepository implements SystemBrandingRepository
       appName: model.appName,
       appSubtitle: model.appSubtitle,
       logo: model.logo,
+      icon: model.icon,
     });
   }
 
@@ -29,6 +30,7 @@ export class TypeOrmSystemBrandingRepository implements SystemBrandingRepository
       appName: branding.appName,
       appSubtitle: branding.appSubtitle,
       logo: branding.logo,
+      icon: branding.icon,
     });
   }
 }

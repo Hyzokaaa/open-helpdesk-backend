@@ -128,7 +128,7 @@ export class RouteInboundEmail {
         isEmailVerified: true,
         autoCreated: true,
       });
-      this.logger.log(`Auto-created reporter: ${parsed.fromAddress} (${firstName} ${lastName})`);
+      this.logger.log(`Auto-created user: ${parsed.fromAddress} (${firstName} ${lastName})`);
     }
 
     // 3. Ensure workspace membership
@@ -140,9 +140,9 @@ export class RouteInboundEmail {
       await this.addMember.execute({
         workspaceId: workspaceId,
         userId: user.getId(),
-        role: WorkspaceRole.REPORTER,
+        role: WorkspaceRole.USER,
       });
-      this.logger.log(`Added ${parsed.fromAddress} as REPORTER to workspace ${workspaceId}`);
+      this.logger.log(`Added ${parsed.fromAddress} as USER to workspace ${workspaceId}`);
     }
 
     // 4. Route: reply to existing ticket or create new
