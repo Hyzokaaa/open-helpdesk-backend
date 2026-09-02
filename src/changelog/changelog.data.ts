@@ -16,6 +16,62 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.22.0',
+    date: '2026-09-01',
+    categories: [
+      {
+        title: { en: 'Update Management', es: 'Gestión de Actualizaciones' },
+        features: [
+          { en: 'New "Updates" page in Administration — see current versions, latest release, and component versions at a glance', es: 'Nueva página "Actualizaciones" en Administración — ve versiones actuales, último release y versiones de componentes de un vistazo' },
+          { en: 'Upgrade notifications — get notified via email or in-app when a new version is available', es: 'Notificaciones de actualización — recibe notificaciones por email o en la app cuando hay una nueva versión disponible' },
+          { en: 'System-level and per-user notification toggles for upgrade alerts', es: 'Toggles de notificación a nivel de sistema y por usuario para alertas de actualización' },
+          { en: 'Pre-release indicator when running ahead of the latest stable release', es: 'Indicador de pre-release cuando se ejecuta una versión adelante del último release estable' },
+        ],
+      },
+      {
+        title: { en: 'Knowledge Base Improvements', es: 'Mejoras en Base de Conocimiento' },
+        features: [
+          { en: 'Help Center now respects dark mode and workspace color palette', es: 'El Centro de Ayuda ahora respeta el modo oscuro y la paleta de colores del workspace' },
+          { en: 'Error states with retry button when articles fail to load', es: 'Estados de error con botón de reintentar cuando los artículos no cargan' },
+          { en: 'Help Center fully translated to Spanish', es: 'Centro de Ayuda completamente traducido al español' },
+        ],
+      },
+      {
+        title: { en: 'Usability & Quality', es: 'Usabilidad y Calidad' },
+        features: [
+          { en: 'Clicking a form label now focuses the corresponding field — including rich text editors', es: 'Hacer click en un label de formulario ahora enfoca el campo correspondiente — incluyendo editores de texto enriquecido' },
+          { en: 'Unsaved changes warning when closing forms — prevents accidental data loss', es: 'Advertencia de cambios sin guardar al cerrar formularios — previene pérdida accidental de datos' },
+          { en: 'Keyboard focus stays trapped inside dialogs (Tab cannot escape to background)', es: 'El foco del teclado permanece dentro de los diálogos (Tab no puede escapar al fondo)' },
+          { en: 'Tag deletion now requires confirmation', es: 'La eliminación de etiquetas ahora requiere confirmación' },
+          { en: 'Email Rules are now restricted to users with settings permissions', es: 'Las Reglas de Email ahora están restringidas a usuarios con permisos de configuración' },
+          { en: 'Full Spanish translation for all error messages and system logs', es: 'Traducción completa al español de todos los mensajes de error y logs del sistema' },
+        ],
+      },
+    ],
+  },
+  {
+    version: '1.21.0',
+    date: '2026-08-29',
+    categories: [
+      {
+        title: { en: 'Comment & Description Editing', es: 'Edición de Comentarios y Descripción' },
+        features: [
+          { en: 'Edit your comments and ticket descriptions after posting — with full rich text support', es: 'Edita tus comentarios y descripciones de tickets después de publicarlos — con soporte completo de texto enriquecido' },
+          { en: 'Version history for edits — see who changed what and when', es: 'Historial de versiones para ediciones — ve quién cambió qué y cuándo' },
+          { en: '"Edited" indicator on modified comments and descriptions', es: 'Indicador "Editado" en comentarios y descripciones modificados' },
+        ],
+      },
+      {
+        title: { en: 'Ticket Improvements', es: 'Mejoras en Tickets' },
+        features: [
+          { en: 'Ticket creation now validates title (min 3 characters) and requires a description', es: 'La creación de tickets ahora valida el título (mín 3 caracteres) y requiere una descripción' },
+          { en: 'Project selector in ticket detail sidebar — change project and see categories update', es: 'Selector de proyecto en el sidebar del ticket — cambia el proyecto y ve las categorías actualizarse' },
+          { en: 'Picking up or changing status from "open" now auto-assigns the ticket to you', es: 'Tomar o cambiar estado desde "abierto" ahora auto-asigna el ticket a ti' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.20.0',
     date: '2026-08-28',
     categories: [
