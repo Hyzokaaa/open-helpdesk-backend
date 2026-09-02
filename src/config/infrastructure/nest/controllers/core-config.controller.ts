@@ -33,6 +33,7 @@ export class CoreConfigController {
       brandingAppName: branding?.appName ?? null,
       brandingAppSubtitle: branding?.appSubtitle ?? null,
       brandingLogo: branding?.logo ? await this.storage.getPresignedUrl(branding.logo) : null,
+      brandingIcon: branding?.icon ? await this.storage.getPresignedUrl(branding.icon) : null,
     };
   }
 }
