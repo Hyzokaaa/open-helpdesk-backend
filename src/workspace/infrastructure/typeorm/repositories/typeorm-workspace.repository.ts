@@ -99,6 +99,7 @@ export class TypeOrmWorkspaceRepository implements WorkspaceRepository {
       appName: model.appName ?? null,
       appSubtitle: model.appSubtitle ?? null,
       logo: model.logo ?? null,
+      icon: model.icon ?? null,
     });
   }
 
@@ -118,6 +119,7 @@ export class TypeOrmWorkspaceRepository implements WorkspaceRepository {
     model.appName = workspace.appName;
     model.appSubtitle = workspace.appSubtitle;
     model.logo = workspace.logo;
+    model.icon = workspace.icon;
     return model;
   }
 }

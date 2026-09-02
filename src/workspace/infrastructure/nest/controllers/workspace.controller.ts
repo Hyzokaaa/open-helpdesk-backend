@@ -174,6 +174,9 @@ export class WorkspaceController {
       logo: result.logo
         ? await this.storage.getPresignedUrl(result.logo)
         : null,
+      icon: result.icon
+        ? await this.storage.getPresignedUrl(result.icon)
+        : null,
       cnameTarget: this.config.get<string>(
         "CUSTOM_DOMAIN_CNAME_TARGET",
         "proxy.example.com",
@@ -1259,6 +1262,81 @@ export class WorkspaceController {
     }
 
     return { logo: null };
+  }
+
+  @Post(":slug/branding/icon")
+  @UseInterceptors(FileInterceptor("file"))
+  async uploadIcon(
+    @Param("slug") slug: string,
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: AuthUser,
+  ) {
+    if (!file) throw new BadRequestException("No file uploaded");
+    if (file.size > 512 * 1024)
+      throw new BadRequestException("Icon must be 512KB or less");
+
+    const allowedMimes = [
+      "image/png",
+      "image/svg+xml",
+      "image/jpeg",
+      "image/webp",
+    ];
+    if (!allowedMimes.includes(file.mimetype)) {
+      throw new BadRequestException("Icon must be PNG, SVG, JPEG, or WebP");
+    }
+
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(
+      this.memberRepository,
+    );
+    await ensurePermission.execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+
+    const ext = MIME_TO_EXT[file.mimetype] ?? ".png";
+    const key = `workspaces/${workspaceId}/icon${ext}`;
+
+    const workspace = await this.workspaceRepository.findById(workspaceId);
+    if (!workspace) throw new EntityNotFoundError("Workspace not found");
+
+    if (workspace.icon && workspace.icon !== key) {
+      await this.storage.delete(workspace.icon);
+    }
+
+    await this.storage.upload(file.buffer, key, file.mimetype);
+    workspace.icon = key;
+    await this.workspaceRepository.update(workspace);
+
+    const iconUrl = await this.storage.getPresignedUrl(key);
+    return { icon: iconUrl };
+  }
+
+  @Delete(":slug/branding/icon")
+  async deleteIcon(@Param("slug") slug: string, @CurrentUser() user: AuthUser) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(
+      this.memberRepository,
+    );
+    await ensurePermission.execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+
+    const workspace = await this.workspaceRepository.findById(workspaceId);
+    if (!workspace) throw new EntityNotFoundError("Workspace not found");
+
+    if (workspace.icon) {
+      await this.storage.delete(workspace.icon);
+      workspace.icon = null;
+      await this.workspaceRepository.update(workspace);
+    }
+
+    return { icon: null };
   }
 
   private async resolveWorkspaceId(slug: string): Promise<string> {
