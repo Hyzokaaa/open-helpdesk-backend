@@ -16,6 +16,35 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.23.0',
+    date: '2026-09-02',
+    categories: [
+      {
+        title: { en: 'Roles & Members', es: 'Roles y Miembros' },
+        features: [
+          { en: '"Reporter" role renamed to "User" — clearer terminology across the entire platform', es: 'Rol "Reportero" renombrado a "Usuario" — terminología más clara en toda la plataforma' },
+          { en: '"Team" section renamed to "Members" — now clearly represents workspace staff', es: 'Sección "Equipo" renombrada a "Miembros" — ahora representa claramente al personal del workspace' },
+          { en: 'Add Member now defaults to "Agent" role — "User" role is managed from Contacts', es: 'Agregar Miembro ahora usa "Agente" por defecto — el rol "Usuario" se gestiona desde Contactos' },
+          { en: 'New "Invite Contact" button in Contacts page — invite end-users directly', es: 'Nuevo botón "Invitar Contacto" en la página de Contactos — invita usuarios finales directamente' },
+        ],
+      },
+      {
+        title: { en: 'Branding', es: 'Marca' },
+        features: [
+          { en: 'New "Icon" field in branding — square image displayed in the sidebar and as browser favicon', es: 'Nuevo campo "Icono" en marca — imagen cuadrada que se muestra en la barra lateral y como favicon del navegador' },
+          { en: 'Icon available in both system branding and workspace branding', es: 'Icono disponible tanto en marca del sistema como en marca del workspace' },
+          { en: 'Browser tab favicon updates dynamically when an icon is configured', es: 'El favicon de la pestaña del navegador se actualiza dinámicamente cuando se configura un icono' },
+        ],
+      },
+      {
+        title: { en: 'Custom Domains', es: 'Dominios Personalizados' },
+        features: [
+          { en: 'Administration settings are now hidden when accessing through a custom domain — manage your host from the main domain', es: 'La configuración de administración ahora se oculta al acceder a través de un dominio personalizado — administra el host desde el dominio principal' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.22.0',
     date: '2026-09-01',
     categories: [
