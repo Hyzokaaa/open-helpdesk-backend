@@ -322,7 +322,7 @@ export class WorkspaceController {
         : userId,
     });
 
-    if (targetUser?.autoCreated && body.role !== "reporter") {
+    if (targetUser?.autoCreated && body.role !== "user") {
       targetUser.autoCreated = false;
       await this.userRepository.update(targetUser);
     }

@@ -54,7 +54,7 @@ export class ListTicketsQuery
 
     const filters = { ...props.filters };
     if (!hasPermission(ctx.role, PERMISSIONS.TICKET_VIEW)) {
-      if (hasPermission(ctx.role, PERMISSIONS.TICKET_CREATE) && ctx.role !== WorkspaceRole.REPORTER) {
+      if (hasPermission(ctx.role, PERMISSIONS.TICKET_CREATE) && ctx.role !== WorkspaceRole.USER) {
         filters.agentUserId = props.userId;
       } else {
         filters.reporterId = props.userId;

@@ -419,7 +419,7 @@ export const coreChangelog: ChangelogVersion[] = [
         features: [
           { en: 'My Stats page — see your personal performance metrics at a glance', es: 'Página Mis Estadísticas — ve tus métricas de rendimiento personal de un vistazo' },
           { en: 'Agents see tickets resolved, response times, CSAT score, and resolution trends', es: 'Los agentes ven tickets resueltos, tiempos de respuesta, CSAT y tendencia de resoluciones' },
-          { en: 'Reporters see tickets created, resolution status, and how fast they get served', es: 'Los reporteros ven tickets creados, estado de resolución y qué tan rápido los atienden' },
+          { en: 'Users see tickets created, resolution status, and how fast they get served', es: 'Los usuarios ven tickets creados, estado de resolución y qué tan rápido los atienden' },
           { en: 'Admins and supervisors can view any team member\'s stats from the members page', es: 'Admins y supervisores pueden ver las estadísticas de cualquier miembro del equipo' },
         ],
       },
@@ -621,7 +621,7 @@ export const coreChangelog: ChangelogVersion[] = [
       {
         title: { en: 'Permissions', es: 'Permisos' },
         features: [
-          { en: 'Reporters can no longer edit tickets after creation — updates happen through comments', es: 'Los reporteros ya no pueden editar tickets después de crearlos — las actualizaciones se hacen por comentarios' },
+          { en: 'Users can no longer edit tickets after creation — updates happen through comments', es: 'Los usuarios ya no pueden editar tickets después de crearlos — las actualizaciones se hacen por comentarios' },
           { en: 'Canned responses reserved for agents and admins only', es: 'Respuestas predefinidas reservadas solo para agentes y administradores' },
         ],
       },
@@ -651,10 +651,10 @@ export const coreChangelog: ChangelogVersion[] = [
       {
         title: { en: 'Reporter Experience', es: 'Experiencia del Reportero' },
         features: [
-          { en: 'Reporters now see only their own tickets — cleaner, focused view', es: 'Los reporteros ahora solo ven sus propios tickets — vista limpia y enfocada' },
+          { en: 'Users now see only their own tickets — cleaner, focused view', es: 'Los usuarios ahora solo ven sus propios tickets — vista limpia y enfocada' },
           { en: 'Sidebar shows only relevant sections based on your role', es: 'La barra lateral muestra solo secciones relevantes según tu rol' },
           { en: 'Attachment deletion restricted to files you uploaded', es: 'Eliminación de adjuntos restringida a archivos que tú subiste' },
-          { en: 'Reporters cannot edit priority, category, or tags — only description and custom fields', es: 'Los reporteros no pueden editar prioridad, categoría ni etiquetas — solo descripción y campos personalizados' },
+          { en: 'Users cannot edit priority, category, or tags — only description and custom fields', es: 'Los usuarios no pueden editar prioridad, categoría ni etiquetas — solo descripción y campos personalizados' },
         ],
       },
       {
@@ -820,7 +820,7 @@ export const coreChangelog: ChangelogVersion[] = [
       {
         title: { en: 'Members', es: 'Miembros' },
         features: [
-          { en: 'Add members with role selection (admin, agent, reporter)', es: 'Agregar miembros con selección de rol (admin, agente, reportero)' },
+          { en: 'Add members with role selection (admin, agent, user)', es: 'Agregar miembros con selección de rol (admin, agente, usuario)' },
           { en: 'Change member role with inline dropdown', es: 'Cambiar rol de miembro con selector en línea' },
           { en: 'Remove members from workspace', es: 'Eliminar miembros del espacio de trabajo' },
           { en: 'Last-admin protection: cannot remove or demote the sole admin', es: 'Protección de último admin: no se puede eliminar o degradar al único administrador' },
@@ -876,7 +876,7 @@ export const coreChangelog: ChangelogVersion[] = [
       {
         title: { en: 'Permissions', es: 'Permisos' },
         features: [
-          { en: 'Role-based access: admin, agent, reporter', es: 'Acceso basado en roles: admin, agente, reportero' },
+          { en: 'Role-based access: admin, agent, user', es: 'Acceso basado en roles: admin, agente, usuario' },
           { en: '20+ permissions covering all features', es: '20+ permisos cubriendo todas las funcionalidades' },
           { en: 'System admins have full access to all workspaces', es: 'Los admins del sistema tienen acceso completo a todos los workspaces' },
           { en: 'Buttons and actions are shown or hidden based on your role', es: 'Botones y acciones se muestran u ocultan según tu rol' },

@@ -772,7 +772,7 @@ export class TicketController {
       await addMember.execute({
         workspaceId,
         userId: targetUser.getId(),
-        role: WorkspaceRole.REPORTER,
+        role: WorkspaceRole.USER,
       });
     }
 

@@ -154,7 +154,7 @@ const AGENT_PERMISSIONS: Permission[] = [
   PERMISSIONS.PROJECT_VIEW,
 ];
 
-const REPORTER_PERMISSIONS: Permission[] = [
+const USER_PERMISSIONS: Permission[] = [
   PERMISSIONS.TICKET_CREATE,
   PERMISSIONS.TICKET_VIEW_OWN,
   PERMISSIONS.COMMENT_CREATE,
@@ -168,7 +168,7 @@ const ROLE_PERMISSIONS: Record<WorkspaceRole, Permission[]> = {
   [WorkspaceRole.ADMIN]: ADMIN_PERMISSIONS,
   [WorkspaceRole.SUPERVISOR]: SUPERVISOR_PERMISSIONS,
   [WorkspaceRole.AGENT]: AGENT_PERMISSIONS,
-  [WorkspaceRole.REPORTER]: REPORTER_PERMISSIONS,
+  [WorkspaceRole.USER]: USER_PERMISSIONS,
 };
 
 export function hasPermission(role: WorkspaceRole, permission: Permission): boolean {

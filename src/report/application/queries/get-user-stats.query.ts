@@ -74,7 +74,7 @@ export class GetUserStatsQuery {
       props.workspaceId,
       props.targetUserId,
     );
-    const isReporter = targetMember?.role === WorkspaceRole.REPORTER;
+    const isReporter = targetMember?.role === WorkspaceRole.USER;
 
     if (isReporter) {
       const [overview, ticketsByStatus, creationTrend, userInfo] = await Promise.all([

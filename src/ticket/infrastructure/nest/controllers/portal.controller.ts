@@ -150,7 +150,7 @@ export class PortalController {
       await addMember.execute({
         workspaceId: workspace.getId(),
         userId: user.getId(),
-        role: WorkspaceRole.REPORTER,
+        role: WorkspaceRole.USER,
       });
     }
 
