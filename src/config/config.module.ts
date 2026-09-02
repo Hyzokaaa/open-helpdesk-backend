@@ -15,11 +15,12 @@ import { SystemNotificationSettingsModel } from './infrastructure/typeorm/models
 import { TypeOrmSystemEmailSettingsRepository } from './infrastructure/typeorm/repositories/typeorm-system-email-settings.repository';
 import { TypeOrmSystemBrandingRepository } from './infrastructure/typeorm/repositories/typeorm-system-branding.repository';
 import { TypeOrmSystemNotificationSettingsRepository } from './infrastructure/typeorm/repositories/typeorm-system-notification-settings.repository';
+import { VersionCheckScheduler } from './infrastructure/nest/services/version-check.scheduler';
 
 @Module({
   imports: [SharedModule, AuditLogModule, UserModule, NotificationModule, TypeOrmModule.forFeature([SystemEmailSettingsModel, SystemBrandingModel, SystemNotificationSettingsModel])],
   controllers: [CoreConfigController, SystemEmailSettingsController, SystemBrandingController, SystemNotificationSettingsController, SystemVersionController],
-  providers: [TypeOrmSystemEmailSettingsRepository, TypeOrmSystemBrandingRepository, TypeOrmSystemNotificationSettingsRepository],
+  providers: [TypeOrmSystemEmailSettingsRepository, TypeOrmSystemBrandingRepository, TypeOrmSystemNotificationSettingsRepository, VersionCheckScheduler],
   exports: [TypeOrmSystemEmailSettingsRepository, TypeOrmSystemBrandingRepository, TypeOrmSystemNotificationSettingsRepository],
 })
 export class CoreConfigModule {}
