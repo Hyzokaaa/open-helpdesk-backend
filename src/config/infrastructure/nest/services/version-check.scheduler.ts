@@ -12,8 +12,9 @@ import { SystemNotificationSettings } from '../../../domain/entities/system-noti
 import { EmailService } from '../../../../email/domain/email.service';
 import { EMAIL_SERVICE } from '../../../../email/email.constants';
 import { UpgradeAvailableTemplate } from '../../../../email/templates/upgrade-available.template';
+import { resolveBackendVersion } from '../resolve-backend-version';
 
-const backendVersion: string = require('../../../../../package.json').version;
+const backendVersion: string = resolveBackendVersion();
 
 function isNewer(latest: string, current: string): boolean {
   const [lMaj, lMin, lPat] = latest.split('.').map(Number);
