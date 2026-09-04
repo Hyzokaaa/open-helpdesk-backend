@@ -140,6 +140,7 @@ export class WorkspaceImportController {
           firstName: created.firstName,
           workspaceName: workspace.name,
           resetUrl,
+          workspaceUrl: frontendUrl,
           lang: 'en',
         }));
       } catch {

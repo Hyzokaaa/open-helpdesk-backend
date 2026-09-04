@@ -157,6 +157,10 @@ const translations: Translations = {
     en: 'This link will expire in 1 hour.',
     es: 'Este enlace expirará en 1 hora.',
   },
+  'importWelcome.accessAnytime': {
+    en: 'You can access the workspace anytime at: <a href="{workspaceUrl}" style="color: #6330f7;">{workspaceUrl}</a>',
+    es: 'Puedes acceder al workspace en cualquier momento en: <a href="{workspaceUrl}" style="color: #6330f7;">{workspaceUrl}</a>',
+  },
 
   // Workspace invitation
   'invitation.subject': {
@@ -178,6 +182,10 @@ const translations: Translations = {
   'invitation.expiry': {
     en: 'This invitation will expire in 7 days.',
     es: 'Esta invitación expirará en 7 días.',
+  },
+  'invitation.accessAnytime': {
+    en: 'You can access the workspace anytime at: <a href="{workspaceUrl}" style="color: #6330f7;">{workspaceUrl}</a>',
+    es: 'Puedes acceder al workspace en cualquier momento en: <a href="{workspaceUrl}" style="color: #6330f7;">{workspaceUrl}</a>',
   },
 
   // Ticket confirmation (creator)
