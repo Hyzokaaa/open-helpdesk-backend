@@ -1,5 +1,6 @@
 import { IdGenerator } from '../../../shared/domain/id-generator';
 import { slugify } from '../../../shared/domain/slugify';
+import { DomainValidationError } from '../../../shared/domain/errors';
 import { Workspace } from '../entities/workspace';
 import { WorkspaceRepository } from '../repositories/workspace.repository';
 
@@ -16,7 +17,12 @@ export class CreateWorkspace {
   ) {}
 
   async execute(props: CreateWorkspaceProps): Promise<Workspace> {
-    const slug = await this.generateUniqueSlug(props.name);
+    const slug = slugify(props.name);
+    if (!slug) throw new DomainValidationError('Invalid workspace name');
+
+    if (await this.repository.existsBySlug(slug)) {
+      throw new DomainValidationError('This workspace URL is already taken. Choose a different name.');
+    }
 
     const workspace = new Workspace({
       id: this.idGenerator.create(),
@@ -28,26 +34,5 @@ export class CreateWorkspace {
 
     await this.repository.create(workspace);
     return workspace;
-  }
-
-  private async generateUniqueSlug(name: string): Promise<string> {
-    const base = slugify(name);
-    const maxAttempts = 5;
-
-    for (let i = 0; i < maxAttempts; i++) {
-      const slug = `${base}-${this.randomSuffix()}`;
-      if (!(await this.repository.existsBySlug(slug))) return slug;
-    }
-
-    return `${base}-${this.randomSuffix()}${this.randomSuffix()}`;
-  }
-
-  private randomSuffix(): string {
-    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    for (let i = 0; i < 4; i++) {
-      result += chars[Math.floor(Math.random() * chars.length)];
-    }
-    return result;
   }
 }

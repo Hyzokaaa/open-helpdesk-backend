@@ -20,6 +20,7 @@ import { CurrentUser } from "../../../../shared/nest/decorators/current-user.dec
 import { AuthUser } from "../../../../shared/nest/strategies/jwt.strategy";
 import { UlidGenerator } from "../../../../shared/infrastructure/ulid-generator";
 import { EntityNotFoundError } from "../../../../shared/domain/errors";
+import { slugify } from "../../../../shared/domain/slugify";
 import { CreateWorkspace } from "../../../domain/services/workspace-create";
 import { AddWorkspaceMember } from "../../../domain/services/workspace-add-member";
 import { RemoveWorkspaceMember } from "../../../domain/services/workspace-remove-member";
@@ -145,6 +146,32 @@ export class WorkspaceController {
       accountId: account?.getId(),
       supportEmailDomain,
     });
+  }
+
+  @Get('check-slug')
+  async checkSlug(@Query('name') name: string) {
+    if (!name?.trim()) return { slug: '', available: false, suggestions: [] };
+
+    const base = slugify(name.trim());
+    if (!base) return { slug: '', available: false, suggestions: [] };
+
+    const available = !(await this.workspaceRepository.existsBySlug(base));
+    let suggestions: string[] = [];
+
+    if (!available) {
+      const candidates = [
+        `${base}-team`, `${base}-hq`, `${base}-hub`,
+        `${base}-1`, `${base}-2`, `${base}-3`,
+      ];
+      for (const candidate of candidates) {
+        if (!(await this.workspaceRepository.existsBySlug(candidate))) {
+          suggestions.push(candidate);
+          if (suggestions.length >= 3) break;
+        }
+      }
+    }
+
+    return { slug: base, available, suggestions };
   }
 
   @Get()
