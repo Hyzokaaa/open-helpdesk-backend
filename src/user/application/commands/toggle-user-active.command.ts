@@ -32,6 +32,7 @@ export class ToggleUserActiveCommand implements Command<Props, ToggleUserActiveR
     const user = await this.toggleActive.execute({
       targetUserId: props.targetUserId,
       isActive: props.isActive,
+      requestingUserId: props.requestingUserId,
     });
 
     await this.createAuditLog.execute({
