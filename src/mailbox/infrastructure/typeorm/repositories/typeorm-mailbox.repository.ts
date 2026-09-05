@@ -80,6 +80,8 @@ export class TypeOrmMailboxRepository implements MailboxRepository {
       addressMode: model.addressMode,
       acceptedAddresses: model.acceptedAddresses,
       autoReply: model.autoReply,
+      postProcessAction: model.postProcessAction,
+      postProcessFolder: model.postProcessFolder,
     });
   }
 
@@ -104,6 +106,8 @@ export class TypeOrmMailboxRepository implements MailboxRepository {
     model.addressMode = mailbox.addressMode;
     model.acceptedAddresses = mailbox.acceptedAddresses;
     model.autoReply = mailbox.autoReply;
+    model.postProcessAction = mailbox.postProcessAction;
+    model.postProcessFolder = mailbox.postProcessFolder;
     return model;
   }
 }

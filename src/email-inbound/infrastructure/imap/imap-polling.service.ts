@@ -200,13 +200,21 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
         const parser = new ImapEmailParser();
         const router = this.createRouter();
         let count = 0;
+        const processedUids: number[] = [];
 
         for (const msg of fetched) {
           const result = await this.processMessage(msg, parser, router, mailbox.getId(), mailbox.workspaceId, mailbox);
-          if (result === 'created') count++;
+          if (result === 'created') {
+            count++;
+            processedUids.push(msg.uid);
+          }
         }
 
         if (count > 0) this.logger.log(`IMAP [${mailbox.address}]: processed ${count} email(s)`);
+
+        if (processedUids.length > 0 && mailbox.postProcessAction !== 'none') {
+          await this.postProcessEmails(mailbox, processedUids);
+        }
       }
 
       // Mark success
@@ -455,6 +463,48 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       this.organizationRepository,
       this.ticketCategoryRepository,
     );
+  }
+
+  private async postProcessEmails(mailbox: Mailbox, uids: number[]): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { ImapFlow } = require('imapflow');
+
+    const encryption = mailbox.encryption ?? 'tls';
+    const secure = encryption === 'tls' || encryption === 'tls-insecure';
+    const tlsOptions = encryption === 'tls-insecure' ? { rejectUnauthorized: false } : undefined;
+
+    const client = new ImapFlow({
+      host: mailbox.imapHost,
+      port: mailbox.imapPort ?? (secure ? 993 : 143),
+      secure,
+      ...(tlsOptions && { tls: tlsOptions }),
+      auth: { user: mailbox.imapUser, pass: mailbox.imapPass },
+      logger: false,
+    });
+
+    try {
+      await client.connect();
+      const folder = mailbox.imapFolder ?? 'INBOX';
+      const lock = await client.getMailboxLock(folder);
+
+      try {
+        const uidSet = uids.join(',');
+
+        if (mailbox.postProcessAction === 'mark-read') {
+          await client.messageFlagsAdd({ uid: uidSet }, ['\\Seen']);
+          this.logger.log(`IMAP [${mailbox.address}]: marked ${uids.length} email(s) as read`);
+        } else if (mailbox.postProcessAction === 'move' && mailbox.postProcessFolder) {
+          await client.messageMove({ uid: uidSet }, mailbox.postProcessFolder);
+          this.logger.log(`IMAP [${mailbox.address}]: moved ${uids.length} email(s) to ${mailbox.postProcessFolder}`);
+        }
+      } finally {
+        lock.release();
+      }
+    } catch (err) {
+      this.logger.error(`IMAP [${mailbox.address}] post-processing failed: ${err instanceof Error ? err.message : err}`);
+    } finally {
+      try { await client.logout(); } catch {}
+    }
   }
 }
 

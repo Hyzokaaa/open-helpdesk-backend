@@ -21,6 +21,8 @@ interface Props {
   addressMode?: string;
   acceptedAddresses?: string[];
   autoReply?: boolean;
+  postProcessAction?: string;
+  postProcessFolder?: string | null;
 }
 
 export class Mailbox {
@@ -43,6 +45,8 @@ export class Mailbox {
   addressMode: string;
   acceptedAddresses: string[];
   autoReply: boolean;
+  postProcessAction: string;
+  postProcessFolder: string | null;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -64,6 +68,8 @@ export class Mailbox {
     this.addressMode = props.addressMode ?? 'address';
     this.acceptedAddresses = props.acceptedAddresses ?? [];
     this.autoReply = props.autoReply ?? true;
+    this.postProcessAction = props.postProcessAction ?? 'none';
+    this.postProcessFolder = props.postProcessFolder ?? null;
   }
 
   getId(): string {
