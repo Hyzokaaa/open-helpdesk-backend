@@ -2,14 +2,13 @@ import { PaginatedResult } from '../../../shared/domain/paginated-result';
 import { AuditLogEntry } from '../entities/audit-log-entry';
 
 export interface AuditLogFilters {
-  userId?: string;
-  action?: string;
-  excludeActions?: string[];
-  entityType?: string;
+  actions?: string[];
+  entityTypes?: string[];
   entityId?: string;
-  category?: string;
-  level?: string;
-  source?: string;
+  categories?: string[];
+  levels?: string[];
+  sources?: string[];
+  userIds?: string[];
   dateFrom?: Date;
   dateTo?: Date;
   sortOrder?: 'ASC' | 'DESC';

@@ -10,33 +10,33 @@ export class AuditLogFilterDto extends PaginationDto {
   @IsOptional()
   userId?: string;
 
-  @IsEnum(AuditAction)
   @IsOptional()
-  action?: AuditAction;
+  @Transform(({ value }) => typeof value === 'string' ? value.split(',') : value)
+  actions?: string[];
 
   @IsOptional()
   @Transform(({ value }) => typeof value === 'string' ? value.split(',') : value)
-  excludeActions?: string[];
-
-  @IsString()
-  @IsOptional()
-  entityType?: string;
+  entityTypes?: string[];
 
   @IsString()
   @IsOptional()
   entityId?: string;
 
-  @IsEnum(AuditCategory)
   @IsOptional()
-  category?: AuditCategory;
+  @Transform(({ value }) => typeof value === 'string' ? value.split(',') : value)
+  categories?: string[];
 
-  @IsEnum(AuditLevel)
   @IsOptional()
-  level?: AuditLevel;
+  @Transform(({ value }) => typeof value === 'string' ? value.split(',') : value)
+  levels?: string[];
 
-  @IsString()
   @IsOptional()
-  source?: string;
+  @Transform(({ value }) => typeof value === 'string' ? value.split(',') : value)
+  sources?: string[];
+
+  @IsOptional()
+  @Transform(({ value }) => typeof value === 'string' ? value.split(',') : value)
+  userIds?: string[];
 
   @IsOptional()
   @Type(() => Date)

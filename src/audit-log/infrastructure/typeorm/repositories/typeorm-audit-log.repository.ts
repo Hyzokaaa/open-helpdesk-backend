@@ -34,9 +34,6 @@ export class TypeOrmAuditLogRepository implements AuditLogRepository {
       qb.where('audit.workspaceId IS NULL');
     }
 
-    if (filters.userId) {
-      qb.andWhere('audit.userId = :userId', { userId: filters.userId });
-    }
     this.applyFilters(qb, filters);
 
     const sortOrder = filters.sortOrder === 'ASC' ? 'ASC' : 'DESC';
@@ -77,29 +74,26 @@ export class TypeOrmAuditLogRepository implements AuditLogRepository {
   }
 
   private applyFilters(qb: ReturnType<Repository<AuditLogEntryModel>['createQueryBuilder']>, filters: AuditLogFilters): void {
-    if (filters.userId) {
-      qb.andWhere('audit.userId = :userId', { userId: filters.userId });
+    if (filters.actions?.length) {
+      qb.andWhere('audit.action IN (:...actions)', { actions: filters.actions });
     }
-    if (filters.action) {
-      qb.andWhere('audit.action = :action', { action: filters.action });
-    }
-    if (filters.excludeActions?.length) {
-      qb.andWhere('audit.action NOT IN (:...excludeActions)', { excludeActions: filters.excludeActions });
-    }
-    if (filters.entityType) {
-      qb.andWhere('audit.entityType = :entityType', { entityType: filters.entityType });
+    if (filters.entityTypes?.length) {
+      qb.andWhere('audit.entityType IN (:...entityTypes)', { entityTypes: filters.entityTypes });
     }
     if (filters.entityId) {
       qb.andWhere('audit.entityId = :entityId', { entityId: filters.entityId });
     }
-    if (filters.category) {
-      qb.andWhere('audit.category = :category', { category: filters.category });
+    if (filters.categories?.length) {
+      qb.andWhere('audit.category IN (:...categories)', { categories: filters.categories });
     }
-    if (filters.level) {
-      qb.andWhere('audit.level = :level', { level: filters.level });
+    if (filters.levels?.length) {
+      qb.andWhere('audit.level IN (:...levels)', { levels: filters.levels });
     }
-    if (filters.source) {
-      qb.andWhere('audit.source = :source', { source: filters.source });
+    if (filters.sources?.length) {
+      qb.andWhere('audit.source IN (:...sources)', { sources: filters.sources });
+    }
+    if (filters.userIds?.length) {
+      qb.andWhere('audit.userId IN (:...userIds)', { userIds: filters.userIds });
     }
     if (filters.dateFrom) {
       qb.andWhere('audit.createdAt >= :dateFrom', { dateFrom: filters.dateFrom });
