@@ -143,6 +143,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     const activeIds = new Set<string>();
 
     for (const mailbox of dbMailboxes) {
+      if (!mailbox.isActive) continue;
       activeIds.add(mailbox.getId());
       const hash = this.configHash(mailbox);
       const existing = this.pollers.get(mailbox.getId());
