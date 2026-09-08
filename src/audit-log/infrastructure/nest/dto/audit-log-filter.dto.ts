@@ -38,6 +38,10 @@ export class AuditLogFilterDto extends PaginationDto {
   @Transform(({ value }) => typeof value === 'string' ? value.split(',') : value)
   userIds?: string[];
 
+  @IsString()
+  @IsOptional()
+  search?: string;
+
   @IsOptional()
   @Type(() => Date)
   dateFrom?: Date;

@@ -95,6 +95,9 @@ export class TypeOrmAuditLogRepository implements AuditLogRepository {
     if (filters.userIds?.length) {
       qb.andWhere('audit.userId IN (:...userIds)', { userIds: filters.userIds });
     }
+    if (filters.search) {
+      qb.andWhere('(audit.entityId ILIKE :search OR CAST(audit.metadata AS text) ILIKE :search)', { search: `%${filters.search}%` });
+    }
     if (filters.dateFrom) {
       qb.andWhere('audit.createdAt >= :dateFrom', { dateFrom: filters.dateFrom });
     }

@@ -38,6 +38,7 @@ export class AuditLogController {
         levels: filters.levels,
         sources: filters.sources,
         userIds: filters.userIds,
+        search: filters.search,
         dateFrom: filters.dateFrom,
         dateTo: filters.dateTo,
         sortOrder: filters.sortOrder,

@@ -9,6 +9,7 @@ export interface AuditLogFilters {
   levels?: string[];
   sources?: string[];
   userIds?: string[];
+  search?: string;
   dateFrom?: Date;
   dateTo?: Date;
   sortOrder?: 'ASC' | 'DESC';
