@@ -33,7 +33,7 @@ describe('EnsureWorkspacePermission', () => {
   });
 
   it('should throw AccessDeniedError when reporter tries to delete', async () => {
-    repository.seed(new WorkspaceMember({ id: 'm-2', workspaceId: 'ws-1', userId: 'reporter-1', role: WorkspaceRole.REPORTER }));
+    repository.seed(new WorkspaceMember({ id: 'm-2', workspaceId: 'ws-1', userId: 'reporter-1', role: WorkspaceRole.USER }));
 
     await expect(
       service.execute({ workspaceId: 'ws-1', userId: 'reporter-1', permission: PERMISSIONS.TICKET_DELETE }),
@@ -41,7 +41,7 @@ describe('EnsureWorkspacePermission', () => {
   });
 
   it('should allow reporter to create tickets', async () => {
-    repository.seed(new WorkspaceMember({ id: 'm-3', workspaceId: 'ws-1', userId: 'reporter-1', role: WorkspaceRole.REPORTER }));
+    repository.seed(new WorkspaceMember({ id: 'm-3', workspaceId: 'ws-1', userId: 'reporter-1', role: WorkspaceRole.USER }));
 
     const result = await service.execute({
       workspaceId: 'ws-1',
@@ -49,7 +49,7 @@ describe('EnsureWorkspacePermission', () => {
       permission: PERMISSIONS.TICKET_CREATE,
     });
 
-    expect(result.role).toBe(WorkspaceRole.REPORTER);
+    expect(result.role).toBe(WorkspaceRole.USER);
   });
 
   it('should pass anyOf check when user has at least one of the permissions', async () => {
@@ -65,7 +65,7 @@ describe('EnsureWorkspacePermission', () => {
   });
 
   it('should throw AccessDeniedError when user has none of the anyOf permissions', async () => {
-    repository.seed(new WorkspaceMember({ id: 'm-5', workspaceId: 'ws-1', userId: 'reporter-2', role: WorkspaceRole.REPORTER }));
+    repository.seed(new WorkspaceMember({ id: 'm-5', workspaceId: 'ws-1', userId: 'reporter-2', role: WorkspaceRole.USER }));
 
     await expect(
       service.execute({

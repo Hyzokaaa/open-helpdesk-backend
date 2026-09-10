@@ -99,7 +99,7 @@ describe('EnsureTicketAccess', () => {
   });
 
   it('should return full for reporter who created the ticket', async () => {
-    memberRepo.seed(makeMember('reporter-1', WorkspaceRole.REPORTER));
+    memberRepo.seed(makeMember('reporter-1', WorkspaceRole.USER));
     await ticketRepo.create(makeTicket({ reporterId: 'reporter-1' }));
 
     const result = await service.execute({

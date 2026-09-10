@@ -20,12 +20,12 @@ describe('ChangeWorkspaceMemberRole', () => {
     const result = await service.execute({
       workspaceId: 'ws-1',
       targetUserId: 'agent-1',
-      newRole: WorkspaceRole.REPORTER,
+      newRole: WorkspaceRole.USER,
       requestingUserId: 'admin-1',
       isSystemAdmin: false,
     });
 
-    expect(result.role).toBe(WorkspaceRole.REPORTER);
+    expect(result.role).toBe(WorkspaceRole.USER);
   });
 
   it('should allow system admin to change any role including admin', async () => {
@@ -60,7 +60,7 @@ describe('ChangeWorkspaceMemberRole', () => {
 
   it('should throw AccessDeniedError when non-admin tries to change role', async () => {
     repository.seed(new WorkspaceMember({ id: 'm-1', workspaceId: 'ws-1', userId: 'agent-1', role: WorkspaceRole.AGENT }));
-    repository.seed(new WorkspaceMember({ id: 'm-2', workspaceId: 'ws-1', userId: 'reporter-1', role: WorkspaceRole.REPORTER }));
+    repository.seed(new WorkspaceMember({ id: 'm-2', workspaceId: 'ws-1', userId: 'reporter-1', role: WorkspaceRole.USER }));
 
     await expect(
       service.execute({

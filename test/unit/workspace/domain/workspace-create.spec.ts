@@ -1,5 +1,5 @@
 import { CreateWorkspace } from '../../../../src/workspace/domain/services/workspace-create';
-import { Workspace } from '../../../../src/workspace/domain/entities/workspace';
+import { DomainValidationError } from '../../../../src/shared/domain/errors';
 import { FakeIdGenerator } from '../../../mocks/fake-id-generator';
 import { MockWorkspaceRepository } from '../../../mocks/mock-workspace.repository';
 
@@ -12,20 +12,25 @@ describe('CreateWorkspace', () => {
     service = new CreateWorkspace(new FakeIdGenerator(), repository);
   });
 
-  it('should create a workspace with a slug based on name plus random suffix', async () => {
+  it('should create a workspace with a slug based on name', async () => {
     const workspace = await service.execute({ name: 'My Workspace', description: 'desc' });
 
     expect(workspace.name).toBe('My Workspace');
-    expect(workspace.slug).toMatch(/^my-workspace-[a-z0-9]{4}$/);
+    expect(workspace.slug).toBe('my-workspace');
     expect(workspace.description).toBe('desc');
   });
 
-  it('should generate unique slug when duplicate exists', async () => {
-    const first = await service.execute({ name: 'My Workspace', description: '' });
-    const second = await service.execute({ name: 'My Workspace', description: '' });
+  it('should throw when slug is already taken', async () => {
+    await service.execute({ name: 'My Workspace', description: '' });
 
-    expect(first.slug).toMatch(/^my-workspace-[a-z0-9]{4}$/);
-    expect(second.slug).toMatch(/^my-workspace-[a-z0-9]{4}$/);
-    expect(first.slug).not.toBe(second.slug);
+    await expect(
+      service.execute({ name: 'My Workspace', description: '' }),
+    ).rejects.toThrow(DomainValidationError);
+  });
+
+  it('should throw when name produces an empty slug', async () => {
+    await expect(
+      service.execute({ name: '!!!', description: '' }),
+    ).rejects.toThrow(DomainValidationError);
   });
 });
