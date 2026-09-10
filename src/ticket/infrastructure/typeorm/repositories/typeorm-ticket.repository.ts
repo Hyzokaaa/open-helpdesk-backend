@@ -149,8 +149,13 @@ export class TypeOrmTicketRepository implements TicketRepository {
       name: { col: 'ticket.name', lower: true },
       priority: { col: 'ticket.priority', lower: false },
       status: { col: 'ticket.status', lower: false },
+      category: { col: 'ticket.categoryId', lower: false },
       categoryId: { col: 'ticket.categoryId', lower: false },
       createdAt: { col: 'ticket.createdAt', lower: false },
+      organization: { col: 'ticket.organizationId', lower: false },
+      organizationId: { col: 'ticket.organizationId', lower: false },
+      department: { col: 'ticket.departmentId', lower: false },
+      departmentId: { col: 'ticket.departmentId', lower: false },
     };
 
     const field = VALID_SORT_FIELDS[filters.sortBy ?? ''] ?? { col: 'ticket.createdAt', lower: false };
