@@ -314,6 +314,7 @@ export class WorkspaceController {
     const query = new ListWorkspaceMembersQuery(
       this.memberRepository,
       this.userRepository,
+      this.storage,
     );
     return query.execute({
       workspaceId,
