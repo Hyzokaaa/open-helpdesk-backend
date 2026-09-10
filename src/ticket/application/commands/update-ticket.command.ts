@@ -22,6 +22,8 @@ interface Props {
   categoryId?: string;
   tagIds?: string[];
   departmentId?: string | null;
+  organizationId?: string | null;
+  projectId?: string | null;
   customFields?: Record<string, unknown>;
 }
 
@@ -67,7 +69,7 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
     const canEditTags = hasPermission(ctx.role, PERMISSIONS.TICKET_EDIT_TAGS);
     const canEditCustomFields = hasPermission(ctx.role, PERMISSIONS.TICKET_EDIT_DESCRIPTION);
 
-    const before = { name: ticket.name, priority: ticket.priority, categoryId: ticket.categoryId };
+    const before = { name: ticket.name, priority: ticket.priority, categoryId: ticket.categoryId, departmentId: ticket.departmentId, organizationId: ticket.organizationId, projectId: ticket.projectId };
 
     let validatedCustomFields: Record<string, unknown> | undefined;
     if (props.customFields && canEditCustomFields) {
@@ -86,11 +88,13 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
       categoryId: canEditCategory ? props.categoryId : undefined,
       tagIds: canEditTags ? props.tagIds : undefined,
       departmentId: props.departmentId,
+      organizationId: props.organizationId,
+      projectId: props.projectId,
       customFields: validatedCustomFields,
       editedById: props.userId,
     });
 
-    const after = { name: updated.name, priority: updated.priority, categoryId: updated.categoryId };
+    const after = { name: updated.name, priority: updated.priority, categoryId: updated.categoryId, departmentId: updated.departmentId, organizationId: updated.organizationId, projectId: updated.projectId };
     await this.createAuditLog.execute({
       action: AuditAction.TICKET_UPDATED,
       category: AuditCategory.TICKET,
