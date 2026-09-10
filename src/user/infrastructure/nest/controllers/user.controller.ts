@@ -1,7 +1,9 @@
 import {
+  BadRequestException,
   Body,
   ConflictException,
   Controller,
+  Delete,
   ForbiddenException,
   NotFoundException,
   Get,
@@ -10,7 +12,10 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { SkipEmailVerification } from '../../../../shared/nest/decorators/skip-email-verification.decorator';
@@ -37,8 +42,16 @@ import { AuditAction } from '../../../../audit-log/domain/enums/audit-action.enu
 import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
 import { CreateAccountForUser } from '../../../../account/domain/services/account-create-for-user';
+import { StorageService } from '../../../../shared/domain/storage-service';
+import { STORAGE_SERVICE } from '../../../../shared/shared.module';
 import { RegisterUserRequest } from '../dto/register-user.request';
 import { SortDto } from '../../../../shared/nest/dto/sort.dto';
+
+const MIME_TO_EXT: Record<string, string> = {
+  'image/png': '.png',
+  'image/jpeg': '.jpg',
+  'image/webp': '.webp',
+};
 
 @Controller('users')
 export class UserController {
@@ -48,12 +61,13 @@ export class UserController {
     @Inject() private readonly idGenerator: UlidGenerator,
     @Inject() private readonly passwordHasher: BcryptPasswordHasher,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
+    @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
   ) {}
 
   @SkipEmailVerification()
   @Get('me')
   me(@CurrentUser() user: AuthUser) {
-    const query = new GetUserProfileQuery(this.userRepository);
+    const query = new GetUserProfileQuery(this.userRepository, this.storage);
     return query.execute({ userId: user.userId });
   }
 
@@ -371,5 +385,51 @@ export class UserController {
       requestingUserIsAdmin: user.isSystemAdmin,
       requestingUserId: user.userId,
     });
+  }
+
+  @Post('me/avatar')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadAvatar(
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() authUser: AuthUser,
+  ) {
+    if (!file) throw new BadRequestException('No file uploaded');
+    if (file.size > 1024 * 1024)
+      throw new BadRequestException('Avatar must be 1MB or less');
+
+    const allowedMimes = ['image/png', 'image/jpeg', 'image/webp'];
+    if (!allowedMimes.includes(file.mimetype))
+      throw new BadRequestException('Avatar must be PNG, JPEG, or WebP');
+
+    const user = await this.userRepository.findById(authUser.userId);
+    if (!user) throw new NotFoundException('User not found');
+
+    const ext = MIME_TO_EXT[file.mimetype] ?? '.png';
+    const key = `users/${user.getId()}/avatar${ext}`;
+
+    if (user.avatarKey && user.avatarKey !== key) {
+      await this.storage.delete(user.avatarKey);
+    }
+
+    await this.storage.upload(file.buffer, key, file.mimetype);
+    user.avatarKey = key;
+    await this.userRepository.update(user);
+
+    const avatarUrl = await this.storage.getPresignedUrl(key);
+    return { avatarUrl };
+  }
+
+  @Delete('me/avatar')
+  async deleteAvatar(@CurrentUser() authUser: AuthUser) {
+    const user = await this.userRepository.findById(authUser.userId);
+    if (!user) throw new NotFoundException('User not found');
+
+    if (user.avatarKey) {
+      await this.storage.delete(user.avatarKey);
+      user.avatarKey = null;
+      await this.userRepository.update(user);
+    }
+
+    return { avatarUrl: null };
   }
 }

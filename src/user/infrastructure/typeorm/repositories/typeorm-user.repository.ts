@@ -74,6 +74,7 @@ export class TypeOrmUserRepository implements UserRepository {
       dateFormat: model.dateFormat,
       timezone: model.timezone,
       autoCreated: model.autoCreated,
+      avatarKey: model.avatarKey,
     });
   }
 
@@ -92,6 +93,7 @@ export class TypeOrmUserRepository implements UserRepository {
     model.dateFormat = user.dateFormat;
     model.timezone = user.timezone;
     model.autoCreated = user.autoCreated;
+    model.avatarKey = user.avatarKey;
     return model;
   }
 }

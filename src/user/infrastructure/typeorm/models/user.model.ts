@@ -50,6 +50,9 @@ export class UserModel {
   @Column({ type: 'varchar', nullable: true, default: null })
   authProvider!: string | null;
 
+  @Column({ type: 'varchar', nullable: true, default: null })
+  avatarKey!: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
