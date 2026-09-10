@@ -9,6 +9,8 @@ import { DataSource } from 'typeorm';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { EntityNotFoundError } from '../../../../shared/domain/errors';
+import { StorageService } from '../../../../shared/domain/storage-service';
+import { STORAGE_SERVICE } from '../../../../shared/shared.module';
 import { TypeOrmWorkspaceRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository';
 import { TypeOrmWorkspaceMemberRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
 import { TypeOrmUserRepository } from '../../../../user/infrastructure/typeorm/repositories/typeorm-user.repository';
@@ -24,6 +26,7 @@ export class ReportController {
     @Inject() private readonly workspaceRepository: TypeOrmWorkspaceRepository,
     @Inject() private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
     @Inject() private readonly userRepository: TypeOrmUserRepository,
+    @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -77,7 +80,7 @@ export class ReportController {
     if (!workspace) throw new EntityNotFoundError('Workspace not found');
 
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
-    const query = new GetUserStatsQuery(this.dataSource, ensurePermission, this.userRepository, this.memberRepository);
+    const query = new GetUserStatsQuery(this.dataSource, ensurePermission, this.userRepository, this.memberRepository, this.storage);
     return query.execute({
       workspaceId: workspace.getId(),
       requesterId: user.userId,
@@ -100,7 +103,7 @@ export class ReportController {
     if (!workspace) throw new EntityNotFoundError('Workspace not found');
 
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
-    const query = new GetUserStatsQuery(this.dataSource, ensurePermission, this.userRepository, this.memberRepository);
+    const query = new GetUserStatsQuery(this.dataSource, ensurePermission, this.userRepository, this.memberRepository, this.storage);
     return query.execute({
       workspaceId: workspace.getId(),
       requesterId: user.userId,
