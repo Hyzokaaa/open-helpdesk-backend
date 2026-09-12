@@ -25,6 +25,7 @@ export interface TicketDetailResponse {
   assigneeId: string | null;
   firstResponseAt: Date | null;
   resolvedAt: Date | null;
+  resolvedById: string | null;
   ticketNumber: number;
   createdAt: Date | null;
   originDate: Date | null;
@@ -69,6 +70,7 @@ export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
       assigneeId: ticket.assigneeId,
       firstResponseAt: ticket.firstResponseAt,
       resolvedAt: ticket.resolvedAt,
+      resolvedById: ticket.resolvedById,
       ticketNumber: ticket.ticketNumber,
       createdAt: ticket.createdAt,
       originDate: ticket.originDate,
