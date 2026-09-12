@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'crypto';
 import { Logger } from '@nestjs/common';
 import { EventPublisher } from '../../../shared/domain/event-publisher';
+import { textToHtml } from '../../../shared/domain/text-to-html';
 import { MailboxRepository } from '../../../mailbox/domain/repositories/mailbox.repository';
 import { UserRepository } from '../../../user/domain/repositories/user.repository';
 import { WorkspaceMemberRepository } from '../../../workspace/domain/repositories/workspace-member.repository';
@@ -179,7 +180,7 @@ export class RouteInboundEmail {
       const ticket = await this.ticketRepository.findById(parsed.inReplyToTicketId);
       if (ticket && ticket.workspaceId === workspaceId) {
         const comment = await this.createComment.execute({
-          content: parsed.body,
+          content: textToHtml(parsed.body),
           ticketId: ticket.getId(),
           authorId: user.getId(),
         });
@@ -231,7 +232,7 @@ export class RouteInboundEmail {
 
     const ticket = await this.createTicket.execute({
       name: parsed.subject,
-      description: parsed.body,
+      description: textToHtml(parsed.body),
       priority: ruleResult.priority ?? TicketPriority.MEDIUM,
       categoryId: ruleResult.category ?? (this.ticketCategoryRepository ? (await this.ticketCategoryRepository.findBySlugAndWorkspace('issue', workspaceId))?.getId() ?? '' : ''),
       workspaceId: workspaceId,
