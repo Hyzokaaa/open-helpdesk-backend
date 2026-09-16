@@ -26,7 +26,7 @@ export interface TicketListItem {
   projectId: string | null;
   reporterId: string;
   assigneeId: string | null;
-  ticketNumber: number;
+  ticketNumber: string;
   createdAt: Date | null;
   tagIds: string[];
   customFields: Record<string, unknown>;

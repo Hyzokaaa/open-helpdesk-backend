@@ -121,11 +121,6 @@ export class ImportWorkspace {
 
       // 4. Tickets — map old ID → new ID, skip duplicates
       const ticketIdMap = new Map<string, string>();
-      const maxNumResult = await qr.query(
-        `SELECT COALESCE(MAX("ticketNumber"), 0) as max FROM tickets WHERE "workspaceId" = $1`, [targetWorkspaceId],
-      );
-      let ticketNumber = Number(maxNumResult[0].max);
-
       // Build set of existing tickets to detect duplicates
       const existingTickets = await qr.query(
         `SELECT name, "reporterId", "createdAt" FROM tickets WHERE "workspaceId" = $1 AND "deletedAt" IS NULL`, [targetWorkspaceId],
@@ -140,7 +135,10 @@ export class ImportWorkspace {
         if (existingTicketKeys.has(ticketKey)) continue;
 
         const newId = ulid();
-        ticketNumber++;
+        // Imported tickets also receive a new globally unique number.
+        const [{ ticketNumber }] = await qr.query(
+          `SELECT 'TK' || LPAD(nextval('ticket_number_seq')::text, 6, '0') AS "ticketNumber"`,
+        );
         await qr.query(`
           INSERT INTO tickets (
             id, name, description, priority, status, category,
