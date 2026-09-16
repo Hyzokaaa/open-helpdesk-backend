@@ -3,7 +3,7 @@ import { emailLayout, buttonHtml } from './base.template';
 
 interface Data {
   ticketName: string;
-  ticketNumber?: number;
+  ticketNumber?: string;
   ticketUrl: string;
   authorName: string;
   commentPreview: string;

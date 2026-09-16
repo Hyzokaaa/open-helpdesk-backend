@@ -25,7 +25,7 @@ export interface TicketDetailResponse {
   assigneeId: string | null;
   firstResponseAt: Date | null;
   resolvedAt: Date | null;
-  ticketNumber: number;
+  ticketNumber: string;
   createdAt: Date | null;
   originDate: Date | null;
   tagIds: string[];
