@@ -24,7 +24,7 @@ function makeTicket(overrides: Partial<{ id: string; workspaceId: string; report
     workspaceId: overrides.workspaceId ?? 'ws-1',
     reporterId: overrides.reporterId ?? 'creator-1',
     assigneeId: overrides.assigneeId ?? null,
-    ticketNumber: 1,
+    ticketNumber: 'TK000001',
     tagIds: [],
     customFields: {},
     discardReason: null,
@@ -99,7 +99,7 @@ describe('EnsureTicketAccess', () => {
   });
 
   it('should return full for reporter who created the ticket', async () => {
-    memberRepo.seed(makeMember('reporter-1', WorkspaceRole.REPORTER));
+    memberRepo.seed(makeMember('reporter-1', WorkspaceRole.USER));
     await ticketRepo.create(makeTicket({ reporterId: 'reporter-1' }));
 
     const result = await service.execute({
