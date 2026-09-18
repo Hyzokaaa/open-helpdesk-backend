@@ -13,7 +13,7 @@ interface Data {
 
 export class NewCommentTemplate {
   subject(data: Data): string {
-    const ref = data.ticketNumber ? ` — #${data.ticketNumber}` : '';
+    const ref = data.ticketNumber ? ` — ${data.ticketNumber}` : '';
     return `[${data.workspaceName}] Re: ${data.ticketName}${ref}`;
   }
 
@@ -25,7 +25,7 @@ export class NewCommentTemplate {
       </div>
       ${buttonHtml(data.lang, data.ticketUrl)}
       <p style="color: #9ca3af; font-size: 12px; margin-top: 24px;">
-        ${t('newComment.footer', data.lang, { ticketNumber: data.ticketNumber ? `#${data.ticketNumber}` : '', workspaceName: data.workspaceName })}
+        ${t('newComment.footer', data.lang, { ticketNumber: data.ticketNumber ?? '', workspaceName: data.workspaceName })}
       </p>`;
     return emailLayout(data.lang, content);
   }

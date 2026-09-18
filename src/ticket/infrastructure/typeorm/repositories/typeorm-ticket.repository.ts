@@ -7,6 +7,7 @@ import { TicketPriority } from '../../../domain/enums/ticket-priority.enum';
 import { TicketDiscardReason } from '../../../domain/enums/ticket-discard-reason.enum';
 import { TicketSource } from '../../../domain/enums/ticket-source.enum';
 import { TicketStatus } from '../../../domain/enums/ticket-status.enum';
+import { parseTicketNumber } from '../../../domain/ticket-number';
 import {
   TicketFilters,
   TicketRepository,
@@ -23,11 +24,15 @@ export class TypeOrmTicketRepository implements TicketRepository {
 
   async create(ticket: Ticket): Promise<void> {
     await this.repository.manager.transaction(async (manager) => {
-      // Generate a global TK###### number atomically in PostgreSQL.
-      const [{ ticketNumber }] = await manager.query(
-        `SELECT 'TK' || LPAD(nextval('ticket_number_seq')::text, 6, '0') AS "ticketNumber"`,
+      await manager.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [
+        ticket.workspaceId,
+      ]);
+
+      const [{ max }] = await manager.query(
+        `SELECT COALESCE(MAX("ticketNumber"), 0) as max FROM tickets WHERE "workspaceId" = $1`,
+        [ticket.workspaceId],
       );
-      ticket.ticketNumber = ticketNumber;
+      ticket.ticketNumber = Number(max) + 1;
 
       const model = this.toModel(ticket);
       model.tags = ticket.tagIds.map((id) => {
@@ -60,11 +65,20 @@ export class TypeOrmTicketRepository implements TicketRepository {
 
     if (filters.search) {
       const search = filters.search.trim();
-      // Search both the formatted number and the ticket text.
-      qb.andWhere(
-        '(ticket.ticketNumber ILIKE :search OR ticket.name ILIKE :search OR ticket.description ILIKE :search)',
-        { search: `%${search}%` },
-      );
+      // A term that reads as a ticket reference resolves by equality on the
+      // indexed counter; other terms only hit the text columns.
+      const ticketNumber = parseTicketNumber(search);
+      if (ticketNumber !== null) {
+        qb.andWhere(
+          '(ticket.ticketNumber = :ticketNumber OR ticket.name ILIKE :search OR ticket.description ILIKE :search)',
+          { ticketNumber, search: `%${search}%` },
+        );
+      } else {
+        qb.andWhere(
+          '(ticket.name ILIKE :search OR ticket.description ILIKE :search)',
+          { search: `%${search}%` },
+        );
+      }
     }
     if (filters.status) {
       qb.andWhere('ticket.status = :status', { status: filters.status });
@@ -212,7 +226,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
       resolvedById: model.resolvedById,
       createdAt: model.createdAt,
       deletedAt: model.deletedAt,
-      ticketNumber: model.ticketNumber ?? '',
+      ticketNumber: model.ticketNumber,
       tagIds: model.tags ? model.tags.map((t) => t.id) : [],
       customFields: model.customFields ?? {},
       discardReason: model.discardReason as TicketDiscardReason | null,

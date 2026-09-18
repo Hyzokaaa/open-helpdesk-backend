@@ -7,6 +7,7 @@ import {
   TicketFilters,
   TicketRepository,
 } from '../../domain/repositories/ticket.repository';
+import { formatTicketNumber } from '../../domain/ticket-number';
 
 interface Props {
   workspaceId: string;
@@ -78,7 +79,7 @@ export class ListTicketsQuery
         projectId: ticket.projectId,
         reporterId: ticket.reporterId,
         assigneeId: ticket.assigneeId,
-        ticketNumber: ticket.ticketNumber,
+        ticketNumber: formatTicketNumber(ticket.ticketNumber),
         createdAt: ticket.createdAt,
         tagIds: ticket.tagIds,
         customFields: ticket.customFields,

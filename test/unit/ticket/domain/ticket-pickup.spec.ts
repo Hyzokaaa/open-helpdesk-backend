@@ -17,7 +17,7 @@ function makeTicket(overrides: Partial<{ status: TicketStatus; assigneeId: strin
     workspaceId: 'ws-1',
     reporterId: 'creator-1',
     assigneeId: overrides.assigneeId ?? null,
-    ticketNumber: 'TK000001',
+    ticketNumber: 1,
     tagIds: [],
     customFields: {},
     discardReason: null,

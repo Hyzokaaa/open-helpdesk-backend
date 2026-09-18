@@ -21,7 +21,7 @@ export interface WorkspaceExportTicket {
   category: string;
   reporterEmail: string;
   assigneeEmail: string | null;
-  ticketNumber: string;
+  ticketNumber: number;
   customFields: Record<string, unknown>;
   discardReason: string | null;
   portalToken: string | null;
