@@ -12,6 +12,9 @@ const AppDataSource = new DataSource({
   database: process.env.DB_NAME || 'open_helpdesk',
   entities: [__dirname + '/../**/infrastructure/typeorm/models/*.model{.ts,.js}'],
   migrations: [__dirname + '/migrations/*{.ts,.js}'],
+  // Mirrors app.module.ts: migrations that build indexes CONCURRENTLY opt out
+  // of the transaction, and the default 'all' mode rejects that override.
+  migrationsTransactionMode: 'each',
   synchronize: false,
   logging: false,
 });

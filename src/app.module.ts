@@ -66,6 +66,9 @@ import { SystemMailboxController } from "./mailbox/infrastructure/nest/controlle
         autoLoadEntities: true,
         synchronize: config.get("DB_SYNCHRONIZE", "false") === "true",
         migrationsRun: config.get("DB_RUN_MIGRATIONS", "true") === "true",
+        // Required by migrations that opt out of the transaction to build
+        // indexes CONCURRENTLY: the default "all" mode rejects the override.
+        migrationsTransactionMode: "each",
         migrations: [__dirname + "/database/migrations/*{.ts,.js}"],
       }),
     }),

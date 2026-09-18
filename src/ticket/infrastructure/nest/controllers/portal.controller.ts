@@ -48,6 +48,7 @@ import { CreatePortalCommentRequest } from '../dto/create-portal-comment.request
 import { TypeOrmOrganizationRepository } from '../../../../organization/infrastructure/typeorm/repositories/typeorm-organization.repository';
 import { TypeOrmTicketCategoryRepository } from '../../../../project/infrastructure/typeorm/repositories/typeorm-ticket-category.repository';
 import { AutoEnrollOrganization } from '../../../../organization/domain/services/organization-auto-enroll';
+import { formatTicketNumber } from '../../../domain/ticket-number';
 
 @Public()
 @Controller('portal')
@@ -219,14 +220,14 @@ export class PortalController {
       entityId: ticket.getId(),
       userId: user.getId(),
       workspaceId: workspace.getId(),
-      metadata: { ticketNumber: ticket.ticketNumber, email: body.email },
+      metadata: { ticketNumber: formatTicketNumber(ticket.ticketNumber), email: body.email },
       category: AuditCategory.TICKET,
       level: AuditLevel.INFO,
       source: 'portal',
     });
 
     return {
-      ticketNumber: ticket.ticketNumber,
+      ticketNumber: formatTicketNumber(ticket.ticketNumber),
       portalToken: ticket.portalToken,
       message: 'Ticket created',
     };
@@ -268,7 +269,7 @@ export class PortalController {
       : null;
 
     return {
-      ticketNumber: ticket.ticketNumber,
+      ticketNumber: formatTicketNumber(ticket.ticketNumber),
       name: ticket.name,
       description: ticket.description,
       status: ticket.status,

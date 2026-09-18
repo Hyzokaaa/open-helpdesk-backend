@@ -12,6 +12,7 @@ import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.en
 import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 import { AddTicketParticipant } from '../../../ticket/domain/services/ticket-add-participant';
 import { ParticipantRole } from '../../../ticket/domain/enums/participant-role.enum';
+import { formatTicketNumber } from '../../../ticket/domain/ticket-number';
 
 interface Props {
   content: string;
@@ -63,7 +64,7 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
       const event: NewCommentEvent = {
         ticketId: props.ticketId,
         ticketName: ticket.name,
-        ticketNumber: ticket.ticketNumber,
+        ticketNumber: formatTicketNumber(ticket.ticketNumber),
         commentId: comment.getId(),
         authorId: props.authorId,
         authorName: `${author.firstName} ${author.lastName}`,
