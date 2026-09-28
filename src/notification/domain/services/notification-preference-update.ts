@@ -15,6 +15,7 @@ interface UpdatePreferenceProps {
   inAppTicketCreated?: boolean;
   inAppTicketAssigned?: boolean;
   inAppStatusChanged?: boolean;
+  inAppTicketUnassigned?: boolean;
   inAppCommentCreated?: boolean;
   inAppTransferRequest?: boolean;
   emailUpgradeAvailable?: boolean;
@@ -46,6 +47,7 @@ export class UpdateNotificationPreference {
         inAppTicketCreated: true,
         inAppTicketAssigned: true,
         inAppStatusChanged: true,
+        inAppTicketUnassigned: true,
         inAppCommentCreated: true,
         inAppTransferRequest: true,
         emailUpgradeAvailable: true,
@@ -65,6 +67,7 @@ export class UpdateNotificationPreference {
     if (props.inAppTicketCreated !== undefined) pref.inAppTicketCreated = props.inAppTicketCreated;
     if (props.inAppTicketAssigned !== undefined) pref.inAppTicketAssigned = props.inAppTicketAssigned;
     if (props.inAppStatusChanged !== undefined) pref.inAppStatusChanged = props.inAppStatusChanged;
+    if (props.inAppTicketUnassigned !== undefined) pref.inAppTicketUnassigned = props.inAppTicketUnassigned;
     if (props.inAppCommentCreated !== undefined) pref.inAppCommentCreated = props.inAppCommentCreated;
     if (props.inAppTransferRequest !== undefined) pref.inAppTransferRequest = props.inAppTransferRequest;
     if (props.emailUpgradeAvailable !== undefined) pref.emailUpgradeAvailable = props.emailUpgradeAvailable;

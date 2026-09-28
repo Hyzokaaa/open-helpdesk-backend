@@ -51,6 +51,7 @@ export class TypeOrmNotificationPreferenceRepository
       inAppTicketCreated: model.inAppTicketCreated,
       inAppTicketAssigned: model.inAppTicketAssigned,
       inAppStatusChanged: model.inAppStatusChanged,
+      inAppTicketUnassigned: model.inAppTicketUnassigned,
       inAppCommentCreated: model.inAppCommentCreated,
       inAppTransferRequest: model.inAppTransferRequest,
       emailUpgradeAvailable: model.emailUpgradeAvailable,
@@ -76,6 +77,7 @@ export class TypeOrmNotificationPreferenceRepository
     model.inAppTicketCreated = pref.inAppTicketCreated;
     model.inAppTicketAssigned = pref.inAppTicketAssigned;
     model.inAppStatusChanged = pref.inAppStatusChanged;
+    model.inAppTicketUnassigned = pref.inAppTicketUnassigned;
     model.inAppCommentCreated = pref.inAppCommentCreated;
     model.inAppTransferRequest = pref.inAppTransferRequest;
     model.emailUpgradeAvailable = pref.emailUpgradeAvailable;
