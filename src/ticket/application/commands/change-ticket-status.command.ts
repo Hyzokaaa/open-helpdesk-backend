@@ -1,12 +1,12 @@
 import { EventPublisher } from '../../../shared/domain/event-publisher';
 import { Command } from '../../../shared/domain/command';
-import { EntityNotFoundError } from '../../../shared/domain/errors';
+import { AccessDeniedError, EntityNotFoundError } from '../../../shared/domain/errors';
 import { TicketDiscardReason } from '../../domain/enums/ticket-discard-reason.enum';
 import { TicketStatus } from '../../domain/enums/ticket-status.enum';
 import { TicketRepository } from '../../domain/repositories/ticket.repository';
 import { ChangeTicketStatus } from '../../domain/services/ticket-change-status';
 import { EnsureWorkspacePermission } from '../../../workspace/domain/services/workspace-ensure-permission';
-import { PERMISSIONS } from '../../../workspace/domain/permissions';
+import { PERMISSIONS, hasPermission } from '../../../workspace/domain/permissions';
 import { WorkspaceRole } from '../../../workspace/domain/enums/workspace-role.enum';
 import { StatusChangedEvent } from '../../../email/domain/events';
 import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
@@ -55,6 +55,17 @@ export class ChangeTicketStatusCommand implements Command<Props, ChangeStatusRes
       isSystemAdmin: props.isSystemAdmin,
     });
 
+    // Roles scoped to their own tickets may only move tickets assigned to them. Open tickets are
+    // visible to every agent, so without this an agent could push one out of the queue without
+    // taking it, leaving it unassigned and out of their own reach. Pickup is the way to take it.
+    // The one exception is discarding straight from the queue (spam, duplicates); the audit entry
+    // below records who did it.
+    const seesAllTickets = props.isSystemAdmin || hasPermission(ctx.role, PERMISSIONS.TICKET_VIEW);
+    const discardsFromQueue = ticket.status === TicketStatus.OPEN && !ticket.assigneeId && props.status === TicketStatus.DISCARDED;
+    if (!seesAllTickets && ticket.assigneeId !== props.userId && !discardsFromQueue) {
+      throw new AccessDeniedError('Only the assignee can change the status of this ticket');
+    }
+
     const canMoveToOpen = ctx.role === WorkspaceRole.ADMIN || ctx.role === WorkspaceRole.SUPERVISOR;
 
     const oldStatus = ticket.status;
@@ -87,7 +98,12 @@ export class ChangeTicketStatusCommand implements Command<Props, ChangeStatusRes
       entityId: props.ticketId,
       userId: props.userId,
       workspaceId: props.workspaceId,
-      metadata: { ticketName: ticket.name, before: { status: oldStatus }, after: { status: props.status } },
+      metadata: {
+        ticketName: ticket.name,
+        before: { status: oldStatus },
+        after: { status: props.status },
+        ...(props.status === TicketStatus.DISCARDED && { discardReason: props.discardReason }),
+      },
     });
 
     return {
