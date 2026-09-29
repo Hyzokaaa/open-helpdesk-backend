@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
@@ -8,6 +8,8 @@ interface JwtPayload {
   email: string;
   isSystemAdmin: boolean;
   isEmailVerified: boolean;
+  /** Set on single-purpose tokens (password reset, email verification, invitation…). */
+  type?: string;
 }
 
 export interface AuthUser {
@@ -31,6 +33,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   validate(payload: JwtPayload): AuthUser {
+    // Single-purpose tokens share the signing secret; they must not work as access tokens
+    if (payload.type) throw new UnauthorizedException();
     return { userId: payload.sub, email: payload.email, isSystemAdmin: payload.isSystemAdmin, isEmailVerified: payload.isEmailVerified };
   }
 }
