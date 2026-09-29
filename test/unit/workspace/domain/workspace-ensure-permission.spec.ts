@@ -32,6 +32,22 @@ describe('EnsureWorkspacePermission', () => {
     ).rejects.toThrow(AccessDeniedError);
   });
 
+  it('should throw AccessDeniedError when an agent tries to delete a ticket', async () => {
+    repository.seed(new WorkspaceMember({ id: 'm-3', workspaceId: 'ws-1', userId: 'agent-1', role: WorkspaceRole.AGENT }));
+
+    await expect(
+      service.execute({ workspaceId: 'ws-1', userId: 'agent-1', permission: PERMISSIONS.TICKET_DELETE }),
+    ).rejects.toThrow(AccessDeniedError);
+  });
+
+  it('should let a supervisor delete a ticket', async () => {
+    repository.seed(new WorkspaceMember({ id: 'm-4', workspaceId: 'ws-1', userId: 'sup-1', role: WorkspaceRole.SUPERVISOR }));
+
+    const result = await service.execute({ workspaceId: 'ws-1', userId: 'sup-1', permission: PERMISSIONS.TICKET_DELETE });
+
+    expect(result.role).toBe(WorkspaceRole.SUPERVISOR);
+  });
+
   it('should throw AccessDeniedError when reporter tries to delete', async () => {
     repository.seed(new WorkspaceMember({ id: 'm-2', workspaceId: 'ws-1', userId: 'reporter-1', role: WorkspaceRole.USER }));
 
