@@ -11,6 +11,7 @@ import { EmailVerifiedGuard } from "./shared/nest/guards/email-verified.guard";
 import { SharedModule } from "./shared/shared.module";
 import { UserModule } from "./user/user.module";
 import { WorkspaceModule } from "./workspace/workspace.module";
+import { RealtimeModule } from "./realtime/realtime.module";
 import { TagModule } from "./tag/tag.module";
 import { DepartmentModule } from "./department/department.module";
 import { OrganizationModule } from "./organization/organization.module";
@@ -75,6 +76,7 @@ import { SystemMailboxController } from "./mailbox/infrastructure/nest/controlle
     SharedModule,
     UserModule,
     WorkspaceModule,
+    RealtimeModule,
     TagModule,
     DepartmentModule,
     OrganizationModule,
