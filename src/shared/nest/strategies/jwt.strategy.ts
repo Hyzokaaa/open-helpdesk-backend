@@ -2,17 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-
-interface JwtPayload {
-  sub: string;
-  email: string;
-  isSystemAdmin: boolean;
-  isEmailVerified: boolean;
-  /** Session the token was issued for; absent on tokens from the API token exchange. */
-  sid?: string;
-  /** Set on single-purpose tokens (password reset, email verification, OAuth code…). */
-  type?: string;
-}
+import { AccessTokenPayload, authUserFromAccessToken } from './access-token';
 
 export interface AuthUser {
   userId: string;
@@ -35,15 +25,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  validate(payload: JwtPayload): AuthUser {
-    // Single-purpose tokens share the signing secret; they must not work as access tokens
-    if (payload.type) throw new UnauthorizedException();
-    return {
-      userId: payload.sub,
-      email: payload.email,
-      isSystemAdmin: payload.isSystemAdmin,
-      isEmailVerified: payload.isEmailVerified,
-      sessionId: payload.sid,
-    };
+  validate(payload: AccessTokenPayload): AuthUser {
+    const user = authUserFromAccessToken(payload);
+    if (!user) throw new UnauthorizedException();
+    return user;
   }
 }
