@@ -34,6 +34,8 @@ import { ToggleSystemAdmin } from '../../../domain/services/user-toggle-system-a
 import { ToggleUserActive } from '../../../domain/services/user-toggle-active';
 import { ChangePassword } from '../../../domain/services/user-change-password';
 import { ChangePasswordCommand } from '../../../application/commands/change-password.command';
+import { RevokeUserSessions } from '../../../domain/services/user-sessions-revoke';
+import { TypeOrmUserSessionRepository } from '../../typeorm/repositories/typeorm-user-session.repository';
 import { TypeOrmUserRepository } from '../../typeorm/repositories/typeorm-user.repository';
 import { TypeOrmAccountRepository } from '../../../../account/infrastructure/typeorm/repositories/typeorm-account.repository';
 import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
@@ -62,6 +64,7 @@ export class UserController {
     @Inject() private readonly passwordHasher: BcryptPasswordHasher,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
     @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
+    @Inject() private readonly sessionRepository: TypeOrmUserSessionRepository,
   ) {}
 
   @SkipEmailVerification()
@@ -235,11 +238,12 @@ export class UserController {
     @CurrentUser() authUser: AuthUser,
   ) {
     const service = new ChangePassword(this.userRepository, this.passwordHasher);
-    const command = new ChangePasswordCommand(service);
+    const command = new ChangePasswordCommand(service, new RevokeUserSessions(this.sessionRepository));
     const result = await command.execute({
       userId: authUser.userId,
       currentPassword: body.currentPassword,
       newPassword: body.newPassword,
+      sessionId: authUser.sessionId,
     });
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);

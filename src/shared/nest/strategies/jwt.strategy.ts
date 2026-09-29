@@ -8,7 +8,9 @@ interface JwtPayload {
   email: string;
   isSystemAdmin: boolean;
   isEmailVerified: boolean;
-  /** Set on single-purpose tokens (password reset, email verification, invitation…). */
+  /** Session the token was issued for; absent on tokens from the API token exchange. */
+  sid?: string;
+  /** Set on single-purpose tokens (password reset, email verification, OAuth code…). */
   type?: string;
 }
 
@@ -17,6 +19,7 @@ export interface AuthUser {
   email: string;
   isSystemAdmin: boolean;
   isEmailVerified: boolean;
+  sessionId?: string;
   apiKeyId?: string;
   workspaceId?: string;
   apiKeyScopes?: string[];
@@ -35,6 +38,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   validate(payload: JwtPayload): AuthUser {
     // Single-purpose tokens share the signing secret; they must not work as access tokens
     if (payload.type) throw new UnauthorizedException();
-    return { userId: payload.sub, email: payload.email, isSystemAdmin: payload.isSystemAdmin, isEmailVerified: payload.isEmailVerified };
+    return {
+      userId: payload.sub,
+      email: payload.email,
+      isSystemAdmin: payload.isSystemAdmin,
+      isEmailVerified: payload.isEmailVerified,
+      sessionId: payload.sid,
+    };
   }
 }

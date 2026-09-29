@@ -41,12 +41,25 @@ import { TypeOrmWorkspaceMemberRepository } from '../../../../workspace/infrastr
 import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
 import { TypeOrmWorkspaceRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository';
 import { resolveFrontendUrl } from '../../../../shared/infrastructure/resolve-frontend-url';
+import { TypeOrmUserSessionRepository } from '../../typeorm/repositories/typeorm-user-session.repository';
+import { SessionPolicy, StartUserSession } from '../../../domain/services/user-session-start';
+import { SignAccessToken } from '../../../domain/services/user-session-sign-access-token';
+import { RefreshUserSession } from '../../../domain/services/user-session-refresh';
+import { EndUserSession } from '../../../domain/services/user-session-end';
+import { RevokeUserSessions } from '../../../domain/services/user-sessions-revoke';
+import { ExchangeOAuthCodeCommand } from '../../../application/commands/exchange-oauth-code.command';
+import { RefreshSessionCommand } from '../../../application/commands/refresh-session.command';
+import { LogoutCommand } from '../../../application/commands/logout.command';
+import { ExchangeOAuthCodeRequest } from '../dto/exchange-oauth-code.request';
+import { RefreshSessionRequest } from '../dto/refresh-session.request';
+import { sessionPolicyFromConfig } from '../session-policy';
 
 @Controller('auth')
 export class AuthController {
   private readonly frontendUrl: string;
   private readonly googleEnabled: boolean;
   private readonly microsoftEnabled: boolean;
+  private readonly sessionPolicy: SessionPolicy;
 
   constructor(
     @Inject() private readonly userRepository: TypeOrmUserRepository,
@@ -59,11 +72,21 @@ export class AuthController {
     @Inject() private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
     @Inject() private readonly workspaceRepository: TypeOrmWorkspaceRepository,
+    @Inject() private readonly sessionRepository: TypeOrmUserSessionRepository,
     private readonly config: ConfigService,
   ) {
     this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
     this.googleEnabled = !!config.get('GOOGLE_CLIENT_ID');
     this.microsoftEnabled = !!config.get('MICROSOFT_CLIENT_ID');
+    this.sessionPolicy = sessionPolicyFromConfig(config);
+  }
+
+  private createSignAccessToken(): SignAccessToken {
+    return new SignAccessToken(this.tokenService, this.sessionPolicy.accessTokenTtl);
+  }
+
+  private createStartSession(): StartUserSession {
+    return new StartUserSession(this.sessionRepository, this.idGenerator, this.createSignAccessToken(), this.sessionPolicy);
   }
 
   private async isVerifiedDomain(hostname: string): Promise<boolean> {
@@ -85,10 +108,11 @@ export class AuthController {
   @Post('login')
   async login(@Body() body: LoginUserRequest) {
     const service = new AuthenticateUser(this.userRepository, this.passwordHasher);
-    const command = new LoginUserCommand(service, this.tokenService);
+    const command = new LoginUserCommand(service, this.createStartSession());
     const result = await command.execute({
       email: body.email,
       password: body.password,
+      rememberMe: body.rememberMe ?? false,
     });
 
     const user = await this.userRepository.findByEmail(body.email);
@@ -120,7 +144,7 @@ export class AuthController {
     const createAuditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     const command = new SignupUserCommand(
       createUser, createAccount, acceptInvitation,
-      this.invitationRepository, this.tokenService, createAuditLog,
+      this.invitationRepository, this.createStartSession(), createAuditLog,
     );
     return command.execute({
       email: body.email,
@@ -129,6 +153,33 @@ export class AuthController {
       lastName: body.lastName,
       invitationToken: body.invitationToken,
     });
+  }
+
+  @Public()
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  @Post('oauth/exchange')
+  exchangeOAuthCode(@Body() body: ExchangeOAuthCodeRequest) {
+    const command = new ExchangeOAuthCodeCommand(this.tokenService, this.userRepository, this.createStartSession());
+    return command.execute({ code: body.code, rememberMe: body.rememberMe ?? false });
+  }
+
+  @Public()
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
+  @Post('refresh')
+  refresh(@Body() body: RefreshSessionRequest) {
+    const service = new RefreshUserSession(this.sessionRepository, this.userRepository, this.createSignAccessToken(), this.sessionPolicy);
+    const command = new RefreshSessionCommand(service);
+    return command.execute({ refreshToken: body.refreshToken });
+  }
+
+  // Public on purpose: holding the refresh token is what proves the right to end its session,
+  // and an expired access token must not stop someone from signing out.
+  @Public()
+  @Post('logout')
+  async logout(@Body() body: RefreshSessionRequest) {
+    const command = new LogoutCommand(new EndUserSession(this.sessionRepository));
+    await command.execute({ refreshToken: body.refreshToken });
+    return { message: 'Signed out' };
   }
 
   @Public()
@@ -163,7 +214,7 @@ export class AuthController {
   @Post('reset-password')
   async resetPassword(@Body() body: { token: string; newPassword: string }) {
     const service = new ResetPassword(this.userRepository, this.passwordHasher);
-    const command = new ResetPasswordCommand(service, this.tokenService);
+    const command = new ResetPasswordCommand(service, this.tokenService, new RevokeUserSessions(this.sessionRepository));
     await command.execute({ token: body.token, newPassword: body.newPassword });
 
     let userId: string | null = null;
@@ -307,7 +358,7 @@ export class AuthController {
         });
       }
 
-      return res.redirect(`${redirectUrl}/auth/callback?token=${result.accessToken}`);
+      return res.redirect(`${redirectUrl}/auth/callback?code=${encodeURIComponent(result.code)}`);
     } catch {
       return res.redirect(`${redirectUrl}/login?error=oauth_failed`);
     }
