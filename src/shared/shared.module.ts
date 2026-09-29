@@ -62,7 +62,6 @@ const filesystemProvider: Provider = {
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         secret: config.getOrThrow('JWT_SECRET'),
-        signOptions: { expiresIn: config.get('JWT_EXPIRATION', '1d') },
       }),
     }),
   ],

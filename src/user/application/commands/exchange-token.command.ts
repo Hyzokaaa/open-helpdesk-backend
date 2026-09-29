@@ -22,6 +22,7 @@ export class ExchangeTokenCommand implements Command<Props, ExchangeTokenRespons
     private readonly exchangeToken: ExchangeToken,
     private readonly addWorkspaceMember: AddWorkspaceMember,
     private readonly tokenService: TokenService,
+    private readonly accessTokenTtl: string,
   ) {}
 
   async execute(props: Props): Promise<ExchangeTokenResponse> {
@@ -47,7 +48,7 @@ export class ExchangeTokenCommand implements Command<Props, ExchangeTokenRespons
       isSystemAdmin: user.isSystemAdmin,
       isEmailVerified: user.isEmailVerified,
     };
-    const accessToken = this.tokenService.sign(payload);
+    const accessToken = this.tokenService.sign(payload, { expiresIn: this.accessTokenTtl });
 
     return {
       accessToken,

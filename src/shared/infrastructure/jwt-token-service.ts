@@ -6,7 +6,7 @@ import { TokenService } from '../domain/token-service';
 export class JwtTokenService implements TokenService {
   constructor(private readonly jwtService: JwtService) {}
 
-  sign(payload: Record<string, unknown>, options?: { expiresIn?: string }): string {
+  sign(payload: Record<string, unknown>, options: { expiresIn: string }): string {
     return this.jwtService.sign(payload, options);
   }
 

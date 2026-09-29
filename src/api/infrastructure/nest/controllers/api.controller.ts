@@ -12,6 +12,8 @@ import {
 } from '@nestjs/common';
 import { ApiKeyScope } from '../../../../api-key/domain/enums/api-key-scope.enum';
 import { Throttle } from '@nestjs/throttler';
+import { ConfigService } from '@nestjs/config';
+import { tokenExchangeTtlFromConfig } from '../token-exchange-ttl';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
@@ -61,6 +63,8 @@ import { BcryptPasswordHasher } from '../../../../shared/infrastructure/bcrypt-p
 @Controller('api/v1')
 @Throttle({ default: { ttl: 60000, limit: 100 } })
 export class ApiController {
+  private readonly tokenExchangeTtl: string;
+
   constructor(
     @Inject() private readonly ticketRepository: TypeOrmTicketRepository,
     @Inject() private readonly commentRepository: TypeOrmCommentRepository,
@@ -74,7 +78,10 @@ export class ApiController {
     @Inject() private readonly tokenService: JwtTokenService,
     @Inject() private readonly passwordHasher: BcryptPasswordHasher,
     @Inject() private readonly participantRepository: TypeOrmTicketParticipantRepository,
-  ) {}
+    config: ConfigService,
+  ) {
+    this.tokenExchangeTtl = tokenExchangeTtlFromConfig(config);
+  }
 
   // --- Tickets ---
 
@@ -338,7 +345,7 @@ export class ApiController {
 
     const service = new ExchangeToken(this.idGenerator, this.userRepository, this.passwordHasher);
     const addMember = new AddWorkspaceMember(this.idGenerator, this.memberRepository);
-    const command = new ExchangeTokenCommand(service, addMember, this.tokenService);
+    const command = new ExchangeTokenCommand(service, addMember, this.tokenService, this.tokenExchangeTtl);
 
     return command.execute({
       email: body.email,
