@@ -12,7 +12,8 @@ interface DispatchProps {
   ticketId: string | null;
   workspaceSlug: string;
   inAppPrefKey: keyof NotificationPreference;
-  emailPrefKey: keyof NotificationPreference;
+  /** Omit for in-app-only notifications. */
+  emailPrefKey?: keyof NotificationPreference;
 }
 
 export interface DispatchResult {
@@ -51,8 +52,10 @@ export class DispatchNotifications {
 
     // Group email recipients by language
     const emailRecipients = new Map<string, string[]>();
+    const emailPrefKey = props.emailPrefKey;
+    if (!emailPrefKey) return { emailRecipients };
     for (const user of props.users) {
-      if (this.shouldNotifyEmail(prefs.get(user.getId()), props.emailPrefKey)) {
+      if (this.shouldNotifyEmail(prefs.get(user.getId()), emailPrefKey)) {
         const lang = user.language || 'en';
         if (!emailRecipients.has(lang)) emailRecipients.set(lang, []);
         emailRecipients.get(lang)!.push(user.email);

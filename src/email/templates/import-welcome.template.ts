@@ -7,6 +7,7 @@ interface Data {
   firstName: string;
   workspaceName: string;
   resetUrl: string;
+  workspaceUrl: string;
   lang: string;
 }
 
@@ -18,6 +19,7 @@ export function importWelcomeEmail(data: Data): SendEmailParams {
       <a href="${data.resetUrl}" style="background-color: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">${t('importWelcome.button', data.lang)}</a>
     </div>
     <p style="color: #666; font-size: 13px;">${t('importWelcome.expiry', data.lang)}</p>
+    <p style="color: #666; font-size: 13px;">${t('importWelcome.accessAnytime', data.lang, { workspaceUrl: data.workspaceUrl })}</p>
   `;
 
   return {

@@ -28,7 +28,7 @@ describe('EnsureWorkspaceRole', () => {
   });
 
   it('should throw AccessDeniedError when user role is not in allowed list', async () => {
-    repository.seed(new WorkspaceMember({ id: 'm-1', workspaceId: 'ws-1', userId: 'user-1', role: WorkspaceRole.REPORTER }));
+    repository.seed(new WorkspaceMember({ id: 'm-1', workspaceId: 'ws-1', userId: 'user-1', role: WorkspaceRole.USER }));
 
     await expect(
       service.execute({ workspaceId: 'ws-1', userId: 'user-1', allowedRoles: [WorkspaceRole.ADMIN, WorkspaceRole.AGENT] }),

@@ -7,6 +7,7 @@ import { TicketPriority } from '../../../domain/enums/ticket-priority.enum';
 import { TicketDiscardReason } from '../../../domain/enums/ticket-discard-reason.enum';
 import { TicketSource } from '../../../domain/enums/ticket-source.enum';
 import { TicketStatus } from '../../../domain/enums/ticket-status.enum';
+import { parseTicketNumber } from '../../../domain/ticket-number';
 import {
   TicketFilters,
   TicketRepository,
@@ -64,11 +65,13 @@ export class TypeOrmTicketRepository implements TicketRepository {
 
     if (filters.search) {
       const search = filters.search.trim();
-      const isNumeric = /^\d+$/.test(search);
-      if (isNumeric) {
+      // A term that reads as a ticket reference resolves by equality on the
+      // indexed counter; other terms only hit the text columns.
+      const ticketNumber = parseTicketNumber(search);
+      if (ticketNumber !== null) {
         qb.andWhere(
-          '(CAST(ticket.ticketNumber AS TEXT) LIKE :numSearch OR ticket.name ILIKE :search OR ticket.description ILIKE :search)',
-          { numSearch: `%${search}%`, search: `%${search}%` },
+          '(ticket.ticketNumber = :ticketNumber OR ticket.name ILIKE :search OR ticket.description ILIKE :search)',
+          { ticketNumber, search: `%${search}%` },
         );
       } else {
         qb.andWhere(
@@ -149,8 +152,13 @@ export class TypeOrmTicketRepository implements TicketRepository {
       name: { col: 'ticket.name', lower: true },
       priority: { col: 'ticket.priority', lower: false },
       status: { col: 'ticket.status', lower: false },
+      category: { col: 'ticket.categoryId', lower: false },
       categoryId: { col: 'ticket.categoryId', lower: false },
       createdAt: { col: 'ticket.createdAt', lower: false },
+      organization: { col: 'ticket.organizationId', lower: false },
+      organizationId: { col: 'ticket.organizationId', lower: false },
+      department: { col: 'ticket.departmentId', lower: false },
+      departmentId: { col: 'ticket.departmentId', lower: false },
     };
 
     const field = VALID_SORT_FIELDS[filters.sortBy ?? ''] ?? { col: 'ticket.createdAt', lower: false };

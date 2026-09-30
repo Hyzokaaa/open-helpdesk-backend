@@ -87,7 +87,7 @@ describe('UpdateTicketCommand', () => {
 
   it('should throw AccessDeniedError for non-creator reporter editing other tickets', async () => {
     seedTicket();
-    memberRepository.seed(new WorkspaceMember({ id: 'm-3', workspaceId: 'ws-1', userId: 'other-reporter', role: WorkspaceRole.REPORTER }));
+    memberRepository.seed(new WorkspaceMember({ id: 'm-3', workspaceId: 'ws-1', userId: 'other-reporter', role: WorkspaceRole.USER }));
 
     await expect(
       command.execute({

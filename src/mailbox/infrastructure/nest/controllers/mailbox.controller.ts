@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Inject, Param, Patch, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Inject, Param, Patch, Post } from '@nestjs/common';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
@@ -17,6 +17,7 @@ import { CreateImapMailbox } from '../../../domain/services/mailbox-create-imap'
 import { UpdateMailbox } from '../../../domain/services/mailbox-update';
 import { DeleteMailbox } from '../../../domain/services/mailbox-delete';
 import { MailboxType } from '../../../domain/enums/mailbox-type.enum';
+import { Mailbox } from '../../../domain/entities/mailbox';
 import { NestEventPublisher } from '../../../../shared/infrastructure/nest-event-publisher';
 
 @Controller('workspaces/:slug/mailboxes')
@@ -144,6 +145,8 @@ export class MailboxController {
       addressMode?: string;
       acceptedAddresses?: string[];
       autoReply?: boolean;
+      postProcessAction?: string;
+      postProcessFolder?: string | null;
     },
     @CurrentUser() user: AuthUser,
   ) {
@@ -153,6 +156,10 @@ export class MailboxController {
     const existing = await this.mailboxRepository.findById(mailboxId);
     if (!existing || existing.workspaceId !== workspaceId) {
       throw new EntityNotFoundError('Mailbox not found');
+    }
+
+    if (body.postProcessAction === 'move' && body.postProcessFolder) {
+      await this.ensureImapFolder(existing, body.postProcessFolder);
     }
 
     const service = new UpdateMailbox(this.mailboxRepository);
@@ -326,6 +333,48 @@ export class MailboxController {
     const workspace = await this.workspaceRepository.findBySlug(slug);
     if (!workspace) throw new EntityNotFoundError('Workspace not found');
     return workspace.getId();
+  }
+
+  private async ensureImapFolder(mailbox: Mailbox, folderName: string): Promise<void> {
+    if (!mailbox.imapHost || !mailbox.imapUser || !mailbox.imapPass) {
+      throw new BadRequestException('IMAP credentials are required to validate the folder');
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { ImapFlow } = require('imapflow');
+    const encryption = mailbox.encryption ?? 'tls';
+    const secure = encryption === 'tls' || encryption === 'tls-insecure';
+    const tlsOptions = encryption === 'tls-insecure' ? { rejectUnauthorized: false } : undefined;
+
+    const client = new ImapFlow({
+      host: mailbox.imapHost,
+      port: mailbox.imapPort ?? (secure ? 993 : 143),
+      secure,
+      ...(tlsOptions && { tls: tlsOptions }),
+      auth: { user: mailbox.imapUser, pass: mailbox.imapPass },
+      logger: false,
+    });
+
+    try {
+      await client.connect();
+      const list = await client.list();
+      const exists = list.some((f: any) => f.path === folderName);
+
+      if (!exists) {
+        try {
+          await client.mailboxCreate(folderName);
+        } catch {
+          throw new BadRequestException(
+            `Folder "${folderName}" not found and could not be created automatically. Please create it manually in your email provider.`,
+          );
+        }
+      }
+    } catch (err) {
+      if (err instanceof BadRequestException) throw err;
+      throw new BadRequestException(`Could not connect to IMAP server to validate folder: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      try { await client.logout(); } catch {}
+    }
   }
 
   private async ensurePermission(workspaceId: string, user: AuthUser) {

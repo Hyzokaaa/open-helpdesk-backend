@@ -4,6 +4,7 @@ import { PERMISSIONS } from '../../../workspace/domain/permissions';
 import { UserRepository } from '../../../user/domain/repositories/user.repository';
 import { WorkspaceMemberRepository } from '../../../workspace/domain/repositories/workspace-member.repository';
 import { EntityNotFoundError } from '../../../shared/domain/errors';
+import { StorageService } from '../../../shared/domain/storage-service';
 import { WorkspaceRole } from '../../../workspace/domain/enums/workspace-role.enum';
 
 interface Props {
@@ -21,6 +22,7 @@ export interface UserStatsUser {
   lastName: string;
   email: string;
   role: string;
+  avatarUrl: string | null;
 }
 
 export interface UserStatsResult {
@@ -50,6 +52,7 @@ export class GetUserStatsQuery {
     private readonly ensurePermission: EnsureWorkspacePermission,
     private readonly userRepository: UserRepository,
     private readonly memberRepository: WorkspaceMemberRepository,
+    private readonly storage?: StorageService,
   ) {}
 
   async execute(props: Props): Promise<UserStatsResult> {
@@ -107,6 +110,9 @@ export class GetUserStatsQuery {
       lastName: user.lastName,
       email: user.email,
       role: member?.role ?? 'agent',
+      avatarUrl: user.avatarKey && this.storage
+        ? await this.storage.getPresignedUrl(user.avatarKey)
+        : null,
     };
   }
 

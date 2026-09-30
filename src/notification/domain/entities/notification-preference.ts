@@ -14,6 +14,7 @@ interface Props {
   inAppTicketCreated: boolean;
   inAppTicketAssigned: boolean;
   inAppStatusChanged: boolean;
+  inAppTicketUnassigned: boolean;
   inAppCommentCreated: boolean;
   inAppTransferRequest: boolean;
   emailUpgradeAvailable: boolean;
@@ -35,6 +36,7 @@ export class NotificationPreference {
   inAppTicketCreated: boolean;
   inAppTicketAssigned: boolean;
   inAppStatusChanged: boolean;
+  inAppTicketUnassigned: boolean;
   inAppCommentCreated: boolean;
   inAppTransferRequest: boolean;
   emailUpgradeAvailable: boolean;
@@ -55,6 +57,7 @@ export class NotificationPreference {
     this.inAppTicketCreated = props.inAppTicketCreated;
     this.inAppTicketAssigned = props.inAppTicketAssigned;
     this.inAppStatusChanged = props.inAppStatusChanged;
+    this.inAppTicketUnassigned = props.inAppTicketUnassigned;
     this.inAppCommentCreated = props.inAppCommentCreated;
     this.inAppTransferRequest = props.inAppTransferRequest;
     this.emailUpgradeAvailable = props.emailUpgradeAvailable;

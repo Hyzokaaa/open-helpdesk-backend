@@ -143,7 +143,7 @@ describe('RouteInboundEmail', () => {
       id: 'wm-1',
       workspaceId: 'ws-1',
       userId: 'u-existing',
-      role: WorkspaceRole.REPORTER,
+      role: WorkspaceRole.USER,
     }));
 
     const existingTicket = new Ticket({
@@ -202,16 +202,16 @@ describe('RouteInboundEmail', () => {
     expect(result.reason).toBe('unknown-mailbox');
   });
 
-  it('should add sender as REPORTER member to workspace if not already a member', async () => {
+  it('should add sender as USER member to workspace if not already a member', async () => {
     await service.execute(baseParsedEmail({ fromAddress: 'newguy@ext.com' }));
 
     const members = await memberRepository.findByWorkspaceId('ws-1');
     const newMember = members.find((m) => {
       // Find the user first to get ID
-      return m.role === WorkspaceRole.REPORTER;
+      return m.role === WorkspaceRole.USER;
     });
     expect(newMember).toBeDefined();
-    expect(newMember!.role).toBe(WorkspaceRole.REPORTER);
+    expect(newMember!.role).toBe(WorkspaceRole.USER);
   });
 
   it('should emit ticket.created event when creating a new ticket', async () => {
@@ -238,7 +238,7 @@ describe('RouteInboundEmail', () => {
       id: 'wm-1',
       workspaceId: 'ws-1',
       userId: 'u-existing',
-      role: WorkspaceRole.REPORTER,
+      role: WorkspaceRole.USER,
     }));
     ticketRepository.create(new Ticket({
       id: 'ticket-abc',

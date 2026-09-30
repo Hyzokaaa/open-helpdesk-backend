@@ -15,6 +15,7 @@ interface Props {
   timezone?: string;
   autoCreated?: boolean;
   authProvider?: string | null;
+  avatarKey?: string | null;
 }
 
 export class User {
@@ -32,6 +33,7 @@ export class User {
   timezone: string;
   autoCreated: boolean;
   authProvider: string | null;
+  avatarKey: string | null;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -48,6 +50,7 @@ export class User {
     this.timezone = props.timezone ?? 'auto';
     this.autoCreated = props.autoCreated ?? false;
     this.authProvider = props.authProvider ?? null;
+    this.avatarKey = props.avatarKey ?? null;
   }
 
   getId(): string {

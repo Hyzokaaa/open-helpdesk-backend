@@ -13,7 +13,7 @@ import { FilesystemStorageService } from './infrastructure/filesystem-storage.se
 import { NestEventPublisher } from './infrastructure/nest-event-publisher';
 import { JwtTokenService } from './infrastructure/jwt-token-service';
 import { SeederService } from './infrastructure/seeder.service';
-import { EventsGateway } from './infrastructure/ws/events.gateway';
+import { AccessTokenVerifier } from './infrastructure/access-token-verifier';
 import { JwtStrategy } from './nest/strategies/jwt.strategy';
 import { StorageFileController } from './infrastructure/nest/controllers/storage-file.controller';
 import { UserModel } from '../user/infrastructure/typeorm/models/user.model';
@@ -62,12 +62,11 @@ const filesystemProvider: Provider = {
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         secret: config.getOrThrow('JWT_SECRET'),
-        signOptions: { expiresIn: config.get('JWT_EXPIRATION', '1d') },
       }),
     }),
   ],
   controllers: [StorageFileController],
-  providers: [UlidGenerator, BcryptPasswordHasher, S3StorageService, FilesystemStorageService, storageProvider, filesystemProvider, NestEventPublisher, JwtTokenService, SeederService, JwtStrategy, EventsGateway, ...buildOAuthProviders()],
-  exports: [UlidGenerator, BcryptPasswordHasher, S3StorageService, FilesystemStorageService, STORAGE_SERVICE, NestEventPublisher, JwtTokenService, JwtModule, PassportModule],
+  providers: [UlidGenerator, BcryptPasswordHasher, S3StorageService, FilesystemStorageService, storageProvider, filesystemProvider, NestEventPublisher, JwtTokenService, AccessTokenVerifier, SeederService, JwtStrategy, ...buildOAuthProviders()],
+  exports: [UlidGenerator, BcryptPasswordHasher, S3StorageService, FilesystemStorageService, STORAGE_SERVICE, NestEventPublisher, JwtTokenService, AccessTokenVerifier, JwtModule, PassportModule],
 })
 export class SharedModule {}

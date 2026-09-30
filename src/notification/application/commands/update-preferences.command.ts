@@ -14,6 +14,7 @@ interface Props {
   inAppTicketCreated?: boolean;
   inAppTicketAssigned?: boolean;
   inAppStatusChanged?: boolean;
+  inAppTicketUnassigned?: boolean;
   inAppCommentCreated?: boolean;
   inAppTransferRequest?: boolean;
   emailUpgradeAvailable?: boolean;
@@ -33,6 +34,7 @@ export interface UpdatePreferencesResponse {
   inAppTicketCreated: boolean;
   inAppTicketAssigned: boolean;
   inAppStatusChanged: boolean;
+  inAppTicketUnassigned: boolean;
   inAppCommentCreated: boolean;
   inAppTransferRequest: boolean;
   emailUpgradeAvailable: boolean;
@@ -60,6 +62,7 @@ export class UpdatePreferencesCommand implements Command<Props, UpdatePreference
       inAppTicketCreated: pref.inAppTicketCreated,
       inAppTicketAssigned: pref.inAppTicketAssigned,
       inAppStatusChanged: pref.inAppStatusChanged,
+      inAppTicketUnassigned: pref.inAppTicketUnassigned,
       inAppCommentCreated: pref.inAppCommentCreated,
       inAppTransferRequest: pref.inAppTransferRequest,
       emailUpgradeAvailable: pref.emailUpgradeAvailable,

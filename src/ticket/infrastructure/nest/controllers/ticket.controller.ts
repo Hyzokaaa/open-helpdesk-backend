@@ -263,6 +263,8 @@ export class TicketController {
       categoryId: body.categoryId,
       tagIds: body.tagIds,
       departmentId: body.departmentId,
+      organizationId: body.organizationId,
+      projectId: body.projectId,
       customFields: body.customFields,
       isSystemAdmin: user.isSystemAdmin,
     });

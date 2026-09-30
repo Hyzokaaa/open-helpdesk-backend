@@ -1,20 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-
-interface JwtPayload {
-  sub: string;
-  email: string;
-  isSystemAdmin: boolean;
-  isEmailVerified: boolean;
-}
+import { AccessTokenPayload, authUserFromAccessToken } from './access-token';
 
 export interface AuthUser {
   userId: string;
   email: string;
   isSystemAdmin: boolean;
   isEmailVerified: boolean;
+  sessionId?: string;
   apiKeyId?: string;
   workspaceId?: string;
   apiKeyScopes?: string[];
@@ -30,7 +25,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  validate(payload: JwtPayload): AuthUser {
-    return { userId: payload.sub, email: payload.email, isSystemAdmin: payload.isSystemAdmin, isEmailVerified: payload.isEmailVerified };
+  validate(payload: AccessTokenPayload): AuthUser {
+    const user = authUserFromAccessToken(payload);
+    if (!user) throw new UnauthorizedException();
+    return user;
   }
 }

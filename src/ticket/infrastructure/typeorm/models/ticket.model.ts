@@ -3,6 +3,7 @@ import {
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
+  Index,
   JoinTable,
   ManyToMany,
   ManyToOne,
@@ -18,6 +19,10 @@ import { ProjectModel } from '../../../../project/infrastructure/typeorm/models/
 import { TicketCategoryModel } from '../../../../project/infrastructure/typeorm/models/ticket-category.model';
 
 @Entity('tickets')
+@Index('IDX_tickets_workspace_number', ['workspaceId', 'ticketNumber'], {
+  unique: true,
+})
+@Index('IDX_tickets_workspace_created_at', ['workspaceId', 'createdAt'])
 export class TicketModel {
   @PrimaryColumn()
   id!: string;

@@ -32,6 +32,7 @@ export class ToggleSystemAdminCommand implements Command<Props, ToggleSystemAdmi
     const user = await this.toggleSystemAdmin.execute({
       targetUserId: props.targetUserId,
       isSystemAdmin: props.isSystemAdmin,
+      requestingUserId: props.requestingUserId,
     });
 
     await this.createAuditLog.execute({

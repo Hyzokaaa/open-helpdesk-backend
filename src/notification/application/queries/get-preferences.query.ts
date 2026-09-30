@@ -17,6 +17,7 @@ export interface PreferencesResponse {
   inAppTicketCreated: boolean;
   inAppTicketAssigned: boolean;
   inAppStatusChanged: boolean;
+  inAppTicketUnassigned: boolean;
   inAppCommentCreated: boolean;
   inAppTransferRequest: boolean;
   emailUpgradeAvailable: boolean;
@@ -36,6 +37,7 @@ const DEFAULTS: PreferencesResponse = {
   inAppTicketCreated: true,
   inAppTicketAssigned: true,
   inAppStatusChanged: true,
+  inAppTicketUnassigned: true,
   inAppCommentCreated: true,
   inAppTransferRequest: true,
   emailUpgradeAvailable: true,
@@ -62,6 +64,7 @@ export class GetPreferencesQuery implements Query<Props, PreferencesResponse> {
       inAppTicketCreated: pref.inAppTicketCreated,
       inAppTicketAssigned: pref.inAppTicketAssigned,
       inAppStatusChanged: pref.inAppStatusChanged,
+      inAppTicketUnassigned: pref.inAppTicketUnassigned,
       inAppCommentCreated: pref.inAppCommentCreated,
       inAppTransferRequest: pref.inAppTransferRequest,
       emailUpgradeAvailable: pref.emailUpgradeAvailable,

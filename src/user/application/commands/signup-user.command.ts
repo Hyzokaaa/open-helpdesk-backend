@@ -1,7 +1,7 @@
 import { Command } from '../../../shared/domain/command';
-import { TokenService } from '../../../shared/domain/token-service';
 import { DomainValidationError, ConflictError } from '../../../shared/domain/errors';
 import { CreateUser } from '../../domain/services/user-create';
+import { StartUserSession } from '../../domain/services/user-session-start';
 import { CreateAccountForUser } from '../../../account/domain/services/account-create-for-user';
 import { AcceptInvitation } from '../../../workspace/domain/services/invitation-accept';
 import { WorkspaceInvitationRepository } from '../../../workspace/domain/repositories/workspace-invitation.repository';
@@ -21,6 +21,7 @@ interface Props {
 
 export interface SignupResponse {
   accessToken: string;
+  refreshToken: string;
   user: {
     id: string;
     email: string;
@@ -36,7 +37,7 @@ export class SignupUserCommand implements Command<Props, SignupResponse> {
     private readonly createAccount: CreateAccountForUser,
     private readonly acceptInvitation: AcceptInvitation,
     private readonly invitationRepository: WorkspaceInvitationRepository,
-    private readonly tokenService: TokenService,
+    private readonly startSession: StartUserSession,
     private readonly createAuditLog: CreateAuditLogEntry,
   ) {}
 
@@ -77,12 +78,7 @@ export class SignupUserCommand implements Command<Props, SignupResponse> {
       userEmail: user.email,
     });
 
-    const accessToken = this.tokenService.sign({
-      sub: user.getId(),
-      email: user.email,
-      isSystemAdmin: user.isSystemAdmin,
-      isEmailVerified: true,
-    });
+    const { accessToken, refreshToken } = await this.startSession.execute({ user, rememberMe: false });
 
     await this.createAuditLog.execute({
       action: AuditAction.USER_SIGNED_UP,
@@ -98,6 +94,7 @@ export class SignupUserCommand implements Command<Props, SignupResponse> {
 
     return {
       accessToken,
+      refreshToken,
       user: {
         id: user.getId(),
         email: user.email,

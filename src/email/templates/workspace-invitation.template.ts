@@ -7,6 +7,7 @@ interface Data {
   workspaceName: string;
   inviterName: string;
   invitationUrl: string;
+  workspaceUrl: string;
   lang: string;
 }
 
@@ -18,6 +19,7 @@ export function invitationEmail(data: Data): SendEmailParams {
       <a href="${data.invitationUrl}" style="background-color: #6330f7; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">${t('invitation.button', data.lang)}</a>
     </div>
     <p style="color: #666; font-size: 13px;">${t('invitation.expiry', data.lang)}</p>
+    <p style="color: #666; font-size: 13px;">${t('invitation.accessAnytime', data.lang, { workspaceUrl: data.workspaceUrl })}</p>
   `;
 
   return {

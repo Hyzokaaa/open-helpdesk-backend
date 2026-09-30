@@ -22,6 +22,13 @@ import { ResolveTicketStakeholders } from '../../notification/domain/services/no
 import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
 import { WorkspaceFrontendResolver } from '../../shared/infrastructure/workspace-frontend-resolver';
+import { TypeOrmWorkspaceMemberRepository } from '../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
+import { ResolveWorkspaceAdmins } from '../../notification/domain/services/notification-resolve-workspace-admins';
+import { TicketStatus } from '../../ticket/domain/enums/ticket-status.enum';
+
+// Statuses that mean someone is expected to be working the ticket. An unassigned ticket in one
+// of these has left the open queue without an owner, so admins and supervisors should assign it.
+const STATUSES_NEEDING_ASSIGNEE: string[] = [TicketStatus.PENDING, TicketStatus.IN_PROGRESS];
 
 @Injectable()
 export class StatusChangedHandler {
@@ -39,10 +46,42 @@ export class StatusChangedHandler {
     private readonly emailSenderRepository: TypeOrmWorkspaceEmailSenderRepository,
     private readonly auditLogRepository: TypeOrmAuditLogRepository,
     private readonly frontendResolver: WorkspaceFrontendResolver,
+    private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
   ) {}
 
   @OnEvent('ticket.statusChanged')
   async handle(event: StatusChangedEvent): Promise<void> {
+    await this.notifyUnassigned(event);
+    await this.notifyStakeholders(event);
+  }
+
+  private async notifyUnassigned(event: StatusChangedEvent): Promise<void> {
+    const ticket = await this.ticketRepository.findById(event.ticketId);
+    if (!ticket || ticket.workspaceId !== event.workspaceId) return;
+    if (ticket.assigneeId || !STATUSES_NEEDING_ASSIGNEE.includes(ticket.status)) return;
+
+    const resolveAdmins = new ResolveWorkspaceAdmins(this.memberRepository, this.userRepository);
+    const admins = await resolveAdmins.execute({ workspaceId: event.workspaceId });
+    // The author is included on purpose, so whoever moved it is reminded it still needs an owner.
+    // A system admin need not be a workspace member, so they are added explicitly.
+    const users = admins.some((u) => u.getId() === event.changedById)
+      ? admins
+      : [...admins, ...(await this.userRepository.findByIds([event.changedById]))];
+    if (users.length === 0) return;
+
+    // In-app only: it is a call to action inside the app.
+    const dispatch = new DispatchNotifications(this.idGenerator, this.notificationRepository, this.preferenceRepository);
+    await dispatch.execute({
+      users,
+      type: NotificationType.TICKET_UNASSIGNED,
+      title: `${event.ticketName}: ${event.newStatus}`,
+      ticketId: event.ticketId,
+      workspaceSlug: event.workspaceSlug,
+      inAppPrefKey: 'inAppTicketUnassigned',
+    });
+  }
+
+  private async notifyStakeholders(event: StatusChangedEvent): Promise<void> {
     const resolveStakeholders = new ResolveTicketStakeholders(this.ticketRepository, this.participantRepository, this.userRepository);
     const users = await resolveStakeholders.execute({
       ticketId: event.ticketId,

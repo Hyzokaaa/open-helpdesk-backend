@@ -90,6 +90,7 @@ export class WorkspaceInvitationController {
         workspaceName: workspace.name,
         inviterName,
         invitationUrl,
+        workspaceUrl: frontendUrl,
         lang: 'en',
       }));
     } catch {
@@ -151,6 +152,7 @@ export class WorkspaceInvitationController {
               workspaceName: workspace.name,
               inviterName,
               invitationUrl,
+              workspaceUrl: frontendUrl,
               lang: 'en',
             }));
             (result as any).emailSent = emailResult.success && !emailResult.mock;
@@ -247,6 +249,7 @@ export class WorkspaceInvitationController {
         workspaceName: workspace.name,
         inviterName,
         invitationUrl,
+        workspaceUrl: frontendUrl,
         lang: 'en',
       }));
       emailSent = emailResult.success && !emailResult.mock;

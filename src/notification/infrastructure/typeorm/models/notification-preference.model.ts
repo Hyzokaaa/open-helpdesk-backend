@@ -53,6 +53,9 @@ export class NotificationPreferenceModel {
   inAppStatusChanged!: boolean;
 
   @Column({ default: true })
+  inAppTicketUnassigned!: boolean;
+
+  @Column({ default: true })
   inAppCommentCreated!: boolean;
 
   @Column({ default: true })

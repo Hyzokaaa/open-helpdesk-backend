@@ -37,6 +37,12 @@ function run(command, label) {
   }
 }
 
+// execSync('sleep 1') fails on Windows: Node runs it through cmd.exe,
+// which has no sleep command.
+function sleepSeconds(seconds) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, seconds * 1000);
+}
+
 function waitForDb(maxAttempts = 15) {
   console.log('\n⏳ Waiting for PostgreSQL to be ready...');
   for (let i = 1; i <= maxAttempts; i++) {
@@ -52,7 +58,7 @@ function waitForDb(maxAttempts = 15) {
         console.error('❌ PostgreSQL did not start in time');
         process.exit(1);
       }
-      execSync('sleep 1');
+      sleepSeconds(1);
     }
   }
 }

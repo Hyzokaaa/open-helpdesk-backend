@@ -69,6 +69,12 @@ export class MailboxModel {
   @Column({ type: 'boolean', default: true })
   autoReply!: boolean;
 
+  @Column({ type: 'varchar', default: 'none' })
+  postProcessAction!: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  postProcessFolder!: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 }

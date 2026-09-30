@@ -1,20 +1,22 @@
-import { TokenService } from '../../../shared/domain/token-service';
 import { Command } from '../../../shared/domain/command';
 import { AuthenticateUser } from '../../domain/services/user-authenticate';
+import { StartUserSession } from '../../domain/services/user-session-start';
 
 interface Props {
   email: string;
   password: string;
+  rememberMe: boolean;
 }
 
 export interface LoginUserResponse {
   accessToken: string;
+  refreshToken: string;
 }
 
 export class LoginUserCommand implements Command<Props, LoginUserResponse> {
   constructor(
     private readonly authenticateUser: AuthenticateUser,
-    private readonly tokenService: TokenService,
+    private readonly startSession: StartUserSession,
   ) {}
 
   async execute(props: Props): Promise<LoginUserResponse> {
@@ -23,9 +25,7 @@ export class LoginUserCommand implements Command<Props, LoginUserResponse> {
       password: props.password,
     });
 
-    const payload = { sub: user.getId(), email: user.email, isSystemAdmin: user.isSystemAdmin, isEmailVerified: user.isEmailVerified };
-    const accessToken = this.tokenService.sign(payload);
-
-    return { accessToken };
+    const tokens = await this.startSession.execute({ user, rememberMe: props.rememberMe });
+    return { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken };
   }
 }

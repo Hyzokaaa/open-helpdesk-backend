@@ -16,6 +16,95 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.24.0',
+    date: '2026-09-29',
+    categories: [
+      {
+        title: { en: 'Sign-in & Sessions', es: 'Inicio de Sesión y Sesiones' },
+        features: [
+          { en: 'New "Keep me signed in" option — stay signed in for 30 days, extended every time you use the app', es: 'Nueva opción "Mantener sesión iniciada" — sigue conectado 30 días, que se renuevan cada vez que usas la app' },
+          { en: 'Sessions renew silently in the background — no more requests failing after a while with the tab open', es: 'Las sesiones se renuevan solas en segundo plano — se acabaron las peticiones que fallaban tras un rato con la pestaña abierta' },
+          { en: 'When a session does end, you are sent to sign in and brought back to the page you were on', es: 'Si una sesión termina, te lleva a iniciar sesión y te devuelve a la página donde estabas' },
+          { en: 'Changing your password signs you out of every other device; resetting it signs you out everywhere', es: 'Cambiar tu contraseña cierra la sesión en los demás dispositivos; restablecerla la cierra en todos' },
+          { en: 'Signing out now also ends the session on the server', es: 'Cerrar sesión ahora también termina la sesión en el servidor' },
+          { en: 'Links for password reset and email verification can no longer be used to access the account', es: 'Los enlaces para restablecer la contraseña y verificar el email ya no sirven para acceder a la cuenta' },
+        ],
+      },
+      {
+        title: { en: 'Ticket Workflow', es: 'Flujo de Tickets' },
+        features: [
+          { en: 'Pick up an open ticket straight into the status you choose — also available to supervisors and admins', es: 'Toma un ticket abierto directamente en el estado que elijas — también disponible para supervisores y administradores' },
+          { en: 'Agents change the status only of tickets assigned to them — open tickets are picked up instead, so none is left without an owner', es: 'Los agentes solo cambian el estado de los tickets asignados a ellos — los abiertos se toman, así ninguno queda sin responsable' },
+          { en: 'Agents can discard an open ticket straight from the queue (spam, duplicates) — the audit log records who did it and why', es: 'Los agentes pueden descartar un ticket abierto desde la cola (spam, duplicados) — el registro de auditoría guarda quién y por qué' },
+          { en: 'Only admins and supervisors can delete tickets', es: 'Solo administradores y supervisores pueden eliminar tickets' },
+          { en: 'Bulk status changes report which tickets could not be updated and keep them selected', es: 'Los cambios de estado masivos indican qué tickets no se pudieron actualizar y los mantienen seleccionados' },
+          { en: 'Ticket references shown as TK-000042; sort the list by number, organization and department', es: 'Referencias de ticket con formato TK-000042; ordena la lista por número, organización y departamento' },
+          { en: 'Redesigned ticket detail — sticky header with an actions menu, properties grouped in one card and times in their own', es: 'Detalle de ticket rediseñado — cabecera fija con menú de acciones, propiedades agrupadas en una tarjeta y tiempos en otra' },
+          { en: 'See who resolved a ticket in its details', es: 'Ve quién resolvió un ticket en sus detalles' },
+          { en: 'Department column in the ticket list; status tabs (active, resolved, discarded) moved into the Filters popover', es: 'Columna de departamento en la lista de tickets; las pestañas de estado (activos, resueltos, descartados) pasan al panel de Filtros' },
+          { en: 'Faster ticket lists in large workspaces', es: 'Listas de tickets más rápidas en workspaces grandes' },
+        ],
+      },
+      {
+        title: { en: 'Notifications & Live Updates', es: 'Notificaciones y Tiempo Real' },
+        features: [
+          { en: 'New "Needs an assignee" alert when a ticket is left pending or in progress with nobody assigned — can be muted in your preferences', es: 'Nuevo aviso "Sin asignar" cuando un ticket queda pendiente o en curso sin nadie asignado — se puede silenciar en tus preferencias' },
+          { en: 'The notification bell shows the ticket title instead of a comment preview', es: 'La campana de notificaciones muestra el título del ticket en lugar de un extracto del comentario' },
+          { en: 'Live updates now connect on installations served under /api, where they previously failed', es: 'Las actualizaciones en tiempo real ahora conectan en instalaciones servidas bajo /api, donde antes fallaban' },
+          { en: 'Live updates require signing in and only reach members of the workspace', es: 'Las actualizaciones en tiempo real requieren sesión iniciada y solo llegan a los miembros del workspace' },
+        ],
+      },
+      {
+        title: { en: 'Profiles & Avatars', es: 'Perfiles y Avatares' },
+        features: [
+          { en: 'Upload a profile picture — shown in the navbar, tickets, comments, members and stats', es: 'Sube una foto de perfil — se muestra en la barra superior, tickets, comentarios, miembros y estadísticas' },
+        ],
+      },
+      {
+        title: { en: 'Audit Log', es: 'Registro de Auditoría' },
+        features: [
+          { en: 'Search the audit log, including entry details, with matches highlighted', es: 'Busca en el registro de auditoría, incluidos los detalles de cada entrada, con las coincidencias resaltadas' },
+          { en: 'Multi-select filters with search and select-all on every dimension', es: 'Filtros de selección múltiple con búsqueda y "seleccionar todo" en todas las dimensiones' },
+          { en: 'Routine entries are hidden by default in the workspace audit log', es: 'Las entradas rutinarias se ocultan por defecto en el registro de auditoría del workspace' },
+        ],
+      },
+      {
+        title: { en: 'Email & Mailboxes', es: 'Email y Buzones' },
+        features: [
+          { en: 'Choose what happens to imported emails — mark as read or move to a folder', es: 'Elige qué pasa con los emails importados — marcarlos como leídos o moverlos a una carpeta' },
+          { en: 'Email rules can be scoped to a mailbox, with a one-click filter for no-reply and bounce messages', es: 'Las reglas de email pueden limitarse a un buzón, con un filtro de un clic para mensajes no-reply y rebotes' },
+          { en: 'Invitation and welcome emails include the workspace link', es: 'Los emails de invitación y bienvenida incluyen el enlace al workspace' },
+        ],
+      },
+      {
+        title: { en: 'Workspaces & Administration', es: 'Workspaces y Administración' },
+        features: [
+          { en: 'Clean workspace slugs with a live availability check and suggestions', es: 'Slugs de workspace limpios con comprobación de disponibilidad en vivo y sugerencias' },
+          { en: 'The last system admin can no longer be demoted or deactivated', es: 'El último administrador del sistema ya no puede ser degradado ni desactivado' },
+          { en: 'Default privacy and terms pages, linked from the login page, and a cookie consent banner', es: 'Páginas de privacidad y términos por defecto, enlazadas desde el inicio de sesión, y un aviso de consentimiento de cookies' },
+        ],
+      },
+      {
+        title: { en: 'Fixes', es: 'Correcciones' },
+        features: [
+          { en: 'Changing the organization or project of a ticket is saved again', es: 'Cambiar la organización o el proyecto de un ticket vuelve a guardarse' },
+          { en: 'Discarding a ticket from its status menu asks for a reason instead of failing', es: 'Descartar un ticket desde su menú de estado pide un motivo en lugar de fallar' },
+          { en: 'Opening Edit from the actions menu loads the current values of the ticket', es: 'Abrir Editar desde el menú de acciones carga los valores actuales del ticket' },
+          { en: 'Inactive mailboxes are no longer polled, and their poll and import actions are hidden', es: 'Los buzones inactivos ya no se consultan, y sus acciones de consultar e importar se ocultan' },
+          { en: 'Escape and scroll lock only affect the topmost dialog', es: 'Escape y el bloqueo de scroll solo afectan al diálogo superior' },
+          { en: 'Update notifications read the installed version correctly', es: 'Las notificaciones de actualización leen correctamente la versión instalada' },
+        ],
+      },
+      {
+        title: { en: 'Self-hosting', es: 'Instalación Propia' },
+        features: [
+          { en: 'nginx must forward websocket upgrades on /api for live updates to use websockets — the installer does it, and the updater tells you if an install is missing it', es: 'nginx debe reenviar el upgrade a websocket en /api para que el tiempo real use websockets — el instalador lo configura y el actualizador avisa si falta' },
+          { en: 'JWT_EXPIRATION is renamed to API_TOKEN_EXCHANGE_EXPIRATION (the old name still works); new SESSION_* settings control session lifetimes', es: 'JWT_EXPIRATION pasa a llamarse API_TOKEN_EXCHANGE_EXPIRATION (el nombre anterior sigue funcionando); las nuevas variables SESSION_* controlan la duración de las sesiones' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.23.0',
     date: '2026-09-02',
     categories: [

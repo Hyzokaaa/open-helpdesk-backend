@@ -2,6 +2,7 @@ import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { Query } from '../../../shared/domain/query';
 import { TicketRepository } from '../../domain/repositories/ticket.repository';
 import { EnsureTicketAccess, TicketAccessLevel } from '../../domain/services/ticket-ensure-access';
+import { formatTicketNumber } from '../../domain/ticket-number';
 
 interface Props {
   ticketId: string;
@@ -25,7 +26,8 @@ export interface TicketDetailResponse {
   assigneeId: string | null;
   firstResponseAt: Date | null;
   resolvedAt: Date | null;
-  ticketNumber: number;
+  resolvedById: string | null;
+  ticketNumber: string;
   createdAt: Date | null;
   originDate: Date | null;
   tagIds: string[];
@@ -69,7 +71,8 @@ export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
       assigneeId: ticket.assigneeId,
       firstResponseAt: ticket.firstResponseAt,
       resolvedAt: ticket.resolvedAt,
-      ticketNumber: ticket.ticketNumber,
+      resolvedById: ticket.resolvedById,
+      ticketNumber: formatTicketNumber(ticket.ticketNumber),
       createdAt: ticket.createdAt,
       originDate: ticket.originDate,
       tagIds: ticket.tagIds,

@@ -64,7 +64,7 @@ export class NewCommentHandler {
     const { emailRecipients } = await dispatch.execute({
       users,
       type: NotificationType.COMMENT_CREATED,
-      title: `${event.authorName}: ${preview.substring(0, 100)}`,
+      title: `${event.authorName} on ${event.ticketName}`,
       ticketId: event.ticketId,
       workspaceSlug: event.workspaceSlug,
       inAppPrefKey: 'inAppCommentCreated',
