@@ -343,7 +343,7 @@ export class ApiController {
     this.requireScope(user, ApiKeyScope.AUTH_EXCHANGE);
     const workspaceId = this.resolveWorkspaceId(user);
 
-    const service = new ExchangeToken(this.idGenerator, this.userRepository, this.passwordHasher);
+    const service = new ExchangeToken(this.idGenerator, this.userRepository, this.passwordHasher, this.memberRepository);
     const addMember = new AddWorkspaceMember(this.idGenerator, this.memberRepository);
     const command = new ExchangeTokenCommand(service, addMember, this.tokenService, this.tokenExchangeTtl);
 
@@ -353,6 +353,7 @@ export class ApiController {
       lastName: body.lastName,
       role: body.role ?? WorkspaceRole.AGENT,
       workspaceId,
+      allowElevatedRoles: user.apiKeyScopes?.includes(ApiKeyScope.AUTH_EXCHANGE_ADMIN) ?? false,
     });
   }
 

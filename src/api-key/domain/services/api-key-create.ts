@@ -2,7 +2,8 @@ import { createHash, randomBytes } from 'crypto';
 import { IdGenerator } from '../../../shared/domain/id-generator';
 import { ApiKey } from '../entities/api-key';
 import { ApiKeyRepository } from '../repositories/api-key.repository';
-import { ALL_API_KEY_SCOPES } from '../enums/api-key-scope.enum';
+import { DomainValidationError } from '../../../shared/domain/errors';
+import { ApiKeyScope, DEFAULT_API_KEY_SCOPES } from '../enums/api-key-scope.enum';
 
 interface CreateApiKeyProps {
   workspaceId: string;
@@ -24,6 +25,11 @@ export class CreateApiKey {
   ) {}
 
   async execute(props: CreateApiKeyProps): Promise<CreateApiKeyResult> {
+    const scopes = props.scopes ?? DEFAULT_API_KEY_SCOPES;
+    if (scopes.includes(ApiKeyScope.AUTH_EXCHANGE_ADMIN) && !scopes.includes(ApiKeyScope.AUTH_EXCHANGE)) {
+      throw new DomainValidationError(`${ApiKeyScope.AUTH_EXCHANGE_ADMIN} requires ${ApiKeyScope.AUTH_EXCHANGE}`);
+    }
+
     const raw = 'ohd_' + randomBytes(16).toString('hex');
     const hash = createHash('sha256').update(raw).digest('hex');
     const prefix = raw.substring(0, 8);
@@ -34,7 +40,7 @@ export class CreateApiKey {
       name: props.name,
       key: hash,
       prefix,
-      scopes: props.scopes ?? ALL_API_KEY_SCOPES,
+      scopes,
       expiresAt: props.expiresAt ?? null,
       lastUsedAt: null,
       createdAt: null,
