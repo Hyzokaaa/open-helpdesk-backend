@@ -16,6 +16,19 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.24.1',
+    date: '2026-10-02',
+    categories: [
+      {
+        title: { en: 'Update Management', es: 'Gestión de Actualizaciones' },
+        features: [
+          { en: 'The Updates page shows the product version you are running, or that it is a development build when its components match no release', es: 'La página de Actualizaciones muestra la versión del producto que tienes instalada, o que es una versión de desarrollo si sus componentes no coinciden con ninguna release' },
+          { en: 'Component versions are reported correctly by every build of the core, including products built on top of it', es: 'Las versiones de los componentes se informan correctamente en cualquier build del core, incluidos los productos construidos sobre él' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.24.0',
     date: '2026-09-29',
     categories: [
