@@ -83,6 +83,9 @@ import { WorkspaceEmailSender } from "../../../domain/entities/workspace-email-s
 import * as nodemailer from "nodemailer";
 import { TypeOrmTicketCategoryRepository } from "../../../../project/infrastructure/typeorm/repositories/typeorm-ticket-category.repository";
 import { SeedDefaultCategories } from "../../../../project/domain/services/ticket-category-seed";
+import { EnsureCanCreateWorkspace } from "../../../domain/services/workspace-ensure-can-create";
+import { TypeOrmWorkspaceCreationSettingsRepository } from "../../typeorm/repositories/typeorm-workspace-creation-settings.repository";
+import { workspaceCreationPolicy } from "../workspace-creation-policy";
 
 @Controller("workspaces")
 export class WorkspaceController {
@@ -101,6 +104,7 @@ export class WorkspaceController {
     @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
     private readonly dataSource: DataSource,
     @Inject() private readonly ticketCategoryRepository: TypeOrmTicketCategoryRepository,
+    @Inject() private readonly creationSettingsRepository: TypeOrmWorkspaceCreationSettingsRepository,
   ) {}
 
   @Post()
@@ -132,8 +136,12 @@ export class WorkspaceController {
       this.idGenerator,
       this.ticketCategoryRepository,
     );
+    const ensureCanCreate = new EnsureCanCreateWorkspace(
+      workspaceCreationPolicy(this.creationSettingsRepository, this.config),
+    );
     const command = new CreateWorkspaceCommand(
       createService,
+      ensureCanCreate,
       addMemberService,
       auditLog,
       seedCategories,
@@ -143,6 +151,7 @@ export class WorkspaceController {
       name: body.name,
       description: body.description,
       creatorUserId: user.userId,
+      creatorIsSystemAdmin: user.isSystemAdmin,
       accountId: account?.getId(),
       supportEmailDomain,
     });

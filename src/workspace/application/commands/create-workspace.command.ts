@@ -1,6 +1,7 @@
 import { Command } from '../../../shared/domain/command';
 import { CreateWorkspace } from '../../domain/services/workspace-create';
 import { AddWorkspaceMember } from '../../domain/services/workspace-add-member';
+import { EnsureCanCreateWorkspace } from '../../domain/services/workspace-ensure-can-create';
 import { WorkspaceRole } from '../../domain/enums/workspace-role.enum';
 import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
@@ -13,6 +14,7 @@ interface Props {
   name: string;
   description: string;
   creatorUserId: string;
+  creatorIsSystemAdmin: boolean;
   accountId?: string;
   supportEmailDomain?: string;
 }
@@ -27,6 +29,7 @@ export interface CreateWorkspaceResponse {
 export class CreateWorkspaceCommand implements Command<Props, CreateWorkspaceResponse> {
   constructor(
     private readonly createWorkspace: CreateWorkspace,
+    private readonly ensureCanCreate: EnsureCanCreateWorkspace,
     private readonly addMember: AddWorkspaceMember,
     private readonly createAuditLog: CreateAuditLogEntry,
     private readonly seedCategories?: SeedDefaultCategories,
@@ -34,6 +37,8 @@ export class CreateWorkspaceCommand implements Command<Props, CreateWorkspaceRes
   ) {}
 
   async execute(props: Props): Promise<CreateWorkspaceResponse> {
+    await this.ensureCanCreate.execute({ isSystemAdmin: props.creatorIsSystemAdmin });
+
     const workspace = await this.createWorkspace.execute({
       name: props.name,
       description: props.description,

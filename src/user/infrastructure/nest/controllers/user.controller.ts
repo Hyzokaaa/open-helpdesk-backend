@@ -36,6 +36,9 @@ import { ChangePassword } from '../../../domain/services/user-change-password';
 import { ChangePasswordCommand } from '../../../application/commands/change-password.command';
 import { RevokeUserSessions } from '../../../domain/services/user-sessions-revoke';
 import { TypeOrmUserSessionRepository } from '../../typeorm/repositories/typeorm-user-session.repository';
+import { ConfigService } from '@nestjs/config';
+import { TypeOrmWorkspaceCreationSettingsRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-creation-settings.repository';
+import { workspaceCreationPolicy } from '../../../../workspace/infrastructure/nest/workspace-creation-policy';
 import { TypeOrmUserRepository } from '../../typeorm/repositories/typeorm-user.repository';
 import { TypeOrmAccountRepository } from '../../../../account/infrastructure/typeorm/repositories/typeorm-account.repository';
 import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
@@ -65,12 +68,18 @@ export class UserController {
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
     @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
     @Inject() private readonly sessionRepository: TypeOrmUserSessionRepository,
+    @Inject() private readonly creationSettingsRepository: TypeOrmWorkspaceCreationSettingsRepository,
+    private readonly config: ConfigService,
   ) {}
 
   @SkipEmailVerification()
   @Get('me')
   me(@CurrentUser() user: AuthUser) {
-    const query = new GetUserProfileQuery(this.userRepository, this.storage);
+    const query = new GetUserProfileQuery(
+      this.userRepository,
+      this.storage,
+      workspaceCreationPolicy(this.creationSettingsRepository, this.config),
+    );
     return query.execute({ userId: user.userId });
   }
 
