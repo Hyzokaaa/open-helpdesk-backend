@@ -15,6 +15,11 @@ export interface DomainVerificationResult {
   txtRecord: string;
 }
 
+/** DNS names compare case-insensitively and may carry the root's trailing dot. */
+function normalizeHost(host: string): string {
+  return host.trim().toLowerCase().replace(/.$/, '');
+}
+
 export class VerifyCustomDomain {
   constructor(
     private readonly repository: WorkspaceRepository,
@@ -51,7 +56,8 @@ export class VerifyCustomDomain {
     // Check CNAME first
     try {
       const cnames = await dns.resolveCname(domain);
-      if (cnames.some((c) => c.toLowerCase().includes(this.expectedCnameTarget.toLowerCase()))) {
+      const expected = normalizeHost(this.expectedCnameTarget);
+      if (cnames.some((c) => normalizeHost(c) === expected)) {
         return true;
       }
     } catch {}

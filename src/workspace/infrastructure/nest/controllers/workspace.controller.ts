@@ -1113,6 +1113,7 @@ export class WorkspaceController {
       workspaceId,
       domain: body.domain,
       autoVerify: body.autoVerify,
+      isSystemAdmin: user.isSystemAdmin,
     });
 
     const auditLog = new CreateAuditLogEntry(
