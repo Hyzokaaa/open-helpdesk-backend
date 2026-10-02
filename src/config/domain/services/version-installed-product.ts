@@ -1,0 +1,32 @@
+export interface ProductRelease {
+  product: string;
+  components: { backend?: string | null; client?: string | null };
+}
+
+function compareVersions(a: string, b: string): number {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) - (pb[i] ?? 0);
+  }
+  return 0;
+}
+
+/**
+ * The product version an installation runs, deduced from its component versions: products are
+ * only defined in the release manifest, as a mapping to components. When several releases ship
+ * the same components (e.g. a re-release), the newest wins; null when none matches, as with a
+ * build from a branch or components from different releases.
+ */
+export function findInstalledProduct(
+  releases: ProductRelease[],
+  backend: string,
+  client: string | null,
+): string | null {
+  if (!client) return null;
+  const matches = releases
+    .filter((r) => r.components.backend === backend && r.components.client === client)
+    .map((r) => r.product);
+  if (matches.length === 0) return null;
+  return matches.sort(compareVersions)[matches.length - 1];
+}
