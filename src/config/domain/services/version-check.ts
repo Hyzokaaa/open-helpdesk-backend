@@ -1,3 +1,5 @@
+import { ProductRelease, findInstalledProduct } from './version-installed-product';
+
 interface GitHubRelease {
   tag_name: string;
   body: string;
@@ -19,6 +21,8 @@ export interface LatestRelease {
 
 export interface VersionCheckResult {
   backend: string;
+  /** Product version this installation runs, or null when its components match no release. */
+  currentProduct: string | null;
   latestRelease: LatestRelease | null;
   latestComponents: {
     backend: string | null;
@@ -34,33 +38,61 @@ const REPOS = {
   client: 'Hyzokaaa/open-helpdesk-client',
 };
 
+interface FetchedVersions {
+  latestRelease: LatestRelease | null;
+  latestComponents: { backend: string | null; client: string | null };
+  releases: ProductRelease[];
+}
+
 export class VersionCheck {
-  private cache: { result: VersionCheckResult; fetchedAt: number } | null = null;
+  private cache: { data: FetchedVersions; fetchedAt: number } | null = null;
 
   constructor(private readonly currentBackend: string) {}
 
-  async execute(): Promise<VersionCheckResult> {
+  /** `currentClient` is the version the admin's browser runs, which the server cannot know. */
+  async execute(currentClient: string | null = null): Promise<VersionCheckResult> {
+    const data = await this.fetchVersions();
+    return {
+      backend: this.currentBackend,
+      currentProduct: findInstalledProduct(data.releases, this.currentBackend, currentClient),
+      latestRelease: data.latestRelease,
+      latestComponents: data.latestComponents,
+    };
+  }
+
+  private async fetchVersions(): Promise<FetchedVersions> {
     if (this.cache && Date.now() - this.cache.fetchedAt < CACHE_TTL_MS) {
-      return this.cache.result;
+      return this.cache.data;
     }
 
-    const [latestRelease, latestBackend, latestClient] = await Promise.all([
+    const [latestRelease, latestBackend, latestClient, releases] = await Promise.all([
       this.fetchLatestRelease(),
       this.fetchLatestTag(REPOS.backend),
       this.fetchLatestTag(REPOS.client),
+      this.fetchReleaseManifest(),
     ]);
 
-    const result: VersionCheckResult = {
-      backend: this.currentBackend,
+    const data: FetchedVersions = {
       latestRelease,
-      latestComponents: {
-        backend: latestBackend,
-        client: latestClient,
-      },
+      latestComponents: { backend: latestBackend, client: latestClient },
+      releases,
     };
+    this.cache = { data, fetchedAt: Date.now() };
+    return data;
+  }
 
-    this.cache = { result, fetchedAt: Date.now() };
-    return result;
+  /** The product → components mapping published with every release (releases.json). */
+  private async fetchReleaseManifest(): Promise<ProductRelease[]> {
+    try {
+      const res = await fetch(`https://raw.githubusercontent.com/${REPOS.umbrella}/main/releases.json`, {
+        headers: { 'User-Agent': 'OpenHelpdesk' },
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [];
+    }
   }
 
   private async fetchLatestRelease(): Promise<LatestRelease | null> {

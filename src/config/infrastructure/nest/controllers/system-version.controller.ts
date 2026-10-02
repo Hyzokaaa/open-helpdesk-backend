@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { AccessDeniedError } from '../../../../shared/domain/errors';
@@ -12,13 +12,14 @@ let instance: VersionCheck | null = null;
 @Controller('admin')
 export class SystemVersionController {
   @Get('version')
-  async getVersion(@CurrentUser() user: AuthUser) {
+  async getVersion(@CurrentUser() user: AuthUser, @Query('client') client?: string) {
     if (!user.isSystemAdmin) throw new AccessDeniedError('System admin required');
 
     if (!instance) {
       instance = new VersionCheck(backendVersion);
     }
 
-    return instance.execute();
+    // Only a well-formed version is used to look up the installed product
+    return instance.execute(client && /^d+.d+.d+$/.test(client) ? client : null);
   }
 }
