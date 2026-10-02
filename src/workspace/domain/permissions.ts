@@ -37,6 +37,8 @@ export const PERMISSIONS = {
   // Attachments
   ATTACHMENT_UPLOAD: 'attachment.upload',
   ATTACHMENT_DELETE: 'attachment.delete',
+  /** Delete attachments someone else added; without it, members delete only their own. */
+  ATTACHMENT_DELETE_ANY: 'attachment.delete.any',
 
   // Users
   USER_CREATE: 'user.create',
@@ -112,6 +114,7 @@ const SUPERVISOR_PERMISSIONS: Permission[] = [
   PERMISSIONS.COMMENT_CREATE,
   PERMISSIONS.ATTACHMENT_UPLOAD,
   PERMISSIONS.ATTACHMENT_DELETE,
+  PERMISSIONS.ATTACHMENT_DELETE_ANY,
   PERMISSIONS.USER_LIST,
   PERMISSIONS.CANNED_RESPONSE_CREATE,
   PERMISSIONS.CANNED_RESPONSE_EDIT,

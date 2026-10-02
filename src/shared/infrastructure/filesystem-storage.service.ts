@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'crypto';
 import { promises as fs } from 'fs';
-import { join, dirname } from 'path';
+import { dirname, resolve, sep } from 'path';
 import { StorageService } from '../domain/storage-service';
 
 @Injectable()
@@ -47,8 +47,16 @@ export class FilesystemStorageService implements StorageService {
     return this.sign(key, expires) === signature;
   }
 
+  /** Keys are relative paths under the storage folder; anything that would leave it is refused. */
   private resolvePath(key: string): string {
-    return join(this.basePath, ...key.split('/'));
+    const segments = key.split('/');
+    const unsafe = segments.some((s) => s === '' || s === '.' || s === '..' || /[\\:]/.test(s));
+    const root = resolve(this.basePath);
+    const filePath = resolve(root, ...segments);
+    if (unsafe || !filePath.startsWith(root + sep)) {
+      throw new Error(`Invalid storage key: ${key}`);
+    }
+    return filePath;
   }
 
   private sign(key: string, expires: number): string {

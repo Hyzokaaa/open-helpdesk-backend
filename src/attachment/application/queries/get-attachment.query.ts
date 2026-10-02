@@ -1,10 +1,11 @@
-import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { Query } from '../../../shared/domain/query';
 import { StorageService } from '../../../shared/domain/storage-service';
-import { AttachmentRepository } from '../../domain/repositories/attachment.repository';
+import { EnsureAttachmentAccess } from '../../domain/services/attachment-ensure-access';
 
 interface Props {
   attachmentId: string;
+  userId: string;
+  isSystemAdmin: boolean;
 }
 
 export interface AttachmentResponse {
@@ -17,16 +18,12 @@ export interface AttachmentResponse {
 
 export class GetAttachmentQuery implements Query<Props, AttachmentResponse> {
   constructor(
-    private readonly repository: AttachmentRepository,
+    private readonly ensureAttachmentAccess: EnsureAttachmentAccess,
     private readonly storage: StorageService,
   ) {}
 
   async execute(props: Props): Promise<AttachmentResponse> {
-    const attachment = await this.repository.findById(props.attachmentId);
-    if (!attachment) {
-      throw new EntityNotFoundError('Attachment not found');
-    }
-
+    const { attachment } = await this.ensureAttachmentAccess.execute(props);
     const downloadUrl = await this.storage.getPresignedUrl(attachment.s3Key);
 
     return {

@@ -8,6 +8,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { StorageService } from '../domain/storage-service';
+import { fileDelivery } from './file-delivery';
 
 @Injectable()
 export class S3StorageService implements StorageService {
@@ -48,9 +49,14 @@ export class S3StorageService implements StorageService {
   }
 
   async getPresignedUrl(key: string, expiresIn = 3600): Promise<string> {
+    // The stored Content-Type is whatever the uploader declared; the link overrides it so a file
+    // only displays when its type cannot run script, and downloads otherwise.
+    const delivery = fileDelivery(key);
     const command = new GetObjectCommand({
       Bucket: this.bucket,
       Key: key,
+      ResponseContentType: delivery.contentType,
+      ResponseContentDisposition: delivery.contentDisposition,
     });
     try {
       return await getSignedUrl(this.client, command, { expiresIn });

@@ -1,4 +1,4 @@
-import { AccessDeniedError } from '../../../shared/domain/errors';
+import { AccessDeniedError, EntityNotFoundError } from '../../../shared/domain/errors';
 import { EnsureWorkspacePermission } from '../../../workspace/domain/services/workspace-ensure-permission';
 import { PERMISSIONS, hasPermission } from '../../../workspace/domain/permissions';
 import { WorkspaceRole } from '../../../workspace/domain/enums/workspace-role.enum';
@@ -21,20 +21,26 @@ export class EnsureTicketAccess {
     private readonly participantRepository: TicketParticipantRepository,
   ) {}
 
+  /**
+   * Membership is checked before the ticket is loaded, and a ticket missing or outside
+   * `workspaceId` is not found for everyone, so neither reveals that a ticket exists.
+   */
   async execute(props: Props): Promise<TicketAccessLevel> {
-    if (props.isSystemAdmin) return 'full';
-
-    const ctx = await this.ensurePermission.execute({
-      workspaceId: props.workspaceId,
-      userId: props.userId,
-      anyOf: [PERMISSIONS.TICKET_VIEW, PERMISSIONS.TICKET_VIEW_OWN],
-      isSystemAdmin: false,
-    });
-
-    if (hasPermission(ctx.role, PERMISSIONS.TICKET_VIEW)) return 'full';
+    const ctx = props.isSystemAdmin
+      ? null
+      : await this.ensurePermission.execute({
+          workspaceId: props.workspaceId,
+          userId: props.userId,
+          anyOf: [PERMISSIONS.TICKET_VIEW, PERMISSIONS.TICKET_VIEW_OWN],
+          isSystemAdmin: false,
+        });
 
     const ticket = await this.ticketRepository.findById(props.ticketId);
-    if (!ticket || ticket.workspaceId !== props.workspaceId) return 'full';
+    if (!ticket || ticket.workspaceId !== props.workspaceId) {
+      throw new EntityNotFoundError('Ticket not found');
+    }
+
+    if (!ctx || hasPermission(ctx.role, PERMISSIONS.TICKET_VIEW)) return 'full';
 
     const isAgent = ctx.role === WorkspaceRole.AGENT;
     const hasDirectAccess = isAgent

@@ -270,9 +270,13 @@ export class ApiController {
     @CurrentUser() user: AuthUser,
   ) {
     this.requireScope(user, ApiKeyScope.COMMENTS_READ);
-    const query = new ListTicketCommentsQuery(this.commentRepository);
+    const workspaceId = this.resolveWorkspaceId(user);
+    const query = new ListTicketCommentsQuery(this.commentRepository, this.createEnsureTicketAccess());
     return query.execute({
       ticketId: id,
+      workspaceId,
+      userId: user.userId,
+      isSystemAdmin: user.isSystemAdmin,
       page: pagination.page,
       limit: pagination.limit,
     });
@@ -293,6 +297,7 @@ export class ApiController {
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     const command = new CreateCommentCommand(
       service,
+      this.createEnsureTicketAccess(),
       this.ticketRepository,
       this.workspaceRepository,
       this.userRepository,
@@ -304,6 +309,7 @@ export class ApiController {
       ticketId: id,
       authorId: user.userId,
       workspaceSlug: workspace.slug,
+      isSystemAdmin: user.isSystemAdmin,
     });
   }
 
@@ -355,6 +361,11 @@ export class ApiController {
       workspaceId,
       allowElevatedRoles: user.apiKeyScopes?.includes(ApiKeyScope.AUTH_EXCHANGE_ADMIN) ?? false,
     });
+  }
+
+  private createEnsureTicketAccess(): EnsureTicketAccess {
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    return new EnsureTicketAccess(this.ticketRepository, ensurePermission, this.participantRepository);
   }
 
   private resolveWorkspaceId(user: AuthUser): string {

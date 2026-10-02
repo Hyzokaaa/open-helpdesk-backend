@@ -50,6 +50,9 @@ import { TypeOrmTicketCategoryRepository } from '../../../../project/infrastruct
 import { AutoEnrollOrganization } from '../../../../organization/domain/services/organization-auto-enroll';
 import { formatTicketNumber } from '../../../domain/ticket-number';
 
+/** Portal visitors have no account; their staged uploads are claimed only by portal tickets. */
+const PORTAL_UPLOADER = 'portal-anonymous';
+
 @Public()
 @Controller('portal')
 export class PortalController {
@@ -194,6 +197,7 @@ export class PortalController {
       await claimAttachments.execute({
         tokens: body.uploadTokens,
         ticketId: ticket.getId(),
+        uploadedById: PORTAL_UPLOADER,
       });
     }
 
@@ -337,7 +341,7 @@ export class PortalController {
       originalName: file.originalname,
       mimeType: file.mimetype,
       size: file.size,
-      uploadedById: 'portal-anonymous',
+      uploadedById: PORTAL_UPLOADER,
     });
   }
 }

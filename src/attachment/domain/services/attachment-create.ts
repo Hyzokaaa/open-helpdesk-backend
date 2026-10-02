@@ -1,6 +1,7 @@
 import { IdGenerator } from '../../../shared/domain/id-generator';
 import { StorageService } from '../../../shared/domain/storage-service';
 import { Attachment } from '../entities/attachment';
+import { attachmentStorageKey } from '../attachment-storage-key';
 import { AttachmentRepository } from '../repositories/attachment.repository';
 
 interface CreateAttachmentProps {
@@ -24,7 +25,7 @@ export class CreateAttachment {
 
   async execute(props: CreateAttachmentProps): Promise<Attachment> {
     const id = this.idGenerator.create();
-    const s3Key = `attachments/${id}/${props.originalName}`;
+    const s3Key = attachmentStorageKey(id, props.originalName);
 
     await this.storage.upload(props.buffer, s3Key, props.mimeType);
 

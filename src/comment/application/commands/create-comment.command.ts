@@ -1,8 +1,10 @@
 import { EventPublisher } from '../../../shared/domain/event-publisher';
+import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { Command } from '../../../shared/domain/command';
 import { CreateComment } from '../../domain/services/comment-create';
 import { ExtractMentions } from '../../domain/services/comment-extract-mentions';
 import { TicketRepository } from '../../../ticket/domain/repositories/ticket.repository';
+import { EnsureTicketAccess } from '../../../ticket/domain/services/ticket-ensure-access';
 import { WorkspaceRepository } from '../../../workspace/domain/repositories/workspace.repository';
 import { UserRepository } from '../../../user/domain/repositories/user.repository';
 import { NewCommentEvent } from '../../../email/domain/events';
@@ -19,6 +21,7 @@ interface Props {
   ticketId: string;
   authorId: string;
   workspaceSlug: string;
+  isSystemAdmin: boolean;
 }
 
 export interface CreateCommentResponse {
@@ -31,6 +34,7 @@ export interface CreateCommentResponse {
 export class CreateCommentCommand implements Command<Props, CreateCommentResponse> {
   constructor(
     private readonly createComment: CreateComment,
+    private readonly ensureTicketAccess: EnsureTicketAccess,
     private readonly ticketRepository: TicketRepository,
     private readonly workspaceRepository: WorkspaceRepository,
     private readonly userRepository: UserRepository,
@@ -40,6 +44,18 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
   ) {}
 
   async execute(props: Props): Promise<CreateCommentResponse> {
+    const workspace = await this.workspaceRepository.findBySlug(props.workspaceSlug);
+    if (!workspace) throw new EntityNotFoundError('Workspace not found');
+
+    await this.ensureTicketAccess.ensureFull({
+      ticketId: props.ticketId,
+      userId: props.authorId,
+      workspaceId: workspace.getId(),
+      isSystemAdmin: props.isSystemAdmin,
+    });
+    const ticket = await this.ticketRepository.findById(props.ticketId);
+    if (!ticket) throw new EntityNotFoundError('Ticket not found');
+
     const extractMentions = new ExtractMentions();
     const mentionedUserIds = extractMentions.execute(props.content);
 
@@ -50,16 +66,14 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
       mentionedUserIds,
     });
 
-    const ticket = await this.ticketRepository.findById(props.ticketId);
-    const workspace = await this.workspaceRepository.findBySlug(props.workspaceSlug);
     const author = await this.userRepository.findById(props.authorId);
 
-    if (ticket && ticket.firstResponseAt === null && props.authorId !== ticket.reporterId) {
+    if (ticket.firstResponseAt === null && props.authorId !== ticket.reporterId) {
       ticket.firstResponseAt = new Date();
       await this.ticketRepository.update(ticket);
     }
 
-    if (ticket && workspace && author) {
+    if (author) {
 
       const event: NewCommentEvent = {
         ticketId: props.ticketId,
@@ -89,19 +103,17 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
       }
     }
 
-    if (ticket && workspace) {
-      await this.createAuditLog.execute({
-        action: AuditAction.COMMENT_CREATED,
-        category: AuditCategory.TICKET,
-        level: AuditLevel.INFO,
-        source: 'ui',
-        entityType: 'ticket',
-        entityId: props.ticketId,
-        userId: props.authorId,
-        workspaceId: workspace.getId(),
-        metadata: { ticketName: ticket.name, commentId: comment.getId(), content: props.content },
-      });
-    }
+    await this.createAuditLog.execute({
+      action: AuditAction.COMMENT_CREATED,
+      category: AuditCategory.TICKET,
+      level: AuditLevel.INFO,
+      source: 'ui',
+      entityType: 'ticket',
+      entityId: props.ticketId,
+      userId: props.authorId,
+      workspaceId: workspace.getId(),
+      metadata: { ticketName: ticket.name, commentId: comment.getId(), content: props.content },
+    });
 
     return {
       id: comment.getId(),

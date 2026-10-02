@@ -5,7 +5,7 @@ import { TicketParticipant } from '../../../../src/ticket/domain/entities/ticket
 import { WorkspaceMember } from '../../../../src/workspace/domain/entities/workspace-member';
 import { WorkspaceRole } from '../../../../src/workspace/domain/enums/workspace-role.enum';
 import { ParticipantRole } from '../../../../src/ticket/domain/enums/participant-role.enum';
-import { AccessDeniedError } from '../../../../src/shared/domain/errors';
+import { AccessDeniedError, EntityNotFoundError } from '../../../../src/shared/domain/errors';
 import { TicketPriority } from '../../../../src/ticket/domain/enums/ticket-priority.enum';
 import { TicketStatus } from '../../../../src/ticket/domain/enums/ticket-status.enum';
 
@@ -62,6 +62,8 @@ describe('EnsureTicketAccess', () => {
   });
 
   it('should return full for system admin', async () => {
+    await ticketRepo.create(makeTicket());
+
     const result = await service.execute({
       ticketId: 'ticket-1', userId: 'admin', workspaceId: 'ws-1', isSystemAdmin: true,
     });
@@ -145,5 +147,33 @@ describe('EnsureTicketAccess', () => {
     await expect(
       service.ensureFull({ ticketId: 'ticket-1', userId: 'agent-2', workspaceId: 'ws-1', isSystemAdmin: false }),
     ).rejects.toThrow(AccessDeniedError);
+  });
+
+  describe('tickets outside the workspace', () => {
+    it('does not grant a workspace admin access to a ticket of another workspace', async () => {
+      memberRepo.seed(makeMember('admin-user', WorkspaceRole.ADMIN));
+      await ticketRepo.create(makeTicket({ workspaceId: 'ws-2' }));
+
+      await expect(
+        service.execute({ ticketId: 'ticket-1', userId: 'admin-user', workspaceId: 'ws-1', isSystemAdmin: false }),
+      ).rejects.toThrow(EntityNotFoundError);
+    });
+
+    it('does not grant a user access to a ticket of another workspace', async () => {
+      memberRepo.seed(makeMember('user-1', WorkspaceRole.USER));
+      await ticketRepo.create(makeTicket({ workspaceId: 'ws-2', reporterId: 'someone-else' }));
+
+      await expect(
+        service.execute({ ticketId: 'ticket-1', userId: 'user-1', workspaceId: 'ws-1', isSystemAdmin: false }),
+      ).rejects.toThrow(EntityNotFoundError);
+    });
+
+    it('does not grant access to a ticket that does not exist', async () => {
+      memberRepo.seed(makeMember('user-1', WorkspaceRole.USER));
+
+      await expect(
+        service.execute({ ticketId: 'missing', userId: 'user-1', workspaceId: 'ws-1', isSystemAdmin: false }),
+      ).rejects.toThrow(EntityNotFoundError);
+    });
   });
 });

@@ -85,6 +85,7 @@ export class CreateTicketCommand implements Command<Props, CreateTicketResponse>
       await this.claimStagedAttachments.execute({
         tokens: props.uploadTokens,
         ticketId: ticket.getId(),
+        uploadedById: props.registeredById ?? props.userId,
       });
     }
 

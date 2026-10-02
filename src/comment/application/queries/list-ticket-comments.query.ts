@@ -1,9 +1,13 @@
 import { Query } from '../../../shared/domain/query';
 import { PaginatedResult } from '../../../shared/domain/paginated-result';
 import { CommentRepository } from '../../domain/repositories/comment.repository';
+import { EnsureTicketAccess } from '../../../ticket/domain/services/ticket-ensure-access';
 
 interface Props {
   ticketId: string;
+  workspaceId: string;
+  userId: string;
+  isSystemAdmin: boolean;
   page: number;
   limit: number;
 }
@@ -20,9 +24,19 @@ export interface CommentListItem {
 export class ListTicketCommentsQuery
   implements Query<Props, PaginatedResult<CommentListItem>>
 {
-  constructor(private readonly repository: CommentRepository) {}
+  constructor(
+    private readonly repository: CommentRepository,
+    private readonly ensureTicketAccess: EnsureTicketAccess,
+  ) {}
 
   async execute(props: Props): Promise<PaginatedResult<CommentListItem>> {
+    await this.ensureTicketAccess.execute({
+      ticketId: props.ticketId,
+      userId: props.userId,
+      workspaceId: props.workspaceId,
+      isSystemAdmin: props.isSystemAdmin,
+    });
+
     const result = await this.repository.findByTicketId(
       props.ticketId,
       props.page,

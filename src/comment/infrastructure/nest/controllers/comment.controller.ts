@@ -18,6 +18,8 @@ import { EditComment } from "../../../domain/services/comment-edit";
 import { CreateCommentCommand } from "../../../application/commands/create-comment.command";
 import { EditCommentCommand } from "../../../application/commands/edit-comment.command";
 import { ListTicketCommentsQuery } from "../../../application/queries/list-ticket-comments.query";
+import { GetCommentHistoryQuery } from "../../../application/queries/get-comment-history.query";
+import { EntityNotFoundError } from "../../../../shared/domain/errors";
 import { TypeOrmCommentRepository } from "../../typeorm/repositories/typeorm-comment.repository";
 import { TypeOrmCommentEditRepository } from "../../typeorm/repositories/typeorm-comment-edit.repository";
 import { TypeOrmTicketRepository } from "../../../../ticket/infrastructure/typeorm/repositories/typeorm-ticket.repository";
@@ -54,18 +56,12 @@ export class CommentController {
     @Body() body: CreateCommentRequest,
     @CurrentUser() user: AuthUser,
   ) {
-    const workspace = await this.workspaceRepository.findBySlug(slug);
-    if (workspace) {
-      const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
-      const ensureAccess = new EnsureTicketAccess(this.ticketRepository, ensurePermission, this.participantRepository);
-      await ensureAccess.ensureFull({ ticketId, userId: user.userId, workspaceId: workspace.getId(), isSystemAdmin: user.isSystemAdmin });
-    }
-
     const service = new CreateComment(this.idGenerator, this.commentRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     const addParticipant = new AddTicketParticipant(this.idGenerator, this.participantRepository);
     const command = new CreateCommentCommand(
       service,
+      this.createEnsureTicketAccess(),
       this.ticketRepository,
       this.workspaceRepository,
       this.userRepository,
@@ -78,17 +74,24 @@ export class CommentController {
       ticketId,
       authorId: user.userId,
       workspaceSlug: slug,
+      isSystemAdmin: user.isSystemAdmin,
     });
   }
 
   @Get()
-  list(
+  async list(
+    @Param("slug") slug: string,
     @Param("ticketId") ticketId: string,
     @Query() pagination: PaginationDto,
+    @CurrentUser() user: AuthUser,
   ) {
-    const query = new ListTicketCommentsQuery(this.commentRepository);
+    const workspace = await this.resolveWorkspace(slug);
+    const query = new ListTicketCommentsQuery(this.commentRepository, this.createEnsureTicketAccess());
     return query.execute({
       ticketId,
+      workspaceId: workspace.getId(),
+      userId: user.userId,
+      isSystemAdmin: user.isSystemAdmin,
       page: pagination.page,
       limit: pagination.limit,
     });
@@ -102,36 +105,50 @@ export class CommentController {
     @Body() body: CreateCommentRequest,
     @CurrentUser() user: AuthUser,
   ) {
-    const workspace = await this.workspaceRepository.findBySlug(slug);
-    if (workspace) {
-      const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
-      const ensureAccess = new EnsureTicketAccess(this.ticketRepository, ensurePermission, this.participantRepository);
-      await ensureAccess.ensureFull({ ticketId, userId: user.userId, workspaceId: workspace.getId(), isSystemAdmin: user.isSystemAdmin });
-    }
-
+    const workspace = await this.resolveWorkspace(slug);
     const service = new EditComment(this.idGenerator, this.commentRepository, this.commentEditRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-    const command = new EditCommentCommand(service, auditLog);
+    const command = new EditCommentCommand(service, this.createEnsureTicketAccess(), auditLog);
     return command.execute({
       commentId,
       content: body.content,
       userId: user.userId,
       isAdmin: user.isSystemAdmin,
-      workspaceId: workspace?.getId() ?? '',
+      workspaceId: workspace.getId(),
       ticketId,
     });
   }
 
   @Get(":commentId/history")
   async history(
+    @Param("slug") slug: string,
+    @Param("ticketId") ticketId: string,
     @Param("commentId") commentId: string,
+    @CurrentUser() user: AuthUser,
   ) {
-    const edits = await this.commentEditRepository.findByCommentId(commentId);
-    return edits.map((edit) => ({
-      id: edit.getId(),
-      content: edit.content,
-      editedById: edit.editedById,
-      createdAt: edit.createdAt,
-    }));
+    const workspace = await this.resolveWorkspace(slug);
+    const query = new GetCommentHistoryQuery(
+      this.commentRepository,
+      this.createEnsureTicketAccess(),
+      this.commentEditRepository,
+    );
+    return query.execute({
+      commentId,
+      ticketId,
+      workspaceId: workspace.getId(),
+      userId: user.userId,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+  }
+
+  private createEnsureTicketAccess() {
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    return new EnsureTicketAccess(this.ticketRepository, ensurePermission, this.participantRepository);
+  }
+
+  private async resolveWorkspace(slug: string) {
+    const workspace = await this.workspaceRepository.findBySlug(slug);
+    if (!workspace) throw new EntityNotFoundError("Workspace not found");
+    return workspace;
   }
 }

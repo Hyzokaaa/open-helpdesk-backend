@@ -1,5 +1,6 @@
 import { Command } from '../../../shared/domain/command';
 import { EditComment } from '../../domain/services/comment-edit';
+import { EnsureTicketAccess } from '../../../ticket/domain/services/ticket-ensure-access';
 import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
 import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
@@ -23,12 +24,21 @@ export interface EditCommentResponse {
 export class EditCommentCommand implements Command<Props, EditCommentResponse> {
   constructor(
     private readonly editComment: EditComment,
+    private readonly ensureTicketAccess: EnsureTicketAccess,
     private readonly createAuditLog: CreateAuditLogEntry,
   ) {}
 
   async execute(props: Props): Promise<EditCommentResponse> {
+    await this.ensureTicketAccess.ensureFull({
+      ticketId: props.ticketId,
+      userId: props.userId,
+      workspaceId: props.workspaceId,
+      isSystemAdmin: props.isAdmin,
+    });
+
     const comment = await this.editComment.execute({
       commentId: props.commentId,
+      ticketId: props.ticketId,
       content: props.content,
       userId: props.userId,
       isAdmin: props.isAdmin,
