@@ -43,8 +43,8 @@ function makeMember(userId: string, role: WorkspaceRole, workspaceId = 'ws-1') {
   return new WorkspaceMember({ id: `mem-${userId}`, workspaceId, userId, role });
 }
 
-function makeParticipant(ticketId: string, userId: string) {
-  return new TicketParticipant({ id: `part-${userId}`, ticketId, userId, role: ParticipantRole.FOLLOWER });
+function makeParticipant(ticketId: string, userId: string, role = ParticipantRole.FOLLOWER) {
+  return new TicketParticipant({ id: `part-${userId}`, ticketId, userId, role });
 }
 
 describe('EnsureTicketAccess', () => {
@@ -146,6 +146,29 @@ describe('EnsureTicketAccess', () => {
 
     await expect(
       service.ensureFull({ ticketId: 'ticket-1', userId: 'agent-2', workspaceId: 'ws-1', isSystemAdmin: false }),
+    ).rejects.toThrow(AccessDeniedError);
+  });
+
+  it('gives collaborators what followers get until their role is decided', async () => {
+    memberRepo.seed(makeMember('agent-2', WorkspaceRole.AGENT));
+    await ticketRepo.create(makeTicket({ assigneeId: 'agent-1' }));
+    participantRepo.seed(makeParticipant('ticket-1', 'agent-2', ParticipantRole.COLLABORATOR));
+
+    const result = await service.execute({ ticketId: 'ticket-1', userId: 'agent-2', workspaceId: 'ws-1', isSystemAdmin: false });
+    expect(result).toBe('readonly');
+  });
+
+  it('lets read-only participants contribute, but not anyone without access', async () => {
+    memberRepo.seed(makeMember('agent-2', WorkspaceRole.AGENT));
+    memberRepo.seed(makeMember('agent-3', WorkspaceRole.AGENT));
+    await ticketRepo.create(makeTicket({ assigneeId: 'agent-1' }));
+    participantRepo.seed(makeParticipant('ticket-1', 'agent-2'));
+
+    await expect(
+      service.ensureCanContribute({ ticketId: 'ticket-1', userId: 'agent-2', workspaceId: 'ws-1', isSystemAdmin: false }),
+    ).resolves.toBe('readonly');
+    await expect(
+      service.ensureCanContribute({ ticketId: 'ticket-1', userId: 'agent-3', workspaceId: 'ws-1', isSystemAdmin: false }),
     ).rejects.toThrow(AccessDeniedError);
   });
 

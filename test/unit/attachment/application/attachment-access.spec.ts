@@ -147,9 +147,16 @@ describe('Attachment access', () => {
       await expect(remove('by-agent', 'agent')).resolves.toBeUndefined();
     });
 
-    it('does not let read-only followers delete', async () => {
+    it('lets followers delete what they added, and nothing else', async () => {
       attachments.seed(makeAttachment('by-follower', { ticketId: 'ticket-1', uploadedById: 'follower' }));
-      await expect(remove('by-follower', 'follower')).rejects.toThrow(AccessDeniedError);
+      await expect(remove('by-agent', 'follower')).rejects.toThrow(AccessDeniedError);
+      await expect(remove('by-follower', 'follower')).resolves.toBeUndefined();
+    });
+
+    it('does not let anyone who cannot see the ticket delete', async () => {
+      attachments.seed(makeAttachment('by-other-agent', { ticketId: 'ticket-1', uploadedById: 'other-agent' }));
+      await expect(remove('by-other-agent', 'other-agent')).rejects.toThrow(EntityNotFoundError);
+      await expect(remove('by-agent', 'outsider')).rejects.toThrow(EntityNotFoundError);
     });
 
     it('audits the deletion in the workspace of the ticket', async () => {
@@ -179,10 +186,14 @@ describe('Attachment access', () => {
         workspaceId: props.workspaceId ?? 'ws-1', userId: props.userId, isSystemAdmin: false,
       });
 
-    it('needs full access to the ticket', async () => {
-      await expect(upload({ ticketId: 'ticket-1', userId: 'follower' })).rejects.toThrow(AccessDeniedError);
-      await expect(upload({ ticketId: 'ticket-2', userId: 'admin' })).rejects.toThrow(EntityNotFoundError);
+    it('is open to everyone who sees the ticket, followers included', async () => {
+      await expect(upload({ ticketId: 'ticket-1', userId: 'follower' })).resolves.toMatchObject({ originalName: 'notes.txt' });
       await expect(upload({ ticketId: 'ticket-1', userId: 'reporter' })).resolves.toMatchObject({ originalName: 'notes.txt' });
+    });
+
+    it('is refused to agents without access and to other workspaces', async () => {
+      await expect(upload({ ticketId: 'ticket-1', userId: 'other-agent' })).rejects.toThrow(AccessDeniedError);
+      await expect(upload({ ticketId: 'ticket-2', userId: 'admin' })).rejects.toThrow(EntityNotFoundError);
     });
 
     it('accepts a comment only of the same ticket, and records the ticket so the file is listed', async () => {

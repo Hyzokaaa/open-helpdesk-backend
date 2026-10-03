@@ -113,7 +113,7 @@ export class CommentController {
       commentId,
       content: body.content,
       userId: user.userId,
-      isAdmin: user.isSystemAdmin,
+      isSystemAdmin: user.isSystemAdmin,
       workspaceId: workspace.getId(),
       ticketId,
     });

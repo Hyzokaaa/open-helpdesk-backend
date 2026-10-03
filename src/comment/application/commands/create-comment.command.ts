@@ -47,7 +47,7 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
     const workspace = await this.workspaceRepository.findBySlug(props.workspaceSlug);
     if (!workspace) throw new EntityNotFoundError('Workspace not found');
 
-    await this.ensureTicketAccess.ensureFull({
+    await this.ensureTicketAccess.ensureCanContribute({
       ticketId: props.ticketId,
       userId: props.authorId,
       workspaceId: workspace.getId(),

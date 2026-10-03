@@ -40,7 +40,7 @@ export class UploadAttachmentCommand implements Command<Props, UploadAttachmentR
   ) {}
 
   async execute(props: Props): Promise<UploadAttachmentResponse> {
-    await this.ensureTicketAccess.ensureFull({
+    await this.ensureTicketAccess.ensureCanContribute({
       ticketId: props.ticketId,
       userId: props.userId,
       workspaceId: props.workspaceId,

@@ -31,14 +31,13 @@ export class ListTicketAttachmentsQuery implements Query<Props, AttachmentListIt
   ) {}
 
   async execute(props: Props): Promise<AttachmentListItem[]> {
-    const ticketAccess = await this.ensureTicketAccess.execute(props);
+    await this.ensureTicketAccess.execute(props);
     const ctx = props.isSystemAdmin
       ? null
       : await this.ensurePermission.execute({ workspaceId: props.workspaceId, userId: props.userId });
     const deleter: AttachmentDeleter = {
       userId: props.userId,
       isSystemAdmin: props.isSystemAdmin,
-      ticketAccess,
       role: ctx?.role ?? null,
     };
 

@@ -4,8 +4,22 @@ import { PERMISSIONS, hasPermission } from '../../../workspace/domain/permission
 import { WorkspaceRole } from '../../../workspace/domain/enums/workspace-role.enum';
 import { TicketRepository } from '../repositories/ticket.repository';
 import { TicketParticipantRepository } from '../repositories/ticket-participant.repository';
+import { ParticipantRole } from '../enums/participant-role.enum';
 
+/**
+ * `full` manages the ticket (status, assignment, fields). `readonly` cannot, but still takes part
+ * in the conversation: see `ensureCanContribute`.
+ */
 export type TicketAccessLevel = 'full' | 'readonly';
+
+/**
+ * The one place a participant's role becomes access. Collaborators are not assigned anywhere yet,
+ * so they get what followers get until it is decided what more they may do.
+ */
+const PARTICIPANT_ACCESS: Record<ParticipantRole, TicketAccessLevel> = {
+  [ParticipantRole.FOLLOWER]: 'readonly',
+  [ParticipantRole.COLLABORATOR]: 'readonly',
+};
 
 interface Props {
   ticketId: string;
@@ -49,10 +63,16 @@ export class EnsureTicketAccess {
 
     if (hasDirectAccess) return 'full';
 
-    const isParticipant = await this.participantRepository.exists(props.ticketId, props.userId);
-    if (isParticipant) return 'readonly';
+    const participants = await this.participantRepository.findByTicketId(props.ticketId);
+    const participant = participants.find((p) => p.userId === props.userId);
+    if (participant) return PARTICIPANT_ACCESS[participant.role];
 
     throw new AccessDeniedError('You do not have access to this ticket');
+  }
+
+  /** Commenting and adding files: open to everyone who can see the ticket, participants included. */
+  async ensureCanContribute(props: Props): Promise<TicketAccessLevel> {
+    return this.execute(props);
   }
 
   async ensureFull(props: Props): Promise<void> {

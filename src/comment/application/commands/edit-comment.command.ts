@@ -10,7 +10,7 @@ interface Props {
   commentId: string;
   content: string;
   userId: string;
-  isAdmin: boolean;
+  isSystemAdmin: boolean;
   workspaceId: string;
   ticketId: string;
 }
@@ -29,11 +29,11 @@ export class EditCommentCommand implements Command<Props, EditCommentResponse> {
   ) {}
 
   async execute(props: Props): Promise<EditCommentResponse> {
-    await this.ensureTicketAccess.ensureFull({
+    await this.ensureTicketAccess.ensureCanContribute({
       ticketId: props.ticketId,
       userId: props.userId,
       workspaceId: props.workspaceId,
-      isSystemAdmin: props.isAdmin,
+      isSystemAdmin: props.isSystemAdmin,
     });
 
     const comment = await this.editComment.execute({
@@ -41,7 +41,6 @@ export class EditCommentCommand implements Command<Props, EditCommentResponse> {
       ticketId: props.ticketId,
       content: props.content,
       userId: props.userId,
-      isAdmin: props.isAdmin,
     });
 
     await this.createAuditLog.execute({

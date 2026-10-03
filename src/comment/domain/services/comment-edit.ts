@@ -12,7 +12,6 @@ interface EditCommentProps {
   ticketId: string;
   content: string;
   userId: string;
-  isAdmin: boolean;
 }
 
 export class EditComment {
@@ -28,7 +27,8 @@ export class EditComment {
       throw new EntityNotFoundError('Comment not found');
     }
 
-    if (comment.authorId !== props.userId && !props.isAdmin) {
+    // Nobody else, system admins included, may put words in the author's mouth.
+    if (comment.authorId !== props.userId) {
       throw new AccessDeniedError('You can only edit your own comments');
     }
 
