@@ -1,4 +1,5 @@
 import { Command } from '../../../shared/domain/command';
+import { AccessDeniedError } from '../../../shared/domain/errors';
 import { CreateInvitation } from '../../domain/services/invitation-create';
 import { EnsureWorkspacePermission } from '../../domain/services/workspace-ensure-permission';
 import { PERMISSIONS } from '../../domain/permissions';
@@ -28,12 +29,17 @@ export class CreateInvitationCommand implements Command<Props, CreateInvitationR
   ) {}
 
   async execute(props: Props): Promise<CreateInvitationResponse> {
-    await this.ensurePermission.execute({
+    const requester = await this.ensurePermission.execute({
       workspaceId: props.workspaceId,
       userId: props.requestingUserId,
       permission: PERMISSIONS.WORKSPACE_INVITATIONS_MANAGE,
       isSystemAdmin: props.isSystemAdmin,
     });
+
+    // Supervisors hold WORKSPACE_INVITATIONS_MANAGE but must not hand out a role above their own.
+    if (props.role === WorkspaceRole.ADMIN && requester.role !== WorkspaceRole.ADMIN) {
+      throw new AccessDeniedError('Only workspace admins can invite admins');
+    }
 
     const invitation = await this.createInvitation.execute({
       workspaceId: props.workspaceId,
