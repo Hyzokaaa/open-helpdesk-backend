@@ -15,6 +15,7 @@ import { Throttle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import { tokenExchangeTtlFromConfig } from '../token-exchange-ttl';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
+import { ApiKeyAuth } from '../../../../shared/nest/decorators/api-key-auth.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
 import { NestEventPublisher } from '../../../../shared/infrastructure/nest-event-publisher';
@@ -61,6 +62,7 @@ import { JwtTokenService } from '../../../../shared/infrastructure/jwt-token-ser
 import { BcryptPasswordHasher } from '../../../../shared/infrastructure/bcrypt-password-hasher';
 
 @Controller('api/v1')
+@ApiKeyAuth()
 @Throttle({ default: { ttl: 60000, limit: 100 } })
 export class ApiController {
   private readonly tokenExchangeTtl: string;
