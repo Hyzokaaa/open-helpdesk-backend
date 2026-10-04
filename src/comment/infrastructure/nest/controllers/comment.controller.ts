@@ -27,6 +27,7 @@ import { TypeOrmWorkspaceRepository } from "../../../../workspace/infrastructure
 import { TypeOrmWorkspaceMemberRepository } from "../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository";
 import { EnsureWorkspacePermission } from "../../../../workspace/domain/services/workspace-ensure-permission";
 import { TypeOrmUserRepository } from "../../../../user/infrastructure/typeorm/repositories/typeorm-user.repository";
+import { SummarizeUsers } from "../../../../user/domain/services/user-summarize";
 import { TypeOrmAuditLogRepository } from "../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository";
 import { CreateAuditLogEntry } from "../../../../audit-log/domain/services/audit-log-create";
 import { AddTicketParticipant } from "../../../../ticket/domain/services/ticket-add-participant";
@@ -86,7 +87,7 @@ export class CommentController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspace = await this.resolveWorkspace(slug);
-    const query = new ListTicketCommentsQuery(this.commentRepository, this.createEnsureTicketAccess());
+    const query = new ListTicketCommentsQuery(this.commentRepository, this.createEnsureTicketAccess(), new SummarizeUsers(this.userRepository));
     return query.execute({
       ticketId,
       workspaceId: workspace.getId(),

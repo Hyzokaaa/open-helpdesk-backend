@@ -15,6 +15,7 @@ import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
 import { EntityNotFoundError } from '../../../../shared/domain/errors';
 import { CreateUser } from '../../../../user/domain/services/user-create';
+import { SummarizeUsers } from '../../../../user/domain/services/user-summarize';
 import { AddWorkspaceMember } from '../../../../workspace/domain/services/workspace-add-member';
 import { BcryptPasswordHasher } from '../../../../shared/infrastructure/bcrypt-password-hasher';
 import { TicketSource } from '../../../domain/enums/ticket-source.enum';
@@ -275,7 +276,7 @@ export class TicketController {
   ) {
     const workspace = await this.resolveWorkspace(slug);
     const ensureAccess = this.createEnsureTicketAccess();
-    const query = new GetTicketQuery(this.ticketRepository, ensureAccess);
+    const query = new GetTicketQuery(this.ticketRepository, ensureAccess, new SummarizeUsers(this.userRepository));
     return query.execute({ ticketId: id, workspaceId: workspace.getId(), userId: user.userId, isSystemAdmin: user.isSystemAdmin });
   }
 

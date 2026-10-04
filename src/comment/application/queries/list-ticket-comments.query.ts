@@ -2,6 +2,7 @@ import { Query } from '../../../shared/domain/query';
 import { PaginatedResult } from '../../../shared/domain/paginated-result';
 import { CommentRepository } from '../../domain/repositories/comment.repository';
 import { EnsureTicketAccess } from '../../../ticket/domain/services/ticket-ensure-access';
+import { SummarizeUsers, UserSummary } from '../../../user/domain/services/user-summarize';
 
 interface Props {
   ticketId: string;
@@ -19,6 +20,7 @@ export interface CommentListItem {
   mentionedUserIds: string[];
   createdAt: Date | null;
   editedAt: Date | null;
+  author?: UserSummary | null;
 }
 
 export class ListTicketCommentsQuery
@@ -27,6 +29,7 @@ export class ListTicketCommentsQuery
   constructor(
     private readonly repository: CommentRepository,
     private readonly ensureTicketAccess: EnsureTicketAccess,
+    private readonly summarizeUsers?: SummarizeUsers,
   ) {}
 
   async execute(props: Props): Promise<PaginatedResult<CommentListItem>> {
@@ -43,6 +46,10 @@ export class ListTicketCommentsQuery
       props.limit,
     );
 
+    const authors = this.summarizeUsers
+      ? await this.summarizeUsers.execute(result.items.map((comment) => comment.authorId))
+      : null;
+
     return {
       items: result.items.map((comment) => ({
         id: comment.getId(),
@@ -51,6 +58,7 @@ export class ListTicketCommentsQuery
         mentionedUserIds: comment.mentionedUserIds,
         createdAt: comment.createdAt,
         editedAt: comment.editedAt,
+        ...(authors && { author: authors.get(comment.authorId) ?? null }),
       })),
       total: result.total,
       page: result.page,
