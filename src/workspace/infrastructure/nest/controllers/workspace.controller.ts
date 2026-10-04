@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Inject,
   Param,
   Patch,
@@ -83,6 +84,13 @@ import {
   validateExportToken,
 } from "../../../domain/services/workspace-export-token";
 import { Public } from "../../../../shared/nest/decorators/public.decorator";
+import { ExportWorkspaceRequest } from "../dto/export-workspace.request";
+import {
+  assertExportPassword,
+  deriveExportKey,
+  encodeExport,
+  encodeExportWithKey,
+} from "../../export-file-codec";
 import { TypeOrmWorkspaceEmailSenderRepository } from "../../typeorm/repositories/typeorm-workspace-email-sender.repository";
 import { WorkspaceEmailSender } from "../../../domain/entities/workspace-email-sender";
 import * as nodemailer from "nodemailer";
@@ -645,9 +653,11 @@ export class WorkspaceController {
     return { systemMailboxEnabled: workspace.systemMailboxEnabled };
   }
 
-  @Get(":slug/export")
+  @Post(":slug/export")
+  @HttpCode(200)
   async exportWorkspace(
     @Param("slug") slug: string,
+    @Body() body: ExportWorkspaceRequest,
     @CurrentUser() user: AuthUser,
     @Res() res: Response,
   ) {
@@ -661,14 +671,21 @@ export class WorkspaceController {
       permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
       isSystemAdmin: user.isSystemAdmin,
     });
+    assertExportPassword(body.password);
     const service = new ExportWorkspace(this.dataSource);
     const data = await service.execute(workspaceId);
-    res.setHeader("Content-Type", "application/json");
+    this.sendExportFile(res, slug, await encodeExport(data, body.password));
+  }
+
+  /** The .ohd file as a download, named after the workspace and the day it was made. */
+  private sendExportFile(res: Response, slug: string, bytes: Buffer) {
+    const day = new Date().toISOString().slice(0, 10);
+    res.setHeader("Content-Type", "application/octet-stream");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${slug}-export.json"`,
+      `attachment; filename="${slug}-${day}.ohd"`,
     );
-    res.send(JSON.stringify(data, null, 2));
+    res.send(bytes);
   }
 
   @Post(":slug/import")
@@ -735,6 +752,7 @@ export class WorkspaceController {
   @Post(":slug/export/token")
   async createExportTokenEndpoint(
     @Param("slug") slug: string,
+    @Body() body: ExportWorkspaceRequest,
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
@@ -747,7 +765,12 @@ export class WorkspaceController {
       permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
       isSystemAdmin: user.isSystemAdmin,
     });
-    const { token, expiresAt } = createExportToken(workspaceId);
+    assertExportPassword(body.password);
+    // Keep the derived key, not the password: the file is built and encrypted when it is downloaded
+    const { token, expiresAt } = createExportToken(
+      workspaceId,
+      await deriveExportKey(body.password),
+    );
     const baseUrl = process.env.API_URL || process.env.BACKEND_URL || "";
 
     const auditLog = new CreateAuditLogEntry(
@@ -779,20 +802,19 @@ export class WorkspaceController {
     @Param("token") token: string,
     @Res() res: Response,
   ) {
-    const workspaceId = validateExportToken(token);
-    if (!workspaceId) {
+    const entry = validateExportToken(token);
+    if (!entry) {
       res.status(401).json({ message: "Invalid or expired export token" });
       return;
     }
     const workspace = await this.workspaceRepository.findBySlug(slug);
-    if (!workspace || workspace.getId() !== workspaceId) {
+    if (!workspace || workspace.getId() !== entry.workspaceId) {
       res.status(404).json({ message: "Workspace not found" });
       return;
     }
     const service = new ExportWorkspace(this.dataSource);
-    const data = await service.execute(workspaceId);
-    res.setHeader("Content-Type", "application/json");
-    res.send(JSON.stringify(data));
+    const data = await service.execute(entry.workspaceId);
+    this.sendExportFile(res, slug, await encodeExportWithKey(data, entry.encryption));
   }
 
   @Get(":slug/email-sender")
