@@ -43,6 +43,8 @@ import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/
 import { TypeOrmWorkspaceRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository';
 import { resolveFrontendUrl } from '../../../../shared/infrastructure/resolve-frontend-url';
 import { TypeOrmUserSessionRepository } from '../../typeorm/repositories/typeorm-user-session.repository';
+import { TypeOrmUsedTokenRepository } from '../../typeorm/repositories/typeorm-used-token.repository';
+import { ConsumeOneTimeToken } from '../../../domain/services/user-token-consume';
 import { SessionPolicy, StartUserSession } from '../../../domain/services/user-session-start';
 import { SignAccessToken } from '../../../domain/services/user-session-sign-access-token';
 import { RefreshUserSession } from '../../../domain/services/user-session-refresh';
@@ -75,6 +77,7 @@ export class AuthController {
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
     @Inject() private readonly workspaceRepository: TypeOrmWorkspaceRepository,
     @Inject() private readonly sessionRepository: TypeOrmUserSessionRepository,
+    @Inject() private readonly usedTokenRepository: TypeOrmUsedTokenRepository,
     private readonly config: ConfigService,
   ) {
     this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
@@ -162,7 +165,8 @@ export class AuthController {
   @Throttle({ default: { ttl: 60000, limit: 10 } })
   @Post('oauth/exchange')
   exchangeOAuthCode(@Body() body: ExchangeOAuthCodeRequest) {
-    const command = new ExchangeOAuthCodeCommand(this.tokenService, this.userRepository, this.createStartSession());
+    const consumeToken = new ConsumeOneTimeToken(this.tokenService, this.usedTokenRepository);
+    const command = new ExchangeOAuthCodeCommand(consumeToken, this.userRepository, this.createStartSession());
     return command.execute({ code: body.code, rememberMe: body.rememberMe ?? false });
   }
 
@@ -217,7 +221,8 @@ export class AuthController {
   @Post('reset-password')
   async resetPassword(@Body() body: ResetPasswordRequest) {
     const service = new ResetPassword(this.userRepository, this.passwordHasher);
-    const command = new ResetPasswordCommand(service, this.tokenService, new RevokeUserSessions(this.sessionRepository));
+    const consumeToken = new ConsumeOneTimeToken(this.tokenService, this.usedTokenRepository);
+    const command = new ResetPasswordCommand(service, consumeToken, new RevokeUserSessions(this.sessionRepository));
     await command.execute({ token: body.token, newPassword: body.newPassword });
 
     let userId: string | null = null;
