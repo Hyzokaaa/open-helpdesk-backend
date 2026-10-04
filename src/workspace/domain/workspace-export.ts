@@ -46,6 +46,16 @@ export interface WorkspaceExportCategory {
   createdAt: string;
 }
 
+/** Since 1.15. Soft-deleted projects are not exported. */
+export interface WorkspaceExportProject {
+  id: string;
+  name: string;
+  description: string | null;
+  /** Slugs of the ticket categories linked to the project, resolved like a ticket's category. */
+  categorySlugs: string[];
+  createdAt: string;
+}
+
 export interface WorkspaceExportTicket {
   id: string;
   name: string;
@@ -70,6 +80,8 @@ export interface WorkspaceExportTicket {
   organizationId?: string | null;
   /** Source department id, resolved against `departments`. Since 1.15. */
   departmentId?: string | null;
+  /** Source project id, resolved against `projects`. Since 1.15. */
+  projectId?: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 }
@@ -160,6 +172,7 @@ export interface WorkspaceExportData {
   departments: WorkspaceExportDepartment[];
   tags: WorkspaceExportTag[];
   categories: WorkspaceExportCategory[];
+  projects: WorkspaceExportProject[];
   tickets: WorkspaceExportTicket[];
   comments: WorkspaceExportComment[];
   attachments: WorkspaceExportAttachment[];

@@ -54,6 +54,16 @@ export class ExportWorkspace {
         `SELECT id, name, slug, color, "createdAt" FROM ticket_categories WHERE "workspaceId" = $1`, [workspaceId],
       );
 
+      const projects = await qr.query(`
+        SELECT p.id, p.name, p.description, p."createdAt",
+          COALESCE(array_agg(tc.slug) FILTER (WHERE tc.slug IS NOT NULL), '{}') AS "categorySlugs"
+        FROM projects p
+        LEFT JOIN project_categories pc ON pc."projectId" = p.id
+        LEFT JOIN ticket_categories tc ON tc.id = pc."categoryId"
+        WHERE p."workspaceId" = $1 AND p."deletedAt" IS NULL
+        GROUP BY p.id
+      `, [workspaceId]);
+
       // tickets.category was replaced by a categoryId FK; the export keeps the
       // slug so older files and newer ones describe the category the same way.
       const tickets = await qr.query(`
@@ -61,7 +71,7 @@ export class ExportWorkspace {
           t."reporterId", t."assigneeId", t."ticketNumber", t."customFields",
           t."discardReason", t."portalToken", t."firstResponseAt", t."resolvedAt",
           t."resolvedById", t."firstResponseBreached", t."resolutionBreached",
-          t."organizationId", t."departmentId", t."createdAt", t."updatedAt",
+          t."organizationId", t."departmentId", t."projectId", t."createdAt", t."updatedAt",
           COALESCE(array_agg(tt."tagsId") FILTER (WHERE tt."tagsId" IS NOT NULL), '{}') as "tagIds"
         FROM tickets t
         LEFT JOIN ticket_categories tc ON tc.id = t."categoryId"
@@ -184,6 +194,13 @@ export class ExportWorkspace {
           color: c.color,
           createdAt: c.createdAt?.toISOString(),
         })),
+        projects: projects.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          description: p.description ?? null,
+          categorySlugs: p.categorySlugs ?? [],
+          createdAt: p.createdAt?.toISOString(),
+        })),
         tickets: tickets.map((t: any) => ({
           id: t.id,
           name: t.name,
@@ -205,6 +222,7 @@ export class ExportWorkspace {
           tagIds: t.tagIds,
           organizationId: t.organizationId ?? null,
           departmentId: t.departmentId ?? null,
+          projectId: t.projectId ?? null,
           createdAt: t.createdAt?.toISOString() ?? null,
           updatedAt: t.updatedAt?.toISOString() ?? null,
         })),

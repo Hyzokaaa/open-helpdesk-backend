@@ -22,6 +22,7 @@ export interface ImportResult {
   departmentsImported: number;
   tagsImported: number;
   categoriesImported: number;
+  projectsImported: number;
   ticketsImported: number;
   commentsImported: number;
   /** Comments not imported because their author is missing from the file or no longer exists. */
@@ -156,6 +157,13 @@ function validateExportData(data: WorkspaceExportData): void {
   });
   each('tags', data.tags, (t, p) => { text(t, p, 'id'); text(t, p, 'name'); });
   each('categories', data.categories, (c, p) => { text(c, p, 'slug'); text(c, p, 'name'); });
+  each('projects', data.projects, (pr, p) => {
+    text(pr, p, 'id');
+    text(pr, p, 'name');
+    optionalText(pr, p, 'description');
+    if (!Array.isArray(pr.categorySlugs) || !pr.categorySlugs.every(isText)) fail(`${p}.categorySlugs`, 'must be a list of slugs');
+    optionalDate(pr, p, 'createdAt');
+  });
   each('tickets', data.tickets, (t, p) => {
     text(t, p, 'id');
     text(t, p, 'name');
@@ -172,6 +180,7 @@ function validateExportData(data: WorkspaceExportData): void {
     if (!Array.isArray(t.tagIds)) fail(`${p}.tagIds`, 'must be a list');
     optionalText(t, p, 'organizationId');
     optionalText(t, p, 'departmentId');
+    optionalText(t, p, 'projectId');
     if (t.customFields != null && (typeof t.customFields !== 'object' || Array.isArray(t.customFields))) {
       fail(`${p}.customFields`, 'must be an object');
     }
@@ -245,7 +254,7 @@ export class ImportWorkspace {
     await qr.startTransaction();
 
     const result: ImportResult = {
-      usersCreated: 0, membersAdded: 0, organizationsImported: 0, departmentsImported: 0, tagsImported: 0, categoriesImported: 0, ticketsImported: 0,
+      usersCreated: 0, membersAdded: 0, organizationsImported: 0, departmentsImported: 0, tagsImported: 0, categoriesImported: 0, projectsImported: 0, ticketsImported: 0,
       commentsImported: 0, commentsSkipped: 0, attachmentsImported: 0, participantsImported: 0,
       cannedResponsesImported: 0, customFieldsImported: 0, csatResponsesImported: 0,
       auditLogImported: 0, settingsApplied: [],
@@ -459,9 +468,9 @@ export class ImportWorkspace {
       for (const c of data.categories ?? []) {
         wanted.set(c.slug, { name: c.name, color: c.color ?? 'blue', createdAt: c.createdAt ?? null });
       }
-      for (const t of data.tickets) {
-        if (t.category && !wanted.has(t.category)) {
-          wanted.set(t.category, { name: slugToName(t.category), color: 'blue', createdAt: null });
+      for (const slug of [...data.tickets.map((t) => t.category), ...data.projects.flatMap((p) => p.categorySlugs)]) {
+        if (slug && !wanted.has(slug)) {
+          wanted.set(slug, { name: slugToName(slug), color: 'blue', createdAt: null });
         }
       }
       for (const [slug, c] of wanted) {
@@ -476,7 +485,37 @@ export class ImportWorkspace {
       }
       const categoryIdFor = (slug: string | null | undefined) => slug ? (categoryIdBySlug.get(slug) ?? null) : null;
 
-      // 3c. Custom fields — before tickets, whose values are keyed by definition id. A definition
+      // 3c. Projects and their categories — after categories, before tickets. One with the same
+      // name in the target workspace is reused; its category links are added to, never replaced.
+      const projectIdMap = new Map<string, string>();
+      const existingProjects = await qr.query(
+        `SELECT id, name FROM projects WHERE "workspaceId" = $1 AND "deletedAt" IS NULL`, [targetWorkspaceId],
+      );
+      const projectIdByName = new Map<string, string>(existingProjects.map((p: any) => [p.name, p.id]));
+      for (const p of data.projects) {
+        let targetId = projectIdByName.get(p.name);
+        if (!targetId) {
+          targetId = ulid();
+          await qr.query(`
+            INSERT INTO projects (id, name, description, "workspaceId", "createdAt")
+            VALUES ($1, $2, $3, $4, $5)
+          `, [targetId, p.name, p.description ?? null, targetWorkspaceId, p.createdAt ?? new Date().toISOString()]);
+          projectIdByName.set(p.name, targetId);
+          result.projectsImported++;
+        }
+        projectIdMap.set(p.id, targetId);
+        for (const slug of p.categorySlugs) {
+          const categoryId = categoryIdFor(slug);
+          if (!categoryId) continue;
+          await qr.query(
+            `INSERT INTO project_categories ("projectId", "categoryId") VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+            [targetId, categoryId],
+          );
+        }
+      }
+      const projectIdFor = (id: string | null | undefined) => id ? (projectIdMap.get(id) ?? null) : null;
+
+      // 3d. Custom fields — before tickets, whose values are keyed by definition id. A definition
       // with the same name and type in the target workspace is reused instead of duplicated.
       const customFieldIdMap = new Map<string, string>();
       const existingFields = await qr.query(
@@ -553,15 +592,15 @@ export class ImportWorkspace {
             "customFields", "discardReason", "portalToken",
             "firstResponseAt", "resolvedAt", "resolvedById",
             "firstResponseBreached", "resolutionBreached", "createdAt", "updatedAt",
-            "organizationId", "departmentId"
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+            "organizationId", "departmentId", "projectId"
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
         `, [
           newId, t.name, t.description, t.priority, t.status, categoryIdFor(t.category),
           targetWorkspaceId, userIdFor(t.reporterEmail), userIdFor(t.assigneeEmail), ticketNumber,
           JSON.stringify(remapCustomFields(t.customFields)), t.discardReason, null,
           t.firstResponseAt, t.resolvedAt, userIdFor(t.resolvedByEmail),
           t.firstResponseBreached, t.resolutionBreached, t.createdAt, t.updatedAt,
-          organizationIdFor(t.organizationId), departmentIdFor(t.departmentId),
+          organizationIdFor(t.organizationId), departmentIdFor(t.departmentId), projectIdFor(t.projectId),
         ]);
         ticketIdMap.set(t.id, newId);
 
@@ -702,6 +741,7 @@ export class ImportWorkspace {
         csat: csatIdMap,
         organization: organizationIdMap,
         department: departmentIdMap,
+        project: projectIdMap,
         user: sourceUserIdMap,
         workspace: workspaceIdMap,
       };
@@ -713,6 +753,7 @@ export class ImportWorkspace {
         categoryId: categoryIdMap,
         organizationId: organizationIdMap,
         departmentId: departmentIdMap,
+        projectId: projectIdMap,
         workspaceId: workspaceIdMap,
         userId: sourceUserIdMap,
         assigneeId: sourceUserIdMap,

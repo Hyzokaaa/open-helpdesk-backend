@@ -50,6 +50,7 @@ function emptyExport(overrides: Partial<WorkspaceExportData> = {}): WorkspaceExp
     departments: [],
     tags: [],
     categories: [],
+    projects: [],
     tickets: [],
     comments: [],
     attachments: [],
@@ -250,6 +251,25 @@ describe('ExportWorkspace', () => {
       { id: 'd-1', name: 'Billing', description: 'money', memberEmails: ['a@example.com'], createdAt: '2026-01-01T00:00:00.000Z' },
     ]);
     expect(result.tickets[0].departmentId).toBe('d-1');
+  });
+
+  it('exports live projects with their category slugs, and the project of tickets', async () => {
+    const qr = new FakeQueryRunner((sql, params) => {
+      if (/FROM projects p/.test(sql)) return [{ id: 'p-1', name: 'Website', description: null, categorySlugs: ['bug'], createdAt }];
+      if (/FROM tickets t/.test(sql)) {
+        return [{ id: 't-1', name: 'T', status: 'open', category: null, reporterId: 'u-1', projectId: 'p-1', tagIds: [], createdAt, updatedAt: createdAt }];
+      }
+      return answer(sql, params);
+    });
+    const result = await new ExportWorkspace(dataSourceOf(qr)).execute('ws-1');
+
+    const [projectQuery] = qr.find(/FROM projects p/);
+    expect(projectQuery.sql).toMatch(/p\."deletedAt" IS NULL/);
+    expect(projectQuery.sql).toMatch(/LEFT JOIN project_categories pc ON pc\."projectId" = p\.id/);
+    expect(result.projects).toEqual([
+      { id: 'p-1', name: 'Website', description: null, categorySlugs: ['bug'], createdAt: '2026-01-01T00:00:00.000Z' },
+    ]);
+    expect(result.tickets[0].projectId).toBe('p-1');
   });
 
   it('scopes the categories query to the exported workspace', async () => {
@@ -789,6 +809,46 @@ describe('ImportWorkspace departments', () => {
   });
 });
 
+describe('ImportWorkspace projects', () => {
+  const at = '2026-01-01T00:00:00.000Z';
+
+  it('reuses a project by name, creates the rest, links categories by slug and remaps tickets and audit', async () => {
+    const qr = new FakeQueryRunner((sql) => {
+      if (/FROM users WHERE email = ANY/.test(sql)) return [{ id: 'u-1', email: 'alice@example.com' }];
+      if (/FROM ticket_categories WHERE/.test(sql)) return [{ id: 'cat-existing', slug: 'bug' }];
+      if (/FROM projects WHERE/.test(sql)) return [{ id: 'proj-existing', name: 'Website' }];
+      if (/MAX\("ticketNumber"\)/.test(sql)) return [{ max: 0 }];
+      return [];
+    });
+    const data = emptyExport({
+      users: [{ email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' }],
+      categories: [{ id: 'c-feat', name: 'Feature', slug: 'feature', color: 'green', createdAt: at }],
+      projects: [
+        { id: 'src-web', name: 'Website', description: null, categorySlugs: ['bug'], createdAt: at },
+        { id: 'src-app', name: 'App', description: 'Mobile', categorySlugs: ['bug', 'feature'], createdAt: at },
+      ],
+      tickets: [{ ...ticket('t-1', null), projectId: 'src-app' }, { ...ticket('t-2', null), projectId: 'src-web' }],
+      auditLog: [{ action: 'project-created', entityType: 'project', entityId: 'src-app', userEmail: null, metadata: { projectId: 'src-web' }, createdAt: at }],
+    });
+
+    const { result } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    const [featureInsert] = qr.find(/INSERT INTO ticket_categories/);
+    const projectInserts = qr.find(/INSERT INTO projects/);
+    expect(projectInserts.map((q) => q.params.slice(1, 4))).toEqual([['App', 'Mobile', 'ws-target']]);
+    expect(qr.queries.indexOf(featureInsert)).toBeLessThan(qr.queries.indexOf(projectInserts[0]));
+    const appId = projectInserts[0].params[0];
+    expect(qr.find(/INSERT INTO project_categories/).map((q) => q.params)).toEqual([
+      ['proj-existing', 'cat-existing'], [appId, 'cat-existing'], [appId, featureInsert.params[0]],
+    ]);
+    expect(qr.find(/INSERT INTO tickets/).map((q) => q.params[22])).toEqual([appId, 'proj-existing']);
+    const [audit] = qr.find(/INSERT INTO audit_log_entries/);
+    expect(audit.params[3]).toBe(appId);
+    expect(JSON.parse(audit.params[6] as string)).toEqual({ projectId: 'proj-existing' });
+    expect(result.projectsImported).toBe(1);
+  });
+});
+
 describe('ImportWorkspace settings overwrite', () => {
   const answer: Answer = (sql) => (/MAX\("ticketNumber"\)/.test(sql) ? [{ max: 0 }] : []);
   const source = () => emptyExport({
@@ -846,7 +906,7 @@ describe('ImportWorkspace settings overwrite', () => {
   });
 });
 
-const NEW_IN_1_15 = ['organizations', 'departments'] as const;
+const NEW_IN_1_15 = ['organizations', 'departments', 'projects'] as const;
 
 describe('applyTransforms', () => {
   it('upgrades 1.12.0 to the current version by adding an empty categories list and normalising missing categories to null', () => {
