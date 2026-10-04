@@ -1,6 +1,7 @@
 import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { PasswordHasher } from '../../../shared/domain/password-hasher';
 import { UserRepository } from '../repositories/user.repository';
+import { ensurePasswordAcceptable } from '../password-policy';
 
 interface ResetPasswordProps {
   userId: string;
@@ -14,6 +15,7 @@ export class ResetPassword {
   ) {}
 
   async execute(props: ResetPasswordProps): Promise<void> {
+    ensurePasswordAcceptable(props.newPassword);
     const user = await this.repository.findById(props.userId);
     if (!user) throw new EntityNotFoundError('User not found');
 

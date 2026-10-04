@@ -51,6 +51,7 @@ import { StorageService } from '../../../../shared/domain/storage-service';
 import { STORAGE_SERVICE } from '../../../../shared/shared.module';
 import { RegisterUserRequest } from '../dto/register-user.request';
 import { UpdateUserNameRequest } from '../dto/update-user-name.request';
+import { ChangePasswordRequest } from '../dto/change-password.request';
 import { SortDto } from '../../../../shared/nest/dto/sort.dto';
 
 const MIME_TO_EXT: Record<string, string> = {
@@ -244,7 +245,7 @@ export class UserController {
 
   @Patch('me/password')
   async changePassword(
-    @Body() body: { currentPassword: string; newPassword: string },
+    @Body() body: ChangePasswordRequest,
     @CurrentUser() authUser: AuthUser,
   ) {
     const service = new ChangePassword(this.userRepository, this.passwordHasher);

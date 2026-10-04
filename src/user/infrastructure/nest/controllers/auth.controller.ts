@@ -25,6 +25,7 @@ import { ResendVerificationCommand } from '../../../application/commands/resend-
 import { TypeOrmUserRepository } from '../../typeorm/repositories/typeorm-user.repository';
 import { LoginUserRequest } from '../dto/login-user.request';
 import { SignupUserRequest } from '../dto/signup-user.request';
+import { ResetPasswordRequest } from '../dto/reset-password.request';
 import { GoogleAuthGuard } from '../../../../shared/nest/guards/google-auth.guard';
 import { MicrosoftAuthGuard } from '../../../../shared/nest/guards/microsoft-auth.guard';
 import { CreateUser } from '../../../domain/services/user-create';
@@ -212,7 +213,7 @@ export class AuthController {
 
   @Public()
   @Post('reset-password')
-  async resetPassword(@Body() body: { token: string; newPassword: string }) {
+  async resetPassword(@Body() body: ResetPasswordRequest) {
     const service = new ResetPassword(this.userRepository, this.passwordHasher);
     const command = new ResetPasswordCommand(service, this.tokenService, new RevokeUserSessions(this.sessionRepository));
     await command.execute({ token: body.token, newPassword: body.newPassword });
