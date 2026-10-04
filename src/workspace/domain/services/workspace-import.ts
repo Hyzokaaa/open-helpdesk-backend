@@ -177,6 +177,8 @@ export class ImportWorkspace {
 
       // 4. Tickets — map old ID → new ID, skip duplicates
       const ticketIdMap = new Map<string, string>();
+      // Same lock as TypeOrmTicketRepository.create, so a ticket created meanwhile cannot take a number
+      await qr.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [targetWorkspaceId]);
       const maxNumResult = await qr.query(
         `SELECT COALESCE(MAX("ticketNumber"), 0) as max FROM tickets WHERE "workspaceId" = $1`, [targetWorkspaceId],
       );
@@ -190,7 +192,11 @@ export class ImportWorkspace {
         existingTickets.map((t: any) => `${t.name}|${t.reporterId}|${new Date(t.createdAt).toISOString().slice(0, 19)}`),
       );
 
-      for (const t of data.tickets) {
+      // Numbers are reassigned in the original order, whatever order the file lists tickets in
+      const ticketsInOrder = [...data.tickets].sort(
+        (a, b) => (Number(a.ticketNumber) || 0) - (Number(b.ticketNumber) || 0),
+      );
+      for (const t of ticketsInOrder) {
         const reporterId = userIdFor(t.reporterEmail);
         const ticketKey = `${t.name}|${reporterId}|${t.createdAt ? new Date(t.createdAt).toISOString().slice(0, 19) : ''}`;
         if (existingTicketKeys.has(ticketKey)) continue;

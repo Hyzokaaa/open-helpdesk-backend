@@ -121,6 +121,14 @@ describe('ExportWorkspace', () => {
     ]);
   });
 
+  it('lists tickets by ticket number so the import can keep their order', async () => {
+    const qr = new FakeQueryRunner(answer);
+    await new ExportWorkspace(dataSourceOf(qr)).execute('ws-1');
+
+    const [ticketQuery] = qr.find(/FROM tickets t\s/);
+    expect(ticketQuery.sql).toMatch(/ORDER BY t\."ticketNumber"/);
+  });
+
   it('scopes the categories query to the exported workspace', async () => {
     const qr = new FakeQueryRunner(answer);
     await new ExportWorkspace(dataSourceOf(qr)).execute('ws-1');
@@ -208,6 +216,30 @@ describe('ImportWorkspace', () => {
 
     expect(qr.find(/INSERT INTO audit_log_entries/).map((q) => q.params[1])).toEqual(['ticket-updated']);
     expect(result.auditLogImported).toBe(1);
+  });
+
+  it('takes the ticket-number advisory lock of the target workspace before reading MAX and keeps the original order', async () => {
+    const qr = new FakeQueryRunner((sql, params) => {
+      if (/MAX\("ticketNumber"\)/.test(sql)) return [{ max: 41 }];
+      return answer(sql, params);
+    });
+    const second = { ...ticket('t-2', null), ticketNumber: 2 };
+    const first = { ...ticket('t-1', null), ticketNumber: 1 };
+    const data = emptyExport({
+      users: [{ email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' }],
+      tickets: [second, first],
+    });
+
+    await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    const lockIndex = qr.queries.findIndex((q) => /pg_advisory_xact_lock\(hashtext\(\$1\)\)/.test(q.sql));
+    const maxIndex = qr.queries.findIndex((q) => /MAX\("ticketNumber"\)/.test(q.sql));
+    expect(lockIndex).toBeGreaterThanOrEqual(0);
+    expect(qr.queries[lockIndex].params).toEqual(['ws-target']);
+    expect(lockIndex).toBeLessThan(maxIndex);
+
+    const inserts = qr.find(/INSERT INTO tickets/);
+    expect(inserts.map((q) => [q.params[1], q.params[9]])).toEqual([['Ticket t-1', 42], ['Ticket t-2', 43]]);
   });
 
   it('upgrades a 1.12 file that only carries slugs on tickets and derives a category name from the slug', async () => {

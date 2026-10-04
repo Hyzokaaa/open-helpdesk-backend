@@ -71,6 +71,7 @@ export class ExportWorkspace {
         LEFT JOIN ticket_tag tt ON tt."ticketsId" = t.id
         WHERE t."workspaceId" = $1 AND t."deletedAt" IS NULL
         GROUP BY t.id, tc.id
+        ORDER BY t."ticketNumber"
       `, [workspaceId]);
 
       const comments = await qr.query(`
