@@ -3,6 +3,7 @@ import { ExportWorkspace } from '../../../../src/workspace/domain/services/works
 import { ImportWorkspace } from '../../../../src/workspace/domain/services/workspace-import';
 import { applyTransforms, CURRENT_VERSION } from '../../../../src/workspace/domain/services/workspace-export-transforms';
 import { WorkspaceExportData } from '../../../../src/workspace/domain/workspace-export';
+import { DomainValidationError } from '../../../../src/shared/domain/errors';
 
 interface RecordedQuery {
   sql: string;
@@ -594,5 +595,65 @@ describe('applyTransforms', () => {
     const result = applyTransforms(current);
     expect(result.version).toBe(CURRENT_VERSION);
     expect(result.tickets[0].category).toBe('bug');
+  });
+});
+
+describe('ImportWorkspace validation', () => {
+  const alice = { email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' };
+
+  async function importError(data: unknown): Promise<Error> {
+    const qr = new FakeQueryRunner(() => []);
+    const error = await new ImportWorkspace(dataSourceOf(qr))
+      .execute('ws-target', data as WorkspaceExportData)
+      .then(() => null, (e: Error) => e);
+    expect(error).toBeInstanceOf(DomainValidationError);
+    // Rejected before the transaction: nothing was read or written
+    expect(qr.queries).toHaveLength(0);
+    return error as Error;
+  }
+
+  it('rejects a body that is not an object', async () => {
+    expect((await importError([])).message).toBe('Invalid export file: expected a JSON object');
+  });
+
+  it('rejects a file without the tickets list', async () => {
+    const data = emptyExport();
+    delete (data as Partial<WorkspaceExportData>).tickets;
+    expect((await importError(data)).message).toBe('Invalid export file: "tickets" must be a list');
+  });
+
+  it('rejects a missing, too old or newer version with a message that says which', async () => {
+    expect((await importError(emptyExport({ version: '' }))).message).toBe('Invalid export file: the "version" field is missing');
+    expect((await importError(emptyExport({ version: '1.0.0' }))).message)
+      .toBe(`Unsupported export version 1.0.0: this server imports versions 1.11.0 to ${CURRENT_VERSION}`);
+    expect((await importError(emptyExport({ version: '9.0.0' }))).message)
+      .toBe(`Export version 9.0.0 was made by a newer Open Helpdesk; this server imports up to ${CURRENT_VERSION}. Upgrade it first.`);
+  });
+
+  it('rejects a ticket without reporterEmail', async () => {
+    const data = emptyExport({ users: [alice], tickets: [ticket('t-1', null), { ...ticket('t-2', null), reporterEmail: '' }] });
+    expect((await importError(data)).message).toBe('Invalid export file: tickets[1].reporterEmail is required');
+  });
+
+  it('rejects an invalid date', async () => {
+    const data = emptyExport({ users: [alice], tickets: [{ ...ticket('t-1', null), createdAt: 'yesterday' }] });
+    expect((await importError(data)).message).toBe('Invalid export file: tickets[0].createdAt must be a valid date');
+  });
+
+  it('rejects an unknown member role', async () => {
+    const data = emptyExport({ users: [{ ...alice, role: 'owner' }] });
+    expect((await importError(data)).message)
+      .toBe('Invalid export file: users[0].role must be one of: admin, supervisor, agent, user');
+  });
+
+  it('rejects invalid enums in tickets, custom fields and CSAT ratings', async () => {
+    expect((await importError(emptyExport({ users: [alice], tickets: [{ ...ticket('t-1', null), status: 'closed' }] }))).message)
+      .toMatch(/^Invalid export file: tickets\[0\]\.status must be one of: open, /);
+    expect((await importError(emptyExport({
+      customFields: [{ id: 'cf', name: 'X', type: 'color', options: null, position: 0, required: false, createdAt: '2026-01-01T00:00:00.000Z' }],
+    }))).message).toMatch(/^Invalid export file: customFields\[0\]\.type must be one of: text, /);
+    expect((await importError(emptyExport({
+      csatResponses: [{ ticketId: 't-1', rating: 6, respondedAt: null, createdAt: '2026-01-01T00:00:00.000Z' }],
+    }))).message).toBe('Invalid export file: csatResponses[0].rating must be a whole number from 1 to 5 or null');
   });
 });

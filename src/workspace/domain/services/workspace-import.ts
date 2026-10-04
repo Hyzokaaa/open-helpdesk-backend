@@ -5,6 +5,15 @@ import { randomBytes } from 'crypto';
 import { WorkspaceExportData } from '../workspace-export';
 import { applyTransforms } from './workspace-export-transforms';
 import { ExtractMentions } from '../../../comment/domain/services/comment-extract-mentions';
+import { DomainValidationError } from '../../../shared/domain/errors';
+import { WorkspaceRole } from '../enums/workspace-role.enum';
+import { TicketPriority } from '../../../ticket/domain/enums/ticket-priority.enum';
+import { TicketStatus } from '../../../ticket/domain/enums/ticket-status.enum';
+import { TicketDiscardReason } from '../../../ticket/domain/enums/ticket-discard-reason.enum';
+import { ParticipantRole } from '../../../ticket/domain/enums/participant-role.enum';
+import { CustomFieldType } from '../../../custom-field/domain/enums/custom-field-type.enum';
+import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
+import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 
 export interface ImportResult {
   usersCreated: number;
@@ -44,6 +53,116 @@ function mentionedIdsOf(value: unknown): string[] {
   return typeof value === 'string' && value ? value.split(',') : [];
 }
 
+/**
+ * Checks the shape of an (already upgraded) export before anything is written, so a bad file is
+ * a 400 naming the offending field instead of a database error halfway through the transaction.
+ */
+function validateExportData(data: WorkspaceExportData): void {
+  const fail = (path: string, problem: string): never => {
+    throw new DomainValidationError(`Invalid export file: ${path} ${problem}`);
+  };
+  const isText = (v: unknown) => typeof v === 'string' && v.trim() !== '';
+  const isDate = (v: unknown) => (typeof v === 'string' || typeof v === 'number') && !Number.isNaN(new Date(v).getTime());
+  const oneOf = (values: object) => Object.values(values) as unknown[];
+  const each = (section: string, rows: unknown, check: (row: any, path: string) => void) => {
+    if (!Array.isArray(rows)) return fail(`"${section}"`, 'must be a list');
+    rows.forEach((row, i) => {
+      const path = `${section}[${i}]`;
+      if (!row || typeof row !== 'object') fail(path, 'must be an object');
+      check(row, path);
+    });
+  };
+  const text = (row: any, path: string, field: string) => {
+    if (!isText(row[field])) fail(`${path}.${field}`, 'is required');
+  };
+  const optionalText = (row: any, path: string, field: string) => {
+    if (row[field] != null && typeof row[field] !== 'string') fail(`${path}.${field}`, 'must be text or null');
+  };
+  const date = (row: any, path: string, field: string) => {
+    if (!isDate(row[field])) fail(`${path}.${field}`, 'must be a valid date');
+  };
+  const optionalDate = (row: any, path: string, field: string) => {
+    if (row[field] != null && !isDate(row[field])) fail(`${path}.${field}`, 'must be a valid date or null');
+  };
+  const member = (row: any, path: string, field: string, values: unknown[], nullable = false) => {
+    if (nullable && row[field] == null) return;
+    if (!values.includes(row[field])) fail(`${path}.${field}`, `must be one of: ${values.join(', ')}`);
+  };
+
+  each('users', data.users, (u, p) => {
+    text(u, p, 'email');
+    optionalText(u, p, 'id');
+    member(u, p, 'role', oneOf(WorkspaceRole), true);
+  });
+  each('tags', data.tags, (t, p) => { text(t, p, 'id'); text(t, p, 'name'); });
+  each('categories', data.categories, (c, p) => { text(c, p, 'slug'); text(c, p, 'name'); });
+  each('tickets', data.tickets, (t, p) => {
+    text(t, p, 'id');
+    text(t, p, 'name');
+    text(t, p, 'reporterEmail');
+    optionalText(t, p, 'assigneeEmail');
+    optionalText(t, p, 'resolvedByEmail');
+    date(t, p, 'createdAt');
+    optionalDate(t, p, 'updatedAt');
+    optionalDate(t, p, 'firstResponseAt');
+    optionalDate(t, p, 'resolvedAt');
+    member(t, p, 'priority', oneOf(TicketPriority));
+    member(t, p, 'status', oneOf(TicketStatus));
+    member(t, p, 'discardReason', oneOf(TicketDiscardReason), true);
+    if (!Array.isArray(t.tagIds)) fail(`${p}.tagIds`, 'must be a list');
+    if (t.customFields != null && (typeof t.customFields !== 'object' || Array.isArray(t.customFields))) {
+      fail(`${p}.customFields`, 'must be an object');
+    }
+  });
+  each('comments', data.comments, (c, p) => {
+    text(c, p, 'id');
+    text(c, p, 'ticketId');
+    optionalText(c, p, 'authorEmail');
+    if (typeof c.content !== 'string') fail(`${p}.content`, 'must be text');
+    date(c, p, 'createdAt');
+  });
+  each('attachments', data.attachments, (a, p) => {
+    text(a, p, 'id');
+    optionalText(a, p, 'ticketId');
+    optionalText(a, p, 'uploadedByEmail');
+    date(a, p, 'createdAt');
+  });
+  each('participants', data.participants, (pt, p) => {
+    text(pt, p, 'ticketId');
+    optionalText(pt, p, 'userEmail');
+    member(pt, p, 'role', oneOf(ParticipantRole));
+  });
+  each('cannedResponses', data.cannedResponses, (cr, p) => {
+    text(cr, p, 'id');
+    text(cr, p, 'title');
+    if (typeof cr.content !== 'string') fail(`${p}.content`, 'must be text');
+  });
+  each('customFields', data.customFields, (cf, p) => {
+    text(cf, p, 'id');
+    text(cf, p, 'name');
+    member(cf, p, 'type', oneOf(CustomFieldType));
+    if (cf.options != null && !(Array.isArray(cf.options) && cf.options.every((o: unknown) => typeof o === 'string'))) {
+      fail(`${p}.options`, 'must be a list of text or null');
+    }
+  });
+  each('csatResponses', data.csatResponses, (cs, p) => {
+    text(cs, p, 'ticketId');
+    if (cs.rating != null && !(Number.isInteger(cs.rating) && cs.rating >= 1 && cs.rating <= 5)) {
+      fail(`${p}.rating`, 'must be a whole number from 1 to 5 or null');
+    }
+  });
+  each('auditLog', data.auditLog, (a, p) => {
+    text(a, p, 'action');
+    text(a, p, 'entityType');
+    text(a, p, 'entityId');
+    optionalText(a, p, 'userEmail');
+    date(a, p, 'createdAt');
+    member(a, p, 'category', oneOf(AuditCategory), true);
+    member(a, p, 'level', oneOf(AuditLevel), true);
+    optionalText(a, p, 'source');
+  });
+}
+
 function slugToName(slug: string): string {
   return slug
     .split(/[-_]+/)
@@ -57,6 +176,7 @@ export class ImportWorkspace {
 
   async execute(targetWorkspaceId: string, rawData: WorkspaceExportData): Promise<ImportOutcome> {
     const data = applyTransforms(rawData);
+    validateExportData(data);
     const qr = this.dataSource.createQueryRunner();
     await qr.connect();
     await qr.startTransaction();

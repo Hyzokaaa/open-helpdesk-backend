@@ -1,4 +1,5 @@
 import { WorkspaceExportData } from '../workspace-export';
+import { DomainValidationError } from '../../../shared/domain/errors';
 
 type Transform = (data: WorkspaceExportData) => WorkspaceExportData;
 
@@ -40,15 +41,47 @@ const VERSION_ORDER = ['1.11.0', '1.12.0', '1.13.0', '1.14.0'];
 const CURRENT_VERSION = '1.14.0';
 const MIN_VERSION = '1.11.0';
 
+/** Sections every supported version has; the transforms walk some of them. */
+const SECTIONS_IN_EVERY_VERSION = [
+  'users', 'tags', 'tickets', 'comments', 'attachments',
+  'cannedResponses', 'customFields', 'csatResponses', 'auditLog',
+] as const;
+
+/** Negative, zero or positive like a comparator; NaN when either side is not a dotted number. */
+function compareVersions(a: string, b: string): number {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
 export function applyTransforms(data: WorkspaceExportData): WorkspaceExportData {
-  if (!data.version) {
-    throw new Error('Export file is missing version field');
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new DomainValidationError('Invalid export file: expected a JSON object');
+  }
+  if (typeof data.version !== 'string' || !data.version) {
+    throw new DomainValidationError('Invalid export file: the "version" field is missing');
   }
 
   const startIdx = VERSION_ORDER.indexOf(data.version);
   if (startIdx === -1) {
-    if (data.version === CURRENT_VERSION) return data;
-    throw new Error(`Unsupported export version: ${data.version}. Minimum supported: ${MIN_VERSION}`);
+    if (compareVersions(data.version, CURRENT_VERSION) > 0) {
+      throw new DomainValidationError(
+        `Export version ${data.version} was made by a newer Open Helpdesk; this server imports up to ${CURRENT_VERSION}. Upgrade it first.`,
+      );
+    }
+    throw new DomainValidationError(
+      `Unsupported export version ${data.version}: this server imports versions ${MIN_VERSION} to ${CURRENT_VERSION}`,
+    );
+  }
+
+  for (const section of SECTIONS_IN_EVERY_VERSION) {
+    if (!Array.isArray(data[section])) {
+      throw new DomainValidationError(`Invalid export file: "${section}" must be a list`);
+    }
   }
 
   let result = data;
