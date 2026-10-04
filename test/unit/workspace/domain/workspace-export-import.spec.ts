@@ -47,6 +47,7 @@ function emptyExport(overrides: Partial<WorkspaceExportData> = {}): WorkspaceExp
     workspace: { name: 'Acme', description: '', slaPolicy: null, metadata: null },
     users: [],
     organizations: [],
+    departments: [],
     tags: [],
     categories: [],
     tickets: [],
@@ -227,6 +228,28 @@ describe('ExportWorkspace', () => {
     ]);
     expect(result.users[0].organizationId).toBe('org-1');
     expect(result.tickets[0].organizationId).toBe('org-1');
+  });
+
+  it('exports live departments with their members by email, and the department of tickets', async () => {
+    const qr = new FakeQueryRunner((sql, params) => {
+      if (/FROM departments WHERE/.test(sql)) return [{ id: 'd-1', name: 'Billing', description: 'money', createdAt }];
+      if (/FROM department_members dm/.test(sql)) return [{ departmentId: 'd-1', userId: 'u-1' }, { departmentId: 'd-1', userId: 'u-gone' }];
+      if (/FROM workspace_members wm JOIN users u/.test(sql)) {
+        return [{ id: 'u-1', email: 'a@example.com', firstName: 'A', lastName: 'A', isActive: true, role: 'agent', organizationId: null }];
+      }
+      if (/FROM tickets t/.test(sql)) {
+        return [{ id: 't-1', name: 'T', status: 'open', category: null, reporterId: 'u-1', departmentId: 'd-1', tagIds: [], createdAt, updatedAt: createdAt }];
+      }
+      return answer(sql, params);
+    });
+    const result = await new ExportWorkspace(dataSourceOf(qr)).execute('ws-1');
+
+    expect(qr.find(/FROM departments WHERE/)[0].sql).toMatch(/"deletedAt" IS NULL/);
+    expect(qr.find(/FROM department_members dm/)[0].sql).toMatch(/d\."deletedAt" IS NULL/);
+    expect(result.departments).toEqual([
+      { id: 'd-1', name: 'Billing', description: 'money', memberEmails: ['a@example.com'], createdAt: '2026-01-01T00:00:00.000Z' },
+    ]);
+    expect(result.tickets[0].departmentId).toBe('d-1');
   });
 
   it('scopes the categories query to the exported workspace', async () => {
@@ -720,6 +743,52 @@ describe('ImportWorkspace organizations', () => {
   });
 });
 
+describe('ImportWorkspace departments', () => {
+  const at = '2026-01-01T00:00:00.000Z';
+
+  it('reuses a department by name, creates the rest with their members, and remaps tickets and audit', async () => {
+    const qr = new FakeQueryRunner((sql) => {
+      if (/FROM users WHERE email = ANY/.test(sql)) return [{ id: 'u-1', email: 'alice@example.com' }];
+      if (/FROM departments WHERE/.test(sql)) return [{ id: 'dept-existing', name: 'Billing' }];
+      if (/MAX\("ticketNumber"\)/.test(sql)) return [{ max: 0 }];
+      return [];
+    });
+    const data = emptyExport({
+      users: [{ id: 'src-alice', email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'agent' }],
+      departments: [
+        { id: 'src-billing', name: 'Billing', description: null, memberEmails: ['alice@example.com'], createdAt: at },
+        { id: 'src-tech', name: 'Tech', description: 'Tech team', memberEmails: ['alice@example.com', 'carl@example.com'], createdAt: at },
+      ],
+      tickets: [{ ...ticket('t-1', null), departmentId: 'src-tech' }, { ...ticket('t-2', null), departmentId: 'src-deleted' }],
+      auditLog: [{ action: 'department-created', entityType: 'department', entityId: 'src-tech', userEmail: null, metadata: { departmentId: 'src-billing' }, createdAt: at }],
+    });
+
+    const { result } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    const deptInserts = qr.find(/INSERT INTO departments/);
+    expect(deptInserts.map((q) => q.params.slice(1, 4))).toEqual([['Tech', 'Tech team', 'ws-target']]);
+    const techId = deptInserts[0].params[0];
+    const carlId = qr.find(/INSERT INTO users/).find((q) => q.params[1] === 'carl@example.com')!.params[0];
+    const memberInserts = qr.find(/INSERT INTO department_members/);
+    expect(memberInserts[0].sql).toMatch(/ON CONFLICT DO NOTHING/);
+    expect(memberInserts.map((q) => q.params.slice(1))).toEqual([
+      ['dept-existing', 'u-1'], [techId, 'u-1'], [techId, carlId],
+    ]);
+    expect(qr.find(/INSERT INTO tickets/).map((q) => q.params[21])).toEqual([techId, null]);
+    const [audit] = qr.find(/INSERT INTO audit_log_entries/);
+    expect(audit.params[3]).toBe(techId);
+    expect(JSON.parse(audit.params[6] as string)).toEqual({ departmentId: 'dept-existing' });
+    expect(result.departmentsImported).toBe(1);
+  });
+
+  it('rejects a department whose members are not a list of emails', async () => {
+    const qr = new FakeQueryRunner(() => []);
+    const data = emptyExport({ departments: [{ id: 'd', name: 'D', description: null, memberEmails: [''], createdAt: at }] });
+    await expect(new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data))
+      .rejects.toThrow('Invalid export file: departments[0].memberEmails must be a list of emails');
+  });
+});
+
 describe('ImportWorkspace settings overwrite', () => {
   const answer: Answer = (sql) => (/MAX\("ticketNumber"\)/.test(sql) ? [{ max: 0 }] : []);
   const source = () => emptyExport({
@@ -777,7 +846,7 @@ describe('ImportWorkspace settings overwrite', () => {
   });
 });
 
-const NEW_IN_1_15 = ['organizations'] as const;
+const NEW_IN_1_15 = ['organizations', 'departments'] as const;
 
 describe('applyTransforms', () => {
   it('upgrades 1.12.0 to the current version by adding an empty categories list and normalising missing categories to null', () => {

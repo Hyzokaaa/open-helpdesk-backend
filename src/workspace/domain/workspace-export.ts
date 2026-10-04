@@ -22,6 +22,15 @@ export interface WorkspaceExportOrganization {
   createdAt: string;
 }
 
+/** Since 1.15. Soft-deleted departments are not exported. */
+export interface WorkspaceExportDepartment {
+  id: string;
+  name: string;
+  description: string | null;
+  memberEmails: string[];
+  createdAt: string;
+}
+
 export interface WorkspaceExportTag {
   id: string;
   name: string;
@@ -59,6 +68,8 @@ export interface WorkspaceExportTicket {
   tagIds: string[];
   /** Source organization id, resolved against `organizations`. Since 1.15. */
   organizationId?: string | null;
+  /** Source department id, resolved against `departments`. Since 1.15. */
+  departmentId?: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 }
@@ -146,6 +157,7 @@ export interface WorkspaceExportData {
   };
   users: WorkspaceExportUser[];
   organizations: WorkspaceExportOrganization[];
+  departments: WorkspaceExportDepartment[];
   tags: WorkspaceExportTag[];
   categories: WorkspaceExportCategory[];
   tickets: WorkspaceExportTicket[];

@@ -19,6 +19,7 @@ export interface ImportResult {
   usersCreated: number;
   membersAdded: number;
   organizationsImported: number;
+  departmentsImported: number;
   tagsImported: number;
   categoriesImported: number;
   ticketsImported: number;
@@ -146,6 +147,13 @@ function validateExportData(data: WorkspaceExportData): void {
     }
     optionalDate(o, p, 'createdAt');
   });
+  each('departments', data.departments, (d, p) => {
+    text(d, p, 'id');
+    text(d, p, 'name');
+    optionalText(d, p, 'description');
+    if (!Array.isArray(d.memberEmails) || !d.memberEmails.every(isText)) fail(`${p}.memberEmails`, 'must be a list of emails');
+    optionalDate(d, p, 'createdAt');
+  });
   each('tags', data.tags, (t, p) => { text(t, p, 'id'); text(t, p, 'name'); });
   each('categories', data.categories, (c, p) => { text(c, p, 'slug'); text(c, p, 'name'); });
   each('tickets', data.tickets, (t, p) => {
@@ -163,6 +171,7 @@ function validateExportData(data: WorkspaceExportData): void {
     member(t, p, 'discardReason', oneOf(TicketDiscardReason), true);
     if (!Array.isArray(t.tagIds)) fail(`${p}.tagIds`, 'must be a list');
     optionalText(t, p, 'organizationId');
+    optionalText(t, p, 'departmentId');
     if (t.customFields != null && (typeof t.customFields !== 'object' || Array.isArray(t.customFields))) {
       fail(`${p}.customFields`, 'must be an object');
     }
@@ -236,7 +245,7 @@ export class ImportWorkspace {
     await qr.startTransaction();
 
     const result: ImportResult = {
-      usersCreated: 0, membersAdded: 0, organizationsImported: 0, tagsImported: 0, categoriesImported: 0, ticketsImported: 0,
+      usersCreated: 0, membersAdded: 0, organizationsImported: 0, departmentsImported: 0, tagsImported: 0, categoriesImported: 0, ticketsImported: 0,
       commentsImported: 0, commentsSkipped: 0, attachmentsImported: 0, participantsImported: 0,
       cannedResponsesImported: 0, customFieldsImported: 0, csatResponsesImported: 0,
       auditLogImported: 0, settingsApplied: [],
@@ -277,6 +286,7 @@ export class ImportWorkspace {
       for (const c of data.comments) { if (c.authorEmail) allEmailsSet.add(c.authorEmail); }
       for (const a of data.attachments) { if (a.uploadedByEmail) allEmailsSet.add(a.uploadedByEmail); }
       for (const p of data.participants) { if (p.userEmail) allEmailsSet.add(p.userEmail); }
+      for (const d of data.departments) for (const email of d.memberEmails) allEmailsSet.add(email);
       // System and anonymous portal events have no user; they keep a null userId on import
       for (const a of data.auditLog) { if (a.userEmail) allEmailsSet.add(a.userEmail); }
 
@@ -382,6 +392,36 @@ export class ImportWorkspace {
           `, [targetWorkspaceId, userId, organizationId]);
         }
       }
+
+      // 2b. Departments and their members — before tickets. One with the same name in the
+      // target workspace is reused; its members are added to, never replaced.
+      const departmentIdMap = new Map<string, string>();
+      const existingDepartments = await qr.query(
+        `SELECT id, name FROM departments WHERE "workspaceId" = $1 AND "deletedAt" IS NULL`, [targetWorkspaceId],
+      );
+      const departmentIdByName = new Map<string, string>(existingDepartments.map((d: any) => [d.name, d.id]));
+      for (const d of data.departments) {
+        let targetId = departmentIdByName.get(d.name);
+        if (!targetId) {
+          targetId = ulid();
+          await qr.query(`
+            INSERT INTO departments (id, name, description, "workspaceId", "createdAt")
+            VALUES ($1, $2, $3, $4, $5)
+          `, [targetId, d.name, d.description ?? null, targetWorkspaceId, d.createdAt ?? new Date().toISOString()]);
+          departmentIdByName.set(d.name, targetId);
+          result.departmentsImported++;
+        }
+        departmentIdMap.set(d.id, targetId);
+        for (const email of d.memberEmails) {
+          const userId = userIdFor(email);
+          if (!userId) continue;
+          await qr.query(`
+            INSERT INTO department_members (id, "departmentId", "userId")
+            VALUES ($1, $2, $3) ON CONFLICT DO NOTHING
+          `, [ulid(), targetId, userId]);
+        }
+      }
+      const departmentIdFor = (id: string | null | undefined) => id ? (departmentIdMap.get(id) ?? null) : null;
 
       // 3. Tags — map old ID → new ID, reuse existing by name
       const tagIdMap = new Map<string, string>();
@@ -513,15 +553,15 @@ export class ImportWorkspace {
             "customFields", "discardReason", "portalToken",
             "firstResponseAt", "resolvedAt", "resolvedById",
             "firstResponseBreached", "resolutionBreached", "createdAt", "updatedAt",
-            "organizationId"
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+            "organizationId", "departmentId"
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
         `, [
           newId, t.name, t.description, t.priority, t.status, categoryIdFor(t.category),
           targetWorkspaceId, userIdFor(t.reporterEmail), userIdFor(t.assigneeEmail), ticketNumber,
           JSON.stringify(remapCustomFields(t.customFields)), t.discardReason, null,
           t.firstResponseAt, t.resolvedAt, userIdFor(t.resolvedByEmail),
           t.firstResponseBreached, t.resolutionBreached, t.createdAt, t.updatedAt,
-          organizationIdFor(t.organizationId),
+          organizationIdFor(t.organizationId), departmentIdFor(t.departmentId),
         ]);
         ticketIdMap.set(t.id, newId);
 
@@ -661,6 +701,7 @@ export class ImportWorkspace {
         'canned-response': cannedIdMap,
         csat: csatIdMap,
         organization: organizationIdMap,
+        department: departmentIdMap,
         user: sourceUserIdMap,
         workspace: workspaceIdMap,
       };
@@ -671,6 +712,7 @@ export class ImportWorkspace {
         tagId: tagIdMap,
         categoryId: categoryIdMap,
         organizationId: organizationIdMap,
+        departmentId: departmentIdMap,
         workspaceId: workspaceIdMap,
         userId: sourceUserIdMap,
         assigneeId: sourceUserIdMap,

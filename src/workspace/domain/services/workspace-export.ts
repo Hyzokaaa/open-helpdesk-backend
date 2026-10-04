@@ -36,6 +36,16 @@ export class ExportWorkspace {
         FROM organizations WHERE "workspaceId" = $1 AND "deletedAt" IS NULL
       `, [workspaceId]);
 
+      const departments = await qr.query(`
+        SELECT id, name, description, "createdAt"
+        FROM departments WHERE "workspaceId" = $1 AND "deletedAt" IS NULL
+      `, [workspaceId]);
+      const departmentMembers = await qr.query(`
+        SELECT dm."departmentId", dm."userId"
+        FROM department_members dm JOIN departments d ON d.id = dm."departmentId"
+        WHERE d."workspaceId" = $1 AND d."deletedAt" IS NULL
+      `, [workspaceId]);
+
       const tags = await qr.query(
         `SELECT id, name, color, "createdAt" FROM tags WHERE "workspaceId" = $1`, [workspaceId],
       );
@@ -51,7 +61,7 @@ export class ExportWorkspace {
           t."reporterId", t."assigneeId", t."ticketNumber", t."customFields",
           t."discardReason", t."portalToken", t."firstResponseAt", t."resolvedAt",
           t."resolvedById", t."firstResponseBreached", t."resolutionBreached",
-          t."organizationId", t."createdAt", t."updatedAt",
+          t."organizationId", t."departmentId", t."createdAt", t."updatedAt",
           COALESCE(array_agg(tt."tagsId") FILTER (WHERE tt."tagsId" IS NOT NULL), '{}') as "tagIds"
         FROM tickets t
         LEFT JOIN ticket_categories tc ON tc.id = t."categoryId"
@@ -112,6 +122,7 @@ export class ExportWorkspace {
         for (const id of [...c.mentionedUserIds, ...extractMentions.execute(c.content ?? '')]) refer(id);
       }
       for (const a of attachments) refer(a.uploadedById);
+      for (const dm of departmentMembers) refer(dm.userId);
       for (const p of participants) refer(p.userId);
       for (const a of auditLog) refer(a.userId);
       if (referenced.size) {
@@ -141,6 +152,16 @@ export class ExportWorkspace {
           role: u.role,
           isActive: u.isActive !== false,
           ...(u.role ? { organizationId: u.organizationId ?? null } : {}),
+        })),
+        departments: departments.map((d: any) => ({
+          id: d.id,
+          name: d.name,
+          description: d.description ?? null,
+          memberEmails: departmentMembers
+            .filter((dm: any) => dm.departmentId === d.id)
+            .map((dm: any) => emailFor(dm.userId))
+            .filter((email: string | null): email is string => !!email),
+          createdAt: d.createdAt?.toISOString(),
         })),
         organizations: organizations.map((o: any) => ({
           id: o.id,
@@ -183,6 +204,7 @@ export class ExportWorkspace {
           resolutionBreached: t.resolutionBreached ?? false,
           tagIds: t.tagIds,
           organizationId: t.organizationId ?? null,
+          departmentId: t.departmentId ?? null,
           createdAt: t.createdAt?.toISOString() ?? null,
           updatedAt: t.updatedAt?.toISOString() ?? null,
         })),

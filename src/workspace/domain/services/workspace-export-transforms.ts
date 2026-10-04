@@ -38,6 +38,7 @@ const TRANSFORMS: Record<string, Transform> = {
     // 1.14 → 1.15: users carry isActive (absent means active); the workspace carries its
     // branding text. New sections start empty and new ticket and member fields are absent.
     if (!data.organizations) data.organizations = [];
+    if (!data.departments) data.departments = [];
     if (data.workspace && typeof data.workspace === 'object') {
       if (data.workspace.appName === undefined) data.workspace.appName = null;
       if (data.workspace.appSubtitle === undefined) data.workspace.appSubtitle = null;
