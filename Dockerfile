@@ -39,6 +39,10 @@ COPY package.json ./
 COPY --from=build --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=build --chown=nestjs:nodejs /app/dist ./dist
 
+# Filesystem storage (STORAGE_PROVIDER=filesystem) writes under /app/data; a named volume mounted here
+# takes this ownership when first created, so the non-root user can write to it
+RUN mkdir -p /app/data && chown nestjs:nodejs /app/data
+
 USER nestjs
 
 EXPOSE 3000
