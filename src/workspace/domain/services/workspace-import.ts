@@ -1,4 +1,5 @@
 import { DataSource } from 'typeorm';
+import type { Readable } from 'node:stream';
 import { ulid } from 'ulid';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
@@ -18,6 +19,8 @@ import { KB_SANITIZE_OPTIONS } from '../../../knowledge-base/domain/services/kb-
 import { sanitizeHtml } from '../../../shared/domain/sanitize-html';
 import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
+import { StorageService } from '../../../shared/domain/storage-service';
+import { attachmentStorageKey } from '../../../attachment/domain/attachment-storage-key';
 
 export interface ImportResult {
   usersCreated: number;
@@ -34,6 +37,8 @@ export interface ImportResult {
   descriptionEditsImported: number;
   commentEditsImported: number;
   attachmentsImported: number;
+  /** Attachments not imported because the file does not carry their bytes (older exports, or missing at export time). */
+  attachmentsSkipped: number;
   participantsImported: number;
   cannedResponsesImported: number;
   customFieldsImported: number;
@@ -48,14 +53,34 @@ export interface ImportResult {
 /**
  * Workspace settings an import may overwrite in the target. None is touched unless asked for:
  * palette → metadata.palette (other metadata keys are kept), sla → slaPolicy,
- * description → description, branding → appName and appSubtitle (not the logo or icon).
+ * description → description, branding → appName, appSubtitle, logo and icon (each when the file
+ * carries it).
  */
 export const IMPORT_SETTINGS = ['palette', 'sla', 'description', 'branding'] as const;
 export type ImportSetting = typeof IMPORT_SETTINGS[number];
 
+/** The files of a decoded .ohd archive, by archive path. */
+export interface ImportArchiveFiles {
+  /** Size of the file at this path, or null when the archive does not carry it. */
+  size(path: string): number | null;
+  open(path: string): Readable;
+}
+
 export interface ImportOptions {
   overwrite?: string[];
+  /** The archive's files. Without them (plain JSON, format 1) no attachment or logo is imported. */
+  files?: ImportArchiveFiles;
 }
+
+/** Same types and sizes the branding and organization logo uploads accept. */
+const LOGO_EXTENSIONS: Record<string, string> = {
+  'image/png': '.png',
+  'image/svg+xml': '.svg',
+  'image/jpeg': '.jpg',
+  'image/webp': '.webp',
+};
+const LOGO_MAX_BYTES = 1024 * 1024;
+const ICON_MAX_BYTES = 512 * 1024;
 
 /** A member of the imported workspace whose account was just created, to be invited to set a password. */
 export interface ImportedNewMember {
@@ -146,7 +171,17 @@ function validateExportData(data: WorkspaceExportData): void {
     if (u.isActive != null && typeof u.isActive !== 'boolean') fail(`${p}.isActive`, 'must be true, false or absent');
     optionalText(u, p, 'organizationId');
   });
+  const fileRef = (row: any, path: string, field: string) => {
+    const ref = row[field];
+    if (ref == null) return;
+    if (typeof ref !== 'object' || Array.isArray(ref)) fail(`${path}.${field}`, 'must be an object or null');
+    optionalText(ref, `${path}.${field}`, 'file');
+    optionalText(ref, `${path}.${field}`, 'mimeType');
+  };
+  fileRef(ws, 'workspace', 'logoFile');
+  fileRef(ws, 'workspace', 'iconFile');
   each('organizations', data.organizations, (o, p) => {
+    fileRef(o, p, 'logoFile');
     text(o, p, 'id');
     text(o, p, 'name');
     optionalText(o, p, 'description');
@@ -214,6 +249,9 @@ function validateExportData(data: WorkspaceExportData): void {
   }
   each('attachments', data.attachments, (a, p) => {
     text(a, p, 'id');
+    optionalText(a, p, 'file');
+    optionalText(a, p, 'originalName');
+    optionalText(a, p, 'mimeType');
     optionalText(a, p, 'ticketId');
     optionalText(a, p, 'uploadedByEmail');
     date(a, p, 'createdAt');
@@ -308,18 +346,31 @@ export interface ImportPreview {
     kbArticles: number;
     customFields: number;
     cannedResponses: number;
+    /** Attachments the file carries, and the files (attachments and logos) in the archive. */
+    attachments: number;
+    files: number;
+    filesBytes: number;
   };
   /** The workspace settings the file carries a value for; null or false when it has none. */
   settings: {
     palette: string | null;
     sla: boolean;
     description: string | null;
-    branding: { appName: string | null; appSubtitle: string | null } | null;
+    branding: { appName: string | null; appSubtitle: string | null; logo: boolean; icon: boolean } | null;
   };
 }
 
+/** What the decoded archive holds besides the JSON. */
+export interface ImportArchiveSummary {
+  files: number;
+  bytes: number;
+}
+
 /** What importing this export would bring in, checked exactly as the import checks it. */
-export function buildImportPreview(rawData: WorkspaceExportData): ImportPreview {
+export function buildImportPreview(
+  rawData: WorkspaceExportData,
+  archive: ImportArchiveSummary = { files: 0, bytes: 0 },
+): ImportPreview {
   const fileVersion = rawData && typeof rawData === 'object' ? (rawData as { version?: unknown }).version : undefined;
   const data = prepareImportData(rawData);
   const count = (rows: unknown) => (Array.isArray(rows) ? rows.length : 0);
@@ -339,20 +390,36 @@ export function buildImportPreview(rawData: WorkspaceExportData): ImportPreview 
       kbArticles: count(data.kbArticles),
       customFields: count(data.customFields),
       cannedResponses: count(data.cannedResponses),
+      attachments: data.attachments.filter((a) => present(a.file)).length,
+      files: archive.files,
+      filesBytes: archive.bytes,
     },
     settings: {
       palette: present(palette) ? String(palette) : null,
       sla: present(ws.slaPolicy),
       description: text(ws.description),
-      branding: present(ws.appName) || present(ws.appSubtitle)
-        ? { appName: text(ws.appName), appSubtitle: text(ws.appSubtitle) }
+      branding: present(ws.appName) || present(ws.appSubtitle) || present(ws.logoFile?.file) || present(ws.iconFile?.file)
+        ? {
+          appName: text(ws.appName),
+          appSubtitle: text(ws.appSubtitle),
+          logo: present(ws.logoFile?.file),
+          icon: present(ws.iconFile?.file),
+        }
         : null,
     },
   };
 }
 
 export class ImportWorkspace {
-  constructor(private readonly dataSource: DataSource) {}
+  /**
+   * Without storage no file is imported. `onCleanupFailure` hears about objects this import
+   * stored but could not delete after a rollback (or old logos it could not delete after a commit).
+   */
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly storage?: StorageService,
+    private readonly onCleanupFailure?: (key: string, error: unknown) => void,
+  ) {}
 
   async execute(targetWorkspaceId: string, rawData: WorkspaceExportData, options: ImportOptions = {}): Promise<ImportOutcome> {
     const settings = overwriteSettingsOf(options.overwrite);
@@ -361,9 +428,29 @@ export class ImportWorkspace {
     await qr.connect();
     await qr.startTransaction();
 
+    // Every object this import stores gets a new key for the target. A storage key from the file is
+    // never used: it could point at another workspace's files.
+    const storedKeys: string[] = [];
+    const replacedKeys: string[] = [];
+    const archive = this.storage ? options.files : undefined;
+    const sizeInArchive = (path: string | null | undefined) => (archive && path ? archive.size(path) : null);
+    const storeFromArchive = async (path: string, key: string, mimeType: string, size: number) => {
+      storedKeys.push(key);
+      await this.storage!.putStream(key, archive!.open(path), mimeType || 'application/octet-stream', size);
+    };
+    /** Stores a carried logo or icon under a key from `keyFor`; null when absent or not acceptable. */
+    const storeImage = async (ref: { file?: string | null; mimeType?: string } | null | undefined, maxBytes: number, keyFor: (ext: string) => string) => {
+      const size = sizeInArchive(ref?.file);
+      const ext = ref?.mimeType ? LOGO_EXTENSIONS[ref.mimeType] : undefined;
+      if (size === null || !ext || size > maxBytes) return null;
+      const key = keyFor(ext);
+      await storeFromArchive(ref!.file!, key, ref!.mimeType!, size);
+      return key;
+    };
+
     const result: ImportResult = {
       usersCreated: 0, membersAdded: 0, organizationsImported: 0, departmentsImported: 0, tagsImported: 0, categoriesImported: 0, projectsImported: 0, ticketsImported: 0,
-      commentsImported: 0, commentsSkipped: 0, descriptionEditsImported: 0, commentEditsImported: 0, attachmentsImported: 0, participantsImported: 0,
+      commentsImported: 0, commentsSkipped: 0, descriptionEditsImported: 0, commentEditsImported: 0, attachmentsImported: 0, attachmentsSkipped: 0, participantsImported: 0,
       cannedResponsesImported: 0, customFieldsImported: 0, csatResponsesImported: 0,
       kbCategoriesImported: 0, kbArticlesImported: 0, auditLogImported: 0, settingsApplied: [],
     };
@@ -379,16 +466,38 @@ export class ImportWorkspace {
         params.push(value);
         sets.push(assignment(`$${params.length}`));
       };
+      const current = settings.includes('branding')
+        ? (await qr.query(`SELECT logo, icon FROM workspaces WHERE id = $1`, [targetWorkspaceId]))[0] ?? {}
+        : {};
       for (const key of settings) {
+        if (key === 'branding') {
+          // Keys of their own, not the upload endpoint's fixed logo.<ext>: storing over the current
+          // logo would destroy it if this import then rolled back
+          const logo = await storeImage(ws.logoFile, LOGO_MAX_BYTES, (ext) => `workspaces/${targetWorkspaceId}/logo-${ulid()}${ext}`);
+          const icon = await storeImage(ws.iconFile, ICON_MAX_BYTES, (ext) => `workspaces/${targetWorkspaceId}/icon-${ulid()}${ext}`);
+          const text = present(ws.appName) || present(ws.appSubtitle);
+          if (!text && !logo && !icon) continue;
+          if (text) {
+            set((v) => `"appName" = ${v}`, ws.appName ?? null);
+            set((v) => `"appSubtitle" = ${v}`, ws.appSubtitle ?? null);
+          }
+          if (logo) {
+            set((v) => `logo = ${v}`, logo);
+            if (current.logo) replacedKeys.push(current.logo);
+          }
+          if (icon) {
+            set((v) => `icon = ${v}`, icon);
+            if (current.icon) replacedKeys.push(current.icon);
+          }
+          result.settingsApplied.push(key);
+          continue;
+        }
         if (key === 'palette' && present(ws.metadata?.palette)) {
           set((v) => `metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('palette', ${v}::text)`, ws.metadata?.palette);
         } else if (key === 'sla' && present(ws.slaPolicy)) {
           set((v) => `"slaPolicy" = ${v}`, JSON.stringify(ws.slaPolicy));
         } else if (key === 'description' && present(ws.description)) {
           set((v) => `description = ${v}`, ws.description);
-        } else if (key === 'branding' && (present(ws.appName) || present(ws.appSubtitle))) {
-          set((v) => `"appName" = ${v}`, ws.appName ?? null);
-          set((v) => `"appSubtitle" = ${v}`, ws.appSubtitle ?? null);
         } else {
           continue;
         }
@@ -482,14 +591,24 @@ export class ImportWorkspace {
       });
 
       // 1b. Organizations — before members and tickets, which point at them. One with the same
-      // name in the target workspace is reused. The logo file is not carried.
+      // name in the target workspace is reused, and gets the carried logo only if it has none.
       const organizationIdMap = new Map<string, string>();
       const existingOrganizations = await qr.query(
-        `SELECT id, name FROM organizations WHERE "workspaceId" = $1 AND "deletedAt" IS NULL`, [targetWorkspaceId],
+        `SELECT id, name, logo FROM organizations WHERE "workspaceId" = $1 AND "deletedAt" IS NULL`, [targetWorkspaceId],
       );
       const organizationIdByName = new Map<string, string>(existingOrganizations.map((o: any) => [o.name, o.id]));
+      const organizationsWithLogo = new Set<string>(existingOrganizations.filter((o: any) => o.logo).map((o: any) => o.id));
       for (const o of data.organizations) {
         let targetId = organizationIdByName.get(o.name);
+        if (targetId && !organizationsWithLogo.has(targetId)) {
+          const id = targetId;
+          // A reused organization keeps any logo object it may still have under the plain key
+          const logo = await storeImage(o.logoFile, LOGO_MAX_BYTES, (ext) => `organizations/${id}/logo-${ulid()}${ext}`);
+          if (logo) {
+            await qr.query(`UPDATE organizations SET logo = $2 WHERE id = $1`, [id, logo]);
+            organizationsWithLogo.add(id);
+          }
+        }
         if (!targetId) {
           targetId = ulid();
           // domains is jsonb: node-pg would send a bare array as a Postgres array literal
@@ -499,6 +618,13 @@ export class ImportWorkspace {
           `, [targetId, o.name, o.description ?? null, o.notes ?? null, JSON.stringify(o.domains ?? []), targetWorkspaceId, o.createdAt ?? new Date().toISOString()]);
           organizationIdByName.set(o.name, targetId);
           result.organizationsImported++;
+          // Same key the organization logo upload uses; the organization is new, so it is free
+          const id = targetId;
+          const logo = await storeImage(o.logoFile, LOGO_MAX_BYTES, (ext) => `organizations/${id}/logo${ext}`);
+          if (logo) {
+            await qr.query(`UPDATE organizations SET logo = $2 WHERE id = $1`, [id, logo]);
+            organizationsWithLogo.add(id);
+          }
         }
         organizationIdMap.set(o.id, targetId);
       }
@@ -801,11 +927,21 @@ export class ImportWorkspace {
         const newTicketId = a.ticketId ? ticketIdMap.get(a.ticketId) : null;
         const newCommentId = a.commentId ? commentIdMap.get(a.commentId) : null;
         if (a.ticketId && !newTicketId) continue;
+        // Only bytes carried in the archive are imported, stored under the target's own key, the
+        // way an upload stores them. A row pointing at the source's key would serve its file.
+        const size = sizeInArchive(a.file);
+        if (size === null) {
+          result.attachmentsSkipped++;
+          continue;
+        }
         const newAttachmentId = ulid();
+        const originalName = a.originalName || a.fileName || 'file';
+        const key = attachmentStorageKey(newAttachmentId, originalName);
+        await storeFromArchive(a.file!, key, a.mimeType, size);
         await qr.query(`
           INSERT INTO attachments (id, "fileName", "originalName", "mimeType", size, "s3Key", "ticketId", "commentId", "uploadedById", "createdAt")
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        `, [newAttachmentId, a.fileName, a.originalName, a.mimeType, a.size, a.s3Key, newTicketId, newCommentId, userIdFor(a.uploadedByEmail), a.createdAt]);
+        `, [newAttachmentId, a.fileName || originalName, originalName, a.mimeType || 'application/octet-stream', size, key, newTicketId, newCommentId, userIdFor(a.uploadedByEmail), a.createdAt]);
         attachmentIdMap.set(a.id, newAttachmentId);
         result.attachmentsImported++;
       }
@@ -987,12 +1123,27 @@ export class ImportWorkspace {
       }
 
       await qr.commitTransaction();
-      return { result, newMembers };
     } catch (error) {
-      await qr.rollbackTransaction();
+      await qr.rollbackTransaction().catch(() => undefined);
+      await this.deleteQuietly(storedKeys);
       throw error;
     } finally {
       await qr.release();
+    }
+    // The logo and icon this import replaced are no longer referenced
+    await this.deleteQuietly(replacedKeys.filter((key) => !storedKeys.includes(key)));
+    return { result, newMembers };
+  }
+
+  /** Best effort: a failure is reported, never thrown, so it cannot hide the original outcome. */
+  private async deleteQuietly(keys: string[]): Promise<void> {
+    if (!this.storage) return;
+    for (const key of keys) {
+      try {
+        await this.storage.delete(key);
+      } catch (error) {
+        this.onCleanupFailure?.(key, error);
+      }
     }
   }
 }

@@ -51,11 +51,33 @@ const TRANSFORMS: Record<string, Transform> = {
     data.version = '1.15.0';
     return data;
   },
-  '1.15.0': (data) => data,
+  '1.15.0': (data) => {
+    // 1.15 → 1.16: files travel inside the .ohd archive. Attachments point at them with `file`
+    // instead of the source storage key; organizations and the workspace carry their logos.
+    // Older files carry no bytes, so their attachments have no file (and are skipped on import)
+    // and their logos are absent. A source key is dropped: the import never stores one.
+    data.attachments.forEach((a: any) => {
+      if (a && typeof a === 'object') {
+        a.file = null;
+        delete a.s3Key;
+      }
+    });
+    data.organizations.forEach((o: any) => {
+      if (o && typeof o === 'object') o.logoFile = null;
+    });
+    if (data.workspace && typeof data.workspace === 'object') {
+      data.workspace.logoFile = null;
+      data.workspace.iconFile = null;
+    }
+    if (!data.missingFiles) data.missingFiles = [];
+    data.version = '1.16.0';
+    return data;
+  },
+  '1.16.0': (data) => data,
 };
 
-const VERSION_ORDER = ['1.11.0', '1.12.0', '1.13.0', '1.14.0', '1.15.0'];
-const CURRENT_VERSION = '1.15.0';
+const VERSION_ORDER = ['1.11.0', '1.12.0', '1.13.0', '1.14.0', '1.15.0', '1.16.0'];
+const CURRENT_VERSION = '1.16.0';
 const MIN_VERSION = '1.11.0';
 
 /** Sections every supported version has; the transforms walk some of them. */

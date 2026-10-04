@@ -12,7 +12,27 @@ export interface WorkspaceExportUser {
   organizationId?: string | null;
 }
 
-/** Since 1.15. The logo file is not carried. */
+/**
+ * A file carried inside the .ohd archive (format 2), next to the JSON. Since 1.16.
+ * `file` is the archive path (`files/<id>`), never a storage key; null when the file was missing
+ * from storage at export time, or for files upgraded from an older export, which carried none.
+ */
+export interface WorkspaceExportFile {
+  file: string | null;
+  fileName: string;
+  mimeType: string;
+  size: number | null;
+}
+
+/** A file the export should have carried but storage did not have. Since 1.16. */
+export interface WorkspaceExportMissingFile {
+  kind: 'attachment' | 'organization-logo' | 'workspace-logo' | 'workspace-icon';
+  /** The attachment or organization id; the workspace has none in the file. */
+  id: string | null;
+  fileName: string;
+}
+
+/** Since 1.15. */
 export interface WorkspaceExportOrganization {
   id: string;
   name: string;
@@ -20,6 +40,8 @@ export interface WorkspaceExportOrganization {
   notes: string | null;
   domains: string[];
   createdAt: string;
+  /** The logo image, null when the organization has none. Since 1.16. */
+  logoFile?: WorkspaceExportFile | null;
 }
 
 /** Since 1.15. Soft-deleted departments are not exported. */
@@ -125,7 +147,13 @@ export interface WorkspaceExportAttachment {
   originalName: string;
   mimeType: string;
   size: number;
-  s3Key: string;
+  /**
+   * Archive path of the file's bytes (since 1.16); null when it is not in the file. The import
+   * stores the bytes under a new key of its own and skips an attachment without them.
+   */
+  file?: string | null;
+  /** Storage key in the source, written up to 1.15. Never used by the import. */
+  s3Key?: string;
   ticketId: string | null;
   commentId: string | null;
   uploadedByEmail: string | null;
@@ -213,9 +241,12 @@ export interface WorkspaceExportData {
     description: string;
     slaPolicy: Record<string, unknown> | null;
     metadata: Record<string, unknown> | null;
-    /** Branding text (not the logo or icon files). Since 1.15. */
+    /** Branding text. Since 1.15. */
     appName?: string | null;
     appSubtitle?: string | null;
+    /** Branding images, null when the workspace has none. Since 1.16. */
+    logoFile?: WorkspaceExportFile | null;
+    iconFile?: WorkspaceExportFile | null;
   };
   users: WorkspaceExportUser[];
   organizations: WorkspaceExportOrganization[];
@@ -235,4 +266,6 @@ export interface WorkspaceExportData {
   kbCategories: WorkspaceExportKbCategory[];
   kbArticles: WorkspaceExportKbArticle[];
   auditLog: WorkspaceExportAuditEntry[];
+  /** Files the source storage no longer had when this export was made. Since 1.16. */
+  missingFiles?: WorkspaceExportMissingFile[];
 }

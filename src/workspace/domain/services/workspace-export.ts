@@ -1,7 +1,9 @@
 import { DataSource } from 'typeorm';
-import { WorkspaceExportData } from '../workspace-export';
+import { ulid } from 'ulid';
+import { WorkspaceExportData, WorkspaceExportFile, WorkspaceExportMissingFile } from '../workspace-export';
 import { CURRENT_VERSION } from './workspace-export-transforms';
 import { ExtractMentions } from '../../../comment/domain/services/comment-extract-mentions';
+import { StorageService } from '../../../shared/domain/storage-service';
 
 const extractMentions = new ExtractMentions();
 
@@ -11,16 +13,109 @@ function mentionedIdsOf(value: unknown): string[] {
   return typeof value === 'string' && value ? value.split(',') : [];
 }
 
+/** A stored file the export carries, under the archive path the JSON refers to it by. */
+export interface WorkspaceExportFileSource {
+  path: string;
+  storageKey: string;
+  size: number;
+}
+
+export interface WorkspaceExportBundle {
+  data: WorkspaceExportData;
+  /** In archive order. Only files storage has; the missing ones are listed in data.missingFiles. */
+  files: WorkspaceExportFileSource[];
+}
+
+/** Something in the JSON that refers to a stored file, filled in once storage has been asked. */
+interface FileReference {
+  storageKey: string;
+  missing: WorkspaceExportMissingFile;
+  /** Sets the archive path (null when missing) and the size of the bytes carried. */
+  apply(file: string | null, size: number | null): void;
+}
+
+const MIME_BY_EXTENSION: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  webp: 'image/webp',
+  svg: 'image/svg+xml',
+};
+
+const STAT_CONCURRENCY = 8;
+
 export class ExportWorkspace {
-  constructor(private readonly dataSource: DataSource) {}
+  /** Without storage, files are listed as carried without checking them (no bytes can follow). */
+  constructor(private readonly dataSource: DataSource, private readonly storage?: StorageService) {}
 
   async execute(workspaceId: string): Promise<WorkspaceExportData> {
+    return (await this.prepare(workspaceId)).data;
+  }
+
+  /**
+   * The export JSON plus the stored files it refers to. Storage keys never reach the JSON: each
+   * file gets an archive path. A file storage no longer has stays as metadata with `file: null`
+   * and is listed in `missingFiles`, so one lost object never fails the whole export.
+   */
+  async prepare(workspaceId: string): Promise<WorkspaceExportBundle> {
+    const references: FileReference[] = [];
+    const data = await this.collect(workspaceId, references);
+
+    const sizes: (number | null | undefined)[] = new Array(references.length).fill(undefined);
+    if (this.storage) {
+      const storage = this.storage;
+      let next = 0;
+      const worker = async () => {
+        while (next < references.length) {
+          const index = next++;
+          sizes[index] = (await storage.stat(references[index].storageKey))?.size ?? null;
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(STAT_CONCURRENCY, references.length) }, worker));
+    }
+
+    const files: WorkspaceExportFileSource[] = [];
+    const missingFiles: WorkspaceExportMissingFile[] = [];
+    references.forEach((reference, index) => {
+      const size = sizes[index];
+      if (size === null) {
+        reference.apply(null, null);
+        missingFiles.push(reference.missing);
+        return;
+      }
+      const path = `files/${ulid()}`;
+      reference.apply(path, size ?? null);
+      files.push({ path, storageKey: reference.storageKey, size: size ?? 0 });
+    });
+    data.missingFiles = missingFiles;
+    return { data, files };
+  }
+
+  private async collect(workspaceId: string, references: FileReference[]): Promise<WorkspaceExportData> {
+    /** A logo or icon: stored under a key ending in its image extension, its type kept nowhere else. */
+    const imageFile = (key: string, missing: Omit<WorkspaceExportMissingFile, 'fileName'>): WorkspaceExportFile => {
+      const fileName = key.split('/').pop() || 'image';
+      const extension = fileName.includes('.') ? fileName.split('.').pop()!.toLowerCase() : '';
+      const ref: WorkspaceExportFile = {
+        file: null,
+        fileName,
+        mimeType: MIME_BY_EXTENSION[extension] ?? 'application/octet-stream',
+        size: null,
+      };
+      references.push({
+        storageKey: key,
+        missing: { ...missing, fileName },
+        apply: (file, size) => { ref.file = file; ref.size = size; },
+      });
+      return ref;
+    };
+
     const qr = this.dataSource.createQueryRunner();
     await qr.connect();
 
     try {
       const workspace = await qr.query(
-        `SELECT name, description, "slaPolicy", metadata, "appName", "appSubtitle" FROM workspaces WHERE id = $1`, [workspaceId],
+        `SELECT name, description, "slaPolicy", metadata, "appName", "appSubtitle", logo, icon FROM workspaces WHERE id = $1`, [workspaceId],
       );
       if (!workspace.length) throw new Error('Workspace not found');
       const ws = workspace[0];
@@ -32,7 +127,7 @@ export class ExportWorkspace {
       `, [workspaceId]);
 
       const organizations = await qr.query(`
-        SELECT id, name, description, notes, domains, "createdAt"
+        SELECT id, name, description, notes, domains, logo, "createdAt"
         FROM organizations WHERE "workspaceId" = $1 AND "deletedAt" IS NULL
       `, [workspaceId]);
 
@@ -108,7 +203,7 @@ export class ExportWorkspace {
         SELECT a.id, a."fileName", a."originalName", a."mimeType", a.size, a."s3Key",
           a."ticketId", a."commentId", a."uploadedById", a."createdAt"
         FROM attachments a JOIN tickets t ON a."ticketId" = t.id
-        WHERE t."workspaceId" = $1 AND t."deletedAt" IS NULL
+        WHERE t."workspaceId" = $1 AND t."deletedAt" IS NULL AND a."stagedAt" IS NULL
       `, [workspaceId]);
 
       const participants = await qr.query(`
@@ -181,6 +276,8 @@ export class ExportWorkspace {
           metadata: ws.metadata,
           appName: ws.appName ?? null,
           appSubtitle: ws.appSubtitle ?? null,
+          logoFile: ws.logo ? imageFile(ws.logo, { kind: 'workspace-logo', id: null }) : null,
+          iconFile: ws.icon ? imageFile(ws.icon, { kind: 'workspace-icon', id: null }) : null,
         },
         users: [...users.values()].map((u: any) => ({
           id: u.id,
@@ -208,6 +305,7 @@ export class ExportWorkspace {
           notes: o.notes ?? null,
           domains: o.domains ?? [],
           createdAt: o.createdAt?.toISOString(),
+          logoFile: o.logo ? imageFile(o.logo, { kind: 'organization-logo', id: o.id }) : null,
         })),
         tags: tags.map((t: any) => ({
           id: t.id,
@@ -278,18 +376,27 @@ export class ExportWorkspace {
           editedByEmail: emailFor(e.editedById),
           createdAt: e.createdAt?.toISOString(),
         })),
-        attachments: attachments.map((a: any) => ({
-          id: a.id,
-          fileName: a.fileName,
-          originalName: a.originalName,
-          mimeType: a.mimeType,
-          size: a.size,
-          s3Key: a.s3Key,
-          ticketId: a.ticketId,
-          commentId: a.commentId,
-          uploadedByEmail: emailFor(a.uploadedById),
-          createdAt: a.createdAt?.toISOString(),
-        })),
+        attachments: attachments.map((a: any) => {
+          const attachment = {
+            id: a.id,
+            fileName: a.fileName,
+            originalName: a.originalName,
+            mimeType: a.mimeType,
+            size: a.size,
+            file: null as string | null,
+            ticketId: a.ticketId,
+            commentId: a.commentId,
+            uploadedByEmail: emailFor(a.uploadedById),
+            createdAt: a.createdAt?.toISOString(),
+          };
+          references.push({
+            storageKey: a.s3Key,
+            missing: { kind: 'attachment', id: a.id, fileName: a.originalName },
+            // The size becomes that of the bytes actually carried, which the import records
+            apply: (file, size) => { attachment.file = file; if (size !== null) attachment.size = size; },
+          });
+          return attachment;
+        }),
         participants: participants.map((p: any) => ({
           ticketId: p.ticketId,
           userEmail: emailFor(p.userId),

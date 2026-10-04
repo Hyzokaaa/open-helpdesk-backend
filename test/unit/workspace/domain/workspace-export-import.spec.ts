@@ -1,6 +1,8 @@
 import { DataSource } from 'typeorm';
+import { Readable } from 'stream';
 import { ExportWorkspace } from '../../../../src/workspace/domain/services/workspace-export';
-import { buildImportPreview, ImportWorkspace } from '../../../../src/workspace/domain/services/workspace-import';
+import { buildImportPreview, ImportArchiveFiles, ImportWorkspace } from '../../../../src/workspace/domain/services/workspace-import';
+import { FakeS3Storage } from '../../../mocks/fake-s3-storage';
 import { applyTransforms, CURRENT_VERSION } from '../../../../src/workspace/domain/services/workspace-export-transforms';
 import { WorkspaceExportData } from '../../../../src/workspace/domain/workspace-export';
 import { DomainValidationError } from '../../../../src/shared/domain/errors';
@@ -34,6 +36,14 @@ class FakeQueryRunner {
   find(pattern: RegExp): RecordedQuery[] {
     return this.queries.filter((q) => pattern.test(q.sql));
   }
+}
+
+/** The files of a decoded archive, in memory. */
+function archiveOf(files: Record<string, Buffer>): ImportArchiveFiles {
+  return {
+    size: (path) => files[path]?.length ?? null,
+    open: (path) => Readable.from([files[path]]),
+  };
 }
 
 function dataSourceOf(qr: FakeQueryRunner): DataSource {
@@ -204,13 +214,13 @@ describe('ExportWorkspace', () => {
     });
     const result = await new ExportWorkspace(dataSourceOf(qr)).execute('ws-1');
 
-    expect(qr.find(/FROM workspaces WHERE id/)[0].sql).not.toMatch(/logo|icon/);
     expect(result.workspace).toEqual({
       name: 'Acme', description: 'd', slaPolicy: null, metadata: { palette: 'teal' }, appName: 'Acme Desk', appSubtitle: 'Support',
+      logoFile: null, iconFile: null,
     });
   });
 
-  it('exports live organizations without the logo, and the organization of members and tickets', async () => {
+  it('exports live organizations, and the organization of members and tickets', async () => {
     const qr = new FakeQueryRunner((sql, params) => {
       if (/FROM organizations WHERE/.test(sql)) {
         return [{ id: 'org-1', name: 'Globex', description: null, notes: 'vip', domains: ['globex.com'], createdAt }];
@@ -227,9 +237,8 @@ describe('ExportWorkspace', () => {
 
     const [orgQuery] = qr.find(/FROM organizations WHERE/);
     expect(orgQuery.sql).toMatch(/"deletedAt" IS NULL/);
-    expect(orgQuery.sql).not.toMatch(/logo/);
     expect(result.organizations).toEqual([
-      { id: 'org-1', name: 'Globex', description: null, notes: 'vip', domains: ['globex.com'], createdAt: '2026-01-01T00:00:00.000Z' },
+      { id: 'org-1', name: 'Globex', description: null, notes: 'vip', domains: ['globex.com'], createdAt: '2026-01-01T00:00:00.000Z', logoFile: null },
     ]);
     expect(result.users[0].organizationId).toBe('org-1');
     expect(result.tickets[0].organizationId).toBe('org-1');
@@ -685,7 +694,7 @@ describe('ImportWorkspace', () => {
       cannedResponses: [{ id: 'src-cr', title: 'Hi', content: 'Hello', createdAt: at(0) }],
       tickets: [ticket('src-t', 'bug')],
       comments: [{ id: 'src-c', content: 'x', ticketId: 'src-t', authorEmail: 'alice@example.com', mentionedUserIds: [], createdAt: at(0) }],
-      attachments: [{ id: 'src-a', fileName: 'f', originalName: 'f', mimeType: 'text/plain', size: 1, s3Key: 'k', ticketId: 'src-t', commentId: null, uploadedByEmail: null, createdAt: at(0) }],
+      attachments: [{ id: 'src-a', fileName: 'f', originalName: 'f', mimeType: 'text/plain', size: 1, file: 'files/a', ticketId: 'src-t', commentId: null, uploadedByEmail: null, createdAt: at(0) }],
       csatResponses: [{ id: 'src-csat', ticketId: 'src-t', rating: 5, respondedAt: null, createdAt: at(0) }],
       auditLog: [
         ['ticket', 'src-t'], ['comment', 'src-c'], ['attachment', 'src-a'], ['tag', 'src-tag'],
@@ -698,7 +707,8 @@ describe('ImportWorkspace', () => {
       })),
     });
 
-    await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+    await new ImportWorkspace(dataSourceOf(qr), new FakeS3Storage())
+      .execute('ws-target', data, { files: archiveOf({ 'files/a': Buffer.from('x') }) });
 
     const idOf = (table: string) => qr.find(new RegExp(`INSERT INTO ${table}`))[0].params[0];
     const audit = qr.find(/INSERT INTO audit_log_entries/);
@@ -1176,7 +1186,7 @@ describe('applyTransforms', () => {
 
     const upgraded = applyTransforms(legacy as WorkspaceExportData);
 
-    expect(upgraded.version).toBe('1.15.0');
+    expect(upgraded.version).toBe(CURRENT_VERSION);
     for (const section of NEW_IN_1_15) expect(upgraded[section]).toEqual([]);
     expect(upgraded.workspace.appName).toBeNull();
     expect(upgraded.workspace.appSubtitle).toBeNull();
@@ -1267,6 +1277,7 @@ describe('buildImportPreview', () => {
     expect(preview.counts).toEqual({
       tickets: 2, comments: 0, users: 1, categories: 0, organizations: 0, departments: 0,
       projects: 0, kbArticles: 0, customFields: 0, cannedResponses: 0,
+      attachments: 0, files: 0, filesBytes: 0,
     });
   });
 
@@ -1286,7 +1297,7 @@ describe('buildImportPreview', () => {
     }));
     expect(preview.settings).toEqual({
       palette: 'ocean', sla: true, description: 'Support desk',
-      branding: { appName: 'Acme Help', appSubtitle: null },
+      branding: { appName: 'Acme Help', appSubtitle: null, logo: false, icon: false },
     });
   });
 
@@ -1294,5 +1305,267 @@ describe('buildImportPreview', () => {
     expect(() => buildImportPreview(emptyExport({ version: '9.0.0' }))).toThrow(DomainValidationError);
     expect(() => buildImportPreview({ ...emptyExport(), tickets: 'nope' } as unknown as WorkspaceExportData))
       .toThrow(DomainValidationError);
+  });
+});
+
+describe('ExportWorkspace files', () => {
+  const createdAt = new Date('2026-01-01T00:00:00.000Z');
+  const answer: Answer = (sql) => {
+    if (/FROM workspaces WHERE id/.test(sql)) {
+      return [{ name: 'Acme', description: '', slaPolicy: null, metadata: null, logo: 'workspaces/ws-1/logo.png', icon: 'workspaces/ws-1/icon.svg' }];
+    }
+    if (/FROM organizations WHERE/.test(sql)) {
+      return [
+        { id: 'org-1', name: 'Globex', domains: [], logo: 'organizations/org-1/logo.webp', createdAt },
+        { id: 'org-2', name: 'Initech', domains: [], logo: null, createdAt },
+      ];
+    }
+    if (/FROM tickets t/.test(sql)) return [{ id: 't-1', name: 'T', status: 'open', reporterId: 'u-1', tagIds: [], createdAt, updatedAt: createdAt }];
+    if (/FROM attachments a/.test(sql)) {
+      return [
+        { id: 'a-1', fileName: 'r.pdf', originalName: 'r.pdf', mimeType: 'application/pdf', size: 999, s3Key: 'attachments/a-1/r.pdf', ticketId: 't-1', commentId: null, createdAt },
+        { id: 'a-2', fileName: 'gone.txt', originalName: 'gone.txt', mimeType: 'text/plain', size: 3, s3Key: 'attachments/a-2/gone.txt', ticketId: 't-1', commentId: null, createdAt },
+      ];
+    }
+    return [];
+  };
+
+  async function prepared() {
+    const storage = new FakeS3Storage();
+    await storage.upload(Buffer.from('pdf-bytes'), 'attachments/a-1/r.pdf', 'application/pdf');
+    await storage.upload(Buffer.from('png'), 'workspaces/ws-1/logo.png', 'image/png');
+    await storage.upload(Buffer.from('<svg/>'), 'workspaces/ws-1/icon.svg', 'image/svg+xml');
+    await storage.upload(Buffer.from('webp!'), 'organizations/org-1/logo.webp', 'image/webp');
+    const qr = new FakeQueryRunner(answer);
+    return { qr, bundle: await new ExportWorkspace(dataSourceOf(qr), storage).prepare('ws-1') };
+  }
+
+  it('refers to files by archive path, never by storage key, and lists the stored files to carry', async () => {
+    const { bundle } = await prepared();
+    const json = JSON.stringify(bundle.data);
+    expect(json).not.toMatch(/attachments\/a-1|workspaces\/ws-1|organizations\/org-1|s3Key/);
+
+    const [pdf] = bundle.data.attachments;
+    expect(pdf.file).toMatch(/^files\/[0-9A-Z]{26}$/);
+    expect(pdf).toMatchObject({ originalName: 'r.pdf', mimeType: 'application/pdf', size: 9 });
+    expect(bundle.data.organizations[0].logoFile).toEqual({ file: expect.stringMatching(/^files\//), fileName: 'logo.webp', mimeType: 'image/webp', size: 5 });
+    expect(bundle.data.organizations[1].logoFile).toBeNull();
+    expect(bundle.data.workspace.logoFile).toMatchObject({ mimeType: 'image/png', size: 3 });
+    expect(bundle.data.workspace.iconFile).toMatchObject({ mimeType: 'image/svg+xml', size: 6 });
+
+    const byPath = new Map(bundle.files.map((f) => [f.path, f]));
+    expect(byPath.get(pdf.file!)).toEqual({ path: pdf.file, storageKey: 'attachments/a-1/r.pdf', size: 9 });
+    expect(byPath.get(bundle.data.workspace.logoFile!.file!)?.storageKey).toBe('workspaces/ws-1/logo.png');
+    expect(bundle.files).toHaveLength(4);
+    expect(new Set(bundle.files.map((f) => f.path)).size).toBe(4);
+  });
+
+  it('keeps a file missing from storage as metadata with no file and lists it, without failing', async () => {
+    const { bundle } = await prepared();
+    const gone = bundle.data.attachments[1];
+    expect(gone).toMatchObject({ id: 'a-2', originalName: 'gone.txt', size: 3, file: null });
+    expect(bundle.data.missingFiles).toEqual([{ kind: 'attachment', id: 'a-2', fileName: 'gone.txt' }]);
+    expect(bundle.files.some((f) => f.storageKey === 'attachments/a-2/gone.txt')).toBe(false);
+  });
+
+  it('leaves staged uploads that no ticket claimed out of the export', async () => {
+    const { qr } = await prepared();
+    expect(qr.find(/FROM attachments a/)[0].sql).toMatch(/a\."stagedAt" IS NULL/);
+  });
+});
+
+describe('ImportWorkspace files', () => {
+  const at = '2026-01-01T00:00:00.000Z';
+  const answer: Answer = (sql) => {
+    if (/FROM users WHERE email = ANY/.test(sql)) return [{ id: 'u-1', email: 'alice@example.com' }];
+    if (/SELECT logo, icon FROM workspaces/.test(sql)) return [{ logo: 'workspaces/ws-target/logo.png', icon: null }];
+    if (/MAX\("ticketNumber"\)/.test(sql)) return [{ max: 0 }];
+    return [];
+  };
+  const attachment = (id: string, extra: Record<string, unknown>) => ({
+    id, fileName: `${id}.pdf`, originalName: `${id}.pdf`, mimeType: 'application/pdf', size: 1,
+    ticketId: 'src-t', commentId: null, uploadedByEmail: null, createdAt: at, ...extra,
+  });
+  const withAttachments = (attachments: unknown[], extra: Partial<WorkspaceExportData> = {}) => emptyExport({
+    users: [{ email: 'alice@example.com', firstName: 'A', lastName: 'A', role: 'admin' }],
+    tickets: [ticket('src-t', null)],
+    attachments: attachments as WorkspaceExportData['attachments'],
+    ...extra,
+  });
+
+  it('stores carried bytes under a fresh key for the target and never reuses a key from the file', async () => {
+    const qr = new FakeQueryRunner(answer);
+    const storage = new FakeS3Storage();
+    const data = withAttachments([attachment('src-a', { file: 'files/one', s3Key: 'attachments/victim/secret.pdf', size: 1 })]);
+
+    const { result } = await new ImportWorkspace(dataSourceOf(qr), storage)
+      .execute('ws-target', data, { files: archiveOf({ 'files/one': Buffer.from('bytes!') }) });
+
+    const [insert] = qr.find(/INSERT INTO attachments/);
+    const [newId, , originalName, , size, key] = insert.params as string[];
+    expect(newId).not.toBe('src-a');
+    expect(key).toBe(`attachments/${newId}/${originalName}`);
+    expect(key).not.toMatch(/victim/);
+    expect(size).toBe(6);
+    expect(storage.read(key)?.toString()).toBe('bytes!');
+    expect(storage.uploadedKeys).toEqual([key]);
+    expect(result).toMatchObject({ attachmentsImported: 1, attachmentsSkipped: 0 });
+  });
+
+  it('skips and counts attachments the file carries no bytes for', async () => {
+    const qr = new FakeQueryRunner(answer);
+    const storage = new FakeS3Storage();
+    const data = withAttachments([
+      attachment('no-file', { file: null }),
+      attachment('not-in-archive', { file: 'files/absent' }),
+      attachment('carried', { file: 'files/one' }),
+    ]);
+
+    const { result } = await new ImportWorkspace(dataSourceOf(qr), storage)
+      .execute('ws-target', data, { files: archiveOf({ 'files/one': Buffer.from('x') }) });
+
+    expect(result).toMatchObject({ attachmentsImported: 1, attachmentsSkipped: 2 });
+    expect(qr.find(/INSERT INTO attachments/)).toHaveLength(1);
+  });
+
+  it('skips the attachments of a 1.15 file, whose rows only name a source storage key', async () => {
+    const qr = new FakeQueryRunner(answer);
+    const storage = new FakeS3Storage();
+    const data = withAttachments([attachment('old', { s3Key: 'attachments/other-ws/file.pdf' })], { version: '1.15.0' });
+
+    const { result } = await new ImportWorkspace(dataSourceOf(qr), storage).execute('ws-target', data);
+
+    expect(result).toMatchObject({ attachmentsImported: 0, attachmentsSkipped: 1 });
+    expect(qr.find(/INSERT INTO attachments/)).toHaveLength(0);
+    expect(storage.uploadedKeys).toEqual([]);
+  });
+
+  it('imports no file at all without storage', async () => {
+    const qr = new FakeQueryRunner(answer);
+    const { result } = await new ImportWorkspace(dataSourceOf(qr))
+      .execute('ws-target', withAttachments([attachment('a', { file: 'files/one' })]), { files: archiveOf({ 'files/one': Buffer.from('x') }) });
+    expect(result).toMatchObject({ attachmentsImported: 0, attachmentsSkipped: 1 });
+  });
+
+  it('deletes what it stored when the transaction rolls back, reporting deletes that fail', async () => {
+    const qr = new FakeQueryRunner((sql, params) => {
+      if (/INSERT INTO audit_log_entries/.test(sql)) throw new Error('database went away');
+      return answer(sql, params);
+    });
+    const storage = new FakeS3Storage();
+    const failures: string[] = [];
+    const data = withAttachments(
+      [attachment('a', { file: 'files/one' }), attachment('b', { file: 'files/two' })],
+      { auditLog: [{ action: 'x', entityType: 'ticket', entityId: 'src-t', userEmail: null, metadata: null, createdAt: at }] },
+    );
+    const files = archiveOf({ 'files/one': Buffer.from('1'), 'files/two': Buffer.from('2') });
+    const service = new ImportWorkspace(dataSourceOf(qr), storage, (key) => failures.push(key));
+    const original = storage.putStream.bind(storage);
+    storage.putStream = async (key, stream, mime, size) => {
+      await original(key, stream, mime, size);
+      if (storage.uploadedKeys.length === 2) storage.failingDeletes.add(key);
+    };
+
+    await expect(service.execute('ws-target', data, { files })).rejects.toThrow('database went away');
+
+    expect(qr.rolledBack).toBe(true);
+    expect(qr.committed).toBe(false);
+    expect(storage.uploadedKeys).toHaveLength(2);
+    expect(storage.deletedKeys).toEqual(storage.uploadedKeys);
+    expect(storage.hasFile(storage.uploadedKeys[0])).toBe(false);
+    expect(failures).toEqual([storage.uploadedKeys[1]]);
+  });
+
+  it('gives a new organization the carried logo under the organization logo key', async () => {
+    const qr = new FakeQueryRunner(answer);
+    const storage = new FakeS3Storage();
+    const data = withAttachments([], {
+      organizations: [
+        { id: 'src-org', name: 'Globex', description: null, notes: null, domains: [], createdAt: at, logoFile: { file: 'files/logo', fileName: 'logo.png', mimeType: 'image/png', size: 3 } },
+        { id: 'src-org-2', name: 'Initech', description: null, notes: null, domains: [], createdAt: at, logoFile: { file: null, fileName: 'logo.png', mimeType: 'image/png', size: null } },
+        { id: 'src-org-3', name: 'Hooli', description: null, notes: null, domains: [], createdAt: at, logoFile: { file: 'files/exe', fileName: 'x.exe', mimeType: 'application/x-msdownload', size: 3 } },
+      ],
+    });
+
+    await new ImportWorkspace(dataSourceOf(qr), storage)
+      .execute('ws-target', data, { files: archiveOf({ 'files/logo': Buffer.from('png'), 'files/exe': Buffer.from('MZ!') }) });
+
+    const orgIds = qr.find(/INSERT INTO organizations/).map((q) => q.params[0]);
+    const updates = qr.find(/UPDATE organizations SET logo/);
+    expect(updates.map((q) => q.params)).toEqual([[orgIds[0], `organizations/${orgIds[0]}/logo.png`]]);
+    expect(storage.read(`organizations/${orgIds[0]}/logo.png`)?.toString()).toBe('png');
+    expect(storage.uploadedKeys).toHaveLength(1);
+  });
+
+  it('applies the workspace logo and icon only when branding is overwritten, under keys of their own', async () => {
+    const logoFile = { file: 'files/logo', fileName: 'logo.svg', mimeType: 'image/svg+xml', size: 6 };
+    const iconFile = { file: 'files/icon', fileName: 'icon.png', mimeType: 'image/png', size: 3 };
+    const files = archiveOf({ 'files/logo': Buffer.from('<svg/>'), 'files/icon': Buffer.from('png') });
+    const data = () => withAttachments([], { workspace: { name: 'Acme', description: '', slaPolicy: null, metadata: null, logoFile, iconFile } });
+
+    const untouched = new FakeS3Storage();
+    const qr1 = new FakeQueryRunner(answer);
+    await new ImportWorkspace(dataSourceOf(qr1), untouched).execute('ws-target', data(), { files });
+    expect(untouched.uploadedKeys).toEqual([]);
+    expect(qr1.find(/UPDATE workspaces/)).toHaveLength(0);
+
+    const storage = new FakeS3Storage();
+    await storage.upload(Buffer.from('old'), 'workspaces/ws-target/logo.png', 'image/png');
+    const qr = new FakeQueryRunner(answer);
+    const { result } = await new ImportWorkspace(dataSourceOf(qr), storage).execute('ws-target', data(), { files, overwrite: ['branding'] });
+
+    const [update] = qr.find(/UPDATE workspaces SET/);
+    expect(update.sql).toMatch(/logo = \$2, icon = \$3/);
+    expect(update.sql).not.toMatch(/appName/);
+    const [, logoKey, iconKey] = update.params as string[];
+    expect(logoKey).toMatch(/^workspaces\/ws-target\/logo-[0-9A-Z]{26}\.svg$/);
+    expect(iconKey).toMatch(/^workspaces\/ws-target\/icon-[0-9A-Z]{26}\.png$/);
+    expect(storage.read(logoKey)?.toString()).toBe('<svg/>');
+    expect(result.settingsApplied).toEqual(['branding']);
+    // The logo it replaced is deleted once the import committed
+    expect(storage.hasFile('workspaces/ws-target/logo.png')).toBe(false);
+  });
+
+  it('leaves a workspace icon over the icon size limit unset', async () => {
+    const big = Buffer.alloc(512 * 1024 + 1);
+    const data = withAttachments([], {
+      workspace: { name: 'Acme', description: '', slaPolicy: null, metadata: null, iconFile: { file: 'files/icon', fileName: 'i.png', mimeType: 'image/png', size: big.length } },
+    });
+    const storage = new FakeS3Storage();
+    const qr = new FakeQueryRunner(answer);
+    const { result } = await new ImportWorkspace(dataSourceOf(qr), storage)
+      .execute('ws-target', data, { files: archiveOf({ 'files/icon': big }), overwrite: ['branding'] });
+    expect(storage.uploadedKeys).toEqual([]);
+    expect(result.settingsApplied).toEqual([]);
+  });
+});
+
+describe('applyTransforms 1.16', () => {
+  it('upgrades 1.15.0: attachments lose the source key and carry no file, logos are absent', () => {
+    const legacy = emptyExport({
+      version: '1.15.0',
+      organizations: [{ id: 'o', name: 'O', description: null, notes: null, domains: [], createdAt: '2026-01-01T00:00:00.000Z' }],
+      attachments: [{ id: 'a', fileName: 'f', originalName: 'f', mimeType: 'text/plain', size: 1, s3Key: 'attachments/a/f', ticketId: 't', commentId: null, uploadedByEmail: null, createdAt: '2026-01-01T00:00:00.000Z' }],
+    });
+    const upgraded = applyTransforms(legacy);
+    expect(upgraded.version).toBe('1.16.0');
+    expect(upgraded.attachments[0].file).toBeNull();
+    expect(upgraded.attachments[0]).not.toHaveProperty('s3Key');
+    expect(upgraded.organizations[0].logoFile).toBeNull();
+    expect(upgraded.workspace.logoFile).toBeNull();
+    expect(upgraded.workspace.iconFile).toBeNull();
+    expect(upgraded.missingFiles).toEqual([]);
+  });
+
+  it('previews the attachments carried and the archive files', () => {
+    const preview = buildImportPreview(emptyExport({
+      attachments: [
+        { id: 'a', fileName: 'f', originalName: 'f', mimeType: 'text/plain', size: 1, file: 'files/a', ticketId: 't', commentId: null, uploadedByEmail: null, createdAt: '2026-01-01T00:00:00.000Z' },
+        { id: 'b', fileName: 'f', originalName: 'f', mimeType: 'text/plain', size: 1, file: null, ticketId: 't', commentId: null, uploadedByEmail: null, createdAt: '2026-01-01T00:00:00.000Z' },
+      ],
+      workspace: { name: 'A', description: '', slaPolicy: null, metadata: null, logoFile: { file: 'files/l', fileName: 'l.png', mimeType: 'image/png', size: 1 } },
+    }), { files: 2, bytes: 1234 });
+    expect(preview.counts).toMatchObject({ attachments: 1, files: 2, filesBytes: 1234 });
+    expect(preview.settings.branding).toEqual({ appName: null, appSubtitle: null, logo: true, icon: false });
   });
 });
