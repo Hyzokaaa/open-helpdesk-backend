@@ -34,6 +34,7 @@ export class UpdateDepartmentCommand implements Command<Props, UpdateDepartmentR
 
     const department = await this.updateDepartment.execute({
       id: props.id,
+      workspaceId: props.workspaceId,
       name: props.name,
       description: props.description,
     });

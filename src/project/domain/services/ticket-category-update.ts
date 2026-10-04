@@ -4,6 +4,8 @@ import { TicketCategoryRepository } from '../repositories/ticket-category.reposi
 
 interface UpdateTicketCategoryProps {
   id: string;
+  /** The workspace of the caller; an item of any other workspace is not found. */
+  workspaceId: string;
   name?: string;
   slug?: string;
   color?: string;
@@ -14,7 +16,7 @@ export class UpdateTicketCategory {
 
   async execute(props: UpdateTicketCategoryProps): Promise<TicketCategory> {
     const category = await this.repository.findById(props.id);
-    if (!category) throw new EntityNotFoundError('Category not found');
+    if (!category || category.workspaceId !== props.workspaceId) throw new EntityNotFoundError('Category not found');
 
     if (props.name !== undefined) category.name = props.name;
     if (props.slug !== undefined) category.slug = props.slug;

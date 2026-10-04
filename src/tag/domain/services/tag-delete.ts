@@ -3,6 +3,8 @@ import { TagRepository } from '../repositories/tag.repository';
 
 interface DeleteTagProps {
   id: string;
+  /** The workspace of the caller; an item of any other workspace is not found. */
+  workspaceId: string;
 }
 
 export class DeleteTag {
@@ -10,7 +12,7 @@ export class DeleteTag {
 
   async execute(props: DeleteTagProps): Promise<void> {
     const tag = await this.repository.findById(props.id);
-    if (!tag) {
+    if (!tag || tag.workspaceId !== props.workspaceId) {
       throw new EntityNotFoundError('Tag not found');
     }
 

@@ -181,7 +181,7 @@ export class DepartmentController {
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
-    const service = new AddDepartmentMember(this.idGenerator, this.departmentMemberRepository);
+    const service = new AddDepartmentMember(this.idGenerator, this.departmentMemberRepository, this.departmentRepository, this.memberRepository);
     const command = new AddDepartmentMemberCommand(service, ensurePermission);
     const result = await command.execute({
       departmentId: id,
@@ -216,7 +216,7 @@ export class DepartmentController {
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
-    const service = new RemoveDepartmentMember(this.departmentMemberRepository);
+    const service = new RemoveDepartmentMember(this.departmentMemberRepository, this.departmentRepository);
     const command = new RemoveDepartmentMemberCommand(service, ensurePermission);
     await command.execute({
       departmentId: id,

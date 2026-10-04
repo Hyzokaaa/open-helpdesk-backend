@@ -34,6 +34,7 @@ export class UpdateCannedResponseCommand implements Command<Props, UpdateCannedR
 
     const cannedResponse = await this.updateCannedResponse.execute({
       id: props.id,
+      workspaceId: props.workspaceId,
       title: props.title,
       content: props.content,
     });

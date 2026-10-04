@@ -3,6 +3,7 @@ import { slugify } from '../../../shared/domain/slugify';
 import { KbArticle } from '../entities/kb-article';
 import { KbArticleStatus } from '../enums/kb-article-status.enum';
 import { KbArticleRepository } from '../repositories/kb-article.repository';
+import { KbCategoryRepository } from '../repositories/kb-category.repository';
 import { sanitizeHtml } from '../../../shared/domain/sanitize-html';
 
 const KB_SANITIZE_OPTIONS = {
@@ -13,6 +14,8 @@ const KB_SANITIZE_OPTIONS = {
 
 interface Props {
   id: string;
+  /** The workspace of the caller; the article and its new category must both belong to it. */
+  workspaceId: string;
   title?: string;
   content?: string;
   status?: KbArticleStatus;
@@ -20,11 +23,14 @@ interface Props {
 }
 
 export class UpdateKbArticle {
-  constructor(private readonly repository: KbArticleRepository) {}
+  constructor(
+    private readonly repository: KbArticleRepository,
+    private readonly categoryRepository: KbCategoryRepository,
+  ) {}
 
   async execute(props: Props): Promise<KbArticle> {
     const article = await this.repository.findById(props.id);
-    if (!article) throw new EntityNotFoundError('Article not found');
+    if (!article || article.workspaceId !== props.workspaceId) throw new EntityNotFoundError('Article not found');
 
     if (props.title !== undefined) {
       article.title = props.title;
@@ -32,7 +38,11 @@ export class UpdateKbArticle {
     }
     if (props.content !== undefined) article.content = sanitizeHtml(props.content, KB_SANITIZE_OPTIONS);
     if (props.status !== undefined) article.status = props.status;
-    if (props.categoryId !== undefined) article.categoryId = props.categoryId;
+    if (props.categoryId !== undefined) {
+      const category = await this.categoryRepository.findById(props.categoryId);
+      if (!category || category.workspaceId !== props.workspaceId) throw new EntityNotFoundError('Category not found');
+      article.categoryId = props.categoryId;
+    }
 
     await this.repository.update(article);
     return article;

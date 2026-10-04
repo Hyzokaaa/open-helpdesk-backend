@@ -4,6 +4,8 @@ import { CannedResponse } from '../entities/canned-response';
 
 interface UpdateCannedResponseProps {
   id: string;
+  /** The workspace of the caller; an item of any other workspace is not found. */
+  workspaceId: string;
   title?: string;
   content?: string;
 }
@@ -13,7 +15,7 @@ export class UpdateCannedResponse {
 
   async execute(props: UpdateCannedResponseProps): Promise<CannedResponse> {
     const cannedResponse = await this.repository.findById(props.id);
-    if (!cannedResponse) {
+    if (!cannedResponse || cannedResponse.workspaceId !== props.workspaceId) {
       throw new EntityNotFoundError('Canned response not found');
     }
 

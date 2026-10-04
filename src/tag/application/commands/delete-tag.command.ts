@@ -24,6 +24,6 @@ export class DeleteTagCommand implements Command<Props, void> {
       isSystemAdmin: props.isSystemAdmin,
     });
 
-    await this.deleteTag.execute({ id: props.id });
+    await this.deleteTag.execute({ id: props.id, workspaceId: props.workspaceId });
   }
 }

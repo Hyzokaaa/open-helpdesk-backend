@@ -38,6 +38,7 @@ export class UpdateCustomFieldDefinitionCommand implements Command<Props, Update
 
     const definition = await this.updateDefinition.execute({
       id: props.id,
+      workspaceId: props.workspaceId,
       name: props.name,
       options: props.options,
       required: props.required,

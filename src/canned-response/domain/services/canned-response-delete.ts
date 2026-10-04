@@ -3,6 +3,8 @@ import { CannedResponseRepository } from '../repositories/canned-response.reposi
 
 interface DeleteCannedResponseProps {
   id: string;
+  /** The workspace of the caller; an item of any other workspace is not found. */
+  workspaceId: string;
 }
 
 export class DeleteCannedResponse {
@@ -10,7 +12,7 @@ export class DeleteCannedResponse {
 
   async execute(props: DeleteCannedResponseProps): Promise<void> {
     const cannedResponse = await this.repository.findById(props.id);
-    if (!cannedResponse) {
+    if (!cannedResponse || cannedResponse.workspaceId !== props.workspaceId) {
       throw new EntityNotFoundError('Canned response not found');
     }
 

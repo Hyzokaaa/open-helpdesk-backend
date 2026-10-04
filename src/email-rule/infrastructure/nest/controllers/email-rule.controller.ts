@@ -92,7 +92,15 @@ export class EmailRuleController {
     await this.ensureAdmin(workspaceId, user);
     const service = new UpdateEmailRule(this.emailRuleRepository);
     const command = new UpdateEmailRuleCommand(service);
-    await command.execute({ id, ...body });
+    await command.execute({
+      id,
+      workspaceId,
+      name: body.name,
+      isActive: body.isActive,
+      mailboxIds: body.mailboxIds,
+      conditions: body.conditions,
+      actions: body.actions,
+    });
   }
 
   @Delete(':id')
@@ -105,7 +113,7 @@ export class EmailRuleController {
     await this.ensureAdmin(workspaceId, user);
     const service = new DeleteEmailRule(this.emailRuleRepository);
     const command = new DeleteEmailRuleCommand(service);
-    await command.execute({ id });
+    await command.execute({ id, workspaceId });
   }
 
   @Put('reorder')
