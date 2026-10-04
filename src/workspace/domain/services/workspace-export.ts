@@ -20,7 +20,7 @@ export class ExportWorkspace {
 
     try {
       const workspace = await qr.query(
-        `SELECT name, description, "slaPolicy", metadata FROM workspaces WHERE id = $1`, [workspaceId],
+        `SELECT name, description, "slaPolicy", metadata, "appName", "appSubtitle" FROM workspaces WHERE id = $1`, [workspaceId],
       );
       if (!workspace.length) throw new Error('Workspace not found');
       const ws = workspace[0];
@@ -125,6 +125,8 @@ export class ExportWorkspace {
           description: ws.description,
           slaPolicy: ws.slaPolicy,
           metadata: ws.metadata,
+          appName: ws.appName ?? null,
+          appSubtitle: ws.appSubtitle ?? null,
         },
         users: [...users.values()].map((u: any) => ({
           id: u.id,

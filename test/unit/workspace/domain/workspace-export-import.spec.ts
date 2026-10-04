@@ -188,6 +188,21 @@ describe('ExportWorkspace', () => {
     for (const e of emails) expect(e).toMatch(/@/);
   });
 
+  it('exports the branding text of the workspace', async () => {
+    const qr = new FakeQueryRunner((sql, params) => {
+      if (/FROM workspaces WHERE id/.test(sql)) {
+        return [{ name: 'Acme', description: 'd', slaPolicy: null, metadata: { palette: 'teal' }, appName: 'Acme Desk', appSubtitle: 'Support' }];
+      }
+      return answer(sql, params);
+    });
+    const result = await new ExportWorkspace(dataSourceOf(qr)).execute('ws-1');
+
+    expect(qr.find(/FROM workspaces WHERE id/)[0].sql).not.toMatch(/logo|icon/);
+    expect(result.workspace).toEqual({
+      name: 'Acme', description: 'd', slaPolicy: null, metadata: { palette: 'teal' }, appName: 'Acme Desk', appSubtitle: 'Support',
+    });
+  });
+
   it('scopes the categories query to the exported workspace', async () => {
     const qr = new FakeQueryRunner(answer);
     await new ExportWorkspace(dataSourceOf(qr)).execute('ws-1');
@@ -609,6 +624,63 @@ describe('ImportWorkspace', () => {
 
     const [ticketInsert] = qr.find(/INSERT INTO tickets/);
     expect(ticketInsert.params[5]).toBe(newCategoryId);
+  });
+});
+
+describe('ImportWorkspace settings overwrite', () => {
+  const answer: Answer = (sql) => (/MAX\("ticketNumber"\)/.test(sql) ? [{ max: 0 }] : []);
+  const source = () => emptyExport({
+    workspace: {
+      name: 'Acme', description: 'Source description', slaPolicy: { firstResponseHours: 4 },
+      metadata: { palette: 'teal', other: 'ignored' }, appName: 'Acme Desk', appSubtitle: 'Support',
+    },
+  });
+
+  it('changes no workspace setting when the caller asks for none', async () => {
+    const qr = new FakeQueryRunner(answer);
+    const { result } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', source());
+
+    expect(qr.find(/UPDATE workspaces/)).toHaveLength(0);
+    expect(result.settingsApplied).toEqual([]);
+  });
+
+  it('overwrites only the requested settings, merging the palette into the existing metadata', async () => {
+    const qr = new FakeQueryRunner(answer);
+    const { result } = await new ImportWorkspace(dataSourceOf(qr))
+      .execute('ws-target', source(), { overwrite: ['branding', 'palette'] });
+
+    const [update] = qr.find(/UPDATE workspaces/);
+    expect(update.sql).toMatch(/metadata = COALESCE\(metadata, '\{\}'::jsonb\) \|\| jsonb_build_object\('palette', \$2::text\)/);
+    expect(update.sql).toMatch(/"appName" = \$3, "appSubtitle" = \$4 WHERE id = \$1/);
+    expect(update.sql).not.toMatch(/slaPolicy|description|logo|icon/);
+    expect(update.params).toEqual(['ws-target', 'teal', 'Acme Desk', 'Support']);
+    expect(result.settingsApplied).toEqual(['palette', 'branding']);
+  });
+
+  it('overwrites the SLA policy and description when asked', async () => {
+    const qr = new FakeQueryRunner(answer);
+    const { result } = await new ImportWorkspace(dataSourceOf(qr))
+      .execute('ws-target', source(), { overwrite: ['sla', 'description'] });
+
+    const [update] = qr.find(/UPDATE workspaces/);
+    expect(update.sql).toBe('UPDATE workspaces SET "slaPolicy" = $2, description = $3 WHERE id = $1');
+    expect(update.params).toEqual(['ws-target', '{"firstResponseHours":4}', 'Source description']);
+    expect(result.settingsApplied).toEqual(['sla', 'description']);
+  });
+
+  it('rejects an unknown overwrite key before touching the database', async () => {
+    const qr = new FakeQueryRunner(answer);
+    await expect(new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', source(), { overwrite: ['palette', 'logo'] }))
+      .rejects.toThrow(new DomainValidationError('Unknown overwrite setting: logo. Allowed: palette, sla, description, branding'));
+    expect(qr.queries).toHaveLength(0);
+  });
+
+  it('rejects branding text longer than the column allows', async () => {
+    const qr = new FakeQueryRunner(answer);
+    const data = source();
+    data.workspace.appSubtitle = 'x'.repeat(31);
+    await expect(new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data))
+      .rejects.toThrow('Invalid export file: workspace.appSubtitle must be at most 30 characters');
   });
 });
 

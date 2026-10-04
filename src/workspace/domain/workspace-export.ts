@@ -126,6 +126,9 @@ export interface WorkspaceExportData {
     description: string;
     slaPolicy: Record<string, unknown> | null;
     metadata: Record<string, unknown> | null;
+    /** Branding text (not the logo or icon files). Since 1.15. */
+    appName?: string | null;
+    appSubtitle?: string | null;
   };
   users: WorkspaceExportUser[];
   tags: WorkspaceExportTag[];

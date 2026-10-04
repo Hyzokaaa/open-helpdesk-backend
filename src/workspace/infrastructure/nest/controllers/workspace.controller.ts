@@ -676,6 +676,8 @@ export class WorkspaceController {
     @Param("slug") slug: string,
     @Body() body: any,
     @CurrentUser() user: AuthUser,
+    // Comma list of target settings to overwrite: palette, sla, description, branding
+    @Query("overwrite") overwrite?: string | string[],
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
     const ensurePermission = new EnsureWorkspacePermission(
@@ -698,7 +700,11 @@ export class WorkspaceController {
     }
 
     const service = new ImportWorkspace(this.dataSource);
-    const { result, newMembers } = await service.execute(workspaceId, data);
+    const overwriteKeys = [overwrite ?? []].flat()
+      .flatMap((value) => String(value).split(","))
+      .map((key) => key.trim())
+      .filter(Boolean);
+    const { result, newMembers } = await service.execute(workspaceId, data, { overwrite: overwriteKeys });
 
     const workspace = await this.workspaceRepository.findById(workspaceId);
     await sendImportWelcomeEmails(

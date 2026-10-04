@@ -30,6 +30,20 @@ export interface ImportResult {
   customFieldsImported: number;
   csatResponsesImported: number;
   auditLogImported: number;
+  /** The target workspace settings this import overwrote, as asked by the caller. */
+  settingsApplied: ImportSetting[];
+}
+
+/**
+ * Workspace settings an import may overwrite in the target. None is touched unless asked for:
+ * palette → metadata.palette (other metadata keys are kept), sla → slaPolicy,
+ * description → description, branding → appName and appSubtitle (not the logo or icon).
+ */
+export const IMPORT_SETTINGS = ['palette', 'sla', 'description', 'branding'] as const;
+export type ImportSetting = typeof IMPORT_SETTINGS[number];
+
+export interface ImportOptions {
+  overwrite?: string[];
 }
 
 /** A member of the imported workspace whose account was just created, to be invited to set a password. */
@@ -59,6 +73,16 @@ function mentionedIdsOf(value: unknown): string[] {
  * Checks the shape of an (already upgraded) export before anything is written, so a bad file is
  * a 400 naming the offending field instead of a database error halfway through the transaction.
  */
+function overwriteSettingsOf(keys: string[] | undefined): ImportSetting[] {
+  const unknown = (keys ?? []).filter((k) => !(IMPORT_SETTINGS as readonly string[]).includes(k));
+  if (unknown.length) {
+    throw new DomainValidationError(
+      `Unknown overwrite setting: ${unknown.join(', ')}. Allowed: ${IMPORT_SETTINGS.join(', ')}`,
+    );
+  }
+  return IMPORT_SETTINGS.filter((k) => keys?.includes(k));
+}
+
 function validateExportData(data: WorkspaceExportData): void {
   const fail = (path: string, problem: string): never => {
     throw new DomainValidationError(`Invalid export file: ${path} ${problem}`);
@@ -90,6 +114,19 @@ function validateExportData(data: WorkspaceExportData): void {
     if (nullable && row[field] == null) return;
     if (!values.includes(row[field])) fail(`${path}.${field}`, `must be one of: ${values.join(', ')}`);
   };
+
+  const ws: any = data.workspace;
+  if (!ws || typeof ws !== 'object' || Array.isArray(ws)) fail('"workspace"', 'must be an object');
+  const isObjectOrNull = (v: unknown) => v == null || (typeof v === 'object' && !Array.isArray(v));
+  if (ws.description != null && typeof ws.description !== 'string') fail('workspace.description', 'must be text or null');
+  if (!isObjectOrNull(ws.slaPolicy)) fail('workspace.slaPolicy', 'must be an object or null');
+  if (!isObjectOrNull(ws.metadata)) fail('workspace.metadata', 'must be an object or null');
+  if (ws.metadata?.palette != null && typeof ws.metadata.palette !== 'string') fail('workspace.metadata.palette', 'must be text or null');
+  // Column lengths of workspaces.appName / appSubtitle
+  for (const [field, max] of [['appName', 50], ['appSubtitle', 30]] as const) {
+    optionalText(ws, 'workspace', field);
+    if (typeof ws[field] === 'string' && ws[field].length > max) fail(`workspace.${field}`, `must be at most ${max} characters`);
+  }
 
   each('users', data.users, (u, p) => {
     text(u, p, 'email');
@@ -177,7 +214,8 @@ function slugToName(slug: string): string {
 export class ImportWorkspace {
   constructor(private readonly dataSource: DataSource) {}
 
-  async execute(targetWorkspaceId: string, rawData: WorkspaceExportData): Promise<ImportOutcome> {
+  async execute(targetWorkspaceId: string, rawData: WorkspaceExportData, options: ImportOptions = {}): Promise<ImportOutcome> {
+    const settings = overwriteSettingsOf(options.overwrite);
     const data = applyTransforms(rawData);
     validateExportData(data);
     const qr = this.dataSource.createQueryRunner();
@@ -188,11 +226,33 @@ export class ImportWorkspace {
       usersCreated: 0, membersAdded: 0, tagsImported: 0, categoriesImported: 0, ticketsImported: 0,
       commentsImported: 0, commentsSkipped: 0, attachmentsImported: 0, participantsImported: 0,
       cannedResponsesImported: 0, customFieldsImported: 0, csatResponsesImported: 0,
-      auditLogImported: 0,
+      auditLogImported: 0, settingsApplied: [],
     };
     const newMembers: ImportedNewMember[] = [];
 
     try {
+      // 0. Workspace settings — only the ones the caller asked to overwrite
+      if (settings.length) {
+        const ws = data.workspace;
+        const params: unknown[] = [targetWorkspaceId];
+        const sets: string[] = [];
+        const set = (assignment: (param: string) => string, value: unknown) => {
+          params.push(value);
+          sets.push(assignment(`$${params.length}`));
+        };
+        if (settings.includes('palette')) {
+          set((v) => `metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('palette', ${v}::text)`, ws.metadata?.palette ?? null);
+        }
+        if (settings.includes('sla')) set((v) => `"slaPolicy" = ${v}`, ws.slaPolicy == null ? null : JSON.stringify(ws.slaPolicy));
+        if (settings.includes('description')) set((v) => `description = ${v}`, ws.description ?? '');
+        if (settings.includes('branding')) {
+          set((v) => `"appName" = ${v}`, ws.appName ?? null);
+          set((v) => `"appSubtitle" = ${v}`, ws.appSubtitle ?? null);
+        }
+        await qr.query(`UPDATE workspaces SET ${sets.join(', ')} WHERE id = $1`, params);
+        result.settingsApplied = settings;
+      }
+
       // 1. Collect ALL referenced emails across the entire export
       const allEmailsSet = new Set<string>();
       for (const u of data.users) allEmailsSet.add(u.email);
