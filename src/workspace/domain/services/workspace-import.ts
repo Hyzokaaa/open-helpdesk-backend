@@ -175,6 +175,42 @@ export class ImportWorkspace {
       }
       const categoryIdFor = (slug: string | null | undefined) => slug ? (categoryIdBySlug.get(slug) ?? null) : null;
 
+      // 3c. Custom fields — before tickets, whose values are keyed by definition id. A definition
+      // with the same name and type in the target workspace is reused instead of duplicated.
+      const customFieldIdMap = new Map<string, string>();
+      const existingFields = await qr.query(
+        `SELECT id, name, type FROM custom_field_definitions WHERE "workspaceId" = $1`, [targetWorkspaceId],
+      );
+      const fieldKey = (name: string, type: string) => `${name}|${type}`;
+      const existingFieldIds = new Map<string, string>(
+        existingFields.map((f: any) => [fieldKey(f.name, f.type), f.id]),
+      );
+      for (const cf of data.customFields) {
+        const existingId = existingFieldIds.get(fieldKey(cf.name, cf.type));
+        if (existingId) {
+          customFieldIdMap.set(cf.id, existingId);
+          continue;
+        }
+        const newId = ulid();
+        // options is jsonb: node-pg would send a bare array as a Postgres array literal
+        await qr.query(`
+          INSERT INTO custom_field_definitions (id, name, type, options, position, required, "workspaceId", "createdAt")
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `, [newId, cf.name, cf.type, cf.options == null ? null : JSON.stringify(cf.options), cf.position, cf.required, targetWorkspaceId, cf.createdAt]);
+        customFieldIdMap.set(cf.id, newId);
+        existingFieldIds.set(fieldKey(cf.name, cf.type), newId);
+        result.customFieldsImported++;
+      }
+      // Values whose definition is not in the file have nothing to point at and are dropped
+      const remapCustomFields = (values: Record<string, unknown> | null | undefined) => {
+        const remapped: Record<string, unknown> = {};
+        for (const [oldId, value] of Object.entries(values ?? {})) {
+          const newId = customFieldIdMap.get(oldId);
+          if (newId) remapped[newId] = value;
+        }
+        return remapped;
+      };
+
       // 4. Tickets — map old ID → new ID, skip duplicates
       const ticketIdMap = new Map<string, string>();
       // Same lock as TypeOrmTicketRepository.create, so a ticket created meanwhile cannot take a number
@@ -214,7 +250,7 @@ export class ImportWorkspace {
         `, [
           newId, t.name, t.description, t.priority, t.status, categoryIdFor(t.category),
           targetWorkspaceId, userIdFor(t.reporterEmail), userIdFor(t.assigneeEmail), ticketNumber,
-          JSON.stringify(t.customFields), t.discardReason, null,
+          JSON.stringify(remapCustomFields(t.customFields)), t.discardReason, null,
           t.firstResponseAt, t.resolvedAt, userIdFor(t.resolvedByEmail),
           t.firstResponseBreached, t.resolutionBreached, t.createdAt, t.updatedAt,
         ]);
@@ -292,15 +328,6 @@ export class ImportWorkspace {
         cannedIdMap.set(cr.id, newId);
         cannedIdByTitle.set(cr.title, newId);
         result.cannedResponsesImported++;
-      }
-
-      // 9. Custom fields
-      for (const cf of data.customFields) {
-        await qr.query(`
-          INSERT INTO custom_field_definitions (id, name, type, options, position, required, "workspaceId", "createdAt")
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        `, [ulid(), cf.name, cf.type, cf.options, cf.position, cf.required, targetWorkspaceId, cf.createdAt]);
-        result.customFieldsImported++;
       }
 
       // 10. CSAT responses

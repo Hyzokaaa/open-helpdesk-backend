@@ -283,6 +283,55 @@ describe('ImportWorkspace', () => {
     expect(result.cannedResponsesImported).toBe(1);
   });
 
+  it('creates custom field definitions before tickets and rewrites ticket values to the new definition ids', async () => {
+    const qr = new FakeQueryRunner(answer);
+    const createdAt = '2026-01-01T00:00:00.000Z';
+    const data = emptyExport({
+      users: [{ email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' }],
+      customFields: [
+        { id: 'cf-plan', name: 'Plan', type: 'select', options: ['free', 'pro'], position: 0, required: false, createdAt },
+        { id: 'cf-note', name: 'Note', type: 'text', options: null, position: 1, required: false, createdAt },
+      ],
+      tickets: [{ ...ticket('t-1', null), customFields: { 'cf-plan': 'pro', 'cf-note': 'hi', 'cf-gone': 'x' } }],
+    });
+
+    const { result } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    const fieldInserts = qr.find(/INSERT INTO custom_field_definitions/);
+    expect(fieldInserts).toHaveLength(2);
+    const [planId, , , planOptions] = fieldInserts[0].params as string[];
+    const [noteId, , , noteOptions] = fieldInserts[1].params as (string | null)[];
+    expect(planOptions).toBe('["free","pro"]');
+    expect(noteOptions).toBeNull();
+
+    const fieldsIndex = qr.queries.indexOf(fieldInserts[0]);
+    const [ticketInsert] = qr.find(/INSERT INTO tickets/);
+    expect(fieldsIndex).toBeLessThan(qr.queries.indexOf(ticketInsert));
+    expect(JSON.parse(ticketInsert.params[10] as string)).toEqual({ [planId]: 'pro', [noteId as string]: 'hi' });
+    expect(result.customFieldsImported).toBe(2);
+  });
+
+  it('reuses a custom field definition with the same name and type instead of duplicating it', async () => {
+    const qr = new FakeQueryRunner((sql, params) => {
+      if (/FROM custom_field_definitions WHERE/.test(sql)) return [{ id: 'cf-existing', name: 'Plan', type: 'select' }];
+      return answer(sql, params);
+    });
+    const data = emptyExport({
+      users: [{ email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' }],
+      customFields: [
+        { id: 'cf-plan', name: 'Plan', type: 'select', options: ['free'], position: 0, required: false, createdAt: '2026-01-01T00:00:00.000Z' },
+      ],
+      tickets: [{ ...ticket('t-1', null), customFields: { 'cf-plan': 'free' } }],
+    });
+
+    const { result } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    expect(qr.find(/INSERT INTO custom_field_definitions/)).toHaveLength(0);
+    const [ticketInsert] = qr.find(/INSERT INTO tickets/);
+    expect(JSON.parse(ticketInsert.params[10] as string)).toEqual({ 'cf-existing': 'free' });
+    expect(result.customFieldsImported).toBe(0);
+  });
+
   it('upgrades a 1.12 file that only carries slugs on tickets and derives a category name from the slug', async () => {
     const qr = new FakeQueryRunner(answer);
     const legacy = emptyExport({
