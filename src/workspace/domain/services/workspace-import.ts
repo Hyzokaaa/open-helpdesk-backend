@@ -4,6 +4,7 @@ import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { WorkspaceExportData } from '../workspace-export';
 import { applyTransforms } from './workspace-export-transforms';
+import { ExtractMentions } from '../../../comment/domain/services/comment-extract-mentions';
 
 export interface ImportResult {
   usersCreated: number;
@@ -30,6 +31,17 @@ export interface ImportedNewMember {
 export interface ImportOutcome {
   result: ImportResult;
   newMembers: ImportedNewMember[];
+}
+
+/** The markup ExtractMentions reads: `@[Display Name](userId)`. */
+const MENTION_MARKUP = /@\[([^\]]+)\]\(([^)]+)\)/g;
+
+const extractMentions = new ExtractMentions();
+
+/** Files exported before 1.14 may carry mentionedUserIds as the raw comma-joined column text. */
+function mentionedIdsOf(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter((id): id is string => typeof id === 'string' && id !== '');
+  return typeof value === 'string' && value ? value.split(',') : [];
 }
 
 function slugToName(slug: string): string {
@@ -107,6 +119,24 @@ export class ImportWorkspace {
       }
 
       const userIdFor = (email: string | null) => email ? (emailToUserId.get(email) ?? null) : null;
+
+      // Source user id → target user id, for ids carried inside the data (mentions, audit). Files
+      // before 1.14 list no ids; an id that is already a user here (same instance) is kept as is.
+      const sourceUserIdMap = new Map<string, string>();
+      for (const u of data.users) {
+        const targetId = u.id ? emailToUserId.get(u.email) : undefined;
+        if (u.id && targetId) sourceUserIdMap.set(u.id, targetId);
+      }
+      const unmappedIds = new Set<string>();
+      for (const c of data.comments) {
+        for (const id of [...mentionedIdsOf(c.mentionedUserIds), ...extractMentions.execute(c.content ?? '')]) {
+          if (!sourceUserIdMap.has(id)) unmappedIds.add(id);
+        }
+      }
+      if (unmappedIds.size) {
+        const sameInstance = await qr.query(`SELECT id FROM users WHERE id = ANY($1)`, [[...unmappedIds]]);
+        for (const u of sameInstance) sourceUserIdMap.set(u.id, u.id);
+      }
 
       // 2. Add workspace members (skip if already member)
       for (const u of data.users) {
@@ -280,10 +310,20 @@ export class ImportWorkspace {
         const authorId = userIdFor(c.authorEmail);
         if (!newTicketId || !authorId) continue;
         const newId = ulid();
+        // Mentions point at target users; a mention of someone unknown here degrades to plain text
+        const mentioned = new Set<string>();
+        for (const id of mentionedIdsOf(c.mentionedUserIds)) {
+          const targetId = sourceUserIdMap.get(id);
+          if (targetId) mentioned.add(targetId);
+        }
+        const content = (c.content ?? '').replace(MENTION_MARKUP, (_markup: string, name: string, id: string) => {
+          const targetId = sourceUserIdMap.get(id);
+          return targetId ? `@[${name}](${targetId})` : `@${name}`;
+        });
         await qr.query(`
           INSERT INTO comments (id, content, "ticketId", "authorId", "mentionedUserIds", "createdAt")
           VALUES ($1, $2, $3, $4, $5, $6)
-        `, [newId, c.content, newTicketId, authorId, Array.isArray(c.mentionedUserIds) ? c.mentionedUserIds.join(',') : (c.mentionedUserIds ?? ''), c.createdAt]);
+        `, [newId, content, newTicketId, authorId, [...mentioned].join(','), c.createdAt]);
         commentIdMap.set(c.id, newId);
         result.commentsImported++;
       }

@@ -450,6 +450,39 @@ describe('ImportWorkspace', () => {
     expect(result.participantsImported).toBe(0);
   });
 
+  it('rewrites mention ids and markup to target users and degrades unknown mentions to plain text', async () => {
+    const qr = new FakeQueryRunner((sql, params) => {
+      if (/FROM users WHERE email = ANY/.test(sql)) {
+        return [{ id: 'u-1', email: 'alice@example.com' }, { id: 'u-bob', email: 'bob@example.com' }];
+      }
+      if (/FROM users WHERE id = ANY/.test(sql)) return (params[0] as string[]).includes('local-carol') ? [{ id: 'local-carol' }] : [];
+      return answer(sql, params);
+    });
+    const data = emptyExport({
+      users: [
+        { id: 'src-alice', email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' },
+        { id: 'src-bob', email: 'bob@example.com', firstName: 'Bob', lastName: 'B', role: null },
+      ],
+      tickets: [ticket('t-1', null)],
+      comments: [{
+        id: 'c-1',
+        content: 'cc @[Bob B](src-bob), @[Carol](local-carol) and @[Ghost](src-ghost)',
+        ticketId: 't-1',
+        authorEmail: 'alice@example.com',
+        mentionedUserIds: ['src-bob', 'local-carol', 'src-ghost'],
+        createdAt: '2026-01-01T00:00:00.000Z',
+      }],
+    });
+
+    await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    const [lookup] = qr.find(/FROM users WHERE id = ANY/);
+    expect((lookup.params[0] as string[]).sort()).toEqual(['local-carol', 'src-ghost']);
+    const [commentInsert] = qr.find(/INSERT INTO comments/);
+    expect(commentInsert.params[1]).toBe('cc @[Bob B](u-bob), @[Carol](local-carol) and @Ghost');
+    expect(commentInsert.params[4]).toBe('u-bob,local-carol');
+  });
+
   it('upgrades a 1.12 file that only carries slugs on tickets and derives a category name from the slug', async () => {
     const qr = new FakeQueryRunner(answer);
     const legacy = emptyExport({
