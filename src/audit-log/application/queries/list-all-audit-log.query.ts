@@ -1,5 +1,5 @@
-import { ForbiddenException } from '@nestjs/common';
 import { Query } from '../../../shared/domain/query';
+import { AccessDeniedError } from '../../../shared/domain/errors';
 import { PaginatedResult } from '../../../shared/domain/paginated-result';
 import { AuditLogFilters, AuditLogRepository } from '../../domain/repositories/audit-log.repository';
 import { AuditLogItem } from './list-audit-log.query';
@@ -18,7 +18,7 @@ export class ListAllAuditLogQuery implements Query<Props, PaginatedResult<AuditL
 
   async execute(props: Props): Promise<PaginatedResult<AuditLogItem>> {
     if (!props.isSystemAdmin) {
-      throw new ForbiddenException();
+      throw new AccessDeniedError('System admin required');
     }
 
     const result = await this.repository.findAllUnscoped(
