@@ -749,6 +749,27 @@ describe('ImportWorkspace', () => {
     expect(qr.find(/INSERT INTO audit_log_entries/)[0].params[3]).toBe('existing-t');
   });
 
+  it('reports tickets left alone because they already exist, and only the files they carried', async () => {
+    const qr = new FakeQueryRunner((sql, params) => {
+      if (/SELECT id, name, "reporterId", "createdAt" FROM tickets/.test(sql)) {
+        return [{ id: 'existing-t', name: 'Ticket src-t', reporterId: 'u-1', createdAt: '2026-01-01T00:00:00.000Z' }];
+      }
+      return answer(sql, params);
+    });
+    const attachment = (id: string, ticketId: string, file: string | null) => ({
+      id, ticketId, commentId: null, fileName: 'f.txt', originalName: 'f.txt', mimeType: 'text/plain', size: 1, uploadedByEmail: null, createdAt: '2026-01-01T00:00:00.000Z', file,
+    });
+    const data = emptyExport({
+      users: [{ email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' }],
+      tickets: [ticket('src-t', null), { ...ticket('new-t', null), name: 'Something new' }],
+      attachments: [attachment('a-1', 'src-t', 'files/a-1'), attachment('a-2', 'src-t', null), attachment('a-3', 'new-t', null)] as any,
+    });
+
+    const { result } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    expect(result).toMatchObject({ ticketsImported: 1, ticketsAlreadyPresent: 1, attachmentsOfExistingTickets: 1, attachmentsSkipped: 1 });
+  });
+
   it('upgrades a 1.12 file that only carries slugs on tickets and derives a category name from the slug', async () => {
     const qr = new FakeQueryRunner(answer);
     const legacy = emptyExport({
@@ -1621,7 +1642,7 @@ describe('ImportWorkspace files are stored before the transaction', () => {
     }), { files });
 
     expect(storage.uploadedKeys).toEqual([]);
-    expect(result).toMatchObject({ ticketsImported: 0, attachmentsImported: 0 });
+    expect(result).toMatchObject({ ticketsImported: 0, attachmentsImported: 0, ticketsAlreadyPresent: 1, attachmentsOfExistingTickets: 1, attachmentsSkipped: 0 });
     expect(qr.find(/UPDATE organizations SET logo/)).toHaveLength(0);
   });
 

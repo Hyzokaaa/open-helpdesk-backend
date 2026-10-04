@@ -31,6 +31,8 @@ export interface ImportResult {
   categoriesImported: number;
   projectsImported: number;
   ticketsImported: number;
+  /** Tickets not imported because the workspace already has them (same name, reporter and creation second). */
+  ticketsAlreadyPresent: number;
   commentsImported: number;
   /** Comments not imported because their author is missing from the file or no longer exists. */
   commentsSkipped: number;
@@ -39,6 +41,8 @@ export interface ImportResult {
   attachmentsImported: number;
   /** Attachments not imported because the file does not carry their bytes (older exports, or missing at export time). */
   attachmentsSkipped: number;
+  /** Attachments carried in the file but not imported because their ticket already existed here. */
+  attachmentsOfExistingTickets: number;
   participantsImported: number;
   cannedResponsesImported: number;
   customFieldsImported: number;
@@ -448,7 +452,8 @@ export class ImportWorkspace {
 
     const result: ImportResult = {
       usersCreated: 0, membersAdded: 0, organizationsImported: 0, departmentsImported: 0, tagsImported: 0, categoriesImported: 0, projectsImported: 0, ticketsImported: 0,
-      commentsImported: 0, commentsSkipped: 0, descriptionEditsImported: 0, commentEditsImported: 0, attachmentsImported: 0, attachmentsSkipped: 0, participantsImported: 0,
+      ticketsAlreadyPresent: 0, commentsImported: 0, commentsSkipped: 0, descriptionEditsImported: 0, commentEditsImported: 0, attachmentsImported: 0, attachmentsSkipped: 0,
+      attachmentsOfExistingTickets: 0, participantsImported: 0,
       cannedResponsesImported: 0, customFieldsImported: 0, csatResponsesImported: 0,
       kbCategoriesImported: 0, kbArticlesImported: 0, auditLogImported: 0, settingsApplied: [],
     };
@@ -826,6 +831,7 @@ export class ImportWorkspace {
           const existingTicketId = existingTicketKeys.get(ticketKey);
           if (existingTicketId) {
             alreadyImportedTicketIds.set(t.id, existingTicketId);
+            result.ticketsAlreadyPresent++;
             continue;
           }
 
@@ -921,7 +927,14 @@ export class ImportWorkspace {
         for (const a of data.attachments) {
           const newTicketId = a.ticketId ? ticketIdMap.get(a.ticketId) : null;
           const newCommentId = a.commentId ? commentIdMap.get(a.commentId) : null;
-          if (a.ticketId && !newTicketId) continue;
+          if (a.ticketId && !newTicketId) {
+            // Counted here, where the transaction decides, rather than in the upload planning: the
+            // planning only avoids storing these files, and a ticket appearing in between would
+            // otherwise be counted by one and not the other. Only files the archive carries count,
+            // as the preview counts them.
+            if (alreadyImportedTicketIds.has(a.ticketId) && present(a.file)) result.attachmentsOfExistingTickets++;
+            continue;
+          }
           // Only bytes carried in the archive are imported, already stored under the target's own key,
           // the way an upload stores them. A row pointing at the source's key would serve its file.
           const file = stored.attachments.get(a);
