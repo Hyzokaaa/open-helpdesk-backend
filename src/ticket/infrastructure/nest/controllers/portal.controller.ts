@@ -1,5 +1,6 @@
-import { randomBytes, randomUUID } from 'crypto';
+import { randomUUID } from 'crypto';
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -27,7 +28,6 @@ import { StageAttachment } from '../../../../attachment/domain/services/attachme
 import { StageUploadCommand, StageUploadResponse } from '../../.././../attachment/application/commands/stage-upload.command';
 import { TicketPriority } from '../../../domain/enums/ticket-priority.enum';
 import { TicketSource } from '../../../domain/enums/ticket-source.enum';
-import { WorkspaceRole } from '../../../../workspace/domain/enums/workspace-role.enum';
 import { TicketCreatedEvent } from '../../../../email/domain/events';
 import { TypeOrmWorkspaceRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository';
 import { TypeOrmWorkspaceMemberRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
@@ -49,6 +49,7 @@ import { TypeOrmOrganizationRepository } from '../../../../organization/infrastr
 import { TypeOrmTicketCategoryRepository } from '../../../../project/infrastructure/typeorm/repositories/typeorm-ticket-category.repository';
 import { AutoEnrollOrganization } from '../../../../organization/domain/services/organization-auto-enroll';
 import { formatTicketNumber } from '../../../domain/ticket-number';
+import { ResolvePortalReporter } from '../../../domain/services/ticket-portal-resolve-reporter';
 
 /** Portal visitors have no account; their staged uploads are claimed only by portal tickets. */
 const PORTAL_UPLOADER = 'portal-anonymous';
@@ -130,33 +131,20 @@ export class PortalController {
       isCreate: true,
     });
 
-    // Find or create user
-    let user = await this.userRepository.findByEmail(body.email);
-    if (!user) {
-      const createUser = new CreateUser(this.idGenerator, this.userRepository, this.passwordHasher);
-      user = await createUser.execute({
-        email: body.email,
-        password: randomBytes(32).toString('hex'),
-        firstName: body.name,
-        lastName: '',
-        isEmailVerified: false,
-        autoCreated: true,
-      });
-    }
-
-    // Ensure workspace membership
-    const existingMember = await this.memberRepository.findByWorkspaceAndUser(
-      workspace.getId(),
-      user.getId(),
+    // The portal is anonymous: an address that already has an account gains nothing from this
+    // request (no membership, and its portal link only goes to that inbox by email).
+    const resolveReporter = new ResolvePortalReporter(
+      this.userRepository,
+      this.memberRepository,
+      new CreateUser(this.idGenerator, this.userRepository, this.passwordHasher),
+      new AddWorkspaceMember(this.idGenerator, this.memberRepository),
     );
-    if (!existingMember) {
-      const addMember = new AddWorkspaceMember(this.idGenerator, this.memberRepository);
-      await addMember.execute({
-        workspaceId: workspace.getId(),
-        userId: user.getId(),
-        role: WorkspaceRole.USER,
-      });
-    }
+    const reporter = await resolveReporter.execute({
+      workspaceId: workspace.getId(),
+      email: body.email,
+      name: body.name,
+    });
+    const user = reporter.user;
 
     // Auto-enroll organization by reporter email domain
     const autoEnroll = new AutoEnrollOrganization(this.organizationRepository);
@@ -224,7 +212,11 @@ export class PortalController {
       entityId: ticket.getId(),
       userId: user.getId(),
       workspaceId: workspace.getId(),
-      metadata: { ticketNumber: formatTicketNumber(ticket.ticketNumber), email: body.email },
+      metadata: {
+        ticketNumber: formatTicketNumber(ticket.ticketNumber),
+        email: body.email,
+        existingAccount: !reporter.mayRevealPortalLink,
+      },
       category: AuditCategory.TICKET,
       level: AuditLevel.INFO,
       source: 'portal',
@@ -232,7 +224,8 @@ export class PortalController {
 
     return {
       ticketNumber: formatTicketNumber(ticket.ticketNumber),
-      portalToken: ticket.portalToken,
+      // null for an existing account: the link was emailed to its owner instead
+      portalToken: reporter.mayRevealPortalLink ? ticket.portalToken : null,
       message: 'Ticket created',
     };
   }
@@ -330,10 +323,15 @@ export class PortalController {
   @Post(':slug/uploads')
   @Throttle({ default: { ttl: 60000, limit: 20 } })
   @UseInterceptors(FileInterceptor('file'))
-  stageUpload(
+  async stageUpload(
     @Param('slug') slug: string,
     @UploadedFile() file: Express.Multer.File,
   ): Promise<StageUploadResponse> {
+    // Stays anonymous, but only for a portal that exists
+    const workspace = await this.workspaceRepository.findBySlug(slug);
+    if (!workspace) throw new EntityNotFoundError('Workspace not found');
+    if (!file) throw new BadRequestException('No file uploaded');
+
     const service = new StageAttachment(this.idGenerator, this.attachmentRepository, this.storage);
     const command = new StageUploadCommand(service);
     return command.execute({
