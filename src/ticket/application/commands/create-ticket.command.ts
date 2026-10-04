@@ -90,6 +90,7 @@ export class CreateTicketCommand implements Command<Props, CreateTicketResponse>
       customFields: validatedCustomFields,
       departmentId: props.departmentId,
       organizationId: props.organizationId,
+      projectId: props.projectId,
       source: props.source,
       registeredById: props.registeredById,
     });

@@ -172,6 +172,7 @@ export class TicketController {
       uploadTokens: body.uploadTokens,
       departmentId: body.departmentId,
       organizationId,
+      projectId: body.projectId,
       source: TicketSource.UI,
       registeredById: body.onBehalfOf ? user.userId : null,
       isSystemAdmin: user.isSystemAdmin,

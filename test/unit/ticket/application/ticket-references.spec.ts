@@ -85,4 +85,12 @@ describe('A ticket only points at things in its own workspace', () => {
     })).rejects.toThrow(EntityNotFoundError);
     expect(w.tickets.getAll()).toHaveLength(before);
   });
+
+  it('a new ticket keeps the project it was filed under', async () => {
+    const { id } = await create().execute({
+      name: 'x', description: 'y', priority: TicketPriority.LOW, categoryId: 'cat-a', projectId: 'proj-a', tagIds: [],
+      workspaceId: WS_A, workspaceName: 'A', workspaceSlug: 'a', userId: 'admin-a', userEmail: 'admin-a@example.com', isSystemAdmin: false,
+    });
+    expect((await w.tickets.findById(id))!.projectId).toBe('proj-a');
+  });
 });
