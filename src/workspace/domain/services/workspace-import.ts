@@ -21,6 +21,7 @@ import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.en
 import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 import { StorageService } from '../../../shared/domain/storage-service';
 import { attachmentStorageKey } from '../../../attachment/domain/attachment-storage-key';
+import { IMPORT_LINK_ID_MAX, IMPORT_LINK_TYPES, ImportLinkType } from '../workspace-import-link';
 
 export interface ImportResult {
   usersCreated: number;
@@ -109,6 +110,102 @@ export interface ImportOutcome {
   result: ImportResult;
   newMembers: ImportedNewMember[];
 }
+
+const LINK = IMPORT_LINK_TYPES;
+
+/** The identity a row carries in the file: its origin id (1.17), else its own id; null for none. */
+function originOf(row: { id?: string; originId?: string }): string | null {
+  return row.originId || row.id || null;
+}
+
+/** Second-precision timestamp, the grain natural keys compare dates at. */
+function secondOf(value: string | Date | null | undefined): string {
+  return value ? new Date(value).toISOString().slice(0, 19) : '';
+}
+
+const ticketKey = (name: string, reporterId: string | null, createdAt: string | Date | null) =>
+  `${name}|${reporterId}|${secondOf(createdAt)}`;
+
+/** The target workspace's import links, by `type|sourceId`. */
+async function loadLinks(qr: QueryRunner, workspaceId: string): Promise<Map<string, string>> {
+  const rows = await qr.query(
+    `SELECT "entityType", "sourceId", "targetId" FROM workspace_import_links WHERE "workspaceId" = $1`, [workspaceId],
+  );
+  return new Map(rows.map((r: any) => [`${r.entityType}|${r.sourceId}`, r.targetId]));
+}
+
+/**
+ * Finds the entity of the target workspace a file row stands for, by identity: (1) the entity a
+ * link from an earlier import points at, if it still exists; (2) else an entity whose own id is
+ * the origin id (content coming back to the workspace it was exported from). A stale link is
+ * ignored. Natural keys (names, slugs...) are the caller's fallback.
+ */
+class ImportIdentity {
+  constructor(private readonly links: Map<string, string>) {}
+
+  find(type: ImportLinkType, originId: string | null, exists: (id: string) => boolean): string | undefined {
+    if (!originId) return undefined;
+    const linked = this.links.get(`${type}|${originId}`);
+    if (linked && exists(linked)) return linked;
+    return exists(originId) ? originId : undefined;
+  }
+}
+
+/** The links this import writes: one per entity it created or matched, the last one per source winning. */
+class ImportLinks {
+  private readonly rows = new Map<string, { type: ImportLinkType; sourceId: string; targetId: string }>();
+
+  record(type: ImportLinkType, sourceId: string | null, targetId: string | null | undefined): void {
+    // An entity matched by its own id needs no link, and an id wider than the column cannot have one
+    if (!sourceId || !targetId || sourceId === targetId) return;
+    if (sourceId.length > IMPORT_LINK_ID_MAX || targetId.length > IMPORT_LINK_ID_MAX) return;
+    this.rows.set(`${type}|${sourceId}`, { type, sourceId, targetId });
+  }
+
+  /** A link that already exists is kept, unless it was stale and this import chose another target. */
+  async write(qr: QueryRunner, workspaceId: string): Promise<void> {
+    const rows = [...this.rows.values()];
+    for (let i = 0; i < rows.length; i += 500) {
+      const params: unknown[] = [];
+      const values = rows.slice(i, i + 500).map((r) => {
+        params.push(ulid(), workspaceId, r.type, r.sourceId, r.targetId);
+        const n = params.length;
+        return `($${n - 4}, $${n - 3}, $${n - 2}, $${n - 1}, $${n})`;
+      });
+      await qr.query(`
+        INSERT INTO workspace_import_links (id, "workspaceId", "entityType", "sourceId", "targetId")
+        VALUES ${values.join(', ')}
+        ON CONFLICT ("workspaceId", "entityType", "sourceId")
+        DO UPDATE SET "targetId" = EXCLUDED."targetId" WHERE workspace_import_links."targetId" <> EXCLUDED."targetId"
+      `, params);
+    }
+  }
+}
+
+/**
+ * The tickets of the target workspace each file ticket stands for: by identity, else by the
+ * natural key (same name, reporter and creation second). Shared by the upload planning and the
+ * transaction so both decide alike.
+ */
+function matchTickets(
+  tickets: WorkspaceExportData['tickets'],
+  existing: { id: string; name: string; reporterId: string; createdAt: string | Date }[],
+  identity: ImportIdentity,
+  reporterIdFor: (email: string) => string | null,
+): Map<string, string> {
+  const ids = new Set(existing.map((t) => t.id));
+  const byKey = new Map(existing.map((t) => [ticketKey(t.name, t.reporterId, t.createdAt), t.id]));
+  const matches = new Map<string, string>();
+  for (const t of tickets) {
+    let targetId = identity.find(LINK.ticket, originOf(t), (id) => ids.has(id));
+    const reporterId = targetId ? null : reporterIdFor(t.reporterEmail);
+    if (reporterId) targetId = byKey.get(ticketKey(t.name, reporterId, t.createdAt));
+    if (targetId) matches.set(t.id, targetId);
+  }
+  return matches;
+}
+
+const EXISTING_TICKETS_SQL = `SELECT id, name, "reporterId", "createdAt" FROM tickets WHERE "workspaceId" = $1 AND "deletedAt" IS NULL`;
 
 /** The markup ExtractMentions reads: `@[Display Name](userId)`. */
 const MENTION_MARKUP = /@\[([^\]]+)\]\(([^)]+)\)/g;
@@ -318,6 +415,16 @@ function validateExportData(data: WorkspaceExportData): void {
     date(a, p, 'createdAt');
     optionalDate(a, p, 'updatedAt');
   });
+  const identified = [
+    'organizations', 'departments', 'tags', 'categories', 'projects', 'tickets', 'comments', 'descriptionEdits',
+    'commentEdits', 'attachments', 'cannedResponses', 'customFields', 'kbCategories', 'kbArticles',
+  ] as const;
+  for (const section of identified) {
+    each(section, data[section], (row, p) => {
+      optionalText(row, p, 'id');
+      optionalText(row, p, 'originId');
+    });
+  }
   each('auditLog', data.auditLog, (a, p) => {
     text(a, p, 'action');
     text(a, p, 'entityType');
@@ -597,16 +704,26 @@ export class ImportWorkspace {
           return targetId ? `@[${name}](${targetId})` : `@${name}`;
         });
 
-        // 1b. Organizations — before members and tickets, which point at them. One with the same
-        // name in the target workspace is reused, and gets the carried logo only if it has none.
+        // Identity: what earlier imports created or matched here. Every entity this import creates
+        // or matches is linked in turn, so the next import of the same content finds it by identity
+        // even after it was renamed here.
+        const identity = new ImportIdentity(await loadLinks(qr, targetWorkspaceId));
+        const links = new ImportLinks();
+        const idsOf = (rows: { id: string }[]) => new Set(rows.map((r) => r.id));
+
+        // 1b. Organizations — before members and tickets, which point at them. One the target
+        // workspace already has (by identity, else by name) is reused, and gets the carried logo
+        // only if it has none.
         const organizationIdMap = new Map<string, string>();
         const existingOrganizations = await qr.query(
           `SELECT id, name, logo FROM organizations WHERE "workspaceId" = $1 AND "deletedAt" IS NULL`, [targetWorkspaceId],
         );
+        const existingOrganizationIds = idsOf(existingOrganizations);
         const organizationIdByName = new Map<string, string>(existingOrganizations.map((o: any) => [o.name, o.id]));
         const organizationsWithLogo = new Set<string>(existingOrganizations.filter((o: any) => o.logo).map((o: any) => o.id));
         for (const o of data.organizations) {
-          let targetId = organizationIdByName.get(o.name);
+          let targetId = identity.find(LINK.organization, originOf(o), (id) => existingOrganizationIds.has(id))
+            ?? organizationIdByName.get(o.name);
           const logo = stored.organizations.get(o);
           if (targetId && !organizationsWithLogo.has(targetId) && logo?.targetId === targetId) {
             await qr.query(`UPDATE organizations SET logo = $2 WHERE id = $1`, [targetId, use(logo.key)]);
@@ -627,6 +744,7 @@ export class ImportWorkspace {
             }
           }
           organizationIdMap.set(o.id, targetId);
+          links.record(LINK.organization, originOf(o), targetId);
         }
         const organizationIdFor = (id: string | null | undefined) => id ? (organizationIdMap.get(id) ?? null) : null;
 
@@ -653,15 +771,17 @@ export class ImportWorkspace {
           }
         }
 
-        // 2b. Departments and their members — before tickets. One with the same name in the
-        // target workspace is reused; its members are added to, never replaced.
+        // 2b. Departments and their members — before tickets. One the target workspace already has
+        // (by identity, else by name) is reused; its members are added to, never replaced.
         const departmentIdMap = new Map<string, string>();
         const existingDepartments = await qr.query(
           `SELECT id, name FROM departments WHERE "workspaceId" = $1 AND "deletedAt" IS NULL`, [targetWorkspaceId],
         );
+        const existingDepartmentIds = idsOf(existingDepartments);
         const departmentIdByName = new Map<string, string>(existingDepartments.map((d: any) => [d.name, d.id]));
         for (const d of data.departments) {
-          let targetId = departmentIdByName.get(d.name);
+          let targetId = identity.find(LINK.department, originOf(d), (id) => existingDepartmentIds.has(id))
+            ?? departmentIdByName.get(d.name);
           if (!targetId) {
             targetId = ulid();
             await qr.query(`
@@ -672,6 +792,7 @@ export class ImportWorkspace {
             result.departmentsImported++;
           }
           departmentIdMap.set(d.id, targetId);
+          links.record(LINK.department, originOf(d), targetId);
           for (const email of d.memberEmails) {
             const userId = userIdFor(email);
             if (!userId) continue;
@@ -683,18 +804,21 @@ export class ImportWorkspace {
         }
         const departmentIdFor = (id: string | null | undefined) => id ? (departmentIdMap.get(id) ?? null) : null;
 
-        // 3. Tags — map old ID → new ID, reuse existing by name
+        // 3. Tags — map old ID → new ID, reuse existing by identity, else by name
         const tagIdMap = new Map<string, string>();
         const existingTags = await qr.query(
           `SELECT id, name FROM tags WHERE "workspaceId" = $1`, [targetWorkspaceId],
         );
+        const existingTagIds = idsOf(existingTags);
         const existingTagsByName = new Map<string, string>();
         for (const t of existingTags) existingTagsByName.set(t.name, t.id);
 
         for (const tag of data.tags) {
-          const existingId = existingTagsByName.get(tag.name);
+          const existingId = identity.find(LINK.tag, originOf(tag), (id) => existingTagIds.has(id))
+            ?? existingTagsByName.get(tag.name);
           if (existingId) {
             tagIdMap.set(tag.id, existingId);
+            links.record(LINK.tag, originOf(tag), existingId);
           } else {
             const newId = ulid();
             await qr.query(`
@@ -703,17 +827,26 @@ export class ImportWorkspace {
             `, [newId, tag.name, tag.color, targetWorkspaceId, tag.createdAt]);
             tagIdMap.set(tag.id, newId);
             existingTagsByName.set(tag.name, newId);
+            links.record(LINK.tag, originOf(tag), newId);
             result.tagsImported++;
           }
         }
 
-        // 3b. Categories — resolve by slug, reuse the target workspace's own, create the rest.
-        // Files older than 1.13 carry no categories list, only the slug on each ticket.
+        // 3b. Categories — resolve by identity, else by slug, reuse the target workspace's own,
+        // create the rest. Files older than 1.13 carry no categories list, only the slug on each
+        // ticket. Tickets and projects name categories by the file's slug, which a category matched
+        // by identity may no longer have here: they resolve through `categoryIdByFileSlug`.
         const categoryIdBySlug = new Map<string, string>();
         const existingCategories = await qr.query(
           `SELECT id, slug FROM ticket_categories WHERE "workspaceId" = $1`, [targetWorkspaceId],
         );
         for (const c of existingCategories) categoryIdBySlug.set(c.slug, c.id);
+        const existingCategoryIds = idsOf(existingCategories);
+        const categoryIdByFileSlug = new Map<string, string>();
+        for (const c of data.categories ?? []) {
+          const matched = identity.find(LINK.category, originOf(c), (id) => existingCategoryIds.has(id));
+          if (matched && !categoryIdByFileSlug.has(c.slug)) categoryIdByFileSlug.set(c.slug, matched);
+        }
 
         const wanted = new Map<string, { name: string; color: string; createdAt: string | null }>();
         for (const c of data.categories ?? []) {
@@ -725,26 +858,36 @@ export class ImportWorkspace {
           }
         }
         for (const [slug, c] of wanted) {
-          if (categoryIdBySlug.has(slug)) continue;
+          if (categoryIdByFileSlug.has(slug)) continue;
+          const existingId = categoryIdBySlug.get(slug);
+          if (existingId) {
+            categoryIdByFileSlug.set(slug, existingId);
+            continue;
+          }
           const newId = ulid();
           await qr.query(`
             INSERT INTO ticket_categories (id, name, slug, color, "workspaceId", "createdAt")
             VALUES ($1, $2, $3, $4, $5, $6)
           `, [newId, c.name, slug, c.color, targetWorkspaceId, c.createdAt ?? new Date().toISOString()]);
           categoryIdBySlug.set(slug, newId);
+          categoryIdByFileSlug.set(slug, newId);
           result.categoriesImported++;
         }
-        const categoryIdFor = (slug: string | null | undefined) => slug ? (categoryIdBySlug.get(slug) ?? null) : null;
+        for (const c of data.categories ?? []) links.record(LINK.category, originOf(c), categoryIdByFileSlug.get(c.slug));
+        const categoryIdFor = (slug: string | null | undefined) => slug ? (categoryIdByFileSlug.get(slug) ?? null) : null;
 
-        // 3c. Projects and their categories — after categories, before tickets. One with the same
-        // name in the target workspace is reused; its category links are added to, never replaced.
+        // 3c. Projects and their categories — after categories, before tickets. One the target
+        // workspace already has (by identity, else by name) is reused; its category links are added
+        // to, never replaced.
         const projectIdMap = new Map<string, string>();
         const existingProjects = await qr.query(
           `SELECT id, name FROM projects WHERE "workspaceId" = $1 AND "deletedAt" IS NULL`, [targetWorkspaceId],
         );
+        const existingProjectIds = idsOf(existingProjects);
         const projectIdByName = new Map<string, string>(existingProjects.map((p: any) => [p.name, p.id]));
         for (const p of data.projects) {
-          let targetId = projectIdByName.get(p.name);
+          let targetId = identity.find(LINK.project, originOf(p), (id) => existingProjectIds.has(id))
+            ?? projectIdByName.get(p.name);
           if (!targetId) {
             targetId = ulid();
             await qr.query(`
@@ -755,6 +898,7 @@ export class ImportWorkspace {
             result.projectsImported++;
           }
           projectIdMap.set(p.id, targetId);
+          links.record(LINK.project, originOf(p), targetId);
           for (const slug of p.categorySlugs) {
             const categoryId = categoryIdFor(slug);
             if (!categoryId) continue;
@@ -766,8 +910,8 @@ export class ImportWorkspace {
         }
         const projectIdFor = (id: string | null | undefined) => id ? (projectIdMap.get(id) ?? null) : null;
 
-        // 3d. Custom fields — before tickets, whose values are keyed by definition id. A definition
-        // with the same name and type in the target workspace is reused instead of duplicated.
+        // 3d. Custom fields — before tickets, whose values are keyed by definition id. A definition the
+        // target workspace has by identity, or one with the same name and type, is reused.
         const customFieldIdMap = new Map<string, string>();
         const existingFields = await qr.query(
           `SELECT id, name, type FROM custom_field_definitions WHERE "workspaceId" = $1`, [targetWorkspaceId],
@@ -776,10 +920,13 @@ export class ImportWorkspace {
         const existingFieldIds = new Map<string, string>(
           existingFields.map((f: any) => [fieldKey(f.name, f.type), f.id]),
         );
+        const existingFieldIdSet = idsOf(existingFields);
         for (const cf of data.customFields) {
-          const existingId = existingFieldIds.get(fieldKey(cf.name, cf.type));
+          const existingId = identity.find(LINK.customField, originOf(cf), (id) => existingFieldIdSet.has(id))
+            ?? existingFieldIds.get(fieldKey(cf.name, cf.type));
           if (existingId) {
             customFieldIdMap.set(cf.id, existingId);
+            links.record(LINK.customField, originOf(cf), existingId);
             continue;
           }
           const newId = ulid();
@@ -790,6 +937,7 @@ export class ImportWorkspace {
           `, [newId, cf.name, cf.type, cf.options == null ? null : JSON.stringify(cf.options), cf.position, cf.required, targetWorkspaceId, cf.createdAt]);
           customFieldIdMap.set(cf.id, newId);
           existingFieldIds.set(fieldKey(cf.name, cf.type), newId);
+          links.record(LINK.customField, originOf(cf), newId);
           result.customFieldsImported++;
         }
         // Values whose definition is not in the file have nothing to point at and are dropped
@@ -811,13 +959,9 @@ export class ImportWorkspace {
         );
         let ticketNumber = Number(maxNumResult[0].max);
 
-        // Build set of existing tickets to detect duplicates
-        const existingTickets = await qr.query(
-          `SELECT id, name, "reporterId", "createdAt" FROM tickets WHERE "workspaceId" = $1 AND "deletedAt" IS NULL`, [targetWorkspaceId],
-        );
-        const existingTicketKeys = new Map<string, string>(
-          existingTickets.map((t: any) => [`${t.name}|${t.reporterId}|${new Date(t.createdAt).toISOString().slice(0, 19)}`, t.id]),
-        );
+        // Tickets the workspace already has (by identity, else same name, reporter and second)
+        const existingTickets = await qr.query(EXISTING_TICKETS_SQL, [targetWorkspaceId]);
+        const ticketMatches = matchTickets(data.tickets, existingTickets, identity, userIdFor);
         // A ticket skipped as already imported still anchors its audit entries to the existing ticket
         const alreadyImportedTicketIds = new Map<string, string>();
 
@@ -826,11 +970,10 @@ export class ImportWorkspace {
           (a, b) => (Number(a.ticketNumber) || 0) - (Number(b.ticketNumber) || 0),
         );
         for (const t of ticketsInOrder) {
-          const reporterId = userIdFor(t.reporterEmail);
-          const ticketKey = `${t.name}|${reporterId}|${t.createdAt ? new Date(t.createdAt).toISOString().slice(0, 19) : ''}`;
-          const existingTicketId = existingTicketKeys.get(ticketKey);
+          const existingTicketId = ticketMatches.get(t.id);
           if (existingTicketId) {
             alreadyImportedTicketIds.set(t.id, existingTicketId);
+            links.record(LINK.ticket, originOf(t), existingTicketId);
             result.ticketsAlreadyPresent++;
             continue;
           }
@@ -857,6 +1000,7 @@ export class ImportWorkspace {
             t.source ?? TicketSource.UI, userIdFor(t.registeredByEmail ?? null), t.originDate ?? null, t.descriptionEditedAt ?? null,
           ]);
           ticketIdMap.set(t.id, newId);
+          links.record(LINK.ticket, originOf(t), newId);
 
           // ticket_tag
           for (const oldTagId of t.tagIds) {
@@ -896,6 +1040,7 @@ export class ImportWorkspace {
             VALUES ($1, $2, $3, $4, $5, $6)
           `, [newId, content, newTicketId, authorId, [...mentioned].join(','), c.createdAt]);
           commentIdMap.set(c.id, newId);
+          links.record(LINK.comment, originOf(c), newId);
           result.commentsImported++;
         }
 
@@ -905,20 +1050,24 @@ export class ImportWorkspace {
           const ticketId = ticketIdMap.get(e.ticketId);
           const editorId = userIdFor(e.editedByEmail);
           if (!ticketId || !editorId) continue;
+          const editId = ulid();
           await qr.query(`
             INSERT INTO ticket_description_edits (id, content, "ticketId", "editedById", "createdAt")
             VALUES ($1, $2, $3, $4, $5)
-          `, [ulid(), sanitizeHtml(e.content ?? ''), ticketId, editorId, e.createdAt]);
+          `, [editId, sanitizeHtml(e.content ?? ''), ticketId, editorId, e.createdAt]);
+          links.record(LINK.descriptionEdit, originOf(e), editId);
           result.descriptionEditsImported++;
         }
         for (const e of data.commentEdits) {
           const commentId = commentIdMap.get(e.commentId);
           const editorId = userIdFor(e.editedByEmail);
           if (!commentId || !editorId) continue;
+          const editId = ulid();
           await qr.query(`
             INSERT INTO comment_edits (id, content, "commentId", "editedById", "createdAt")
             VALUES ($1, $2, $3, $4, $5)
-          `, [ulid(), sanitizeHtml(remapMentionMarkup(e.content)), commentId, editorId, e.createdAt]);
+          `, [editId, sanitizeHtml(remapMentionMarkup(e.content)), commentId, editorId, e.createdAt]);
+          links.record(LINK.commentEdit, originOf(e), editId);
           result.commentEditsImported++;
         }
 
@@ -950,6 +1099,7 @@ export class ImportWorkspace {
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
           `, [newAttachmentId, a.fileName || originalName, originalName, a.mimeType || 'application/octet-stream', size, key, newTicketId, newCommentId, userIdFor(a.uploadedByEmail), a.createdAt]);
           attachmentIdMap.set(a.id, newAttachmentId);
+          links.record(LINK.attachment, originOf(a), newAttachmentId);
           result.attachmentsImported++;
         }
 
@@ -966,16 +1116,20 @@ export class ImportWorkspace {
           if (inserted.length) result.participantsImported++;
         }
 
-        // 8. Canned responses — reuse the target workspace's own by title, so a re-import adds none
+        // 8. Canned responses — reuse the target workspace's own by identity, else by title, so a
+        // re-import adds none
         const cannedIdMap = new Map<string, string>();
         const existingCanned = await qr.query(
           `SELECT id, title FROM canned_responses WHERE "workspaceId" = $1`, [targetWorkspaceId],
         );
+        const existingCannedIds = idsOf(existingCanned);
         const cannedIdByTitle = new Map<string, string>(existingCanned.map((cr: any) => [cr.title, cr.id]));
         for (const cr of data.cannedResponses) {
-          const existingId = cannedIdByTitle.get(cr.title);
+          const existingId = identity.find(LINK.cannedResponse, originOf(cr), (id) => existingCannedIds.has(id))
+            ?? cannedIdByTitle.get(cr.title);
           if (existingId) {
             cannedIdMap.set(cr.id, existingId);
+            links.record(LINK.cannedResponse, originOf(cr), existingId);
             continue;
           }
           const newId = ulid();
@@ -985,6 +1139,7 @@ export class ImportWorkspace {
           `, [newId, cr.title, cr.content, targetWorkspaceId, cr.createdAt]);
           cannedIdMap.set(cr.id, newId);
           cannedIdByTitle.set(cr.title, newId);
+          links.record(LINK.cannedResponse, originOf(cr), newId);
           result.cannedResponsesImported++;
         }
 
@@ -1002,15 +1157,18 @@ export class ImportWorkspace {
           result.csatResponsesImported++;
         }
 
-        // 10b. Knowledge base — categories reused by slug; an article whose slug the target
-        // workspace already has is skipped. Content is sanitized as the KB create service does.
+        // 10b. Knowledge base — categories reused by identity, else by slug; an article the target
+        // workspace already has (by identity, else by slug) is skipped. Content is sanitized as the
+        // KB create service does.
         const kbCategoryIdMap = new Map<string, string>();
         const existingKbCategories = await qr.query(
           `SELECT id, slug FROM kb_categories WHERE "workspaceId" = $1`, [targetWorkspaceId],
         );
+        const existingKbCategoryIds = idsOf(existingKbCategories);
         const kbCategoryIdBySlug = new Map<string, string>(existingKbCategories.map((c: any) => [c.slug, c.id]));
         for (const c of data.kbCategories) {
-          let targetId = kbCategoryIdBySlug.get(c.slug);
+          let targetId = identity.find(LINK.kbCategory, originOf(c), (id) => existingKbCategoryIds.has(id))
+            ?? kbCategoryIdBySlug.get(c.slug);
           if (!targetId) {
             targetId = ulid();
             const createdAt = c.createdAt ?? new Date().toISOString();
@@ -1022,16 +1180,20 @@ export class ImportWorkspace {
             result.kbCategoriesImported++;
           }
           kbCategoryIdMap.set(c.id, targetId);
+          links.record(LINK.kbCategory, originOf(c), targetId);
         }
         const kbArticleIdMap = new Map<string, string>();
         const existingKbArticles = await qr.query(
           `SELECT id, slug FROM kb_articles WHERE "workspaceId" = $1`, [targetWorkspaceId],
         );
+        const existingKbArticleIds = idsOf(existingKbArticles);
         const kbArticleIdBySlug = new Map<string, string>(existingKbArticles.map((a: any) => [a.slug, a.id]));
         for (const a of data.kbArticles) {
-          const existingId = kbArticleIdBySlug.get(a.slug);
+          const existingId = identity.find(LINK.kbArticle, originOf(a), (id) => existingKbArticleIds.has(id))
+            ?? kbArticleIdBySlug.get(a.slug);
           if (existingId) {
             kbArticleIdMap.set(a.id, existingId);
+            links.record(LINK.kbArticle, originOf(a), existingId);
             continue;
           }
           // categoryId and createdById are NOT NULL
@@ -1048,6 +1210,7 @@ export class ImportWorkspace {
           ]);
           kbArticleIdBySlug.set(a.slug, newId);
           kbArticleIdMap.set(a.id, newId);
+          links.record(LINK.kbArticle, originOf(a), newId);
           result.kbArticlesImported++;
         }
 
@@ -1064,7 +1227,7 @@ export class ImportWorkspace {
         // carry (mailboxes, webhooks, email rules...) keep their source id.
         const categoryIdMap = new Map<string, string>();
         for (const c of data.categories) {
-          const targetId = categoryIdBySlug.get(c.slug);
+          const targetId = categoryIdByFileSlug.get(c.slug);
           if (targetId) categoryIdMap.set(c.id, targetId);
         }
         const auditTicketIdMap = new Map([...alreadyImportedTicketIds, ...ticketIdMap]);
@@ -1129,6 +1292,7 @@ export class ImportWorkspace {
           result.auditLogImported++;
         }
 
+        await links.write(qr, targetWorkspaceId);
         await qr.commitTransaction();
       } catch (error) {
         await qr.rollbackTransaction().catch(() => undefined);
@@ -1190,16 +1354,25 @@ export class ImportWorkspace {
 
     // Organizations: a new one gets the key the organization logo upload uses, under the id it
     // will be created with; a reused one without a logo gets a key of its own; one with a logo none
+    // The same identity the transaction matches by, read once
+    let identity: ImportIdentity | undefined;
+    const identityNow = async () => (identity ??= new ImportIdentity(await loadLinks(qr, targetWorkspaceId)));
+
     if (data.organizations.some((o) => sizeOf(o.logoFile?.file) !== null)) {
       const existing = await qr.query(
         `SELECT id, name, logo FROM organizations WHERE "workspaceId" = $1 AND "deletedAt" IS NULL`, [targetWorkspaceId],
       );
+      const existingById = new Map<string, { id: string; logo: string | null }>(existing.map((o: any) => [o.id, o]));
       const existingByName = new Map<string, { id: string; logo: string | null }>(existing.map((o: any) => [o.name, o]));
       const planned = new Set<string>();
+      const ids = await identityNow();
       for (const o of data.organizations) {
-        const reused = existingByName.get(o.name);
-        if (planned.has(o.name) || reused?.logo) continue;
-        planned.add(o.name);
+        const matchedId = ids.find(LINK.organization, originOf(o), (id) => existingById.has(id));
+        const reused = matchedId ? existingById.get(matchedId) : existingByName.get(o.name);
+        // One logo per target: a reused organization by its id, a new one by the name it is created under
+        const plan = reused ? `id|${reused.id}` : `name|${o.name}`;
+        if (planned.has(plan) || reused?.logo) continue;
+        planned.add(plan);
         const targetId = reused?.id ?? ulid();
         const key = await storeImage(o.logoFile, LOGO_MAX_BYTES, (ext) =>
           reused ? `organizations/${targetId}/logo-${ulid()}${ext}` : `organizations/${targetId}/logo${ext}`);
@@ -1207,28 +1380,19 @@ export class ImportWorkspace {
       }
     }
 
-    // Attachments of tickets the import will create; a ticket already imported (same name,
-    // reporter and creation second, as the transaction checks) brings none
+    // Attachments of tickets the import will create; a ticket already here (matched as the
+    // transaction matches it) brings none
     const carried = data.attachments.filter((a) => sizeOf(a.file) !== null);
     if (carried.length) {
       const reporters = [...new Set(data.tickets.map((t) => t.reporterEmail))];
       const reporterIds = new Map<string, string>(
         (await qr.query(`SELECT id, email FROM users WHERE email = ANY($1)`, [reporters])).map((u: any) => [u.email, u.id]),
       );
-      const existingTickets = await qr.query(
-        `SELECT id, name, "reporterId", "createdAt" FROM tickets WHERE "workspaceId" = $1 AND "deletedAt" IS NULL`, [targetWorkspaceId],
-      );
-      const existingKeys = new Set<string>(
-        existingTickets.map((t: any) => `${t.name}|${t.reporterId}|${new Date(t.createdAt).toISOString().slice(0, 19)}`),
-      );
-      const importedTickets = new Set<string>();
-      for (const t of data.tickets) {
-        const reporterId = reporterIds.get(t.reporterEmail) ?? null;
-        const key = `${t.name}|${reporterId}|${t.createdAt ? new Date(t.createdAt).toISOString().slice(0, 19) : ''}`;
-        if (!reporterId || !existingKeys.has(key)) importedTickets.add(t.id);
-      }
+      const existingTickets = await qr.query(EXISTING_TICKETS_SQL, [targetWorkspaceId]);
+      const matches = matchTickets(data.tickets, existingTickets, await identityNow(), (email) => reporterIds.get(email) ?? null);
+      const fileTickets = new Set(data.tickets.map((t) => t.id));
       for (const a of carried) {
-        if (!a.ticketId || !importedTickets.has(a.ticketId)) continue;
+        if (!a.ticketId || !fileTickets.has(a.ticketId) || matches.has(a.ticketId)) continue;
         const id = ulid();
         const size = sizeOf(a.file)!;
         const key = attachmentStorageKey(id, a.originalName || a.fileName || 'file');

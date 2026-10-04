@@ -1746,3 +1746,215 @@ describe('ImportWorkspace files are stored before the transaction', () => {
     expect(storage.deletedKeys).toHaveLength(2);
   });
 });
+
+/** The [entityType, sourceId, targetId] of every link the import wrote, in order. */
+function linksWritten(qr: FakeQueryRunner): [string, string, string][] {
+  const rows: [string, string, string][] = [];
+  for (const q of qr.find(/INSERT INTO workspace_import_links/)) {
+    for (let i = 0; i < q.params.length; i += 5) rows.push([q.params[i + 2], q.params[i + 3], q.params[i + 4]] as [string, string, string]);
+  }
+  return rows;
+}
+
+type TableRows = Record<string, unknown[]>;
+
+/** Answers the reads of an import from in-memory rows, by table. */
+function answerFrom(rows: TableRows): Answer {
+  return (sql) => {
+    if (/FROM users WHERE email = ANY/.test(sql)) return [{ id: 'u-1', email: 'alice@example.com' }];
+    if (/MAX\("ticketNumber"\)/.test(sql)) return [{ max: 0 }];
+    if (/FROM workspace_import_links/.test(sql)) return rows.links ?? [];
+    if (/FROM tickets WHERE "workspaceId"/.test(sql)) return rows.tickets ?? [];
+    if (/FROM tickets WHERE id = ANY/.test(sql)) return rows.ticketDetails ?? [];
+    if (/FROM ticket_tag WHERE/.test(sql)) return rows.ticketTags ?? [];
+    if (/FROM comments WHERE/.test(sql)) return rows.comments ?? [];
+    if (/FROM attachments WHERE/.test(sql)) return rows.attachments ?? [];
+    if (/FROM ticket_description_edits WHERE/.test(sql)) return rows.descriptionEdits ?? [];
+    if (/FROM comment_edits WHERE/.test(sql)) return rows.commentEdits ?? [];
+    if (/FROM tags WHERE/.test(sql)) return rows.tags ?? [];
+    if (/FROM organizations WHERE/.test(sql)) return rows.organizations ?? [];
+    if (/FROM departments WHERE/.test(sql)) return rows.departments ?? [];
+    if (/FROM projects WHERE/.test(sql)) return rows.projects ?? [];
+    if (/FROM custom_field_definitions WHERE/.test(sql)) return rows.customFields ?? [];
+    if (/FROM ticket_categories WHERE/.test(sql)) return rows.categories ?? [];
+    return [];
+  };
+}
+
+const importLink = (entityType: string, sourceId: string, targetId: string) => ({ entityType, sourceId, targetId });
+
+describe('ImportWorkspace identity', () => {
+  const at = '2026-01-01T00:00:00.000Z';
+  const alice = { email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' };
+
+  it('links every entity it creates to the origin id the file gives it, in the same transaction', async () => {
+    const qr = new FakeQueryRunner(answerFrom({}));
+    const data = emptyExport({
+      users: [alice],
+      tags: [{ id: 'tag-src', originId: 'tag-origin', name: 'urgent', color: null, createdAt: at }],
+      tickets: [{ ...ticket('t-src', null), originId: 't-origin' }],
+      comments: [{ id: 'c-src', content: 'hi', ticketId: 't-src', authorEmail: 'alice@example.com', mentionedUserIds: [], createdAt: at }],
+      descriptionEdits: [{ id: 'e-src', ticketId: 't-src', content: 'old', editedByEmail: 'alice@example.com', createdAt: at }],
+    });
+
+    await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    const ticketId = qr.find(/INSERT INTO tickets/)[0].params[0];
+    const commentId = qr.find(/INSERT INTO comments/)[0].params[0];
+    const tagId = qr.find(/INSERT INTO tags/)[0].params[0];
+    const editId = qr.find(/INSERT INTO ticket_description_edits/)[0].params[0];
+    expect(linksWritten(qr)).toEqual(expect.arrayContaining([
+      ['ticket', 't-origin', ticketId],
+      ['tag', 'tag-origin', tagId],
+      // Without an origin id (a hand-made 1.17 file) the row's own id is its identity
+      ['comment', 'c-src', commentId],
+      ['ticket-description-edit', 'e-src', editId],
+    ]));
+    const [insert] = qr.find(/INSERT INTO workspace_import_links/);
+    expect(insert.params[1]).toBe('ws-target');
+    expect(insert.sql).toMatch(/ON CONFLICT \("workspaceId", "entityType", "sourceId"\)/);
+    expect(qr.queries.indexOf(insert)).toBeGreaterThan(qr.queries.findIndex((q) => /INSERT INTO tickets/.test(q.sql)));
+    expect(qr.committed).toBe(true);
+  });
+
+  it('matches a ticket renamed here through the link of the import that created it', async () => {
+    const qr = new FakeQueryRunner(answerFrom({
+      links: [importLink('ticket', 't-origin', 'existing-t')],
+      tickets: [{ id: 'existing-t', name: 'Renamed here', reporterId: 'u-1', createdAt: at }],
+    }));
+    const data = emptyExport({ users: [alice], tickets: [{ ...ticket('t-src', null), originId: 't-origin' }] });
+
+    const { result } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    expect(qr.find(/INSERT INTO tickets/)).toHaveLength(0);
+    expect(result).toMatchObject({ ticketsImported: 0, ticketsAlreadyPresent: 1 });
+  });
+
+  it('matches content coming back to the workspace it was exported from by its own id, without a link', async () => {
+    const qr = new FakeQueryRunner(answerFrom({
+      tickets: [{ id: 'home-t', name: 'Renamed at home', reporterId: 'u-1', createdAt: '2025-06-01T00:00:00.000Z' }],
+      tags: [{ id: 'home-tag', name: 'renamed' }],
+    }));
+    // Exported here, imported elsewhere (new ids), exported there: origin ids are this workspace's ids
+    const data = emptyExport({
+      users: [alice],
+      tags: [{ id: 'b-tag', originId: 'home-tag', name: 'urgent', color: null, createdAt: at }],
+      tickets: [{ ...ticket('b-t', null), originId: 'home-t', tagIds: ['b-tag'] }],
+    });
+
+    const { result } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    expect(qr.find(/INSERT INTO tickets/)).toHaveLength(0);
+    expect(qr.find(/INSERT INTO tags/)).toHaveLength(0);
+    expect(result.ticketsAlreadyPresent).toBe(1);
+    expect(linksWritten(qr)).toEqual([]);
+  });
+
+  it('ignores a link whose target is gone, falls back to natural keys and replaces the link', async () => {
+    const qr = new FakeQueryRunner(answerFrom({
+      links: [importLink('ticket', 't-origin', 'deleted-t'), importLink('tag', 'tag-origin', 'deleted-tag')],
+      tags: [{ id: 'tag-here', name: 'urgent' }],
+    }));
+    const data = emptyExport({
+      users: [alice],
+      tags: [{ id: 'tag-src', originId: 'tag-origin', name: 'urgent', color: null, createdAt: at }],
+      tickets: [{ ...ticket('t-src', null), originId: 't-origin' }],
+    });
+
+    const { result } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    expect(result).toMatchObject({ ticketsImported: 1, tagsImported: 0 });
+    const ticketId = qr.find(/INSERT INTO tickets/)[0].params[0];
+    expect(linksWritten(qr)).toEqual(expect.arrayContaining([['ticket', 't-origin', ticketId], ['tag', 'tag-origin', 'tag-here']]));
+    expect(qr.find(/INSERT INTO workspace_import_links/)[0].sql).toMatch(/DO UPDATE SET "targetId" = EXCLUDED\."targetId"/);
+  });
+
+  it('links what it matches by natural key, so the next import matches by identity', async () => {
+    const qr = new FakeQueryRunner(answerFrom({
+      tickets: [{ id: 'existing-t', name: 'Ticket t-src', reporterId: 'u-1', createdAt: at }],
+      organizations: [{ id: 'org-here', name: 'Globex', logo: null }],
+    }));
+    const data = emptyExport({
+      users: [alice],
+      organizations: [{ id: 'org-src', originId: 'org-origin', name: 'Globex', description: null, notes: null, domains: [], createdAt: at }],
+      tickets: [{ ...ticket('t-src', null), originId: 't-origin' }],
+    });
+
+    await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    expect(linksWritten(qr)).toEqual(expect.arrayContaining([['ticket', 't-origin', 'existing-t'], ['organization', 'org-origin', 'org-here']]));
+  });
+
+  it('prefers identity over names for organizations and tags renamed here', async () => {
+    const qr = new FakeQueryRunner(answerFrom({
+      links: [importLink('organization', 'org-origin', 'org-renamed'), importLink('tag', 'tag-origin', 'tag-renamed')],
+      organizations: [{ id: 'org-renamed', name: 'Globex Corp', logo: null }],
+      tags: [{ id: 'tag-renamed', name: 'very urgent' }],
+    }));
+    const data = emptyExport({
+      users: [alice],
+      organizations: [{ id: 'org-src', originId: 'org-origin', name: 'Globex', description: null, notes: null, domains: [], createdAt: at }],
+      tags: [{ id: 'tag-src', originId: 'tag-origin', name: 'urgent', color: null, createdAt: at }],
+      tickets: [{ ...ticket('t-src', null), organizationId: 'org-src', tagIds: ['tag-src'] }],
+    });
+
+    const { result } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    expect(result).toMatchObject({ organizationsImported: 0, tagsImported: 0 });
+    expect(qr.find(/INSERT INTO tickets/)[0].params[20]).toBe('org-renamed');
+    expect(qr.find(/INSERT INTO ticket_tag/)[0].params[1]).toBe('tag-renamed');
+  });
+
+  it('resolves a category whose slug changed here by identity, for tickets too', async () => {
+    const qr = new FakeQueryRunner(answerFrom({
+      links: [importLink('ticket-category', 'cat-origin', 'cat-here')],
+      categories: [{ id: 'cat-here', slug: 'defect' }],
+    }));
+    const data = emptyExport({
+      users: [alice],
+      categories: [{ id: 'cat-src', originId: 'cat-origin', name: 'Bug', slug: 'bug', color: 'red', createdAt: at }],
+      tickets: [ticket('t-src', 'bug')],
+    });
+
+    const { result } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    expect(result.categoriesImported).toBe(0);
+    expect(qr.find(/INSERT INTO ticket_categories/)).toHaveLength(0);
+    expect(qr.find(/INSERT INTO tickets/)[0].params[5]).toBe('cat-here');
+  });
+
+  it('stores no file for a ticket matched by identity', async () => {
+    const qr = new FakeQueryRunner(answerFrom({
+      links: [importLink('ticket', 't-origin', 'existing-t')],
+      tickets: [{ id: 'existing-t', name: 'Renamed here', reporterId: 'u-1', createdAt: at }],
+    }));
+    const storage = new FakeS3Storage();
+    const data = emptyExport({
+      users: [alice],
+      tickets: [{ ...ticket('t-src', null), originId: 't-origin' }],
+      attachments: [{ id: 'a', fileName: 'a.pdf', originalName: 'a.pdf', mimeType: 'application/pdf', size: 3, file: 'files/a', ticketId: 't-src', commentId: null, uploadedByEmail: null, createdAt: at }],
+    });
+
+    const { result } = await new ImportWorkspace(dataSourceOf(qr), storage)
+      .execute('ws-target', data, { files: archiveOf({ 'files/a': Buffer.from('aaa') }) });
+
+    expect(storage.uploadedKeys).toEqual([]);
+    expect(result).toMatchObject({ ticketsAlreadyPresent: 1, attachmentsOfExistingTickets: 1 });
+  });
+
+  it('gives no link to an id wider than the column, instead of failing the import', async () => {
+    const qr = new FakeQueryRunner(answerFrom({}));
+    const data = emptyExport({ users: [alice], tickets: [{ ...ticket('t-src', null), originId: 'x'.repeat(40) }] });
+
+    const { result } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    expect(result.ticketsImported).toBe(1);
+    expect(linksWritten(qr)).toEqual([]);
+  });
+
+  it('rejects an origin id that is not text', async () => {
+    const qr = new FakeQueryRunner(answerFrom({}));
+    const data = emptyExport({ users: [alice], tickets: [{ ...ticket('t-src', null), originId: 42 as unknown as string }] });
+    await expect(new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data)).rejects.toThrow(/tickets\[0\]\.originId/);
+  });
+});
