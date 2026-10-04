@@ -58,6 +58,8 @@ export class MailboxController {
       addressMode: m.addressMode,
       acceptedAddresses: m.acceptedAddresses,
       autoReply: m.autoReply,
+      postProcessAction: m.postProcessAction,
+      postProcessFolder: m.postProcessFolder,
     }));
   }
 
