@@ -12,13 +12,22 @@ export interface WorkspaceExportTag {
   createdAt: string;
 }
 
+export interface WorkspaceExportCategory {
+  id: string;
+  name: string;
+  slug: string;
+  color: string;
+  createdAt: string;
+}
+
 export interface WorkspaceExportTicket {
   id: string;
   name: string;
   description: string;
   priority: string;
   status: string;
-  category: string;
+  /** Slug of the ticket's category, resolved against `categories` (and the target workspace) on import. */
+  category: string | null;
   reporterEmail: string;
   assigneeEmail: string | null;
   ticketNumber: number;
@@ -107,6 +116,7 @@ export interface WorkspaceExportData {
   };
   users: WorkspaceExportUser[];
   tags: WorkspaceExportTag[];
+  categories: WorkspaceExportCategory[];
   tickets: WorkspaceExportTicket[];
   comments: WorkspaceExportComment[];
   attachments: WorkspaceExportAttachment[];

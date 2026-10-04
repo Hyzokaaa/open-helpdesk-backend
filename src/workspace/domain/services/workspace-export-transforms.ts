@@ -16,11 +16,22 @@ const TRANSFORMS: Record<string, Transform> = {
     data.version = '1.12.0';
     return data;
   },
-  '1.12.0': (data) => data,
+  '1.12.0': (data) => {
+    // 1.12 → 1.13: tickets.category became a FK to ticket_categories. The
+    // ticket keeps its category slug; the categories themselves travel in a
+    // new top-level list so the import can recreate them by slug.
+    if (!data.categories) data.categories = [];
+    data.tickets.forEach((t: any) => {
+      if (t.category === undefined) t.category = null;
+    });
+    data.version = '1.13.0';
+    return data;
+  },
+  '1.13.0': (data) => data,
 };
 
-const VERSION_ORDER = ['1.11.0', '1.12.0'];
-const CURRENT_VERSION = '1.12.0';
+const VERSION_ORDER = ['1.11.0', '1.12.0', '1.13.0'];
+const CURRENT_VERSION = '1.13.0';
 const MIN_VERSION = '1.11.0';
 
 export function applyTransforms(data: WorkspaceExportData): WorkspaceExportData {

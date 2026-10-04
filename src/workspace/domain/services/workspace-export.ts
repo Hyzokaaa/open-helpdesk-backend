@@ -53,17 +53,24 @@ export class ExportWorkspace {
         `SELECT id, name, color, "createdAt" FROM tags WHERE "workspaceId" = $1`, [workspaceId],
       );
 
+      const categories = await qr.query(
+        `SELECT id, name, slug, color, "createdAt" FROM ticket_categories WHERE "workspaceId" = $1`, [workspaceId],
+      );
+
+      // tickets.category was replaced by a categoryId FK; the export keeps the
+      // slug so older files and newer ones describe the category the same way.
       const tickets = await qr.query(`
-        SELECT t.id, t.name, t.description, t.priority, t.status, t.category,
+        SELECT t.id, t.name, t.description, t.priority, t.status, tc.slug AS category,
           t."reporterId", t."assigneeId", t."ticketNumber", t."customFields",
           t."discardReason", t."portalToken", t."firstResponseAt", t."resolvedAt",
           t."resolvedById", t."firstResponseBreached", t."resolutionBreached",
           t."createdAt", t."updatedAt",
           COALESCE(array_agg(tt."tagsId") FILTER (WHERE tt."tagsId" IS NOT NULL), '{}') as "tagIds"
         FROM tickets t
+        LEFT JOIN ticket_categories tc ON tc.id = t."categoryId"
         LEFT JOIN ticket_tag tt ON tt."ticketsId" = t.id
         WHERE t."workspaceId" = $1 AND t."deletedAt" IS NULL
-        GROUP BY t.id
+        GROUP BY t.id, tc.id
       `, [workspaceId]);
 
       const comments = await qr.query(`
@@ -124,13 +131,20 @@ export class ExportWorkspace {
           color: t.color,
           createdAt: t.createdAt?.toISOString(),
         })),
+        categories: categories.map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          slug: c.slug,
+          color: c.color,
+          createdAt: c.createdAt?.toISOString(),
+        })),
         tickets: tickets.map((t: any) => ({
           id: t.id,
           name: t.name,
           description: t.description,
           priority: t.priority,
           status: t.status,
-          category: t.category,
+          category: t.category ?? null,
           reporterEmail: emailFor(t.reporterId)!,
           assigneeEmail: emailFor(t.assigneeId),
           ticketNumber: t.ticketNumber,

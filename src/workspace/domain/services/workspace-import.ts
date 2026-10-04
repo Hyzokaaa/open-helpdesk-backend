@@ -9,6 +9,7 @@ export interface ImportResult {
   usersCreated: number;
   membersAdded: number;
   tagsImported: number;
+  categoriesImported: number;
   ticketsImported: number;
   commentsImported: number;
   attachmentsImported: number;
@@ -31,6 +32,14 @@ export interface ImportOutcome {
   newMembers: ImportedNewMember[];
 }
 
+function slugToName(slug: string): string {
+  return slug
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
 export class ImportWorkspace {
   constructor(private readonly dataSource: DataSource) {}
 
@@ -41,7 +50,7 @@ export class ImportWorkspace {
     await qr.startTransaction();
 
     const result: ImportResult = {
-      usersCreated: 0, membersAdded: 0, tagsImported: 0, ticketsImported: 0,
+      usersCreated: 0, membersAdded: 0, tagsImported: 0, categoriesImported: 0, ticketsImported: 0,
       commentsImported: 0, attachmentsImported: 0, participantsImported: 0,
       cannedResponsesImported: 0, customFieldsImported: 0, csatResponsesImported: 0,
       auditLogImported: 0,
@@ -136,6 +145,35 @@ export class ImportWorkspace {
         }
       }
 
+      // 3b. Categories — resolve by slug, reuse the target workspace's own, create the rest.
+      // Files older than 1.13 carry no categories list, only the slug on each ticket.
+      const categoryIdBySlug = new Map<string, string>();
+      const existingCategories = await qr.query(
+        `SELECT id, slug FROM ticket_categories WHERE "workspaceId" = $1`, [targetWorkspaceId],
+      );
+      for (const c of existingCategories) categoryIdBySlug.set(c.slug, c.id);
+
+      const wanted = new Map<string, { name: string; color: string; createdAt: string | null }>();
+      for (const c of data.categories ?? []) {
+        wanted.set(c.slug, { name: c.name, color: c.color ?? 'blue', createdAt: c.createdAt ?? null });
+      }
+      for (const t of data.tickets) {
+        if (t.category && !wanted.has(t.category)) {
+          wanted.set(t.category, { name: slugToName(t.category), color: 'blue', createdAt: null });
+        }
+      }
+      for (const [slug, c] of wanted) {
+        if (categoryIdBySlug.has(slug)) continue;
+        const newId = ulid();
+        await qr.query(`
+          INSERT INTO ticket_categories (id, name, slug, color, "workspaceId", "createdAt")
+          VALUES ($1, $2, $3, $4, $5, $6)
+        `, [newId, c.name, slug, c.color, targetWorkspaceId, c.createdAt ?? new Date().toISOString()]);
+        categoryIdBySlug.set(slug, newId);
+        result.categoriesImported++;
+      }
+      const categoryIdFor = (slug: string | null | undefined) => slug ? (categoryIdBySlug.get(slug) ?? null) : null;
+
       // 4. Tickets — map old ID → new ID, skip duplicates
       const ticketIdMap = new Map<string, string>();
       const maxNumResult = await qr.query(
@@ -160,14 +198,14 @@ export class ImportWorkspace {
         ticketNumber++;
         await qr.query(`
           INSERT INTO tickets (
-            id, name, description, priority, status, category,
+            id, name, description, priority, status, "categoryId",
             "workspaceId", "reporterId", "assigneeId", "ticketNumber",
             "customFields", "discardReason", "portalToken",
             "firstResponseAt", "resolvedAt", "resolvedById",
             "firstResponseBreached", "resolutionBreached", "createdAt", "updatedAt"
           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
         `, [
-          newId, t.name, t.description, t.priority, t.status, t.category,
+          newId, t.name, t.description, t.priority, t.status, categoryIdFor(t.category),
           targetWorkspaceId, userIdFor(t.reporterEmail), userIdFor(t.assigneeEmail), ticketNumber,
           JSON.stringify(t.customFields), t.discardReason, null,
           t.firstResponseAt, t.resolvedAt, userIdFor(t.resolvedByEmail),
