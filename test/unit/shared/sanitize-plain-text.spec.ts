@@ -1,4 +1,4 @@
-import { sanitizePlainText } from '../../../src/shared/domain/sanitize-plain-text';
+import { htmlToPlainText, sanitizePlainText } from '../../../src/shared/domain/sanitize-plain-text';
 
 describe('sanitizePlainText', () => {
   it('leaves ordinary names alone', () => {
@@ -42,5 +42,44 @@ describe('sanitizePlainText', () => {
   it('returns an empty string when nothing is left', () => {
     expect(sanitizePlainText('<script></script>')).toBe('');
     expect(sanitizePlainText('<>')).toBe('');
+  });
+});
+
+describe('htmlToPlainText', () => {
+  it('strips tags and keeps block boundaries as line breaks', () => {
+    expect(htmlToPlainText('<p>Hello <strong>world</strong></p><p>Second</p>')).toBe('Hello world\nSecond');
+    expect(htmlToPlainText('one<br>two<br/>three')).toBe('one\ntwo\nthree');
+    expect(htmlToPlainText('<ul><li>a</li><li>b</li></ul>')).toBe('a\nb');
+  });
+
+  it('removes links, scripts and styles entirely, keeping only readable text', () => {
+    const out = htmlToPlainText('<a href="https://evil.example" style="x">Verify</a><script>alert(1)</script><style>p{}</style>');
+    expect(out).toBe('Verify');
+  });
+
+  it('decodes the basic entities after stripping, so encoded markup stays literal text', () => {
+    expect(htmlToPlainText('a &amp; b &lt;b&gt; &quot;q&quot; &#39;s&#39;&nbsp;end')).toBe('a & b <b> "q" \'s\' end');
+  });
+
+  it('drops an unterminated tag at the end', () => {
+    expect(htmlToPlainText('text <a href="https://evil.example"')).toBe('text');
+  });
+
+  it('collapses excessive blank lines and whitespace', () => {
+    expect(htmlToPlainText('<p>a</p><p></p><p></p><p></p><p>b</p>')).toBe('a\n\nb');
+    expect(htmlToPlainText('a    \t b')).toBe('a b');
+  });
+
+  it('truncates after stripping, so the cut never leaves a partial tag', () => {
+    const long = '<p>' + 'x'.repeat(10) + '</p><a href="https://evil.example">' + 'y'.repeat(300) + '</a>';
+    const out = htmlToPlainText(long, 200);
+    expect(out.length).toBe(203);
+    expect(out.endsWith('...')).toBe(true);
+    expect(out).not.toContain('<');
+    expect(out).not.toContain('evil');
+  });
+
+  it('does not truncate text within the limit', () => {
+    expect(htmlToPlainText('<p>short</p>', 200)).toBe('short');
   });
 });

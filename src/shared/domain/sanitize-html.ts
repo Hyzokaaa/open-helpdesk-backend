@@ -142,7 +142,8 @@ export function sanitizeUrl(value: string, kind: 'link' | 'image'): string | nul
   return null;
 }
 
-function decodeEntities(input: string): string {
+/** Decodes named and numeric HTML entities (repeatedly, as a browser effectively would). */
+export function decodeEntities(input: string): string {
   // Decode repeatedly: `&amp;#106;` becomes `&#106;` and then `j`, which is what a browser ends up with
   let current = input;
   for (let pass = 0; pass < 3; pass++) {
@@ -161,7 +162,8 @@ function decodeEntities(input: string): string {
   return current;
 }
 
-function escapeHtml(input: string): string {
+/** Escapes text for an HTML text node or a quoted attribute (& < > " '). */
+export function escapeHtml(input: string): string {
   return input
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -170,7 +172,8 @@ function escapeHtml(input: string): string {
     .replace(/'/g, '&#x27;');
 }
 
-function escapeAttr(input: string): string {
+/** Escapes a value for a double-quoted HTML attribute. */
+export function escapeAttr(input: string): string {
   return input
     .replace(/&/g, '&amp;')
     .replace(/"/g, '&quot;')
