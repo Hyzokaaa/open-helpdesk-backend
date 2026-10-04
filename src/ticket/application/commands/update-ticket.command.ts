@@ -3,6 +3,7 @@ import { Command } from '../../../shared/domain/command';
 import { TicketPriority } from '../../domain/enums/ticket-priority.enum';
 import { TicketRepository } from '../../domain/repositories/ticket.repository';
 import { UpdateTicket } from '../../domain/services/ticket-update';
+import { EnsureTicketReferences } from '../../domain/services/ticket-ensure-references';
 import { EnsureWorkspacePermission } from '../../../workspace/domain/services/workspace-ensure-permission';
 import { PERMISSIONS, hasPermission } from '../../../workspace/domain/permissions';
 import { EntityNotFoundError } from '../../../shared/domain/errors';
@@ -41,6 +42,7 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
     private readonly ensurePermission: EnsureWorkspacePermission,
     private readonly createAuditLog: CreateAuditLogEntry,
     private readonly validateCustomFields: ValidateCustomFieldValues,
+    private readonly ensureReferences?: EnsureTicketReferences,
   ) {}
 
   async execute(props: Props): Promise<UpdateTicketResponse> {
@@ -80,13 +82,27 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
       });
     }
 
+    const categoryId = canEditCategory ? props.categoryId : undefined;
+    const tagIds = canEditTags ? props.tagIds : undefined;
+
+    if (this.ensureReferences) {
+      await this.ensureReferences.execute({
+        workspaceId: props.workspaceId,
+        categoryId,
+        departmentId: props.departmentId,
+        organizationId: props.organizationId,
+        projectId: props.projectId,
+        tagIds,
+      });
+    }
+
     const updated = await this.updateTicket.execute({
       ticketId: props.ticketId,
       name: canEditName ? props.name : undefined,
       description: props.description,
       priority: canEditPriority ? props.priority : undefined,
-      categoryId: canEditCategory ? props.categoryId : undefined,
-      tagIds: canEditTags ? props.tagIds : undefined,
+      categoryId,
+      tagIds,
       departmentId: props.departmentId,
       organizationId: props.organizationId,
       projectId: props.projectId,

@@ -13,6 +13,7 @@ import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 import { ValidateCustomFieldValues } from '../../../custom-field/domain/services/custom-field-validate-values';
 import { ClaimStagedAttachments } from '../../../attachment/domain/services/attachment-claim-staged';
 import { TicketSource } from '../../domain/enums/ticket-source.enum';
+import { EnsureTicketReferences } from '../../domain/services/ticket-ensure-references';
 
 interface Props {
   name: string;
@@ -50,6 +51,7 @@ export class CreateTicketCommand implements Command<Props, CreateTicketResponse>
     private readonly createAuditLog: CreateAuditLogEntry,
     private readonly validateCustomFields: ValidateCustomFieldValues,
     private readonly claimStagedAttachments?: ClaimStagedAttachments,
+    private readonly ensureReferences?: EnsureTicketReferences,
   ) {}
 
   async execute(props: Props): Promise<CreateTicketResponse> {
@@ -59,6 +61,17 @@ export class CreateTicketCommand implements Command<Props, CreateTicketResponse>
       permission: PERMISSIONS.TICKET_CREATE,
       isSystemAdmin: props.isSystemAdmin,
     });
+
+    if (this.ensureReferences) {
+      await this.ensureReferences.execute({
+        workspaceId: props.workspaceId,
+        categoryId: props.categoryId,
+        departmentId: props.departmentId,
+        organizationId: props.organizationId,
+        projectId: props.projectId,
+        tagIds: props.tagIds,
+      });
+    }
 
     const validatedCustomFields = await this.validateCustomFields.execute({
       workspaceId: props.workspaceId,

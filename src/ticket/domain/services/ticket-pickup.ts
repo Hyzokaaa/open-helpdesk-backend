@@ -7,6 +7,7 @@ const VALID_PICKUP_STATUSES = [TicketStatus.PENDING, TicketStatus.IN_PROGRESS, T
 
 interface PickupTicketProps {
   ticketId: string;
+  workspaceId: string;
   userId: string;
   status?: TicketStatus;
 }
@@ -16,7 +17,7 @@ export class PickupTicket {
 
   async execute(props: PickupTicketProps): Promise<Ticket> {
     const ticket = await this.repository.findById(props.ticketId);
-    if (!ticket) throw new EntityNotFoundError('Ticket not found');
+    if (!ticket || ticket.workspaceId !== props.workspaceId) throw new EntityNotFoundError('Ticket not found');
 
     if (ticket.status !== TicketStatus.OPEN) {
       throw new DomainValidationError('Only open tickets can be picked up');

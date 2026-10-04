@@ -12,6 +12,7 @@ import { MulterModule } from '@nestjs/platform-express';
 import { DepartmentModule } from '../department/department.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { ProjectModule } from '../project/project.module';
+import { TagModule } from '../tag/tag.module';
 import { TicketModel } from './infrastructure/typeorm/models/ticket.model';
 import { TicketParticipantModel } from './infrastructure/typeorm/models/ticket-participant.model';
 import { TransferRequestModel } from './infrastructure/typeorm/models/transfer-request.model';
@@ -28,7 +29,7 @@ import { SlaBreachCheckerService } from './infrastructure/nest/services/sla-brea
 import { TransferRequestExpiryService } from './infrastructure/nest/services/transfer-request-expiry.service';
 
 @Module({
-  imports: [SharedModule, UserModule, WorkspaceModule, AuditLogModule, CustomFieldModule, AttachmentModule, MulterModule.registerAsync({ inject: [ConfigService], useFactory: attachmentUploadOptions }), DepartmentModule, OrganizationModule, ProjectModule, TypeOrmModule.forFeature([TicketModel, TicketParticipantModel, TransferRequestModel, TicketDescriptionEditModel, CommentModel])],
+  imports: [SharedModule, UserModule, WorkspaceModule, AuditLogModule, CustomFieldModule, AttachmentModule, MulterModule.registerAsync({ inject: [ConfigService], useFactory: attachmentUploadOptions }), DepartmentModule, OrganizationModule, ProjectModule, TagModule, TypeOrmModule.forFeature([TicketModel, TicketParticipantModel, TransferRequestModel, TicketDescriptionEditModel, CommentModel])],
   controllers: [TicketController, PortalController],
   providers: [TypeOrmTicketRepository, TypeOrmTicketParticipantRepository, TypeOrmTransferRequestRepository, TypeOrmTicketDescriptionEditRepository, TypeOrmCommentRepository, SlaBreachCheckerService, TransferRequestExpiryService],
   exports: [TypeOrmTicketRepository, TypeOrmTicketParticipantRepository, TypeOrmTransferRequestRepository, TypeOrmTicketDescriptionEditRepository],
