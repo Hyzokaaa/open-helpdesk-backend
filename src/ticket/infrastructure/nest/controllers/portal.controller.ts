@@ -28,7 +28,7 @@ import { StageAttachment } from '../../../../attachment/domain/services/attachme
 import { StageUploadCommand, StageUploadResponse } from '../../.././../attachment/application/commands/stage-upload.command';
 import { TicketPriority } from '../../../domain/enums/ticket-priority.enum';
 import { TicketSource } from '../../../domain/enums/ticket-source.enum';
-import { TicketCreatedEvent } from '../../../../email/domain/events';
+import { NewCommentEvent, TicketCreatedEvent } from '../../../../email/domain/events';
 import { TypeOrmWorkspaceRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository';
 import { TypeOrmWorkspaceMemberRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
 import { TypeOrmUserRepository } from '../../../../user/infrastructure/typeorm/repositories/typeorm-user.repository';
@@ -316,6 +316,30 @@ export class PortalController {
       workspaceId: ticket.workspaceId,
       metadata: { ticketId: ticket.getId() },
     });
+
+    // Tell the team, like any other reply: email to stakeholders, in-app notification and live update
+    const [workspace, reporter] = await Promise.all([
+      this.workspaceRepository.findById(ticket.workspaceId),
+      this.userRepository.findById(ticket.reporterId),
+    ]);
+    if (workspace && reporter) {
+      const event: NewCommentEvent = {
+        ticketId: ticket.getId(),
+        ticketName: ticket.name,
+        ticketNumber: formatTicketNumber(ticket.ticketNumber),
+        commentId: comment.getId(),
+        authorId: ticket.reporterId,
+        authorName: `${reporter.firstName} ${reporter.lastName}`.trim(),
+        commentContent: body.content,
+        assigneeId: ticket.assigneeId,
+        mentionedUserIds: [],
+        workspaceId: workspace.getId(),
+        workspaceName: workspace.name,
+        workspaceSlug: workspace.slug,
+        mailboxId: ticket.mailboxId,
+      };
+      this.eventPublisher.emit('comment.created', event);
+    }
 
     return { message: 'Comment added' };
   }
