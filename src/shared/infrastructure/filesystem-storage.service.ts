@@ -1,9 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createHmac } from 'crypto';
-import { promises as fs } from 'fs';
+import { createHmac, randomBytes } from 'crypto';
+import { createWriteStream, promises as fs } from 'fs';
 import { dirname, resolve, sep } from 'path';
-import { StorageService } from '../domain/storage-service';
+import { Readable } from 'stream';
+import { pipeline } from 'stream/promises';
+import { StorageService, StoredObjectInfo } from '../domain/storage-service';
+import { exactLength } from './exact-length';
 
 @Injectable()
 export class FilesystemStorageService implements StorageService {
@@ -21,6 +24,35 @@ export class FilesystemStorageService implements StorageService {
     const filePath = this.resolvePath(key);
     await fs.mkdir(dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, buffer);
+  }
+
+  async putStream(key: string, stream: Readable, _mimeType: string, size: number): Promise<void> {
+    const filePath = this.resolvePath(key);
+    await fs.mkdir(dirname(filePath), { recursive: true });
+    // Written beside the target and renamed into place, so a failed stream leaves no partial file
+    const partial = `${filePath}.part-${randomBytes(6).toString('hex')}`;
+    try {
+      await pipeline(stream, exactLength(size), createWriteStream(partial, { flags: 'wx' }));
+      await fs.rename(partial, filePath);
+    } catch (error) {
+      await fs.unlink(partial).catch(() => undefined);
+      throw error;
+    }
+  }
+
+  async getStream(key: string): Promise<Readable> {
+    const handle = await fs.open(this.resolvePath(key), 'r');
+    return handle.createReadStream();
+  }
+
+  async stat(key: string): Promise<StoredObjectInfo | null> {
+    try {
+      const info = await fs.stat(this.resolvePath(key));
+      return info.isFile() ? { size: info.size } : null;
+    } catch (err: any) {
+      if (err.code === 'ENOENT' || err.code === 'ENOTDIR') return null;
+      throw err;
+    }
   }
 
   async getPresignedUrl(key: string, expiresIn = 3600): Promise<string> {

@@ -5,10 +5,13 @@ import {
   PutObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { StorageService } from '../domain/storage-service';
+import { Readable } from 'stream';
+import { StorageService, StoredObjectInfo } from '../domain/storage-service';
 import { fileDelivery } from './file-delivery';
+import { exactLength } from './exact-length';
 
 @Injectable()
 export class S3StorageService implements StorageService {
@@ -44,6 +47,48 @@ export class S3StorageService implements StorageService {
         }),
       );
     } catch (error) {
+      throw this.handleConnectionError(error);
+    }
+  }
+
+  async putStream(key: string, stream: Readable, mimeType: string, size: number): Promise<void> {
+    // A single PUT with a declared length (no multipart): S3 discards the object unless all of
+    // it arrives, and the length check fails the request if the stream is short or long
+    const body = stream.pipe(exactLength(size));
+    stream.on('error', (error) => body.destroy(error));
+    try {
+      await this.client.send(
+        new PutObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+          Body: body,
+          ContentType: mimeType,
+          ContentLength: size,
+        }),
+      );
+    } catch (error) {
+      throw this.handleConnectionError(error);
+    }
+  }
+
+  async getStream(key: string): Promise<Readable> {
+    try {
+      const response = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+      if (!response.Body) throw new Error(`Storage object has no body: ${key}`);
+      return response.Body as Readable;
+    } catch (error) {
+      throw this.handleConnectionError(error);
+    }
+  }
+
+  async stat(key: string): Promise<StoredObjectInfo | null> {
+    try {
+      const response = await this.client.send(new HeadObjectCommand({ Bucket: this.bucket, Key: key }));
+      return { size: Number(response.ContentLength ?? 0) };
+    } catch (error) {
+      const status = (error as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode;
+      const name = (error as Error)?.name;
+      if (status === 404 || name === 'NotFound' || name === 'NoSuchKey') return null;
       throw this.handleConnectionError(error);
     }
   }
