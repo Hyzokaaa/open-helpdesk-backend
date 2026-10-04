@@ -14,9 +14,9 @@ function victim() {
 
 describe('AuthenticateOAuth', () => {
   let users: MockUserRepository;
-  const signIn = (email: string, emailVerified: boolean, linkUnverifiedEmails?: boolean) =>
-    new AuthenticateOAuth(new FakeIdGenerator(), users, new FakePasswordHasher(), { linkUnverifiedEmails })
-      .execute({ email, firstName: 'Eve', lastName: 'X', authProvider: 'microsoft', emailVerified });
+  const signIn = (email: string, emailVerified: boolean) =>
+    new AuthenticateOAuth(new FakeIdGenerator(), users, new FakePasswordHasher())
+      .execute({ email, firstName: 'Eve', lastName: 'X', authProvider: 'google', emailVerified });
 
   beforeEach(() => {
     users = new MockUserRepository();
@@ -24,17 +24,11 @@ describe('AuthenticateOAuth', () => {
   });
 
   it('does not sign someone into an existing account on an email the provider did not verify', async () => {
-    // A Microsoft account can carry any address as its profile email without owning it.
     await expect(signIn('ceo@acme.com', false)).rejects.toThrow(AccessDeniedError);
   });
 
   it('signs into the existing account when the provider verified the email', async () => {
     const user = await signIn('ceo@acme.com', true);
-    expect(user.getId()).toBe('victim');
-  });
-
-  it('can be switched back to linking unverified emails, for installations that decide so', async () => {
-    const user = await signIn('ceo@acme.com', false, true);
     expect(user.getId()).toBe('victim');
   });
 

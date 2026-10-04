@@ -14,21 +14,11 @@ interface AuthenticateOAuthProps {
   emailVerified: boolean;
 }
 
-export interface AuthenticateOAuthOptions {
-  /**
-   * Sign into an existing account even when the provider did not verify the email. Off by
-   * default: an unverified profile email (any Microsoft account) is not proof of ownership, so
-   * linking on it lets anyone take over the account registered with that address.
-   */
-  linkUnverifiedEmails?: boolean;
-}
-
 export class AuthenticateOAuth {
   constructor(
     private readonly idGenerator: IdGenerator,
     private readonly repository: UserRepository,
-    private readonly passwordHasher: PasswordHasher,
-    private readonly options: AuthenticateOAuthOptions = {},
+    private readonly passwordHasher: PasswordHasher
   ) {}
 
   async execute(props: AuthenticateOAuthProps): Promise<User> {
@@ -38,7 +28,8 @@ export class AuthenticateOAuth {
       if (!existing.isActive) {
         throw new Error('Account is deactivated');
       }
-      if (!props.emailVerified && !this.options.linkUnverifiedEmails) {
+      // Only a provider that vouches for the address may open an account registered with it
+      if (!props.emailVerified) {
         throw new AccessDeniedError(
           'This email is already registered. Sign in with your password instead.',
         );

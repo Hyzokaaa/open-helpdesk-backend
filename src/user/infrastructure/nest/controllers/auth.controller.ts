@@ -27,7 +27,6 @@ import { LoginUserRequest } from '../dto/login-user.request';
 import { SignupUserRequest } from '../dto/signup-user.request';
 import { ResetPasswordRequest } from '../dto/reset-password.request';
 import { GoogleAuthGuard } from '../../../../shared/nest/guards/google-auth.guard';
-import { MicrosoftAuthGuard } from '../../../../shared/nest/guards/microsoft-auth.guard';
 import { CreateUser } from '../../../domain/services/user-create';
 import { CreateAccountForUser } from '../../../../account/domain/services/account-create-for-user';
 import { AcceptInvitation } from '../../../../workspace/domain/services/invitation-accept';
@@ -63,9 +62,7 @@ import { sessionPolicyFromConfig } from '../session-policy';
 export class AuthController {
   private readonly frontendUrl: string;
   private readonly googleEnabled: boolean;
-  private readonly microsoftEnabled: boolean;
   private readonly sessionPolicy: SessionPolicy;
-  private readonly oauthLinkUnverifiedEmails: boolean;
 
   constructor(
     @Inject() private readonly userRepository: TypeOrmUserRepository,
@@ -84,9 +81,7 @@ export class AuthController {
   ) {
     this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
     this.googleEnabled = !!config.get('GOOGLE_CLIENT_ID');
-    this.microsoftEnabled = !!config.get('MICROSOFT_CLIENT_ID');
     this.sessionPolicy = sessionPolicyFromConfig(config);
-    this.oauthLinkUnverifiedEmails = config.get('OAUTH_LINK_UNVERIFIED_EMAILS') === 'true';
   }
 
   private createSignAccessToken(): SignAccessToken {
@@ -107,7 +102,6 @@ export class AuthController {
   getProviders() {
     return {
       google: this.googleEnabled,
-      microsoft: this.microsoftEnabled,
     };
   }
 
@@ -324,20 +318,6 @@ export class AuthController {
     return this.handleOAuthCallback(req, res);
   }
 
-  @Public()
-  @Get('microsoft')
-  @UseGuards(MicrosoftAuthGuard)
-  microsoftLogin() {
-    // Guard redirects to Microsoft
-  }
-
-  @Public()
-  @Get('microsoft/callback')
-  @UseGuards(MicrosoftAuthGuard)
-  async microsoftCallback(@Req() req: Request, @Res() res: Response) {
-    return this.handleOAuthCallback(req, res);
-  }
-
   private async handleOAuthCallback(req: Request, res: Response) {
     const oauthUser = req.user as { email: string; firstName: string; lastName: string; authProvider: string; emailVerified: boolean };
     // The state must be the one this browser was given when it started the sign-in
@@ -352,9 +332,7 @@ export class AuthController {
     const redirectUrl = await this.resolveRedirectUrl(verified.redirect ?? undefined);
 
     try {
-      const service = new AuthenticateOAuth(this.idGenerator, this.userRepository, this.passwordHasher, {
-        linkUnverifiedEmails: this.oauthLinkUnverifiedEmails,
-      });
+      const service = new AuthenticateOAuth(this.idGenerator, this.userRepository, this.passwordHasher);
       const command = new OAuthLoginCommand(service, this.tokenService);
       const result = await command.execute({
         email: oauthUser.email,
