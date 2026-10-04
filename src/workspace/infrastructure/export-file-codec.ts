@@ -1,10 +1,27 @@
 import { createCipheriv, createDecipheriv, pbkdf2, randomBytes } from 'node:crypto';
+import { Transform, TransformCallback } from 'node:stream';
 import { gunzip, gzip } from 'node:zlib';
 import { promisify } from 'node:util';
 import { DomainValidationError } from '../../shared/domain/errors';
 
 /**
- * The .ohd workspace export file, format v1:
+ * The .ohd workspace export file. Exports are written in format v2; v1 and the plain JSON of
+ * older versions are still read.
+ *
+ * Format v2, written and read as a stream (export-archive.ts defines what the plaintext holds):
+ *
+ *   header = "OHDX" (4) | format version = 2 (1) | PBKDF2 iterations uint32 BE (4) | salt (16)
+ *            | nonce prefix (8, random per file) | chunk size uint32 BE (4)
+ *   then the gzip stream cut into chunks of `chunk size` bytes (the last one may be shorter, or
+ *   empty), each stored as AES-256-GCM ciphertext || tag (16), with
+ *     nonce = nonce prefix || chunk counter uint32 BE (from 0)
+ *     AAD   = header || chunk counter uint32 BE || final flag (1 byte: 1 on the last chunk only)
+ *
+ * Every chunk is authenticated before its plaintext is used. The counter in nonce and AAD rejects
+ * reordered, duplicated or dropped chunks; the final flag rejects a file cut at a chunk boundary.
+ * The key is PBKDF2-SHA256(password, salt, iterations, 32), as in v1.
+ *
+ * Format v1:
  *
  *   "OHDX" (4) | format version = 1 (1) | PBKDF2 iterations uint32 BE (4) | salt (16) | iv (12)
  *   | AES-256-GCM ciphertext of gzip(JSON.stringify(data)) | GCM tag (16)
@@ -20,6 +37,7 @@ const gunzipAsync = promisify(gunzip);
 
 const MAGIC = Buffer.from('OHDX', 'ascii');
 const FORMAT_VERSION = 1;
+export const FORMAT_VERSION_STREAM = 2;
 const SALT_LENGTH = 16;
 const IV_LENGTH = 12;
 const TAG_LENGTH = 16;
@@ -31,6 +49,12 @@ export const EXPORT_PBKDF2_ITERATIONS = 600_000;
 export const MAX_PBKDF2_ITERATIONS = 5_000_000;
 /** Upper bound on the decompressed JSON, so a small file cannot expand into gigabytes. */
 export const MAX_DECOMPRESSED_BYTES = 200 * 1024 * 1024;
+
+const NONCE_PREFIX_LENGTH = 8;
+export const STREAM_HEADER_LENGTH = MAGIC.length + 1 + 4 + SALT_LENGTH + NONCE_PREFIX_LENGTH + 4;
+export const DEFAULT_CHUNK_SIZE = 1024 * 1024;
+/** Upper bound on the chunk size accepted on decode, since a whole chunk is held to verify it. */
+export const MAX_CHUNK_SIZE = 16 * 1024 * 1024;
 
 export const EXPORT_PASSWORD_MIN_LENGTH = 12;
 export const EXPORT_PASSWORD_MAX_LENGTH = 256;
@@ -90,6 +114,167 @@ export async function encodeExport(
 ): Promise<Buffer> {
   assertExportPassword(password);
   return encodeExportWithKey(data, await deriveExportKey(password, undefined, iterations));
+}
+
+export interface StreamHeader {
+  header: Buffer;
+  iterations: number;
+  salt: Buffer;
+  noncePrefix: Buffer;
+  chunkSize: number;
+}
+
+/** Reads a v2 header; throws DomainValidationError when it is not one this server reads. */
+export function parseStreamHeader(header: Buffer): StreamHeader {
+  if (header.length !== STREAM_HEADER_LENGTH || !isEncryptedExport(header)) throw new DomainValidationError(MSG_WRONG_PASSWORD);
+  if (header.readUInt8(MAGIC.length) !== FORMAT_VERSION_STREAM) throw new DomainValidationError(MSG_WRONG_PASSWORD);
+  let offset = MAGIC.length + 1;
+  const iterations = header.readUInt32BE(offset);
+  offset += 4;
+  const salt = header.subarray(offset, offset + SALT_LENGTH);
+  offset += SALT_LENGTH;
+  const noncePrefix = header.subarray(offset, offset + NONCE_PREFIX_LENGTH);
+  offset += NONCE_PREFIX_LENGTH;
+  const chunkSize = header.readUInt32BE(offset);
+  if (iterations < 1 || iterations > MAX_PBKDF2_ITERATIONS) throw new DomainValidationError(MSG_WRONG_PASSWORD);
+  if (chunkSize < 1 || chunkSize > MAX_CHUNK_SIZE) throw new DomainValidationError(MSG_WRONG_PASSWORD);
+  return { header: Buffer.from(header), iterations, salt, noncePrefix, chunkSize };
+}
+
+function chunkNonceAndAad(header: Buffer, noncePrefix: Buffer, counter: number, final: boolean) {
+  const counterBytes = Buffer.alloc(4);
+  counterBytes.writeUInt32BE(counter, 0);
+  return {
+    nonce: Buffer.concat([noncePrefix, counterBytes]),
+    aad: Buffer.concat([header, counterBytes, Buffer.from([final ? 1 : 0])]),
+  };
+}
+
+/** Holds incoming bytes and hands them out in fixed-size pieces. */
+class ByteQueue {
+  private parts: Buffer[] = [];
+  length = 0;
+
+  push(chunk: Buffer) {
+    this.parts.push(chunk);
+    this.length += chunk.length;
+  }
+
+  take(size: number): Buffer {
+    const taken: Buffer[] = [];
+    let needed = Math.min(size, this.length);
+    this.length -= needed;
+    while (needed > 0) {
+      const first = this.parts[0];
+      if (first.length <= needed) {
+        taken.push(first);
+        this.parts.shift();
+        needed -= first.length;
+      } else {
+        taken.push(first.subarray(0, needed));
+        this.parts[0] = first.subarray(needed);
+        needed = 0;
+      }
+    }
+    return taken.length === 1 ? taken[0] : Buffer.concat(taken);
+  }
+}
+
+/**
+ * Encrypts a byte stream (the gzip output) into format v2, header first. A full chunk is sealed
+ * only once more bytes follow it, so the last chunk, and only it, carries the final flag.
+ */
+export function createEncryptStream(context: ExportKeyContext, options: { chunkSize?: number } = {}): Transform {
+  const chunkSize = options.chunkSize ?? DEFAULT_CHUNK_SIZE;
+  if (!Number.isInteger(chunkSize) || chunkSize < 1 || chunkSize > MAX_CHUNK_SIZE) throw new Error('Invalid chunk size');
+
+  const header = Buffer.alloc(STREAM_HEADER_LENGTH);
+  let offset = MAGIC.copy(header, 0);
+  header.writeUInt8(FORMAT_VERSION_STREAM, offset);
+  offset += 1;
+  header.writeUInt32BE(context.iterations, offset);
+  offset += 4;
+  offset += context.salt.copy(header, offset);
+  const noncePrefix = randomBytes(NONCE_PREFIX_LENGTH);
+  offset += noncePrefix.copy(header, offset);
+  header.writeUInt32BE(chunkSize, offset);
+
+  const queue = new ByteQueue();
+  let counter = 0;
+  let headerSent = false;
+  const seal = (plaintext: Buffer, final: boolean): Buffer => {
+    if (counter > 0xffffffff) throw new Error('Export too large for the chunk counter');
+    const { nonce, aad } = chunkNonceAndAad(header, noncePrefix, counter++, final);
+    const cipher = createCipheriv('aes-256-gcm', context.key, nonce);
+    cipher.setAAD(aad);
+    return Buffer.concat([cipher.update(plaintext), cipher.final(), cipher.getAuthTag()]);
+  };
+
+  return new Transform({
+    transform(chunk: Buffer, _encoding: BufferEncoding, callback: TransformCallback) {
+      try {
+        if (!headerSent) this.push(header);
+        headerSent = true;
+        queue.push(chunk);
+        while (queue.length > chunkSize) this.push(seal(queue.take(chunkSize), false));
+        callback();
+      } catch (error) {
+        callback(error as Error);
+      }
+    },
+    flush(callback: TransformCallback) {
+      try {
+        if (!headerSent) this.push(header);
+        headerSent = true;
+        callback(null, seal(queue.take(queue.length), true));
+      } catch (error) {
+        callback(error as Error);
+      }
+    },
+  });
+}
+
+/**
+ * Decrypts the chunks that follow a v2 header. Each chunk is verified before its plaintext is
+ * passed on; a tag failure, a missing final chunk or a reordered chunk fails the stream with
+ * MSG_WRONG_PASSWORD. Which chunk is last is only known when the input ends, so a full chunk is
+ * held until more bytes follow it.
+ */
+export function createDecryptStream(key: Buffer, parsed: StreamHeader): Transform {
+  const sealedChunkSize = parsed.chunkSize + TAG_LENGTH;
+  const queue = new ByteQueue();
+  let counter = 0;
+  const open = (sealed: Buffer, final: boolean): Buffer => {
+    if (sealed.length < TAG_LENGTH || counter > 0xffffffff) throw new DomainValidationError(MSG_WRONG_PASSWORD);
+    const { nonce, aad } = chunkNonceAndAad(parsed.header, parsed.noncePrefix, counter++, final);
+    try {
+      const decipher = createDecipheriv('aes-256-gcm', key, nonce);
+      decipher.setAAD(aad);
+      decipher.setAuthTag(sealed.subarray(sealed.length - TAG_LENGTH));
+      return Buffer.concat([decipher.update(sealed.subarray(0, sealed.length - TAG_LENGTH)), decipher.final()]);
+    } catch {
+      throw new DomainValidationError(MSG_WRONG_PASSWORD);
+    }
+  };
+
+  return new Transform({
+    transform(chunk: Buffer, _encoding: BufferEncoding, callback: TransformCallback) {
+      try {
+        queue.push(chunk);
+        while (queue.length > sealedChunkSize) this.push(open(queue.take(sealedChunkSize), false));
+        callback();
+      } catch (error) {
+        callback(error as Error);
+      }
+    },
+    flush(callback: TransformCallback) {
+      try {
+        callback(null, open(queue.take(queue.length), true));
+      } catch (error) {
+        callback(error as Error);
+      }
+    },
+  });
 }
 
 export function isEncryptedExport(bytes: Buffer): boolean {
