@@ -22,6 +22,7 @@ import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit
 import { AuditAction } from '../../../../audit-log/domain/enums/audit-action.enum';
 import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
+import { UpdatePreferencesRequest } from '../dto/update-preferences.request';
 
 @Controller('notifications')
 export class NotificationController {
@@ -66,12 +67,12 @@ export class NotificationController {
 
   @Put('preferences')
   async updatePreferences(
-    @Body() body: Record<string, boolean>,
+    @Body() body: UpdatePreferencesRequest,
     @CurrentUser() user: AuthUser,
   ) {
     const service = new UpdateNotificationPreference(this.idGenerator, this.preferenceRepository);
     const command = new UpdatePreferencesCommand(service);
-    const result = await command.execute({ userId: user.userId, ...body });
+    const result = await command.execute({ ...body, userId: user.userId });
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({
@@ -80,7 +81,7 @@ export class NotificationController {
       entityId: user.userId,
       userId: user.userId,
       workspaceId: null,
-      metadata: body,
+      metadata: { ...body },
       category: AuditCategory.CONFIG,
       level: AuditLevel.INFO,
       source: 'ui',
