@@ -69,7 +69,8 @@ export class ImportWorkspace {
       for (const c of data.comments) allEmailsSet.add(c.authorEmail);
       for (const a of data.attachments) { if (a.uploadedByEmail) allEmailsSet.add(a.uploadedByEmail); }
       for (const p of data.participants) allEmailsSet.add(p.userEmail);
-      for (const a of data.auditLog) allEmailsSet.add(a.userEmail);
+      // System and anonymous portal events have no user; they keep a null userId on import
+      for (const a of data.auditLog) { if (a.userEmail) allEmailsSet.add(a.userEmail); }
 
       const allEmails = [...allEmailsSet];
 

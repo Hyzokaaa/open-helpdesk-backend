@@ -100,7 +100,8 @@ export interface WorkspaceExportAuditEntry {
   action: string;
   entityType: string;
   entityId: string;
-  userEmail: string;
+  /** Null for system and anonymous (portal) events. */
+  userEmail: string | null;
   metadata: Record<string, unknown> | null;
   createdAt: string;
 }

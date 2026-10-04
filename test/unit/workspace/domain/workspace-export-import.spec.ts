@@ -171,6 +171,25 @@ describe('ImportWorkspace', () => {
     expect(qr.rolledBack).toBe(false);
   });
 
+  it('imports audit entries without a user (system or portal events) instead of failing', async () => {
+    const qr = new FakeQueryRunner(answer);
+    const data = emptyExport({
+      users: [{ email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' }],
+      auditLog: [
+        { action: 'portal-ticket-created', entityType: 'ticket', entityId: 'x', userEmail: null, metadata: null, createdAt: '2026-01-01T00:00:00.000Z' },
+        { action: 'ticket-created', entityType: 'ticket', entityId: 'y', userEmail: 'alice@example.com', metadata: null, createdAt: '2026-01-01T00:00:00.000Z' },
+      ],
+    });
+
+    const { result } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    expect(qr.find(/INSERT INTO users/)).toHaveLength(0);
+    const auditInserts = qr.find(/INSERT INTO audit_log_entries/);
+    expect(auditInserts.map((q) => q.params[4])).toEqual([null, 'u-1']);
+    expect(result.auditLogImported).toBe(2);
+    expect(qr.committed).toBe(true);
+  });
+
   it('upgrades a 1.12 file that only carries slugs on tickets and derives a category name from the slug', async () => {
     const qr = new FakeQueryRunner(answer);
     const legacy = emptyExport({
