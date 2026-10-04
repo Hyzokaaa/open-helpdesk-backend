@@ -2,12 +2,14 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   ManyToOne,
   PrimaryColumn,
 } from 'typeorm';
 import { WorkspaceModel } from '../../../../workspace/infrastructure/typeorm/models/workspace.model';
 
 @Entity('webhooks')
+@Index('IDX_webhooks_workspace', ['workspaceId'])
 export class WebhookModel {
   @PrimaryColumn()
   id!: string;

@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   ManyToOne,
   PrimaryColumn,
 } from 'typeorm';
@@ -9,6 +10,7 @@ import { WorkspaceModel } from '../../../../workspace/infrastructure/typeorm/mod
 import { UserModel } from '../../../../user/infrastructure/typeorm/models/user.model';
 
 @Entity('api_keys')
+@Index('IDX_api_keys_workspace', ['workspaceId'])
 export class ApiKeyModel {
   @PrimaryColumn()
   id!: string;

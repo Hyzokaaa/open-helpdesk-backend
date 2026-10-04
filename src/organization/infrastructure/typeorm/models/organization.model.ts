@@ -3,12 +3,14 @@ import {
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
+  Index,
   ManyToOne,
   PrimaryColumn,
 } from 'typeorm';
 import { WorkspaceModel } from '../../../../workspace/infrastructure/typeorm/models/workspace.model';
 
 @Entity('organizations')
+@Index('IDX_organizations_workspace', ['workspaceId'])
 export class OrganizationModel {
   @PrimaryColumn()
   id!: string;

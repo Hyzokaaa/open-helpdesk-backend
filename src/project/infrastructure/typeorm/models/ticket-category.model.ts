@@ -2,12 +2,14 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   ManyToOne,
   PrimaryColumn,
 } from 'typeorm';
 import { WorkspaceModel } from '../../../../workspace/infrastructure/typeorm/models/workspace.model';
 
 @Entity('ticket_categories')
+@Index('IDX_ticket_categories_workspace', ['workspaceId'])
 export class TicketCategoryModel {
   @PrimaryColumn()
   id!: string;

@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   ManyToOne,
   PrimaryColumn,
 } from 'typeorm';
@@ -9,6 +10,7 @@ import { TicketModel } from '../../../../ticket/infrastructure/typeorm/models/ti
 import { WorkspaceModel } from '../../../../workspace/infrastructure/typeorm/models/workspace.model';
 
 @Entity('csat_responses')
+@Index('IDX_csat_responses_workspace', ['workspaceId'])
 export class CsatResponseModel {
   @PrimaryColumn()
   id!: string;
