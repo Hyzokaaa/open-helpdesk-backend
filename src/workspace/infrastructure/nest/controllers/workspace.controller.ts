@@ -207,12 +207,17 @@ export class WorkspaceController {
   }
 
   @Get(":slug")
-  async get(@Param("slug") slug: string) {
+  async get(@Param("slug") slug: string, @CurrentUser() user: AuthUser) {
     const query = new GetWorkspaceQuery(
       this.workspaceRepository,
+      new EnsureWorkspacePermission(this.memberRepository),
       this.mailboxRepository,
     );
-    const result = await query.execute({ slug });
+    const result = await query.execute({
+      slug,
+      userId: user.userId,
+      isSystemAdmin: user.isSystemAdmin,
+    });
     return {
       ...result,
       logo: result.logo
