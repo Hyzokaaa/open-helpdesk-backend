@@ -2,7 +2,7 @@ import { emailLayout } from './base.template';
 import { t } from './i18n';
 import { SendEmailParams } from '../domain/email.service';
 import { escapeAttr, escapeHtml } from '../../shared/domain/sanitize-html';
-import { sanitizePlainText } from '../../shared/domain/sanitize-plain-text';
+import { singleLineText } from '../../shared/domain/sanitize-plain-text';
 
 interface Data {
   to: string;
@@ -26,7 +26,7 @@ export function importWelcomeEmail(data: Data): SendEmailParams {
 
   return {
     to: data.to,
-    subject: sanitizePlainText(t('importWelcome.subject', data.lang)),
+    subject: singleLineText(t('importWelcome.subject', data.lang)),
     html: emailLayout(data.lang, content),
   };
 }

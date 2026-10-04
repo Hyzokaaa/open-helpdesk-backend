@@ -1,4 +1,4 @@
-import { htmlToPlainText, sanitizePlainText } from '../../../src/shared/domain/sanitize-plain-text';
+import { htmlToPlainText, sanitizePlainText, singleLineText } from '../../../src/shared/domain/sanitize-plain-text';
 
 describe('sanitizePlainText', () => {
   it('leaves ordinary names alone', () => {
@@ -81,5 +81,15 @@ describe('htmlToPlainText', () => {
 
   it('does not truncate text within the limit', () => {
     expect(htmlToPlainText('<p>short</p>', 200)).toBe('short');
+  });
+});
+
+describe('singleLineText', () => {
+  it('turns line breaks and invisible characters into single spaces', () => {
+    expect(singleLineText('a\r\nBcc: x@y.z​\tb')).toBe('a Bcc: x@y.z b');
+  });
+
+  it('keeps angle brackets and other visible text as is', () => {
+    expect(singleLineText('Fallo en <Pantalla de login> & precio < 10')).toBe('Fallo en <Pantalla de login> & precio < 10');
   });
 });

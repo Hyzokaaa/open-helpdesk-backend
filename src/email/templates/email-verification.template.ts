@@ -1,7 +1,7 @@
 import { emailLayout } from './base.template';
 import { t } from './i18n';
 import { escapeAttr, escapeHtml } from '../../shared/domain/sanitize-html';
-import { sanitizePlainText } from '../../shared/domain/sanitize-plain-text';
+import { singleLineText } from '../../shared/domain/sanitize-plain-text';
 
 interface Data {
   firstName: string;
@@ -11,7 +11,7 @@ interface Data {
 
 export class EmailVerificationTemplate {
   subject(data: Data): string {
-    return sanitizePlainText(t('emailVerification.subject', data.lang));
+    return singleLineText(t('emailVerification.subject', data.lang));
   }
 
   html(data: Data): string {

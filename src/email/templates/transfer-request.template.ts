@@ -1,7 +1,7 @@
 import { t } from './i18n';
 import { emailLayout, buttonHtml } from './base.template';
 import { escapeHtml } from '../../shared/domain/sanitize-html';
-import { sanitizePlainText } from '../../shared/domain/sanitize-plain-text';
+import { singleLineText } from '../../shared/domain/sanitize-plain-text';
 
 interface CreatedData {
   ticketName: string;
@@ -21,7 +21,7 @@ interface ResolvedData {
 
 export class TransferRequestTemplate {
   createdSubject(data: CreatedData): string {
-    return sanitizePlainText(`[${data.workspaceName}] ${t('transferRequest.subject', data.lang)}: ${data.ticketName}`);
+    return singleLineText(`[${data.workspaceName}] ${t('transferRequest.subject', data.lang)}: ${data.ticketName}`);
   }
 
   createdHtml(data: CreatedData): string {
@@ -34,7 +34,7 @@ export class TransferRequestTemplate {
   }
 
   resolvedSubject(data: ResolvedData): string {
-    return sanitizePlainText(`[${data.workspaceName}] ${t(`transferResolved.subject.${data.resolution}`, data.lang)}: ${data.ticketName}`);
+    return singleLineText(`[${data.workspaceName}] ${t(`transferResolved.subject.${data.resolution}`, data.lang)}: ${data.ticketName}`);
   }
 
   resolvedHtml(data: ResolvedData): string {

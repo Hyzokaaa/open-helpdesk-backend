@@ -1,7 +1,7 @@
 import { t } from './i18n';
 import { emailLayout, buttonHtml } from './base.template';
 import { escapeHtml } from '../../shared/domain/sanitize-html';
-import { sanitizePlainText } from '../../shared/domain/sanitize-plain-text';
+import { singleLineText } from '../../shared/domain/sanitize-plain-text';
 
 interface Data {
   ticketName: string;
@@ -16,7 +16,7 @@ interface AssignedData extends Data {
 
 export class TicketAssignedTemplate {
   assignedSubject(data: AssignedData): string {
-    return sanitizePlainText(`[${data.workspaceName}] ${t('ticketAssigned.subject', data.lang)}: ${data.ticketName}`);
+    return singleLineText(`[${data.workspaceName}] ${t('ticketAssigned.subject', data.lang)}: ${data.ticketName}`);
   }
 
   assignedHtml(data: AssignedData): string {
@@ -29,7 +29,7 @@ export class TicketAssignedTemplate {
   }
 
   unassignedSubject(data: Data): string {
-    return sanitizePlainText(`[${data.workspaceName}] ${t('ticketUnassigned.subject', data.lang)}: ${data.ticketName}`);
+    return singleLineText(`[${data.workspaceName}] ${t('ticketUnassigned.subject', data.lang)}: ${data.ticketName}`);
   }
 
   unassignedHtml(data: Data): string {

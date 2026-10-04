@@ -1,7 +1,7 @@
 import { t } from './i18n';
 import { emailLayout, buttonHtml } from './base.template';
 import { escapeHtml } from '../../shared/domain/sanitize-html';
-import { sanitizePlainText } from '../../shared/domain/sanitize-plain-text';
+import { singleLineText } from '../../shared/domain/sanitize-plain-text';
 
 interface Data {
   ticketName: string;
@@ -17,7 +17,7 @@ interface Data {
 export class NewCommentTemplate {
   subject(data: Data): string {
     const ref = data.ticketNumber ? ` — ${data.ticketNumber}` : '';
-    return sanitizePlainText(`[${data.workspaceName}] Re: ${data.ticketName}${ref}`);
+    return singleLineText(`[${data.workspaceName}] Re: ${data.ticketName}${ref}`);
   }
 
   html(data: Data): string {

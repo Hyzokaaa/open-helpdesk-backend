@@ -1,7 +1,7 @@
 import { t } from './i18n';
 import { emailLayout } from './base.template';
 import { escapeAttr, escapeHtml } from '../../shared/domain/sanitize-html';
-import { sanitizePlainText } from '../../shared/domain/sanitize-plain-text';
+import { singleLineText } from '../../shared/domain/sanitize-plain-text';
 
 interface Data {
   version: string;
@@ -11,7 +11,7 @@ interface Data {
 
 export class UpgradeAvailableTemplate {
   subject(data: Data): string {
-    return sanitizePlainText(t('upgradeAvailable.subject', data.lang, { version: data.version }));
+    return singleLineText(t('upgradeAvailable.subject', data.lang, { version: data.version }));
   }
 
   html(data: Data): string {

@@ -44,6 +44,15 @@ export function sanitizePlainText(input: string, maxLength?: number): string {
 }
 
 /**
+ * Keeps text on a single line for places that are plain text but line-sensitive, such as an email
+ * subject header: line breaks and invisible characters become spaces. Unlike `sanitizePlainText`
+ * it keeps angle brackets, since the result is never read as HTML.
+ */
+export function singleLineText(input: string): string {
+  return input.replace(INVISIBLE_CHARS, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/**
  * Converts rich-text (HTML) content to readable plain text, keeping line breaks: block boundaries
  * become newlines, every tag is removed, entities are decoded, invisible and control characters
  * are dropped and runs of blank lines collapse. An optional maximum length truncates the result

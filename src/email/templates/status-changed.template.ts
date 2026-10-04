@@ -1,7 +1,7 @@
 import { t } from './i18n';
 import { emailLayout, buttonHtml } from './base.template';
 import { escapeHtml } from '../../shared/domain/sanitize-html';
-import { sanitizePlainText } from '../../shared/domain/sanitize-plain-text';
+import { singleLineText } from '../../shared/domain/sanitize-plain-text';
 
 interface Data {
   ticketName: string;
@@ -14,7 +14,7 @@ interface Data {
 
 export class StatusChangedTemplate {
   subject(data: Data): string {
-    return sanitizePlainText(`[${data.workspaceName}] ${t('statusChanged.subject', data.lang)}: ${data.ticketName}`);
+    return singleLineText(`[${data.workspaceName}] ${t('statusChanged.subject', data.lang)}: ${data.ticketName}`);
   }
 
   html(data: Data): string {

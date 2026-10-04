@@ -1,7 +1,7 @@
 import { t } from './i18n';
 import { emailLayout } from './base.template';
 import { escapeAttr, escapeHtml } from '../../shared/domain/sanitize-html';
-import { sanitizePlainText } from '../../shared/domain/sanitize-plain-text';
+import { singleLineText } from '../../shared/domain/sanitize-plain-text';
 
 interface Data {
   ticketName: string;
@@ -16,7 +16,7 @@ function ratingButton(label: string, emoji: string, url: string, color: string):
 
 export class CsatSurveyTemplate {
   subject(data: Data): string {
-    return sanitizePlainText(`[${data.workspaceName}] ${t('csat.subject', data.lang)}`);
+    return singleLineText(`[${data.workspaceName}] ${t('csat.subject', data.lang)}`);
   }
 
   html(data: Data): string {

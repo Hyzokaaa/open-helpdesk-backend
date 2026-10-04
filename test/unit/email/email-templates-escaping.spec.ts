@@ -128,4 +128,9 @@ describe('email templates escape user and tenant values', () => {
     }
     expect(all[0].subject).toContain('Bcc: victim@example.com');
   });
+
+  it('keeps angle brackets in subjects, which mail clients never read as HTML', () => {
+    const subject = new TicketCreatedTemplate().subject({ ticketName: 'Error <500> when price < 10', ticketUrl: 'u', reporterName: 'r', priority: 'high', category: '', workspaceName: 'w', lang: 'en' });
+    expect(subject).toContain('Error <500> when price < 10');
+  });
 });
