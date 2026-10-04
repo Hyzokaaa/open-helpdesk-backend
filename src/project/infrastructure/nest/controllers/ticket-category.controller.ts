@@ -34,7 +34,8 @@ export class TicketCategoryController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
-    await this.ensurePermission(workspaceId, user, PERMISSIONS.PROJECT_VIEW);
+    // Anyone who can file a ticket must be able to pick its category, the USER role included
+    await this.ensurePermission(workspaceId, user, PERMISSIONS.TICKET_CREATE);
 
     const all = await this.categoryRepository.findByWorkspaceId(workspaceId);
     const projectCategoryIds = projectId
