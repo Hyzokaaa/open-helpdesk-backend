@@ -358,9 +358,12 @@ export class ImportWorkspace {
           ? (ticketIdMap.get(a.entityId) ?? a.entityId)
           : a.entityId;
         await qr.query(`
-          INSERT INTO audit_log_entries (id, action, "entityType", "entityId", "userId", "workspaceId", metadata, "createdAt")
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        `, [ulid(), a.action, a.entityType, entityId, userIdFor(a.userEmail), targetWorkspaceId, JSON.stringify(a.metadata), a.createdAt]);
+          INSERT INTO audit_log_entries (id, action, "entityType", "entityId", "userId", "workspaceId", metadata, category, level, source, "createdAt")
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        `, [
+          ulid(), a.action, a.entityType, entityId, userIdFor(a.userEmail), targetWorkspaceId, JSON.stringify(a.metadata),
+          a.category ?? 'ticket', a.level ?? 'info', a.source ?? null, a.createdAt,
+        ]);
         result.auditLogImported++;
       }
 

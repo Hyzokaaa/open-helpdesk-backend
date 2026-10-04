@@ -114,7 +114,7 @@ describe('ExportWorkspace', () => {
     expect(ticketQuery.sql).toMatch(/tc\.slug AS category/);
     expect(ticketQuery.sql).toMatch(/GROUP BY t\.id, tc\.id/);
 
-    expect(result.version).toBe('1.13.0');
+    expect(result.version).toBe('1.14.0');
     expect(result.tickets.map((t) => [t.id, t.category])).toEqual([['t-1', 'bug'], ['t-2', null]]);
     expect(result.categories).toEqual([
       { id: 'cat-1', name: 'Bug', slug: 'bug', color: 'red', createdAt: '2026-01-01T00:00:00.000Z' },
@@ -127,6 +127,18 @@ describe('ExportWorkspace', () => {
 
     const [ticketQuery] = qr.find(/FROM tickets t\s/);
     expect(ticketQuery.sql).toMatch(/ORDER BY t\."ticketNumber"/);
+  });
+
+  it('exports the audit category, level and source', async () => {
+    const qr = new FakeQueryRunner((sql, params) => {
+      if (/FROM audit_log_entries a/.test(sql)) {
+        return [{ action: 'email-send-failed', entityType: 'email', entityId: 'e', userId: null, metadata: null, category: 'email', level: 'error', source: 'system', createdAt }];
+      }
+      return answer(sql, params);
+    });
+    const result = await new ExportWorkspace(dataSourceOf(qr)).execute('ws-1');
+
+    expect(result.auditLog[0]).toMatchObject({ category: 'email', level: 'error', source: 'system', userEmail: null });
   });
 
   it('scopes the categories query to the exported workspace', async () => {
@@ -332,6 +344,39 @@ describe('ImportWorkspace', () => {
     expect(result.customFieldsImported).toBe(0);
   });
 
+  it('carries the audit category, level and source, and falls back to the column defaults when absent', async () => {
+    const qr = new FakeQueryRunner(answer);
+    const createdAt = '2026-01-01T00:00:00.000Z';
+    const data = emptyExport({
+      auditLog: [
+        { action: 'email-send-failed', entityType: 'email', entityId: 'e', userEmail: null, metadata: null, category: 'email', level: 'error', source: 'system', createdAt },
+        { action: 'ticket-created', entityType: 'ticket', entityId: 't', userEmail: null, metadata: null, createdAt: '2026-01-02T00:00:00.000Z' },
+      ],
+    });
+
+    await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    const inserts = qr.find(/INSERT INTO audit_log_entries/);
+    expect(inserts[0].sql).toMatch(/category, level, source/);
+    expect(inserts.map((q) => q.params.slice(7, 10))).toEqual([['email', 'error', 'system'], ['ticket', 'info', null]]);
+  });
+
+  it('imports a 1.13.0 file, which has no audit category, level or source', async () => {
+    const qr = new FakeQueryRunner(answer);
+    const data = emptyExport({
+      version: '1.13.0',
+      users: [{ email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' }],
+      tickets: [ticket('t-1', null)],
+      auditLog: [{ action: 'ticket-created', entityType: 'ticket', entityId: 't-1', userEmail: 'alice@example.com', metadata: null, createdAt: '2026-01-01T00:00:00.000Z' }],
+    });
+
+    const { result } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    expect(result.ticketsImported).toBe(1);
+    expect(result.auditLogImported).toBe(1);
+    expect(qr.committed).toBe(true);
+  });
+
   it('upgrades a 1.12 file that only carries slugs on tickets and derives a category name from the slug', async () => {
     const qr = new FakeQueryRunner(answer);
     const legacy = emptyExport({
@@ -354,14 +399,14 @@ describe('ImportWorkspace', () => {
 });
 
 describe('applyTransforms', () => {
-  it('upgrades 1.12.0 to 1.13.0 by adding an empty categories list and normalising missing categories to null', () => {
+  it('upgrades 1.12.0 to the current version by adding an empty categories list and normalising missing categories to null', () => {
     const legacy = emptyExport({ version: '1.12.0', tickets: [ticket('t-1', 'bug')] });
     delete (legacy as Partial<WorkspaceExportData>).categories;
     delete (legacy.tickets[0] as Partial<WorkspaceExportData['tickets'][number]>).category;
 
     const upgraded = applyTransforms(legacy);
 
-    expect(upgraded.version).toBe('1.13.0');
+    expect(upgraded.version).toBe(CURRENT_VERSION);
     expect(upgraded.categories).toEqual([]);
     expect(upgraded.tickets[0].category).toBeNull();
   });

@@ -107,7 +107,8 @@ export class ExportWorkspace {
       `, [workspaceId]);
 
       const auditLog = await qr.query(`
-        SELECT a.action, a."entityType", a."entityId", a."userId", a.metadata, a."createdAt"
+        SELECT a.action, a."entityType", a."entityId", a."userId", a.metadata,
+          a.category, a.level, a.source, a."createdAt"
         FROM audit_log_entries a WHERE a."workspaceId" = $1 ORDER BY a."createdAt"
       `, [workspaceId]);
 
@@ -213,6 +214,9 @@ export class ExportWorkspace {
           entityId: a.entityId,
           userEmail: emailFor(a.userId)!,
           metadata: a.metadata,
+          category: a.category,
+          level: a.level,
+          source: a.source ?? null,
           createdAt: a.createdAt?.toISOString(),
         })),
       };

@@ -103,6 +103,10 @@ export interface WorkspaceExportAuditEntry {
   /** Null for system and anonymous (portal) events. */
   userEmail: string | null;
   metadata: Record<string, unknown> | null;
+  /** Since 1.14; older files fall back to the column defaults ('ticket', 'info', null). */
+  category?: string;
+  level?: string;
+  source?: string | null;
   createdAt: string;
 }
 

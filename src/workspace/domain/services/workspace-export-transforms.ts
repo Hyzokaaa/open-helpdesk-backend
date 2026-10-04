@@ -27,11 +27,17 @@ const TRANSFORMS: Record<string, Transform> = {
     data.version = '1.13.0';
     return data;
   },
-  '1.13.0': (data) => data,
+  '1.13.0': (data) => {
+    // 1.13 → 1.14: audit entries carry category, level and source. All new fields are
+    // optional, so an older file only lacks them and the import uses the column defaults.
+    data.version = '1.14.0';
+    return data;
+  },
+  '1.14.0': (data) => data,
 };
 
-const VERSION_ORDER = ['1.11.0', '1.12.0', '1.13.0'];
-const CURRENT_VERSION = '1.13.0';
+const VERSION_ORDER = ['1.11.0', '1.12.0', '1.13.0', '1.14.0'];
+const CURRENT_VERSION = '1.14.0';
 const MIN_VERSION = '1.11.0';
 
 export function applyTransforms(data: WorkspaceExportData): WorkspaceExportData {
