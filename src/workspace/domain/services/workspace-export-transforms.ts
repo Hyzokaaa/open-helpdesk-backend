@@ -3,6 +3,13 @@ import { DomainValidationError } from '../../../shared/domain/errors';
 
 type Transform = (data: WorkspaceExportData) => WorkspaceExportData;
 
+/** Sections whose rows carry an origin id since 1.17 (the edits only when they carry an id). */
+const ORIGIN_SECTIONS = [
+  'organizations', 'departments', 'tags', 'categories', 'projects', 'tickets', 'comments',
+  'descriptionEdits', 'commentEdits', 'attachments', 'cannedResponses', 'customFields',
+  'kbCategories', 'kbArticles',
+] as const;
+
 const TRANSFORMS: Record<string, Transform> = {
   '1.11.0': (data) => {
     // 1.11 → 1.12: add mentionedUserIds to comments, participants, aiCache
@@ -73,11 +80,24 @@ const TRANSFORMS: Record<string, Transform> = {
     data.version = '1.16.0';
     return data;
   },
-  '1.16.0': (data) => data,
+  '1.16.0': (data) => {
+    // 1.16 → 1.17: every entity carries an origin id. Before 1.17 an entity's identity is its own
+    // id; edits carried no id and keep none (they are matched by editor and second).
+    for (const section of ORIGIN_SECTIONS) {
+      const rows = (data as any)[section];
+      if (!Array.isArray(rows)) continue;
+      for (const row of rows) {
+        if (row && typeof row === 'object' && row.originId == null && typeof row.id === 'string') row.originId = row.id;
+      }
+    }
+    data.version = '1.17.0';
+    return data;
+  },
+  '1.17.0': (data) => data,
 };
 
-const VERSION_ORDER = ['1.11.0', '1.12.0', '1.13.0', '1.14.0', '1.15.0', '1.16.0'];
-const CURRENT_VERSION = '1.16.0';
+const VERSION_ORDER = ['1.11.0', '1.12.0', '1.13.0', '1.14.0', '1.15.0', '1.16.0', '1.17.0'];
+const CURRENT_VERSION = '1.17.0';
 const MIN_VERSION = '1.11.0';
 
 /** Sections every supported version has; the transforms walk some of them. */

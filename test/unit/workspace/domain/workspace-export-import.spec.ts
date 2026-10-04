@@ -135,7 +135,7 @@ describe('ExportWorkspace', () => {
     expect(result.version).toBe(CURRENT_VERSION);
     expect(result.tickets.map((t) => [t.id, t.category])).toEqual([['t-1', 'bug'], ['t-2', null]]);
     expect(result.categories).toEqual([
-      { id: 'cat-1', name: 'Bug', slug: 'bug', color: 'red', createdAt: '2026-01-01T00:00:00.000Z' },
+      { id: 'cat-1', originId: 'cat-1', name: 'Bug', slug: 'bug', color: 'red', createdAt: '2026-01-01T00:00:00.000Z' },
     ]);
   });
 
@@ -238,7 +238,7 @@ describe('ExportWorkspace', () => {
     const [orgQuery] = qr.find(/FROM organizations WHERE/);
     expect(orgQuery.sql).toMatch(/"deletedAt" IS NULL/);
     expect(result.organizations).toEqual([
-      { id: 'org-1', name: 'Globex', description: null, notes: 'vip', domains: ['globex.com'], createdAt: '2026-01-01T00:00:00.000Z', logoFile: null },
+      { id: 'org-1', originId: 'org-1', name: 'Globex', description: null, notes: 'vip', domains: ['globex.com'], createdAt: '2026-01-01T00:00:00.000Z', logoFile: null },
     ]);
     expect(result.users[0].organizationId).toBe('org-1');
     expect(result.tickets[0].organizationId).toBe('org-1');
@@ -261,7 +261,7 @@ describe('ExportWorkspace', () => {
     expect(qr.find(/FROM departments WHERE/)[0].sql).toMatch(/"deletedAt" IS NULL/);
     expect(qr.find(/FROM department_members dm/)[0].sql).toMatch(/d\."deletedAt" IS NULL/);
     expect(result.departments).toEqual([
-      { id: 'd-1', name: 'Billing', description: 'money', memberEmails: ['a@example.com'], createdAt: '2026-01-01T00:00:00.000Z' },
+      { id: 'd-1', originId: 'd-1', name: 'Billing', description: 'money', memberEmails: ['a@example.com'], createdAt: '2026-01-01T00:00:00.000Z' },
     ]);
     expect(result.tickets[0].departmentId).toBe('d-1');
   });
@@ -280,7 +280,7 @@ describe('ExportWorkspace', () => {
     expect(projectQuery.sql).toMatch(/p\."deletedAt" IS NULL/);
     expect(projectQuery.sql).toMatch(/LEFT JOIN project_categories pc ON pc\."projectId" = p\.id/);
     expect(result.projects).toEqual([
-      { id: 'p-1', name: 'Website', description: null, categorySlugs: ['bug'], createdAt: '2026-01-01T00:00:00.000Z' },
+      { id: 'p-1', originId: 'p-1', name: 'Website', description: null, categorySlugs: ['bug'], createdAt: '2026-01-01T00:00:00.000Z' },
     ]);
     expect(result.tickets[0].projectId).toBe('p-1');
   });
@@ -338,11 +338,38 @@ describe('ExportWorkspace', () => {
     });
     const result = await new ExportWorkspace(dataSourceOf(qr)).execute('ws-1');
 
-    expect(result.kbCategories).toEqual([{ id: 'kc-1', name: 'Start', slug: 'start', icon: 'book', position: 0, createdAt: '2026-01-01T00:00:00.000Z' }]);
+    expect(result.kbCategories).toEqual([{ id: 'kc-1', originId: 'kc-1', name: 'Start', slug: 'start', icon: 'book', position: 0, createdAt: '2026-01-01T00:00:00.000Z' }]);
     expect(result.kbArticles).toEqual([{
-      id: 'ka-1', title: 'Hello', slug: 'hello', content: '<p>Hi</p>', status: 'published', position: 1, categoryId: 'kc-1',
+      id: 'ka-1', originId: 'ka-1', title: 'Hello', slug: 'hello', content: '<p>Hi</p>', status: 'published', position: 1, categoryId: 'kc-1',
       createdByEmail: 'a@example.com', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
     }]);
+  });
+
+  it('carries as origin id the source id of an imported entity, the earliest link winning, and its own id otherwise', async () => {
+    const qr = new FakeQueryRunner((sql, params) => {
+      if (/FROM workspace_import_links/.test(sql)) {
+        return [
+          { entityType: 'ticket', sourceId: 'src-first', targetId: 't-1' },
+          { entityType: 'ticket', sourceId: 'src-later', targetId: 't-1' },
+          // Same id, other type: does not apply to the ticket t-2
+          { entityType: 'comment', sourceId: 'src-c', targetId: 't-2' },
+          { entityType: 'ticket-category', sourceId: 'src-cat', targetId: 'cat-1' },
+          { entityType: 'ticket-description-edit', sourceId: 'src-e', targetId: 'e-1' },
+        ];
+      }
+      if (/FROM ticket_description_edits e/.test(sql)) return [{ id: 'e-1', ticketId: 't-1', content: 'old', editedById: 'u-1', createdAt }];
+      if (/FROM comment_edits e/.test(sql)) return [{ id: 'ce-1', commentId: 'c-1', content: 'old', editedById: 'u-1', createdAt }];
+      return answer(sql, params);
+    });
+    const result = await new ExportWorkspace(dataSourceOf(qr)).execute('ws-1');
+
+    const [linkQuery] = qr.find(/FROM workspace_import_links/);
+    expect(linkQuery.params).toEqual(['ws-1']);
+    expect(linkQuery.sql).toMatch(/ORDER BY "createdAt", id/);
+    expect(result.tickets.map((t) => [t.id, t.originId])).toEqual([['t-1', 'src-first'], ['t-2', 't-2']]);
+    expect(result.categories[0].originId).toBe('src-cat');
+    expect(result.descriptionEdits[0]).toMatchObject({ id: 'e-1', originId: 'src-e' });
+    expect(result.commentEdits[0]).toMatchObject({ id: 'ce-1', originId: 'ce-1' });
   });
 
   it('scopes the categories query to the exported workspace', async () => {
@@ -1561,6 +1588,27 @@ describe('ImportWorkspace files', () => {
   });
 });
 
+describe('applyTransforms 1.17', () => {
+  it('upgrades 1.16.0: every entity with an id takes it as its origin id, edits without one get none', () => {
+    const legacy = emptyExport({
+      version: '1.16.0',
+      tickets: [ticket('t-1', null)],
+      tags: [{ id: 'tag-1', name: 'x', color: null, createdAt: '2026-01-01T00:00:00.000Z' }],
+      descriptionEdits: [{ ticketId: 't-1', content: 'c', editedByEmail: null, createdAt: '2026-01-01T00:00:00.000Z' }],
+    });
+    const upgraded = applyTransforms(legacy);
+    expect(upgraded.version).toBe('1.17.0');
+    expect(upgraded.tickets[0].originId).toBe('t-1');
+    expect(upgraded.tags[0].originId).toBe('tag-1');
+    expect(upgraded.descriptionEdits[0]).not.toHaveProperty('originId');
+  });
+
+  it('keeps the origin id a 1.17 file carries', () => {
+    const data = emptyExport({ tickets: [{ ...ticket('t-1', null), originId: 'elsewhere' }] });
+    expect(applyTransforms(data).tickets[0].originId).toBe('elsewhere');
+  });
+});
+
 describe('applyTransforms 1.16', () => {
   it('upgrades 1.15.0: attachments lose the source key and carry no file, logos are absent', () => {
     const legacy = emptyExport({
@@ -1569,7 +1617,7 @@ describe('applyTransforms 1.16', () => {
       attachments: [{ id: 'a', fileName: 'f', originalName: 'f', mimeType: 'text/plain', size: 1, s3Key: 'attachments/a/f', ticketId: 't', commentId: null, uploadedByEmail: null, createdAt: '2026-01-01T00:00:00.000Z' }],
     });
     const upgraded = applyTransforms(legacy);
-    expect(upgraded.version).toBe('1.16.0');
+    expect(upgraded.version).toBe(CURRENT_VERSION);
     expect(upgraded.attachments[0].file).toBeNull();
     expect(upgraded.attachments[0]).not.toHaveProperty('s3Key');
     expect(upgraded.organizations[0].logoFile).toBeNull();

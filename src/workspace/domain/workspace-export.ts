@@ -35,6 +35,8 @@ export interface WorkspaceExportMissingFile {
 /** Since 1.15. */
 export interface WorkspaceExportOrganization {
   id: string;
+  /** Identity across workspaces: the id this entity had where it was first created. Since 1.17. */
+  originId?: string;
   name: string;
   description: string | null;
   notes: string | null;
@@ -47,6 +49,8 @@ export interface WorkspaceExportOrganization {
 /** Since 1.15. Soft-deleted departments are not exported. */
 export interface WorkspaceExportDepartment {
   id: string;
+  /** Identity across workspaces: the id this entity had where it was first created. Since 1.17. */
+  originId?: string;
   name: string;
   description: string | null;
   memberEmails: string[];
@@ -55,6 +59,8 @@ export interface WorkspaceExportDepartment {
 
 export interface WorkspaceExportTag {
   id: string;
+  /** Identity across workspaces: the id this entity had where it was first created. Since 1.17. */
+  originId?: string;
   name: string;
   color: string | null;
   createdAt: string;
@@ -62,6 +68,8 @@ export interface WorkspaceExportTag {
 
 export interface WorkspaceExportCategory {
   id: string;
+  /** Identity across workspaces: the id this entity had where it was first created. Since 1.17. */
+  originId?: string;
   name: string;
   slug: string;
   color: string;
@@ -71,6 +79,8 @@ export interface WorkspaceExportCategory {
 /** Since 1.15. Soft-deleted projects are not exported. */
 export interface WorkspaceExportProject {
   id: string;
+  /** Identity across workspaces: the id this entity had where it was first created. Since 1.17. */
+  originId?: string;
   name: string;
   description: string | null;
   /** Slugs of the ticket categories linked to the project, resolved like a ticket's category. */
@@ -80,6 +90,8 @@ export interface WorkspaceExportProject {
 
 export interface WorkspaceExportTicket {
   id: string;
+  /** Identity across workspaces: the id this entity had where it was first created. Since 1.17. */
+  originId?: string;
   name: string;
   description: string;
   priority: string;
@@ -115,6 +127,8 @@ export interface WorkspaceExportTicket {
 
 export interface WorkspaceExportComment {
   id: string;
+  /** Identity across workspaces: the id this entity had where it was first created. Since 1.17. */
+  originId?: string;
   content: string;
   ticketId: string;
   /** Null if the author no longer exists; such a comment cannot be imported. */
@@ -125,6 +139,9 @@ export interface WorkspaceExportComment {
 
 /** A past version of a ticket description. Since 1.15. */
 export interface WorkspaceExportDescriptionEdit {
+  /** Since 1.17; older files carry none and their edits are matched by editor and second. */
+  id?: string;
+  originId?: string;
   ticketId: string;
   content: string;
   /** Null if the editor no longer exists; such an edit cannot be imported. */
@@ -134,6 +151,9 @@ export interface WorkspaceExportDescriptionEdit {
 
 /** A past version of a comment. Since 1.15. */
 export interface WorkspaceExportCommentEdit {
+  /** Since 1.17; older files carry none and their edits are matched by editor and second. */
+  id?: string;
+  originId?: string;
   commentId: string;
   content: string;
   /** Null if the editor no longer exists; such an edit cannot be imported. */
@@ -143,6 +163,8 @@ export interface WorkspaceExportCommentEdit {
 
 export interface WorkspaceExportAttachment {
   id: string;
+  /** Identity across workspaces: the id this entity had where it was first created. Since 1.17. */
+  originId?: string;
   fileName: string;
   originalName: string;
   mimeType: string;
@@ -168,6 +190,8 @@ export interface WorkspaceExportParticipant {
 
 export interface WorkspaceExportCannedResponse {
   id: string;
+  /** Identity across workspaces: the id this entity had where it was first created. Since 1.17. */
+  originId?: string;
   title: string;
   content: string;
   createdAt: string;
@@ -175,6 +199,8 @@ export interface WorkspaceExportCannedResponse {
 
 export interface WorkspaceExportCustomField {
   id: string;
+  /** Identity across workspaces: the id this entity had where it was first created. Since 1.17. */
+  originId?: string;
   name: string;
   type: string;
   options: string[] | null;
@@ -195,6 +221,8 @@ export interface WorkspaceExportCsat {
 /** Since 1.15. */
 export interface WorkspaceExportKbCategory {
   id: string;
+  /** Identity across workspaces: the id this entity had where it was first created. Since 1.17. */
+  originId?: string;
   name: string;
   slug: string;
   icon: string | null;
@@ -205,6 +233,8 @@ export interface WorkspaceExportKbCategory {
 /** Since 1.15. */
 export interface WorkspaceExportKbArticle {
   id: string;
+  /** Identity across workspaces: the id this entity had where it was first created. Since 1.17. */
+  originId?: string;
   title: string;
   slug: string;
   /** Stored HTML; sanitized again on import. */

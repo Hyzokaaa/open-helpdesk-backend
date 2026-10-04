@@ -4,6 +4,7 @@ import { WorkspaceExportData, WorkspaceExportFile, WorkspaceExportMissingFile } 
 import { CURRENT_VERSION } from './workspace-export-transforms';
 import { ExtractMentions } from '../../../comment/domain/services/comment-extract-mentions';
 import { StorageService } from '../../../shared/domain/storage-service';
+import { IMPORT_LINK_TYPES as LINK, ImportLinkType } from '../workspace-import-link';
 
 const extractMentions = new ExtractMentions();
 
@@ -184,14 +185,14 @@ export class ExportWorkspace {
       `, [workspaceId]);
 
       const descriptionEdits = await qr.query(`
-        SELECT e."ticketId", e.content, e."editedById", e."createdAt"
+        SELECT e.id, e."ticketId", e.content, e."editedById", e."createdAt"
         FROM ticket_description_edits e JOIN tickets t ON t.id = e."ticketId"
         WHERE t."workspaceId" = $1 AND t."deletedAt" IS NULL
         ORDER BY e."createdAt"
       `, [workspaceId]);
 
       const commentEdits = await qr.query(`
-        SELECT e."commentId", e.content, e."editedById", e."createdAt"
+        SELECT e.id, e."commentId", e.content, e."editedById", e."createdAt"
         FROM comment_edits e
         JOIN comments c ON c.id = e."commentId"
         JOIN tickets t ON t.id = c."ticketId"
@@ -239,6 +240,20 @@ export class ExportWorkspace {
           a.category, a.level, a.source, a."createdAt"
         FROM audit_log_entries a WHERE a."workspaceId" = $1 ORDER BY a."createdAt"
       `, [workspaceId]);
+
+      // An entity this workspace got from an import keeps the identity it had in the file, so the
+      // next import elsewhere (or back where it came from) recognises it; anything else is its own
+      // origin. The earliest link wins when several files brought the same entity.
+      const links = await qr.query(`
+        SELECT "entityType", "sourceId", "targetId" FROM workspace_import_links
+        WHERE "workspaceId" = $1 ORDER BY "createdAt", id
+      `, [workspaceId]);
+      const originById = new Map<string, string>();
+      for (const l of links) {
+        const key = `${l.entityType}|${l.targetId}`;
+        if (!originById.has(key)) originById.set(key, l.sourceId);
+      }
+      const originOf = (type: ImportLinkType, id: string) => originById.get(`${type}|${id}`) ?? id;
 
       // Every user the file refers to, members or not (former members, past authors, mentioned
       // people), is listed with an id and email so the import can map it. A user that no longer
@@ -290,6 +305,7 @@ export class ExportWorkspace {
         })),
         departments: departments.map((d: any) => ({
           id: d.id,
+          originId: originOf(LINK.department, d.id),
           name: d.name,
           description: d.description ?? null,
           memberEmails: departmentMembers
@@ -300,6 +316,7 @@ export class ExportWorkspace {
         })),
         organizations: organizations.map((o: any) => ({
           id: o.id,
+          originId: originOf(LINK.organization, o.id),
           name: o.name,
           description: o.description ?? null,
           notes: o.notes ?? null,
@@ -309,12 +326,14 @@ export class ExportWorkspace {
         })),
         tags: tags.map((t: any) => ({
           id: t.id,
+          originId: originOf(LINK.tag, t.id),
           name: t.name,
           color: t.color,
           createdAt: t.createdAt?.toISOString(),
         })),
         categories: categories.map((c: any) => ({
           id: c.id,
+          originId: originOf(LINK.category, c.id),
           name: c.name,
           slug: c.slug,
           color: c.color,
@@ -322,6 +341,7 @@ export class ExportWorkspace {
         })),
         projects: projects.map((p: any) => ({
           id: p.id,
+          originId: originOf(LINK.project, p.id),
           name: p.name,
           description: p.description ?? null,
           categorySlugs: p.categorySlugs ?? [],
@@ -329,6 +349,7 @@ export class ExportWorkspace {
         })),
         tickets: tickets.map((t: any) => ({
           id: t.id,
+          originId: originOf(LINK.ticket, t.id),
           name: t.name,
           description: t.description,
           priority: t.priority,
@@ -358,6 +379,7 @@ export class ExportWorkspace {
         })),
         comments: comments.map((c: any) => ({
           id: c.id,
+          originId: originOf(LINK.comment, c.id),
           content: c.content,
           ticketId: c.ticketId,
           authorEmail: emailFor(c.authorId),
@@ -365,12 +387,16 @@ export class ExportWorkspace {
           createdAt: c.createdAt?.toISOString(),
         })),
         descriptionEdits: descriptionEdits.map((e: any) => ({
+          id: e.id,
+          originId: originOf(LINK.descriptionEdit, e.id),
           ticketId: e.ticketId,
           content: e.content,
           editedByEmail: emailFor(e.editedById),
           createdAt: e.createdAt?.toISOString(),
         })),
         commentEdits: commentEdits.map((e: any) => ({
+          id: e.id,
+          originId: originOf(LINK.commentEdit, e.id),
           commentId: e.commentId,
           content: e.content,
           editedByEmail: emailFor(e.editedById),
@@ -379,6 +405,7 @@ export class ExportWorkspace {
         attachments: attachments.map((a: any) => {
           const attachment = {
             id: a.id,
+            originId: originOf(LINK.attachment, a.id),
             fileName: a.fileName,
             originalName: a.originalName,
             mimeType: a.mimeType,
@@ -404,12 +431,14 @@ export class ExportWorkspace {
         })),
         cannedResponses: cannedResponses.map((cr: any) => ({
           id: cr.id,
+          originId: originOf(LINK.cannedResponse, cr.id),
           title: cr.title,
           content: cr.content,
           createdAt: cr.createdAt?.toISOString(),
         })),
         customFields: customFields.map((cf: any) => ({
           id: cf.id,
+          originId: originOf(LINK.customField, cf.id),
           name: cf.name,
           type: cf.type,
           options: cf.options,
@@ -426,6 +455,7 @@ export class ExportWorkspace {
         })),
         kbCategories: kbCategories.map((c: any) => ({
           id: c.id,
+          originId: originOf(LINK.kbCategory, c.id),
           name: c.name,
           slug: c.slug,
           icon: c.icon ?? null,
@@ -434,6 +464,7 @@ export class ExportWorkspace {
         })),
         kbArticles: kbArticles.map((a: any) => ({
           id: a.id,
+          originId: originOf(LINK.kbArticle, a.id),
           title: a.title,
           slug: a.slug,
           content: a.content,
