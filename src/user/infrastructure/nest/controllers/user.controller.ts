@@ -54,6 +54,7 @@ import { UpdateUserNameRequest } from '../dto/update-user-name.request';
 import { ChangePasswordRequest } from '../dto/change-password.request';
 import { SortDto } from '../../../../shared/nest/dto/sort.dto';
 import { imageUploadOptions, RASTER_IMAGE_MIMES } from '../../../../shared/infrastructure/nest/image-upload-options';
+import { normalizeUserName } from '../../../domain/user-name';
 
 const MIME_TO_EXT: Record<string, string> = {
   'image/png': '.png',
@@ -335,13 +336,13 @@ export class UserController {
 
     if (body.firstName !== undefined) {
       before.firstName = existing.firstName;
-      existing.firstName = body.firstName;
-      after.firstName = body.firstName;
+      existing.firstName = normalizeUserName(body.firstName);
+      after.firstName = existing.firstName;
     }
     if (body.lastName !== undefined) {
       before.lastName = existing.lastName;
-      existing.lastName = body.lastName;
-      after.lastName = body.lastName;
+      existing.lastName = normalizeUserName(body.lastName);
+      after.lastName = existing.lastName;
     }
     if (body.email !== undefined && body.email.toLowerCase() !== existing.email.toLowerCase()) {
       const emailTaken = await this.userRepository.findByEmail(body.email);
