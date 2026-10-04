@@ -304,27 +304,32 @@ export class ImportWorkspace {
     const newMembers: ImportedNewMember[] = [];
 
     try {
-      // 0. Workspace settings — only the ones the caller asked to overwrite
-      if (settings.length) {
-        const ws = data.workspace;
-        const params: unknown[] = [targetWorkspaceId];
-        const sets: string[] = [];
-        const set = (assignment: (param: string) => string, value: unknown) => {
-          params.push(value);
-          sets.push(assignment(`$${params.length}`));
-        };
-        if (settings.includes('palette')) {
-          set((v) => `metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('palette', ${v}::text)`, ws.metadata?.palette ?? null);
-        }
-        if (settings.includes('sla')) set((v) => `"slaPolicy" = ${v}`, ws.slaPolicy == null ? null : JSON.stringify(ws.slaPolicy));
-        if (settings.includes('description')) set((v) => `description = ${v}`, ws.description ?? '');
-        if (settings.includes('branding')) {
+      // 0. Workspace settings — only the ones the caller asked to overwrite, and only when the file
+      // carries a value: asking to overwrite something the file lacks must not clear the target's
+      const ws = data.workspace;
+      const present = (v: unknown) => v !== null && v !== undefined && v !== '';
+      const params: unknown[] = [targetWorkspaceId];
+      const sets: string[] = [];
+      const set = (assignment: (param: string) => string, value: unknown) => {
+        params.push(value);
+        sets.push(assignment(`$${params.length}`));
+      };
+      for (const key of settings) {
+        if (key === 'palette' && present(ws.metadata?.palette)) {
+          set((v) => `metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('palette', ${v}::text)`, ws.metadata?.palette);
+        } else if (key === 'sla' && present(ws.slaPolicy)) {
+          set((v) => `"slaPolicy" = ${v}`, JSON.stringify(ws.slaPolicy));
+        } else if (key === 'description' && present(ws.description)) {
+          set((v) => `description = ${v}`, ws.description);
+        } else if (key === 'branding' && (present(ws.appName) || present(ws.appSubtitle))) {
           set((v) => `"appName" = ${v}`, ws.appName ?? null);
           set((v) => `"appSubtitle" = ${v}`, ws.appSubtitle ?? null);
+        } else {
+          continue;
         }
-        await qr.query(`UPDATE workspaces SET ${sets.join(', ')} WHERE id = $1`, params);
-        result.settingsApplied = settings;
+        result.settingsApplied.push(key);
       }
+      if (sets.length) await qr.query(`UPDATE workspaces SET ${sets.join(', ')} WHERE id = $1`, params);
 
       // 1. Collect ALL referenced emails across the entire export
       const allEmailsSet = new Set<string>();

@@ -1118,6 +1118,16 @@ describe('ImportWorkspace settings overwrite', () => {
     expect(result.settingsApplied).toEqual(['palette', 'branding']);
   });
 
+  it('leaves a setting untouched when the file has no value for it, even if asked to overwrite it', async () => {
+    const qr = new FakeQueryRunner(answer);
+    const empty = emptyExport({ workspace: { name: 'Acme', description: '', slaPolicy: null, metadata: null, appName: null, appSubtitle: null } });
+    const { result } = await new ImportWorkspace(dataSourceOf(qr))
+      .execute('ws-target', empty, { overwrite: ['palette', 'sla', 'description', 'branding'] });
+
+    expect(qr.find(/UPDATE workspaces/)).toHaveLength(0);
+    expect(result.settingsApplied).toEqual([]);
+  });
+
   it('overwrites the SLA policy and description when asked', async () => {
     const qr = new FakeQueryRunner(answer);
     const { result } = await new ImportWorkspace(dataSourceOf(qr))
