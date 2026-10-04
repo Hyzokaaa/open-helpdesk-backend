@@ -16,7 +16,12 @@ export class FilesystemStorageService implements StorageService {
 
   constructor(private readonly config: ConfigService) {
     this.basePath = config.get('STORAGE_PATH', './data/storage');
-    this.baseUrl = config.get('FRONTEND_URL', 'http://localhost');
+    // Signed links point at the API's own /storage/files route. With API_URL set the API is
+    // addressed directly; without it the API is assumed to sit under /api on the frontend origin.
+    const apiUrl: string | undefined = config.get('API_URL');
+    this.baseUrl = apiUrl
+      ? apiUrl.replace(/\/+$/, '')
+      : `${config.get('FRONTEND_URL', 'http://localhost')}/api`;
     this.secret = config.getOrThrow('JWT_SECRET');
   }
 
@@ -58,7 +63,7 @@ export class FilesystemStorageService implements StorageService {
   async getPresignedUrl(key: string, expiresIn = 3600): Promise<string> {
     const expires = Math.floor(Date.now() / 1000) + expiresIn;
     const signature = this.sign(key, expires);
-    return `${this.baseUrl}/api/storage/files/${key}?expires=${expires}&signature=${signature}`;
+    return `${this.baseUrl}/storage/files/${key}?expires=${expires}&signature=${signature}`;
   }
 
   async delete(key: string): Promise<void> {

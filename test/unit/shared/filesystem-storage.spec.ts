@@ -17,6 +17,27 @@ describe('FilesystemStorageService', () => {
 
   afterEach(() => rmSync(root, { recursive: true, force: true }));
 
+  function withConfig(extra: Record<string, string>): FilesystemStorageService {
+    const values: Record<string, string> = { STORAGE_PATH: join(root, 'storage'), JWT_SECRET: 'secret', ...extra };
+    const config = { get: (key: string, fallback?: string) => values[key] ?? fallback, getOrThrow: (key: string) => values[key] };
+    return new FilesystemStorageService(config as any);
+  }
+
+  it('signs links under /api on the frontend origin when API_URL is not set', async () => {
+    const url = await withConfig({ FRONTEND_URL: 'https://help.example.com' }).getPresignedUrl('attachments/a/f.png');
+    expect(url).toMatch(/^https:\/\/help\.example\.com\/api\/storage\/files\/attachments\/a\/f\.png\?expires=\d+&signature=[0-9a-f]{64}$/);
+  });
+
+  it('signs links on API_URL without the /api prefix when it is set', async () => {
+    const url = await withConfig({ FRONTEND_URL: 'https://help.example.com', API_URL: 'https://api.example.com' }).getPresignedUrl('attachments/a/f.png');
+    expect(url).toMatch(/^https:\/\/api\.example\.com\/storage\/files\/attachments\/a\/f\.png\?expires=\d+&signature=[0-9a-f]{64}$/);
+  });
+
+  it('drops trailing slashes from API_URL', async () => {
+    const url = await withConfig({ API_URL: 'https://api.example.com//' }).getPresignedUrl('attachments/a/f.png');
+    expect(url.startsWith('https://api.example.com/storage/files/attachments/a/f.png?')).toBe(true);
+  });
+
   it('stores files under the storage folder', async () => {
     await storage.upload(Buffer.from('x'), 'attachments/att-1/file.png', 'image/png');
     expect(storage.getFilePath('attachments/att-1/file.png')).toBe(join(root, 'storage', 'attachments', 'att-1', 'file.png'));
