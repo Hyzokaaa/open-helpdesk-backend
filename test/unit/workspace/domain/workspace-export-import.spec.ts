@@ -115,7 +115,7 @@ describe('ExportWorkspace', () => {
     expect(ticketQuery.sql).toMatch(/tc\.slug AS category/);
     expect(ticketQuery.sql).toMatch(/GROUP BY t\.id, tc\.id/);
 
-    expect(result.version).toBe('1.14.0');
+    expect(result.version).toBe(CURRENT_VERSION);
     expect(result.tickets.map((t) => [t.id, t.category])).toEqual([['t-1', 'bug'], ['t-2', null]]);
     expect(result.categories).toEqual([
       { id: 'cat-1', name: 'Bug', slug: 'bug', color: 'red', createdAt: '2026-01-01T00:00:00.000Z' },
@@ -149,7 +149,7 @@ describe('ExportWorkspace', () => {
     const vanished = '01VANISHED00000000000000AA';
     const qr = new FakeQueryRunner((sql, params) => {
       if (/FROM workspace_members wm JOIN users u/.test(sql)) {
-        return [{ id: member, email: 'agent@example.com', firstName: 'Agent', lastName: 'A', role: 'agent' }];
+        return [{ id: member, email: 'agent@example.com', firstName: 'Agent', lastName: 'A', isActive: true, role: 'agent' }];
       }
       if (/FROM tickets t/.test(sql)) {
         return [{ id: 't-1', name: 'T', status: 'open', category: null, reporterId: member, tagIds: [], createdAt, updatedAt: createdAt }];
@@ -164,7 +164,7 @@ describe('ExportWorkspace', () => {
       if (/FROM users WHERE id = ANY/.test(sql)) {
         const ids = params[0] as string[];
         return [
-          { id: former, email: 'former@example.com', firstName: 'Former', lastName: 'F' },
+          { id: former, email: 'former@example.com', firstName: 'Former', lastName: 'F', isActive: false },
           { id: mentioned, email: 'mia@example.com', firstName: 'Mia', lastName: 'M' },
         ].filter((u) => ids.includes(u.id));
       }
@@ -175,9 +175,9 @@ describe('ExportWorkspace', () => {
 
     expect(qr.find(/FROM users WHERE id = ANY/)).toHaveLength(1);
     expect(result.users).toEqual([
-      { id: member, email: 'agent@example.com', firstName: 'Agent', lastName: 'A', role: 'agent' },
-      { id: former, email: 'former@example.com', firstName: 'Former', lastName: 'F', role: null },
-      { id: mentioned, email: 'mia@example.com', firstName: 'Mia', lastName: 'M', role: null },
+      { id: member, email: 'agent@example.com', firstName: 'Agent', lastName: 'A', role: 'agent', isActive: true },
+      { id: former, email: 'former@example.com', firstName: 'Former', lastName: 'F', role: null, isActive: false },
+      { id: mentioned, email: 'mia@example.com', firstName: 'Mia', lastName: 'M', role: null, isActive: true },
     ]);
     expect(result.comments.map((c) => [c.authorEmail, c.mentionedUserIds])).toEqual([
       ['former@example.com', [mentioned]],
@@ -443,12 +443,47 @@ describe('ImportWorkspace', () => {
     const { result, newMembers } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
 
     const [userInsert] = qr.find(/INSERT INTO users/);
-    expect(userInsert.params.slice(1)).toEqual(['former@example.com', expect.any(String), 'Former', 'F', true]);
+    expect(userInsert.params.slice(1)).toEqual(['former@example.com', expect.any(String), 'Former', 'F', true, true]);
     expect(newMembers).toEqual([]);
     expect(qr.find(/INSERT INTO workspace_members/).map((q) => q.params[2])).toEqual(['u-1']);
     expect(qr.find(/INSERT INTO comments/).map((q) => q.params[1])).toEqual(['kept']);
     expect(result.commentsImported).toBe(1);
+    expect(result.commentsSkipped).toBe(1);
     expect(result.participantsImported).toBe(0);
+  });
+
+  it('keeps a member deactivated in the source deactivated, with membership and history, and does not invite them', async () => {
+    const qr = new FakeQueryRunner(answer);
+    const data = emptyExport({
+      users: [
+        { id: 'src-alice', email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' },
+        { id: 'src-gone', email: 'gone@example.com', firstName: 'Gone', lastName: 'G', role: 'agent', isActive: false },
+        { id: 'src-new', email: 'new@example.com', firstName: 'New', lastName: 'N', role: 'agent', isActive: true },
+      ],
+      tickets: [{ ...ticket('t-1', null), assigneeEmail: 'gone@example.com' }],
+      comments: [{ id: 'c-1', content: 'by gone', ticketId: 't-1', authorEmail: 'gone@example.com', mentionedUserIds: [], createdAt: '2026-01-01T00:00:00.000Z' }],
+    });
+
+    const { result, newMembers } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    const userInserts = qr.find(/INSERT INTO users/);
+    expect(userInserts.map((q) => [q.params[1], q.params[5]])).toEqual([
+      ['gone@example.com', false],
+      ['new@example.com', true],
+    ]);
+    const goneId = userInserts[0].params[0];
+    expect(newMembers.map((m) => m.email)).toEqual(['new@example.com']);
+    expect(qr.find(/INSERT INTO workspace_members/).map((q) => [q.params[2], q.params[3]])).toContainEqual([goneId, 'agent']);
+    expect(qr.find(/INSERT INTO tickets/)[0].params[8]).toBe(goneId);
+    expect(qr.find(/INSERT INTO comments/)[0].params[3]).toBe(goneId);
+    expect(result.commentsSkipped).toBe(0);
+  });
+
+  it('rejects a user whose isActive is not a boolean', async () => {
+    const qr = new FakeQueryRunner(answer);
+    const data = emptyExport({ users: [{ email: 'a@example.com', firstName: 'A', lastName: 'A', role: 'agent', isActive: 'no' as unknown as boolean }] });
+    await expect(new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data))
+      .rejects.toThrow('Invalid export file: users[0].isActive must be true, false or absent');
   });
 
   it('rewrites mention ids and markup to target users and degrades unknown mentions to plain text', async () => {

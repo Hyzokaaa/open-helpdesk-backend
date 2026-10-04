@@ -22,6 +22,8 @@ export interface ImportResult {
   categoriesImported: number;
   ticketsImported: number;
   commentsImported: number;
+  /** Comments not imported because their author is missing from the file or no longer exists. */
+  commentsSkipped: number;
   attachmentsImported: number;
   participantsImported: number;
   cannedResponsesImported: number;
@@ -93,6 +95,7 @@ function validateExportData(data: WorkspaceExportData): void {
     text(u, p, 'email');
     optionalText(u, p, 'id');
     member(u, p, 'role', oneOf(WorkspaceRole), true);
+    if (u.isActive != null && typeof u.isActive !== 'boolean') fail(`${p}.isActive`, 'must be true, false or absent');
   });
   each('tags', data.tags, (t, p) => { text(t, p, 'id'); text(t, p, 'name'); });
   each('categories', data.categories, (c, p) => { text(c, p, 'slug'); text(c, p, 'name'); });
@@ -183,7 +186,7 @@ export class ImportWorkspace {
 
     const result: ImportResult = {
       usersCreated: 0, membersAdded: 0, tagsImported: 0, categoriesImported: 0, ticketsImported: 0,
-      commentsImported: 0, attachmentsImported: 0, participantsImported: 0,
+      commentsImported: 0, commentsSkipped: 0, attachmentsImported: 0, participantsImported: 0,
       cannedResponsesImported: 0, customFieldsImported: 0, csatResponsesImported: 0,
       auditLogImported: 0,
     };
@@ -219,6 +222,8 @@ export class ImportWorkspace {
       // password is the hash of a random secret that is thrown away, and the email is not verified.
       // Members are invited to set a password; people who only appear in the history (old
       // reporters, authors) are created like inbound email senders and can recover access later.
+      // An account deactivated in the source stays deactivated: it keeps its membership and
+      // history, but is not invited. An account that already exists here is left as it is.
       const unusablePassword = await bcrypt.hash(randomBytes(32).toString('hex'), 10);
       // users also lists non-members the history refers to (role null): named, but not members
       const knownUsers = new Map(data.users.map((u) => [u.email, u]));
@@ -227,14 +232,15 @@ export class ImportWorkspace {
           const id = ulid();
           const known = knownUsers.get(email);
           const member = known?.role ? known : undefined;
+          const isActive = known?.isActive !== false;
           const firstName = known?.firstName ?? email.split('@')[0];
           await qr.query(`
             INSERT INTO users (id, email, password, "firstName", "lastName", "isActive", "isSystemAdmin", "isEmailVerified", "autoCreated")
-            VALUES ($1, $2, $3, $4, $5, true, false, false, $6)
-          `, [id, email, unusablePassword, firstName, known?.lastName ?? '', !member]);
+            VALUES ($1, $2, $3, $4, $5, $6, false, false, $7)
+          `, [id, email, unusablePassword, firstName, known?.lastName ?? '', isActive, !member]);
           emailToUserId.set(email, id);
           result.usersCreated++;
-          if (member) newMembers.push({ userId: id, email, firstName });
+          if (member && isActive) newMembers.push({ userId: id, email, firstName });
         }
       }
 
@@ -434,7 +440,11 @@ export class ImportWorkspace {
         // comments.authorId is NOT NULL: a comment whose author no longer exists has nobody to
         // belong to, and attributing it to someone else would misrepresent who wrote it
         const authorId = userIdFor(c.authorEmail);
-        if (!newTicketId || !authorId) continue;
+        if (!newTicketId) continue;
+        if (!authorId) {
+          result.commentsSkipped++;
+          continue;
+        }
         const newId = ulid();
         // Mentions point at target users; a mention of someone unknown here degrades to plain text
         const mentioned = new Set<string>();

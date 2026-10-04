@@ -26,7 +26,7 @@ export class ExportWorkspace {
       const ws = workspace[0];
 
       const members = await qr.query(`
-        SELECT u.id, u.email, u."firstName", u."lastName", wm.role
+        SELECT u.id, u.email, u."firstName", u."lastName", u."isActive", wm.role
         FROM workspace_members wm JOIN users u ON u.id = wm."userId"
         WHERE wm."workspaceId" = $1
       `, [workspaceId]);
@@ -111,7 +111,7 @@ export class ExportWorkspace {
       for (const a of auditLog) refer(a.userId);
       if (referenced.size) {
         const others = await qr.query(
-          `SELECT id, email, "firstName", "lastName" FROM users WHERE id = ANY($1)`, [[...referenced]],
+          `SELECT id, email, "firstName", "lastName", "isActive" FROM users WHERE id = ANY($1)`, [[...referenced]],
         );
         for (const u of others) users.set(u.id, { ...u, role: null });
       }
@@ -132,6 +132,7 @@ export class ExportWorkspace {
           firstName: u.firstName,
           lastName: u.lastName,
           role: u.role,
+          isActive: u.isActive !== false,
         })),
         tags: tags.map((t: any) => ({
           id: t.id,

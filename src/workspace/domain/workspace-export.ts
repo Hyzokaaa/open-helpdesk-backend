@@ -6,6 +6,8 @@ export interface WorkspaceExportUser {
   lastName: string;
   /** Null for a user the history refers to who is not a member (since 1.14); not added as a member. */
   role: string | null;
+  /** False for an account deactivated in the source. Since 1.15; absent means active. */
+  isActive?: boolean;
 }
 
 export interface WorkspaceExportTag {
