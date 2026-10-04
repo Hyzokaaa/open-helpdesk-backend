@@ -9,7 +9,7 @@ interface ConsumeOneTimeTokenProps {
 }
 
 export interface OneTimeTokenPayload {
-  sub: string;
+  sub?: string;
   type: string;
   jti: string;
   exp: number;
@@ -37,7 +37,7 @@ export class ConsumeOneTimeToken {
     } catch {
       return null;
     }
-    if (payload.type !== props.type || !payload.sub || typeof payload.jti !== 'string' || !payload.jti) {
+    if (payload.type !== props.type || typeof payload.jti !== 'string' || !payload.jti) {
       return null;
     }
 

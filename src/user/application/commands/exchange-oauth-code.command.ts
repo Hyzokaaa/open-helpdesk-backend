@@ -25,7 +25,7 @@ export class ExchangeOAuthCodeCommand implements Command<Props, ExchangeOAuthCod
   async execute(props: Props): Promise<ExchangeOAuthCodeResponse> {
     // The code travels in a redirect URL (history, logs, Referer), so it opens one session only
     const payload = await this.consumeToken.execute({ token: props.code, type: OAUTH_CODE_TYPE });
-    if (!payload) throw new InvalidCredentialsError('Invalid or expired sign-in code');
+    if (!payload?.sub) throw new InvalidCredentialsError('Invalid or expired sign-in code');
 
     const user = await this.userRepository.findById(payload.sub);
     if (!user || !user.isActive) throw new InvalidCredentialsError('Invalid sign-in code');

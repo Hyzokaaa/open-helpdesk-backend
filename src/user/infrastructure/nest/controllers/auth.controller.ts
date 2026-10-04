@@ -45,6 +45,8 @@ import { resolveFrontendUrl } from '../../../../shared/infrastructure/resolve-fr
 import { TypeOrmUserSessionRepository } from '../../typeorm/repositories/typeorm-user-session.repository';
 import { TypeOrmUsedTokenRepository } from '../../typeorm/repositories/typeorm-used-token.repository';
 import { ConsumeOneTimeToken } from '../../../domain/services/user-token-consume';
+import { VerifyOAuthState } from '../../../domain/services/user-oauth-state';
+import { OAUTH_NONCE_COOKIE, readOAuthNonce } from '../../../../shared/nest/guards/oauth-state';
 import { SessionPolicy, StartUserSession } from '../../../domain/services/user-session-start';
 import { SignAccessToken } from '../../../domain/services/user-session-sign-access-token';
 import { RefreshUserSession } from '../../../domain/services/user-session-refresh';
@@ -338,7 +340,16 @@ export class AuthController {
 
   private async handleOAuthCallback(req: Request, res: Response) {
     const oauthUser = req.user as { email: string; firstName: string; lastName: string; authProvider: string; emailVerified: boolean };
-    const redirectUrl = await this.resolveRedirectUrl(req.query?.state as string);
+    // The state must be the one this browser was given when it started the sign-in
+    const verifyState = new VerifyOAuthState(new ConsumeOneTimeToken(this.tokenService, this.usedTokenRepository));
+    const verified = await verifyState.execute({
+      state: typeof req.query?.state === 'string' ? req.query.state : null,
+      browserNonce: readOAuthNonce(req),
+    });
+    res.clearCookie(OAUTH_NONCE_COOKIE, { path: '/' });
+    if (!verified) return res.redirect(`${this.frontendUrl}/login?error=oauth_failed`);
+
+    const redirectUrl = await this.resolveRedirectUrl(verified.redirect ?? undefined);
 
     try {
       const service = new AuthenticateOAuth(this.idGenerator, this.userRepository, this.passwordHasher, {
@@ -381,11 +392,11 @@ export class AuthController {
     }
   }
 
-  private async resolveRedirectUrl(state?: string): Promise<string> {
-    if (!state || state === this.frontendUrl) return this.frontendUrl;
+  private async resolveRedirectUrl(redirect?: string): Promise<string> {
+    if (!redirect || redirect === this.frontendUrl) return this.frontendUrl;
     try {
-      const hostname = new URL(state).hostname;
-      if (await this.isVerifiedDomain(hostname)) return state;
+      const hostname = new URL(redirect).hostname;
+      if (await this.isVerifiedDomain(hostname)) return redirect;
     } catch {}
     return this.frontendUrl;
   }

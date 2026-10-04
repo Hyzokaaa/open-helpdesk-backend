@@ -21,7 +21,7 @@ export class ResetPasswordCommand implements Command<Props, void> {
   async execute(props: Props): Promise<void> {
     // A reset link sets the password once: a copy found later in a mailbox or a log is useless
     const payload = await this.consumeToken.execute({ token: props.token, type: PASSWORD_RESET_TYPE });
-    if (!payload) throw new InvalidCredentialsError('Invalid, expired or already used reset token');
+    if (!payload?.sub) throw new InvalidCredentialsError('Invalid, expired or already used reset token');
 
     await this.resetPassword.execute({
       userId: payload.sub,
