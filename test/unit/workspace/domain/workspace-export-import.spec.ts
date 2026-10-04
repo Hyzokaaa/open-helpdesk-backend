@@ -141,6 +141,52 @@ describe('ExportWorkspace', () => {
     expect(result.auditLog[0]).toMatchObject({ category: 'email', level: 'error', source: 'system', userEmail: null });
   });
 
+  it('lists every referenced user with id and email and never exports a raw user id as an email', async () => {
+    const member = '01MEMBER0000000000000000AA';
+    const former = '01FORMER0000000000000000AA';
+    const mentioned = '01MENTION000000000000000AA';
+    const vanished = '01VANISHED00000000000000AA';
+    const qr = new FakeQueryRunner((sql, params) => {
+      if (/FROM workspace_members wm JOIN users u/.test(sql)) {
+        return [{ id: member, email: 'agent@example.com', firstName: 'Agent', lastName: 'A', role: 'agent' }];
+      }
+      if (/FROM tickets t/.test(sql)) {
+        return [{ id: 't-1', name: 'T', status: 'open', category: null, reporterId: member, tagIds: [], createdAt, updatedAt: createdAt }];
+      }
+      if (/FROM comments c/.test(sql)) {
+        return [
+          { id: 'c-1', content: `hi @[Mia](${mentioned})`, ticketId: 't-1', authorId: former, mentionedUserIds: mentioned, createdAt },
+          { id: 'c-2', content: 'gone', ticketId: 't-1', authorId: vanished, mentionedUserIds: '', createdAt },
+        ];
+      }
+      if (/FROM ticket_participants tp/.test(sql)) return [{ ticketId: 't-1', userId: vanished, role: 'follower' }];
+      if (/FROM users WHERE id = ANY/.test(sql)) {
+        const ids = params[0] as string[];
+        return [
+          { id: former, email: 'former@example.com', firstName: 'Former', lastName: 'F' },
+          { id: mentioned, email: 'mia@example.com', firstName: 'Mia', lastName: 'M' },
+        ].filter((u) => ids.includes(u.id));
+      }
+      return answer(sql, params);
+    });
+
+    const result = await new ExportWorkspace(dataSourceOf(qr)).execute('ws-1');
+
+    expect(qr.find(/FROM users WHERE id = ANY/)).toHaveLength(1);
+    expect(result.users).toEqual([
+      { id: member, email: 'agent@example.com', firstName: 'Agent', lastName: 'A', role: 'agent' },
+      { id: former, email: 'former@example.com', firstName: 'Former', lastName: 'F', role: null },
+      { id: mentioned, email: 'mia@example.com', firstName: 'Mia', lastName: 'M', role: null },
+    ]);
+    expect(result.comments.map((c) => [c.authorEmail, c.mentionedUserIds])).toEqual([
+      ['former@example.com', [mentioned]],
+      [null, []],
+    ]);
+    expect(result.participants[0].userEmail).toBeNull();
+    const emails = JSON.stringify(result).match(/"[a-zA-Z]*[eE]mail":"[^"]*"/g) ?? [];
+    for (const e of emails) expect(e).toMatch(/@/);
+  });
+
   it('scopes the categories query to the exported workspace', async () => {
     const qr = new FakeQueryRunner(answer);
     await new ExportWorkspace(dataSourceOf(qr)).execute('ws-1');
@@ -375,6 +421,33 @@ describe('ImportWorkspace', () => {
     expect(result.ticketsImported).toBe(1);
     expect(result.auditLogImported).toBe(1);
     expect(qr.committed).toBe(true);
+  });
+
+  it('names non-member users without adding or inviting them, and skips a comment whose author no longer exists', async () => {
+    const qr = new FakeQueryRunner(answer);
+    const createdAt = '2026-01-01T00:00:00.000Z';
+    const data = emptyExport({
+      users: [
+        { id: 'src-alice', email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' },
+        { id: 'src-former', email: 'former@example.com', firstName: 'Former', lastName: 'F', role: null },
+      ],
+      tickets: [ticket('t-1', null)],
+      comments: [
+        { id: 'c-1', content: 'kept', ticketId: 't-1', authorEmail: 'former@example.com', mentionedUserIds: [], createdAt },
+        { id: 'c-2', content: 'orphan', ticketId: 't-1', authorEmail: null, mentionedUserIds: [], createdAt },
+      ],
+      participants: [{ ticketId: 't-1', userEmail: null, role: 'follower' }],
+    });
+
+    const { result, newMembers } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    const [userInsert] = qr.find(/INSERT INTO users/);
+    expect(userInsert.params.slice(1)).toEqual(['former@example.com', expect.any(String), 'Former', 'F', true]);
+    expect(newMembers).toEqual([]);
+    expect(qr.find(/INSERT INTO workspace_members/).map((q) => q.params[2])).toEqual(['u-1']);
+    expect(qr.find(/INSERT INTO comments/).map((q) => q.params[1])).toEqual(['kept']);
+    expect(result.commentsImported).toBe(1);
+    expect(result.participantsImported).toBe(0);
   });
 
   it('upgrades a 1.12 file that only carries slugs on tickets and derives a category name from the slug', async () => {

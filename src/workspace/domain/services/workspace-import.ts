@@ -66,9 +66,9 @@ export class ImportWorkspace {
         if (t.assigneeEmail) allEmailsSet.add(t.assigneeEmail);
         if (t.resolvedByEmail) allEmailsSet.add(t.resolvedByEmail);
       }
-      for (const c of data.comments) allEmailsSet.add(c.authorEmail);
+      for (const c of data.comments) { if (c.authorEmail) allEmailsSet.add(c.authorEmail); }
       for (const a of data.attachments) { if (a.uploadedByEmail) allEmailsSet.add(a.uploadedByEmail); }
-      for (const p of data.participants) allEmailsSet.add(p.userEmail);
+      for (const p of data.participants) { if (p.userEmail) allEmailsSet.add(p.userEmail); }
       // System and anonymous portal events have no user; they keep a null userId on import
       for (const a of data.auditLog) { if (a.userEmail) allEmailsSet.add(a.userEmail); }
 
@@ -88,16 +88,18 @@ export class ImportWorkspace {
       // Members are invited to set a password; people who only appear in the history (old
       // reporters, authors) are created like inbound email senders and can recover access later.
       const unusablePassword = await bcrypt.hash(randomBytes(32).toString('hex'), 10);
-      const memberMap = new Map(data.users.map((u) => [u.email, u]));
+      // users also lists non-members the history refers to (role null): named, but not members
+      const knownUsers = new Map(data.users.map((u) => [u.email, u]));
       for (const email of allEmails) {
         if (!emailToUserId.has(email)) {
           const id = ulid();
-          const member = memberMap.get(email);
-          const firstName = member?.firstName ?? email.split('@')[0];
+          const known = knownUsers.get(email);
+          const member = known?.role ? known : undefined;
+          const firstName = known?.firstName ?? email.split('@')[0];
           await qr.query(`
             INSERT INTO users (id, email, password, "firstName", "lastName", "isActive", "isSystemAdmin", "isEmailVerified", "autoCreated")
             VALUES ($1, $2, $3, $4, $5, true, false, false, $6)
-          `, [id, email, unusablePassword, firstName, member?.lastName ?? '', !member]);
+          `, [id, email, unusablePassword, firstName, known?.lastName ?? '', !member]);
           emailToUserId.set(email, id);
           result.usersCreated++;
           if (member) newMembers.push({ userId: id, email, firstName });
@@ -109,7 +111,7 @@ export class ImportWorkspace {
       // 2. Add workspace members (skip if already member)
       for (const u of data.users) {
         const userId = emailToUserId.get(u.email);
-        if (!userId) continue;
+        if (!userId || !u.role) continue;
         const exists = await qr.query(
           `SELECT 1 FROM workspace_members WHERE "workspaceId" = $1 AND "userId" = $2`, [targetWorkspaceId, userId],
         );
@@ -273,12 +275,15 @@ export class ImportWorkspace {
       const commentIdMap = new Map<string, string>();
       for (const c of data.comments) {
         const newTicketId = ticketIdMap.get(c.ticketId);
-        if (!newTicketId) continue;
+        // comments.authorId is NOT NULL: a comment whose author no longer exists has nobody to
+        // belong to, and attributing it to someone else would misrepresent who wrote it
+        const authorId = userIdFor(c.authorEmail);
+        if (!newTicketId || !authorId) continue;
         const newId = ulid();
         await qr.query(`
           INSERT INTO comments (id, content, "ticketId", "authorId", "mentionedUserIds", "createdAt")
           VALUES ($1, $2, $3, $4, $5, $6)
-        `, [newId, c.content, newTicketId, userIdFor(c.authorEmail), Array.isArray(c.mentionedUserIds) ? c.mentionedUserIds.join(',') : (c.mentionedUserIds ?? ''), c.createdAt]);
+        `, [newId, c.content, newTicketId, authorId, Array.isArray(c.mentionedUserIds) ? c.mentionedUserIds.join(',') : (c.mentionedUserIds ?? ''), c.createdAt]);
         commentIdMap.set(c.id, newId);
         result.commentsImported++;
       }

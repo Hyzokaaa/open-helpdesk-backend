@@ -1,8 +1,11 @@
 export interface WorkspaceExportUser {
+  /** Source user id, so ids carried in the file (mentions, audit) can be mapped. Since 1.14. */
+  id?: string;
   email: string;
   firstName: string;
   lastName: string;
-  role: string;
+  /** Null for a user the history refers to who is not a member (since 1.14); not added as a member. */
+  role: string | null;
 }
 
 export interface WorkspaceExportTag {
@@ -48,7 +51,8 @@ export interface WorkspaceExportComment {
   id: string;
   content: string;
   ticketId: string;
-  authorEmail: string;
+  /** Null if the author no longer exists; such a comment cannot be imported. */
+  authorEmail: string | null;
   mentionedUserIds: string[];
   createdAt: string;
 }
@@ -68,7 +72,7 @@ export interface WorkspaceExportAttachment {
 
 export interface WorkspaceExportParticipant {
   ticketId: string;
-  userEmail: string;
+  userEmail: string | null;
   role: string;
 }
 

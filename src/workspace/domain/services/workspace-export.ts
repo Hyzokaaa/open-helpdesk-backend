@@ -1,6 +1,15 @@
 import { DataSource } from 'typeorm';
 import { WorkspaceExportData } from '../workspace-export';
 import { CURRENT_VERSION } from './workspace-export-transforms';
+import { ExtractMentions } from '../../../comment/domain/services/comment-extract-mentions';
+
+const extractMentions = new ExtractMentions();
+
+/** comments.mentionedUserIds is a simple-array column, which raw SQL returns as comma-joined text. */
+function mentionedIdsOf(value: unknown): string[] {
+  if (Array.isArray(value)) return value;
+  return typeof value === 'string' && value ? value.split(',') : [];
+}
 
 export class ExportWorkspace {
   constructor(private readonly dataSource: DataSource) {}
@@ -16,38 +25,11 @@ export class ExportWorkspace {
       if (!workspace.length) throw new Error('Workspace not found');
       const ws = workspace[0];
 
-      // Build email lookup for all users in this workspace
       const members = await qr.query(`
-        SELECT u.email, u."firstName", u."lastName", wm.role
+        SELECT u.id, u.email, u."firstName", u."lastName", wm.role
         FROM workspace_members wm JOIN users u ON u.id = wm."userId"
         WHERE wm."workspaceId" = $1
       `, [workspaceId]);
-
-      const userIdToEmail = new Map<string, string>();
-      const userRows = await qr.query(`
-        SELECT u.id, u.email FROM users u
-        JOIN workspace_members wm ON wm."userId" = u.id
-        WHERE wm."workspaceId" = $1
-      `, [workspaceId]);
-      for (const r of userRows) userIdToEmail.set(r.id, r.email);
-
-      // Also map users referenced in tickets but not members (e.g. deleted members)
-      const ticketUserIds = await qr.query(`
-        SELECT DISTINCT x.uid FROM (
-          SELECT "reporterId" as uid FROM tickets WHERE "workspaceId" = $1
-          UNION SELECT "assigneeId" FROM tickets WHERE "workspaceId" = $1 AND "assigneeId" IS NOT NULL
-          UNION SELECT "resolvedById" FROM tickets WHERE "workspaceId" = $1 AND "resolvedById" IS NOT NULL
-        ) x WHERE x.uid NOT IN (SELECT "userId" FROM workspace_members WHERE "workspaceId" = $1)
-      `, [workspaceId]);
-      if (ticketUserIds.length) {
-        const extraUsers = await qr.query(
-          `SELECT id, email FROM users WHERE id = ANY($1)`,
-          [ticketUserIds.map((r: any) => r.uid)],
-        );
-        for (const r of extraUsers) userIdToEmail.set(r.id, r.email);
-      }
-
-      const emailFor = (id: string | null) => id ? (userIdToEmail.get(id) ?? id) : null;
 
       const tags = await qr.query(
         `SELECT id, name, color, "createdAt" FROM tags WHERE "workspaceId" = $1`, [workspaceId],
@@ -112,6 +94,29 @@ export class ExportWorkspace {
         FROM audit_log_entries a WHERE a."workspaceId" = $1 ORDER BY a."createdAt"
       `, [workspaceId]);
 
+      // Every user the file refers to, members or not (former members, past authors, mentioned
+      // people), is listed with an id and email so the import can map it. A user that no longer
+      // exists is exported as a null email, never as its raw id.
+      const users = new Map<string, any>(members.map((m: any) => [m.id, m]));
+      const referenced = new Set<string>();
+      const refer = (id: string | null | undefined) => { if (id && !users.has(id)) referenced.add(id); };
+      for (const t of tickets) { refer(t.reporterId); refer(t.assigneeId); refer(t.resolvedById); }
+      for (const c of comments) {
+        c.mentionedUserIds = mentionedIdsOf(c.mentionedUserIds);
+        refer(c.authorId);
+        for (const id of [...c.mentionedUserIds, ...extractMentions.execute(c.content ?? '')]) refer(id);
+      }
+      for (const a of attachments) refer(a.uploadedById);
+      for (const p of participants) refer(p.userId);
+      for (const a of auditLog) refer(a.userId);
+      if (referenced.size) {
+        const others = await qr.query(
+          `SELECT id, email, "firstName", "lastName" FROM users WHERE id = ANY($1)`, [[...referenced]],
+        );
+        for (const u of others) users.set(u.id, { ...u, role: null });
+      }
+      const emailFor = (id: string | null) => (id ? users.get(id)?.email ?? null : null);
+
       return {
         version: CURRENT_VERSION,
         exportedAt: new Date().toISOString(),
@@ -121,11 +126,12 @@ export class ExportWorkspace {
           slaPolicy: ws.slaPolicy,
           metadata: ws.metadata,
         },
-        users: members.map((m: any) => ({
-          email: m.email,
-          firstName: m.firstName,
-          lastName: m.lastName,
-          role: m.role,
+        users: [...users.values()].map((u: any) => ({
+          id: u.id,
+          email: u.email,
+          firstName: u.firstName,
+          lastName: u.lastName,
+          role: u.role,
         })),
         tags: tags.map((t: any) => ({
           id: t.id,
@@ -166,8 +172,8 @@ export class ExportWorkspace {
           id: c.id,
           content: c.content,
           ticketId: c.ticketId,
-          authorEmail: emailFor(c.authorId)!,
-          mentionedUserIds: c.mentionedUserIds ?? [],
+          authorEmail: emailFor(c.authorId),
+          mentionedUserIds: c.mentionedUserIds,
           createdAt: c.createdAt?.toISOString(),
         })),
         attachments: attachments.map((a: any) => ({
@@ -184,7 +190,7 @@ export class ExportWorkspace {
         })),
         participants: participants.map((p: any) => ({
           ticketId: p.ticketId,
-          userEmail: emailFor(p.userId)!,
+          userEmail: emailFor(p.userId),
           role: p.role,
         })),
         cannedResponses: cannedResponses.map((cr: any) => ({
@@ -212,7 +218,7 @@ export class ExportWorkspace {
           action: a.action,
           entityType: a.entityType,
           entityId: a.entityId,
-          userEmail: emailFor(a.userId)!,
+          userEmail: emailFor(a.userId),
           metadata: a.metadata,
           category: a.category,
           level: a.level,
