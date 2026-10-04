@@ -91,6 +91,7 @@ import { SeedDefaultCategories } from "../../../../project/domain/services/ticke
 import { EnsureCanCreateWorkspace } from "../../../domain/services/workspace-ensure-can-create";
 import { TypeOrmWorkspaceCreationSettingsRepository } from "../../typeorm/repositories/typeorm-workspace-creation-settings.repository";
 import { workspaceCreationPolicy } from "../workspace-creation-policy";
+import { imageUploadOptions, LOGO_IMAGE_MIMES } from "../../../../shared/infrastructure/nest/image-upload-options";
 
 @Controller("workspaces")
 export class WorkspaceController {
@@ -1248,7 +1249,7 @@ export class WorkspaceController {
   }
 
   @Post(":slug/branding/logo")
-  @UseInterceptors(FileInterceptor("file"))
+  @UseInterceptors(FileInterceptor("file", imageUploadOptions(1024 * 1024, LOGO_IMAGE_MIMES)))
   async uploadLogo(
     @Param("slug") slug: string,
     @UploadedFile() file: Express.Multer.File,
@@ -1323,7 +1324,7 @@ export class WorkspaceController {
   }
 
   @Post(":slug/branding/icon")
-  @UseInterceptors(FileInterceptor("file"))
+  @UseInterceptors(FileInterceptor("file", imageUploadOptions(512 * 1024, LOGO_IMAGE_MIMES)))
   async uploadIcon(
     @Param("slug") slug: string,
     @UploadedFile() file: Express.Multer.File,

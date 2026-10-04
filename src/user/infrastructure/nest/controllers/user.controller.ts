@@ -53,6 +53,7 @@ import { RegisterUserRequest } from '../dto/register-user.request';
 import { UpdateUserNameRequest } from '../dto/update-user-name.request';
 import { ChangePasswordRequest } from '../dto/change-password.request';
 import { SortDto } from '../../../../shared/nest/dto/sort.dto';
+import { imageUploadOptions, RASTER_IMAGE_MIMES } from '../../../../shared/infrastructure/nest/image-upload-options';
 
 const MIME_TO_EXT: Record<string, string> = {
   'image/png': '.png',
@@ -403,7 +404,7 @@ export class UserController {
   }
 
   @Post('me/avatar')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', imageUploadOptions(1024 * 1024, RASTER_IMAGE_MIMES)))
   async uploadAvatar(
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() authUser: AuthUser,
