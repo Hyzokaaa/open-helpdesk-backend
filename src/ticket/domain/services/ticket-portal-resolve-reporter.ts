@@ -42,8 +42,13 @@ export class ResolvePortalReporter {
     const existing = await this.userRepository.findByEmail(props.email);
 
     if (existing) {
+      // Like a customer writing in by email, an existing account joins the workspace as a USER.
+      // The anonymous submitter still never gets the portal link: that goes only to the inbox.
       const member = await this.memberRepository.findByWorkspaceAndUser(props.workspaceId, existing.getId());
-      return { user: existing, isMember: member !== null, mayRevealPortalLink: false };
+      if (!member) {
+        await this.addMember.execute({ workspaceId: props.workspaceId, userId: existing.getId(), role: WorkspaceRole.USER });
+      }
+      return { user: existing, isMember: true, mayRevealPortalLink: false };
     }
 
     const user = await this.createUser.execute({

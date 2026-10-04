@@ -35,13 +35,12 @@ describe('ResolvePortalReporter', () => {
     members.seed(new WorkspaceMember({ id: 'm-agent', workspaceId: 'ws-1', userId: 'agent', role: WorkspaceRole.AGENT }));
   });
 
-  it('does not add an existing account to a workspace just because someone typed its address', async () => {
-    // Before, an anonymous POST with any email made that account a USER member of the workspace.
+  it('adds an existing account as a USER member, as an email from that address would', async () => {
     const reporter = await service.execute({ workspaceId: 'ws-1', email: 'ceo@other.com', name: 'Attacker' });
 
     expect(reporter.user.getId()).toBe('victim');
-    expect(reporter.isMember).toBe(false);
-    expect(await members.findByWorkspaceAndUser('ws-1', 'victim')).toBeNull();
+    expect(reporter.isMember).toBe(true);
+    expect((await members.findByWorkspaceAndUser('ws-1', 'victim'))!.role).toBe(WorkspaceRole.USER);
   });
 
   it('does not hand the portal link to whoever typed an existing address', async () => {
