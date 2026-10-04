@@ -6,6 +6,7 @@ import {
   Get,
   HttpCode,
   Inject,
+  Logger,
   Param,
   Patch,
   Post,
@@ -17,6 +18,12 @@ import {
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { Request, Response } from "express";
+import { diskStorage } from "multer";
+import { randomBytes } from "node:crypto";
+import { createReadStream } from "node:fs";
+import { unlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { DataSource } from "typeorm";
 import { JwtTokenService } from "../../../../shared/infrastructure/jwt-token-service";
 import { WorkspaceFrontendResolver } from "../../../../shared/infrastructure/workspace-frontend-resolver";
@@ -81,6 +88,7 @@ import { ConfigService } from "@nestjs/config";
 import { ExportWorkspace } from "../../../domain/services/workspace-export";
 import {
   buildImportPreview,
+  ImportArchiveFiles,
   ImportPreview,
   ImportWorkspace,
 } from "../../../domain/services/workspace-import";
@@ -93,17 +101,24 @@ import { Public } from "../../../../shared/nest/decorators/public.decorator";
 import { ExportWorkspaceRequest } from "../dto/export-workspace.request";
 import {
   downloadExportLink,
+  exportLinkTimeoutFromEnv,
   forgetExportDownload,
   recallExportDownload,
   rememberExportDownload,
 } from "../../export-link-download";
 import {
   assertExportPassword,
-  decodeExport,
   deriveExportKey,
-  encodeExport,
-  encodeExportWithKey,
+  ExportKeyContext,
 } from "../../export-file-codec";
+import {
+  createDecodeDirectory,
+  decodeExportStream,
+  DecodedExport,
+  importLimitsFromEnv,
+  removeDirectory,
+  writeExportArchive,
+} from "../../export-archive";
 import { TypeOrmWorkspaceEmailSenderRepository } from "../../typeorm/repositories/typeorm-workspace-email-sender.repository";
 import { WorkspaceEmailSender } from "../../../domain/entities/workspace-email-sender";
 import * as nodemailer from "nodemailer";
@@ -114,11 +129,31 @@ import { TypeOrmWorkspaceCreationSettingsRepository } from "../../typeorm/reposi
 import { workspaceCreationPolicy } from "../workspace-creation-policy";
 import { imageUploadOptions, LOGO_IMAGE_MIMES } from "../../../../shared/infrastructure/nest/image-upload-options";
 
-/** Import uploads are held in memory (Multer's default storage), capped while they stream in. */
-const IMPORT_UPLOAD_OPTIONS = { limits: { fileSize: 100 * 1024 * 1024, files: 1 } };
+const IMPORT_LIMITS = importLimitsFromEnv();
+
+/**
+ * Import uploads stream to a temp file (never whole into memory), capped at WORKSPACE_IMPORT_MAX_MB
+ * while they arrive (413 past it). The handler always deletes the file.
+ */
+const IMPORT_UPLOAD_OPTIONS = {
+  storage: diskStorage({
+    destination: tmpdir(),
+    filename: (_req, _file, callback) => callback(null, `ohd-upload-${randomBytes(12).toString("hex")}`),
+  }),
+  limits: { fileSize: IMPORT_LIMITS.maxTotalBytes, files: 1 },
+};
+
+/** A decoded import: the export JSON, plus the archive files written to a temp directory. */
+interface ImportSource {
+  data: WorkspaceExportData;
+  source: "file" | "url" | "direct";
+  decoded: DecodedExport | null;
+}
 
 @Controller("workspaces")
 export class WorkspaceController {
+  private readonly logger = new Logger(WorkspaceController.name);
+
   constructor(
     @Inject() private readonly workspaceRepository: TypeOrmWorkspaceRepository,
     @Inject()
@@ -688,20 +723,33 @@ export class WorkspaceController {
       isSystemAdmin: user.isSystemAdmin,
     });
     assertExportPassword(body.password);
-    const service = new ExportWorkspace(this.dataSource);
-    const data = await service.execute(workspaceId);
-    this.sendExportFile(res, slug, await encodeExport(data, body.password));
+    await this.streamExportFile(res, slug, workspaceId, await deriveExportKey(body.password));
   }
 
-  /** The .ohd file as a download, named after the workspace and the day it was made. */
-  private sendExportFile(res: Response, slug: string, bytes: Buffer) {
+  /**
+   * Streams the .ohd file (format 2, with attachments and logos) as a download named after the
+   * workspace and the day. Errors before the first byte go through the usual exception filter;
+   * after it, the response can only be cut short, which the client sees as a failed download.
+   */
+  private async streamExportFile(res: Response, slug: string, workspaceId: string, context: ExportKeyContext) {
+    const bundle = await new ExportWorkspace(this.dataSource, this.storage).prepare(workspaceId);
+    const files = bundle.files.map((file) => ({
+      path: file.path,
+      size: file.size,
+      open: () => this.storage.getStream(file.storageKey),
+    }));
     const day = new Date().toISOString().slice(0, 10);
     res.setHeader("Content-Type", "application/octet-stream");
     res.setHeader(
       "Content-Disposition",
       `attachment; filename="${slug}-${day}.ohd"`,
     );
-    res.send(bytes);
+    try {
+      await writeExportArchive(res, bundle.data, files, context);
+    } catch (error) {
+      this.logger.error(`Export of workspace ${workspaceId} failed midway: ${(error as Error)?.message}`);
+      res.destroy();
+    }
   }
 
   @Post(":slug/import/preview")
@@ -714,18 +762,24 @@ export class WorkspaceController {
     @CurrentUser() user: AuthUser,
     @Req() req: Request,
   ): Promise<ImportPreview> {
-    const workspaceId = await this.resolveWorkspaceId(slug);
-    const ensurePermission = new EnsureWorkspacePermission(
-      this.memberRepository,
-    );
-    await ensurePermission.execute({
-      workspaceId,
-      userId: user.userId,
-      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
-      isSystemAdmin: user.isSystemAdmin,
-    });
-    const { data } = await this.readImportSource(req, file, body, `${workspaceId}:${user.userId}`);
-    return buildImportPreview(data);
+    try {
+      const workspaceId = await this.resolveWorkspaceId(slug);
+      const ensurePermission = new EnsureWorkspacePermission(
+        this.memberRepository,
+      );
+      await ensurePermission.execute({
+        workspaceId,
+        userId: user.userId,
+        permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+        isSystemAdmin: user.isSystemAdmin,
+      });
+      // The whole file is decoded (and so verified) to count its files; the temp copy is dropped
+      return await this.withImportSource(req, file, body, `${workspaceId}:${user.userId}`, async ({ data, decoded }) =>
+        buildImportPreview(data, { files: decoded?.files.size ?? 0, bytes: decoded?.filesBytes ?? 0 }),
+      );
+    } finally {
+      await this.discardUpload(file);
+    }
   }
 
   @Post(":slug/import")
@@ -739,6 +793,21 @@ export class WorkspaceController {
     // Comma list of target settings to overwrite: palette, sla, description, branding
     @Query("overwrite") overwrite?: string | string[],
   ) {
+    try {
+      return await this.runImport(slug, file, body, user, req, overwrite);
+    } finally {
+      await this.discardUpload(file);
+    }
+  }
+
+  private async runImport(
+    slug: string,
+    file: Express.Multer.File | undefined,
+    body: any,
+    user: AuthUser,
+    req: Request,
+    overwrite?: string | string[],
+  ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
     const ensurePermission = new EnsureWorkspacePermission(
       this.memberRepository,
@@ -751,14 +820,27 @@ export class WorkspaceController {
     });
 
     const downloadKey = `${workspaceId}:${user.userId}`;
-    const { data, source } = await this.readImportSource(req, file, body, downloadKey);
-
-    const service = new ImportWorkspace(this.dataSource);
     const overwriteKeys = [overwrite ?? []].flat()
       .flatMap((value) => String(value).split(","))
       .map((key) => key.trim())
       .filter(Boolean);
-    const { result, newMembers } = await service.execute(workspaceId, data, { overwrite: overwriteKeys });
+    const service = new ImportWorkspace(this.dataSource, this.storage, (key, error) =>
+      this.logger.warn(`Could not delete storage object ${key} after a workspace import: ${(error as Error)?.message}`),
+    );
+    // Nothing is written until the whole file has been decoded and verified into the temp directory
+    const { source, result, newMembers } = await this.withImportSource(req, file, body, downloadKey, async ({ data, source, decoded }) => {
+      const files: ImportArchiveFiles | undefined = decoded
+        ? {
+          size: (path) => decoded.files.get(path)?.size ?? null,
+          open: (path) => {
+            const entry = decoded.files.get(path);
+            if (!entry) throw new Error(`Not in the archive: ${path}`);
+            return createReadStream(entry.diskPath);
+          },
+        }
+        : undefined;
+      return { source, ...(await service.execute(workspaceId, data, { overwrite: overwriteKeys, files })) };
+    });
     forgetExportDownload(downloadKey);
 
     const workspace = await this.workspaceRepository.findById(workspaceId);
@@ -850,9 +932,7 @@ export class WorkspaceController {
       res.status(404).json({ message: "Workspace not found" });
       return;
     }
-    const service = new ExportWorkspace(this.dataSource);
-    const data = await service.execute(entry.workspaceId);
-    this.sendExportFile(res, slug, await encodeExportWithKey(data, entry.encryption));
+    await this.streamExportFile(res, slug, entry.workspaceId, entry.encryption);
   }
 
   @Get(":slug/email-sender")
@@ -1467,13 +1547,15 @@ export class WorkspaceController {
   /**
    * The export an import or preview reads: a multipart `file` or `url` (exactly one, with an
    * optional `password`), or, for JSON requests, the export object itself or `{ url, password? }`.
+   * The file is decoded into a fresh temp directory, which is removed once `use` settles.
    */
-  private async readImportSource(
+  private async withImportSource<T>(
     req: Request,
     file: Express.Multer.File | undefined,
     body: any,
     cacheKey: string,
-  ): Promise<{ data: WorkspaceExportData; source: "file" | "url" | "direct" }> {
+    use: (source: ImportSource) => Promise<T>,
+  ): Promise<T> {
     const fields = body && typeof body === "object" ? body : {};
     const password = typeof fields.password === "string" ? fields.password : undefined;
     const url = typeof fields.url === "string" && fields.url.trim() ? fields.url.trim() : undefined;
@@ -1483,23 +1565,34 @@ export class WorkspaceController {
       if (file && url) throw new DomainValidationError("Send either a file or a URL, not both");
       if (!file && !url) throw new DomainValidationError("Send an export file or a URL");
     }
-    if (file) {
-      return { data: (await decodeExport(file.buffer, password)) as WorkspaceExportData, source: "file" };
+    if (!file && !url) return use({ data: fields as WorkspaceExportData, source: "direct", decoded: null });
+
+    const path = file ? file.path : await this.fetchExportFile(url!, cacheKey);
+    const dir = await createDecodeDirectory();
+    try {
+      const decoded = await decodeExportStream(createReadStream(path), password, dir, IMPORT_LIMITS);
+      return await use({ data: decoded.data as WorkspaceExportData, source: file ? "file" : "url", decoded });
+    } finally {
+      await removeDirectory(dir);
     }
-    if (url) {
-      const bytes = await this.fetchExportBytes(url, cacheKey);
-      return { data: (await decodeExport(bytes, password)) as WorkspaceExportData, source: "url" };
-    }
-    return { data: fields as WorkspaceExportData, source: "direct" };
   }
 
-  /** An export link's bytes, reusing the ones a preview already downloaded (links are single use). */
-  private async fetchExportBytes(url: string, cacheKey: string): Promise<Buffer> {
+  /** Multer wrote the upload to a temp file; it is never kept past the request. */
+  private async discardUpload(file: Express.Multer.File | undefined) {
+    if (file?.path) await unlink(file.path).catch(() => undefined);
+  }
+
+  /** An export link downloaded to a temp file, reusing the one a preview already fetched (links are single use). */
+  private async fetchExportFile(url: string, cacheKey: string): Promise<string> {
     const remembered = recallExportDownload(cacheKey, url);
     if (remembered) return remembered;
-    const bytes = await downloadExportLink(url);
-    rememberExportDownload(cacheKey, url, bytes);
-    return bytes;
+    const filePath = join(tmpdir(), `ohd-download-${randomBytes(12).toString("hex")}`);
+    await downloadExportLink(url, filePath, {
+      maxBytes: IMPORT_LIMITS.maxTotalBytes,
+      timeoutMs: exportLinkTimeoutFromEnv(),
+    });
+    rememberExportDownload(cacheKey, url, filePath);
+    return filePath;
   }
 
   private async resolveWorkspaceId(slug: string): Promise<string> {
