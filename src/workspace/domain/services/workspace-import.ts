@@ -651,7 +651,7 @@ export class ImportWorkspace {
             source, "registeredById", "originDate", "descriptionEditedAt"
           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
         `, [
-          newId, t.name, t.description, t.priority, t.status, categoryIdFor(t.category),
+          newId, t.name, sanitizeHtml(t.description ?? ''), t.priority, t.status, categoryIdFor(t.category),
           targetWorkspaceId, userIdFor(t.reporterEmail), userIdFor(t.assigneeEmail), ticketNumber,
           JSON.stringify(remapCustomFields(t.customFields)), t.discardReason, null,
           t.firstResponseAt, t.resolvedAt, userIdFor(t.resolvedByEmail),
@@ -692,7 +692,8 @@ export class ImportWorkspace {
           const targetId = sourceUserIdMap.get(id);
           if (targetId) mentioned.add(targetId);
         }
-        const content = remapMentionMarkup(c.content ?? '');
+        // Same sanitizing as content created in the app: the file is user-supplied
+        const content = sanitizeHtml(remapMentionMarkup(c.content ?? ''));
         await qr.query(`
           INSERT INTO comments (id, content, "ticketId", "authorId", "mentionedUserIds", "createdAt")
           VALUES ($1, $2, $3, $4, $5, $6)
@@ -710,7 +711,7 @@ export class ImportWorkspace {
         await qr.query(`
           INSERT INTO ticket_description_edits (id, content, "ticketId", "editedById", "createdAt")
           VALUES ($1, $2, $3, $4, $5)
-        `, [ulid(), e.content, ticketId, editorId, e.createdAt]);
+        `, [ulid(), sanitizeHtml(e.content ?? ''), ticketId, editorId, e.createdAt]);
         result.descriptionEditsImported++;
       }
       for (const e of data.commentEdits) {
@@ -720,7 +721,7 @@ export class ImportWorkspace {
         await qr.query(`
           INSERT INTO comment_edits (id, content, "commentId", "editedById", "createdAt")
           VALUES ($1, $2, $3, $4, $5)
-        `, [ulid(), remapMentionMarkup(e.content), commentId, editorId, e.createdAt]);
+        `, [ulid(), sanitizeHtml(remapMentionMarkup(e.content)), commentId, editorId, e.createdAt]);
         result.commentEditsImported++;
       }
 

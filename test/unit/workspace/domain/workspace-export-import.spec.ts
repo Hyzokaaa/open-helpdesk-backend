@@ -1017,6 +1017,26 @@ describe('ImportWorkspace knowledge base', () => {
     createdByEmail: 'alice@example.com' as string | null, createdAt: at, updatedAt: at,
   });
 
+  it('sanitizes imported ticket descriptions and comments like content created in the app', async () => {
+    const qr = new FakeQueryRunner((sql) => (/FROM users WHERE email = ANY/.test(sql) ? [{ id: 'u-1', email: 'alice@example.com' }] : /MAX\("ticketNumber"\)/.test(sql) ? [{ max: 0 }] : []));
+    const evil = '<p>hola</p><script>alert(1)</script><a href="javascript:alert(1)">x</a>';
+    const t1 = { ...ticket('t-1', null), description: evil };
+    const data = emptyExport({
+      users: [{ email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' }],
+      tickets: [t1],
+      comments: [{ id: 'c-1', content: evil, ticketId: 't-1', authorEmail: 'alice@example.com', mentionedUserIds: [], createdAt: '2026-01-01T00:00:00.000Z' }],
+    });
+
+    await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    const stored = [...qr.find(/INSERT INTO tickets/), ...qr.find(/INSERT INTO comments/)].map((q) => JSON.stringify(q.params));
+    for (const row of stored) {
+      expect(row).toContain('hola');
+      expect(row).not.toContain('<script');
+      expect(row).not.toContain('javascript:');
+    }
+  });
+
   it('reuses categories by slug, skips articles whose slug exists, sanitizes content and remaps audit', async () => {
     const qr = new FakeQueryRunner((sql) => {
       if (/FROM users WHERE email = ANY/.test(sql)) return [{ id: 'u-1', email: 'alice@example.com' }];
