@@ -242,6 +242,27 @@ describe('ImportWorkspace', () => {
     expect(inserts.map((q) => [q.params[1], q.params[9]])).toEqual([['Ticket t-1', 42], ['Ticket t-2', 43]]);
   });
 
+  it('counts only the participants actually inserted, not the ones ON CONFLICT skipped', async () => {
+    let calls = 0;
+    const qr = new FakeQueryRunner((sql, params) => {
+      if (/INSERT INTO ticket_participants/.test(sql)) return calls++ === 0 ? [{ id: 'p-new' }] : [];
+      return answer(sql, params);
+    });
+    const data = emptyExport({
+      users: [{ email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' }],
+      tickets: [ticket('t-1', null)],
+      participants: [
+        { ticketId: 't-1', userEmail: 'alice@example.com', role: 'follower' },
+        { ticketId: 't-1', userEmail: 'alice@example.com', role: 'collaborator' },
+      ],
+    });
+
+    const { result } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    expect(qr.find(/INSERT INTO ticket_participants[\s\S]*RETURNING id/)).toHaveLength(2);
+    expect(result.participantsImported).toBe(1);
+  });
+
   it('upgrades a 1.12 file that only carries slugs on tickets and derives a category name from the slug', async () => {
     const qr = new FakeQueryRunner(answer);
     const legacy = emptyExport({

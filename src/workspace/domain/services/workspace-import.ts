@@ -264,11 +264,12 @@ export class ImportWorkspace {
         const newTicketId = ticketIdMap.get(p.ticketId);
         const userId = userIdFor(p.userEmail);
         if (!newTicketId || !userId) continue;
-        await qr.query(`
+        const inserted = await qr.query(`
           INSERT INTO ticket_participants (id, "ticketId", "userId", role)
-          VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING
+          VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING RETURNING id
         `, [ulid(), newTicketId, userId, p.role]);
-        result.participantsImported++;
+        // ON CONFLICT DO NOTHING returns no row when the participant was already there
+        if (inserted.length) result.participantsImported++;
       }
 
       // 8. Canned responses
