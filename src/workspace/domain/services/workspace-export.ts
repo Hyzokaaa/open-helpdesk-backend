@@ -26,9 +26,14 @@ export class ExportWorkspace {
       const ws = workspace[0];
 
       const members = await qr.query(`
-        SELECT u.id, u.email, u."firstName", u."lastName", u."isActive", wm.role
+        SELECT u.id, u.email, u."firstName", u."lastName", u."isActive", wm.role, wm."organizationId"
         FROM workspace_members wm JOIN users u ON u.id = wm."userId"
         WHERE wm."workspaceId" = $1
+      `, [workspaceId]);
+
+      const organizations = await qr.query(`
+        SELECT id, name, description, notes, domains, "createdAt"
+        FROM organizations WHERE "workspaceId" = $1 AND "deletedAt" IS NULL
       `, [workspaceId]);
 
       const tags = await qr.query(
@@ -46,7 +51,7 @@ export class ExportWorkspace {
           t."reporterId", t."assigneeId", t."ticketNumber", t."customFields",
           t."discardReason", t."portalToken", t."firstResponseAt", t."resolvedAt",
           t."resolvedById", t."firstResponseBreached", t."resolutionBreached",
-          t."createdAt", t."updatedAt",
+          t."organizationId", t."createdAt", t."updatedAt",
           COALESCE(array_agg(tt."tagsId") FILTER (WHERE tt."tagsId" IS NOT NULL), '{}') as "tagIds"
         FROM tickets t
         LEFT JOIN ticket_categories tc ON tc.id = t."categoryId"
@@ -135,6 +140,15 @@ export class ExportWorkspace {
           lastName: u.lastName,
           role: u.role,
           isActive: u.isActive !== false,
+          ...(u.role ? { organizationId: u.organizationId ?? null } : {}),
+        })),
+        organizations: organizations.map((o: any) => ({
+          id: o.id,
+          name: o.name,
+          description: o.description ?? null,
+          notes: o.notes ?? null,
+          domains: o.domains ?? [],
+          createdAt: o.createdAt?.toISOString(),
         })),
         tags: tags.map((t: any) => ({
           id: t.id,
@@ -168,6 +182,7 @@ export class ExportWorkspace {
           firstResponseBreached: t.firstResponseBreached ?? false,
           resolutionBreached: t.resolutionBreached ?? false,
           tagIds: t.tagIds,
+          organizationId: t.organizationId ?? null,
           createdAt: t.createdAt?.toISOString() ?? null,
           updatedAt: t.updatedAt?.toISOString() ?? null,
         })),

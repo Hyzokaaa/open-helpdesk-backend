@@ -46,6 +46,7 @@ function emptyExport(overrides: Partial<WorkspaceExportData> = {}): WorkspaceExp
     exportedAt: '2026-01-01T00:00:00.000Z',
     workspace: { name: 'Acme', description: '', slaPolicy: null, metadata: null },
     users: [],
+    organizations: [],
     tags: [],
     categories: [],
     tickets: [],
@@ -149,7 +150,7 @@ describe('ExportWorkspace', () => {
     const vanished = '01VANISHED00000000000000AA';
     const qr = new FakeQueryRunner((sql, params) => {
       if (/FROM workspace_members wm JOIN users u/.test(sql)) {
-        return [{ id: member, email: 'agent@example.com', firstName: 'Agent', lastName: 'A', isActive: true, role: 'agent' }];
+        return [{ id: member, email: 'agent@example.com', firstName: 'Agent', lastName: 'A', isActive: true, role: 'agent', organizationId: null }];
       }
       if (/FROM tickets t/.test(sql)) {
         return [{ id: 't-1', name: 'T', status: 'open', category: null, reporterId: member, tagIds: [], createdAt, updatedAt: createdAt }];
@@ -175,7 +176,7 @@ describe('ExportWorkspace', () => {
 
     expect(qr.find(/FROM users WHERE id = ANY/)).toHaveLength(1);
     expect(result.users).toEqual([
-      { id: member, email: 'agent@example.com', firstName: 'Agent', lastName: 'A', role: 'agent', isActive: true },
+      { id: member, email: 'agent@example.com', firstName: 'Agent', lastName: 'A', role: 'agent', isActive: true, organizationId: null },
       { id: former, email: 'former@example.com', firstName: 'Former', lastName: 'F', role: null, isActive: false },
       { id: mentioned, email: 'mia@example.com', firstName: 'Mia', lastName: 'M', role: null, isActive: true },
     ]);
@@ -201,6 +202,31 @@ describe('ExportWorkspace', () => {
     expect(result.workspace).toEqual({
       name: 'Acme', description: 'd', slaPolicy: null, metadata: { palette: 'teal' }, appName: 'Acme Desk', appSubtitle: 'Support',
     });
+  });
+
+  it('exports live organizations without the logo, and the organization of members and tickets', async () => {
+    const qr = new FakeQueryRunner((sql, params) => {
+      if (/FROM organizations WHERE/.test(sql)) {
+        return [{ id: 'org-1', name: 'Globex', description: null, notes: 'vip', domains: ['globex.com'], createdAt }];
+      }
+      if (/FROM workspace_members wm JOIN users u/.test(sql)) {
+        return [{ id: 'u-1', email: 'a@example.com', firstName: 'A', lastName: 'A', isActive: true, role: 'user', organizationId: 'org-1' }];
+      }
+      if (/FROM tickets t/.test(sql)) {
+        return [{ id: 't-1', name: 'T', status: 'open', category: null, reporterId: 'u-1', organizationId: 'org-1', tagIds: [], createdAt, updatedAt: createdAt }];
+      }
+      return answer(sql, params);
+    });
+    const result = await new ExportWorkspace(dataSourceOf(qr)).execute('ws-1');
+
+    const [orgQuery] = qr.find(/FROM organizations WHERE/);
+    expect(orgQuery.sql).toMatch(/"deletedAt" IS NULL/);
+    expect(orgQuery.sql).not.toMatch(/logo/);
+    expect(result.organizations).toEqual([
+      { id: 'org-1', name: 'Globex', description: null, notes: 'vip', domains: ['globex.com'], createdAt: '2026-01-01T00:00:00.000Z' },
+    ]);
+    expect(result.users[0].organizationId).toBe('org-1');
+    expect(result.tickets[0].organizationId).toBe('org-1');
   });
 
   it('scopes the categories query to the exported workspace', async () => {
@@ -627,6 +653,73 @@ describe('ImportWorkspace', () => {
   });
 });
 
+describe('ImportWorkspace organizations', () => {
+  const at = '2026-01-01T00:00:00.000Z';
+  const org = (id: string, name: string) => ({ id, name, description: null, notes: 'n', domains: ['x.com'], createdAt: at });
+
+  it('creates organizations before members and tickets, reusing one with the same name, and remaps both', async () => {
+    const qr = new FakeQueryRunner((sql) => {
+      if (/FROM users WHERE email = ANY/.test(sql)) return [{ id: 'u-1', email: 'alice@example.com' }];
+      if (/FROM organizations WHERE/.test(sql)) return [{ id: 'org-existing', name: 'Globex' }];
+      if (/MAX\("ticketNumber"\)/.test(sql)) return [{ max: 0 }];
+      return [];
+    });
+    const data = emptyExport({
+      organizations: [org('src-globex', 'Globex'), org('src-initech', 'Initech')],
+      users: [
+        { id: 'src-alice', email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'user', organizationId: 'src-globex' },
+        { id: 'src-bob', email: 'bob@example.com', firstName: 'Bob', lastName: 'B', role: 'user', organizationId: 'src-initech' },
+      ],
+      tickets: [{ ...ticket('t-1', null), organizationId: 'src-initech' }, { ...ticket('t-2', null), organizationId: 'src-gone' }],
+      auditLog: [{ action: 'organization-created', entityType: 'organization', entityId: 'src-initech', userEmail: null, metadata: { organizationId: 'src-globex' }, createdAt: at }],
+    });
+
+    const { result } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    const orgInserts = qr.find(/INSERT INTO organizations/);
+    expect(orgInserts).toHaveLength(1);
+    const [initechId, name, , notes, domains, workspaceId] = orgInserts[0].params as string[];
+    expect([name, notes, domains, workspaceId]).toEqual(['Initech', 'n', '["x.com"]', 'ws-target']);
+    expect(orgInserts[0].sql).not.toMatch(/logo/);
+
+    const memberInserts = qr.find(/INSERT INTO workspace_members/);
+    expect(qr.queries.indexOf(orgInserts[0])).toBeLessThan(qr.queries.indexOf(memberInserts[0]));
+    expect(memberInserts.map((q) => q.params[4])).toEqual(['org-existing', initechId]);
+    expect(qr.find(/INSERT INTO tickets/).map((q) => q.params[20])).toEqual([initechId, null]);
+
+    const [audit] = qr.find(/INSERT INTO audit_log_entries/);
+    expect(audit.params[3]).toBe(initechId);
+    expect(JSON.parse(audit.params[6] as string)).toEqual({ organizationId: 'org-existing' });
+    expect(result.organizationsImported).toBe(1);
+  });
+
+  it('gives an existing member the imported organization only when it has none', async () => {
+    const qr = new FakeQueryRunner((sql) => {
+      if (/FROM users WHERE email = ANY/.test(sql)) return [{ id: 'u-1', email: 'alice@example.com' }];
+      if (/SELECT 1 FROM workspace_members/.test(sql)) return [{ '?column?': 1 }];
+      if (/MAX\("ticketNumber"\)/.test(sql)) return [{ max: 0 }];
+      return [];
+    });
+    const data = emptyExport({
+      organizations: [org('src-globex', 'Globex')],
+      users: [{ id: 'src-alice', email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'user', organizationId: 'src-globex' }],
+    });
+
+    await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    expect(qr.find(/INSERT INTO workspace_members/)).toHaveLength(0);
+    const [update] = qr.find(/UPDATE workspace_members/);
+    expect(update.sql).toMatch(/AND "organizationId" IS NULL/);
+    expect(update.params).toEqual(['ws-target', 'u-1', qr.find(/INSERT INTO organizations/)[0].params[0]]);
+  });
+
+  it('rejects an organization without a name', async () => {
+    const qr = new FakeQueryRunner(() => []);
+    await expect(new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', emptyExport({ organizations: [org('o', ' ')] })))
+      .rejects.toThrow('Invalid export file: organizations[0].name is required');
+  });
+});
+
 describe('ImportWorkspace settings overwrite', () => {
   const answer: Answer = (sql) => (/MAX\("ticketNumber"\)/.test(sql) ? [{ max: 0 }] : []);
   const source = () => emptyExport({
@@ -684,6 +777,8 @@ describe('ImportWorkspace settings overwrite', () => {
   });
 });
 
+const NEW_IN_1_15 = ['organizations'] as const;
+
 describe('applyTransforms', () => {
   it('upgrades 1.12.0 to the current version by adding an empty categories list and normalising missing categories to null', () => {
     const legacy = emptyExport({ version: '1.12.0', tickets: [ticket('t-1', 'bug')] });
@@ -695,6 +790,18 @@ describe('applyTransforms', () => {
     expect(upgraded.version).toBe(CURRENT_VERSION);
     expect(upgraded.categories).toEqual([]);
     expect(upgraded.tickets[0].category).toBeNull();
+  });
+
+  it('upgrades 1.14.0 by starting every new 1.15 section empty', () => {
+    const legacy = emptyExport({ version: '1.14.0' }) as Partial<WorkspaceExportData>;
+    for (const section of NEW_IN_1_15) delete legacy[section];
+
+    const upgraded = applyTransforms(legacy as WorkspaceExportData);
+
+    expect(upgraded.version).toBe('1.15.0');
+    for (const section of NEW_IN_1_15) expect(upgraded[section]).toEqual([]);
+    expect(upgraded.workspace.appName).toBeNull();
+    expect(upgraded.workspace.appSubtitle).toBeNull();
   });
 
   it('leaves a current-version file untouched', () => {

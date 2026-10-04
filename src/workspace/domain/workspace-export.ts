@@ -8,6 +8,18 @@ export interface WorkspaceExportUser {
   role: string | null;
   /** False for an account deactivated in the source. Since 1.15; absent means active. */
   isActive?: boolean;
+  /** Source organization of the membership. Since 1.15. */
+  organizationId?: string | null;
+}
+
+/** Since 1.15. The logo file is not carried. */
+export interface WorkspaceExportOrganization {
+  id: string;
+  name: string;
+  description: string | null;
+  notes: string | null;
+  domains: string[];
+  createdAt: string;
 }
 
 export interface WorkspaceExportTag {
@@ -45,6 +57,8 @@ export interface WorkspaceExportTicket {
   firstResponseBreached: boolean;
   resolutionBreached: boolean;
   tagIds: string[];
+  /** Source organization id, resolved against `organizations`. Since 1.15. */
+  organizationId?: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 }
@@ -131,6 +145,7 @@ export interface WorkspaceExportData {
     appSubtitle?: string | null;
   };
   users: WorkspaceExportUser[];
+  organizations: WorkspaceExportOrganization[];
   tags: WorkspaceExportTag[];
   categories: WorkspaceExportCategory[];
   tickets: WorkspaceExportTicket[];

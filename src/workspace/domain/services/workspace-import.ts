@@ -18,6 +18,7 @@ import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 export interface ImportResult {
   usersCreated: number;
   membersAdded: number;
+  organizationsImported: number;
   tagsImported: number;
   categoriesImported: number;
   ticketsImported: number;
@@ -133,6 +134,17 @@ function validateExportData(data: WorkspaceExportData): void {
     optionalText(u, p, 'id');
     member(u, p, 'role', oneOf(WorkspaceRole), true);
     if (u.isActive != null && typeof u.isActive !== 'boolean') fail(`${p}.isActive`, 'must be true, false or absent');
+    optionalText(u, p, 'organizationId');
+  });
+  each('organizations', data.organizations, (o, p) => {
+    text(o, p, 'id');
+    text(o, p, 'name');
+    optionalText(o, p, 'description');
+    optionalText(o, p, 'notes');
+    if (o.domains != null && !(Array.isArray(o.domains) && o.domains.every((d: unknown) => typeof d === 'string'))) {
+      fail(`${p}.domains`, 'must be a list of text');
+    }
+    optionalDate(o, p, 'createdAt');
   });
   each('tags', data.tags, (t, p) => { text(t, p, 'id'); text(t, p, 'name'); });
   each('categories', data.categories, (c, p) => { text(c, p, 'slug'); text(c, p, 'name'); });
@@ -150,6 +162,7 @@ function validateExportData(data: WorkspaceExportData): void {
     member(t, p, 'status', oneOf(TicketStatus));
     member(t, p, 'discardReason', oneOf(TicketDiscardReason), true);
     if (!Array.isArray(t.tagIds)) fail(`${p}.tagIds`, 'must be a list');
+    optionalText(t, p, 'organizationId');
     if (t.customFields != null && (typeof t.customFields !== 'object' || Array.isArray(t.customFields))) {
       fail(`${p}.customFields`, 'must be an object');
     }
@@ -223,7 +236,7 @@ export class ImportWorkspace {
     await qr.startTransaction();
 
     const result: ImportResult = {
-      usersCreated: 0, membersAdded: 0, tagsImported: 0, categoriesImported: 0, ticketsImported: 0,
+      usersCreated: 0, membersAdded: 0, organizationsImported: 0, tagsImported: 0, categoriesImported: 0, ticketsImported: 0,
       commentsImported: 0, commentsSkipped: 0, attachmentsImported: 0, participantsImported: 0,
       cannedResponsesImported: 0, customFieldsImported: 0, csatResponsesImported: 0,
       auditLogImported: 0, settingsApplied: [],
@@ -324,19 +337,49 @@ export class ImportWorkspace {
         for (const u of sameInstance) sourceUserIdMap.set(u.id, u.id);
       }
 
-      // 2. Add workspace members (skip if already member)
+      // 1b. Organizations — before members and tickets, which point at them. One with the same
+      // name in the target workspace is reused. The logo file is not carried.
+      const organizationIdMap = new Map<string, string>();
+      const existingOrganizations = await qr.query(
+        `SELECT id, name FROM organizations WHERE "workspaceId" = $1 AND "deletedAt" IS NULL`, [targetWorkspaceId],
+      );
+      const organizationIdByName = new Map<string, string>(existingOrganizations.map((o: any) => [o.name, o.id]));
+      for (const o of data.organizations) {
+        let targetId = organizationIdByName.get(o.name);
+        if (!targetId) {
+          targetId = ulid();
+          // domains is jsonb: node-pg would send a bare array as a Postgres array literal
+          await qr.query(`
+            INSERT INTO organizations (id, name, description, notes, domains, "workspaceId", "createdAt")
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+          `, [targetId, o.name, o.description ?? null, o.notes ?? null, JSON.stringify(o.domains ?? []), targetWorkspaceId, o.createdAt ?? new Date().toISOString()]);
+          organizationIdByName.set(o.name, targetId);
+          result.organizationsImported++;
+        }
+        organizationIdMap.set(o.id, targetId);
+      }
+      const organizationIdFor = (id: string | null | undefined) => id ? (organizationIdMap.get(id) ?? null) : null;
+
+      // 2. Add workspace members (skip if already member). An existing member keeps the
+      // organization it has here; one without any gets the imported one.
       for (const u of data.users) {
         const userId = emailToUserId.get(u.email);
         if (!userId || !u.role) continue;
+        const organizationId = organizationIdFor(u.organizationId);
         const exists = await qr.query(
           `SELECT 1 FROM workspace_members WHERE "workspaceId" = $1 AND "userId" = $2`, [targetWorkspaceId, userId],
         );
         if (!exists.length) {
           await qr.query(`
-            INSERT INTO workspace_members (id, "workspaceId", "userId", role)
-            VALUES ($1, $2, $3, $4)
-          `, [ulid(), targetWorkspaceId, userId, u.role]);
+            INSERT INTO workspace_members (id, "workspaceId", "userId", role, "organizationId")
+            VALUES ($1, $2, $3, $4, $5)
+          `, [ulid(), targetWorkspaceId, userId, u.role, organizationId]);
           result.membersAdded++;
+        } else if (organizationId) {
+          await qr.query(`
+            UPDATE workspace_members SET "organizationId" = $3
+            WHERE "workspaceId" = $1 AND "userId" = $2 AND "organizationId" IS NULL
+          `, [targetWorkspaceId, userId, organizationId]);
         }
       }
 
@@ -469,14 +512,16 @@ export class ImportWorkspace {
             "workspaceId", "reporterId", "assigneeId", "ticketNumber",
             "customFields", "discardReason", "portalToken",
             "firstResponseAt", "resolvedAt", "resolvedById",
-            "firstResponseBreached", "resolutionBreached", "createdAt", "updatedAt"
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+            "firstResponseBreached", "resolutionBreached", "createdAt", "updatedAt",
+            "organizationId"
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
         `, [
           newId, t.name, t.description, t.priority, t.status, categoryIdFor(t.category),
           targetWorkspaceId, userIdFor(t.reporterEmail), userIdFor(t.assigneeEmail), ticketNumber,
           JSON.stringify(remapCustomFields(t.customFields)), t.discardReason, null,
           t.firstResponseAt, t.resolvedAt, userIdFor(t.resolvedByEmail),
           t.firstResponseBreached, t.resolutionBreached, t.createdAt, t.updatedAt,
+          organizationIdFor(t.organizationId),
         ]);
         ticketIdMap.set(t.id, newId);
 
@@ -615,6 +660,7 @@ export class ImportWorkspace {
         'custom-field': customFieldIdMap,
         'canned-response': cannedIdMap,
         csat: csatIdMap,
+        organization: organizationIdMap,
         user: sourceUserIdMap,
         workspace: workspaceIdMap,
       };
@@ -624,6 +670,7 @@ export class ImportWorkspace {
         attachmentId: attachmentIdMap,
         tagId: tagIdMap,
         categoryId: categoryIdMap,
+        organizationId: organizationIdMap,
         workspaceId: workspaceIdMap,
         userId: sourceUserIdMap,
         assigneeId: sourceUserIdMap,
