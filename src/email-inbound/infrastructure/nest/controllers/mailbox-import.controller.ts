@@ -88,7 +88,7 @@ export class MailboxImportController {
   ) {
     const mailbox = await this.resolveMailbox(slug, mailboxId, user);
     const service = new UpdateMailbox(this.mailboxRepository);
-    await service.execute({ id: mailbox.getId(), isActive: false });
+    await service.execute({ id: mailbox.getId(), workspaceId: mailbox.workspaceId, isActive: false });
     await this.imapPollingService.refreshNow();
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
@@ -115,7 +115,7 @@ export class MailboxImportController {
   ) {
     const mailbox = await this.resolveMailbox(slug, mailboxId, user);
     const service = new UpdateMailbox(this.mailboxRepository);
-    await service.execute({ id: mailbox.getId(), isActive: true });
+    await service.execute({ id: mailbox.getId(), workspaceId: mailbox.workspaceId, isActive: true });
     await this.imapPollingService.refreshNow();
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);

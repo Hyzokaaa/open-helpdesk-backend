@@ -23,6 +23,9 @@ import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category
 import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
 import { EntityNotFoundError } from '../../../../shared/domain/errors';
 import { NestEventPublisher } from '../../../../shared/infrastructure/nest-event-publisher';
+import { CreateMailboxRequest } from '../dto/create-mailbox.request';
+import { UpdateMailboxRequest } from '../dto/update-mailbox.request';
+import { TestMailboxConnectionRequest } from '../dto/test-mailbox-connection.request';
 
 @Controller('admin/platform-mailbox')
 export class SystemMailboxController {
@@ -64,18 +67,7 @@ export class SystemMailboxController {
 
   @Post()
   async create(
-    @Body() body: {
-      address: string;
-      imapHost: string;
-      imapPort: number;
-      imapUser: string;
-      imapPass: string;
-      imapTls?: boolean;
-      encryption?: string;
-      imapFolder?: string;
-      pollInterval?: number;
-      autoReply?: boolean;
-    },
+    @Body() body: CreateMailboxRequest,
     @CurrentUser() user: AuthUser,
   ) {
     this.ensureAdmin(user);
@@ -129,19 +121,7 @@ export class SystemMailboxController {
 
   @Patch()
   async update(
-    @Body() body: {
-      address?: string;
-      isActive?: boolean;
-      imapHost?: string | null;
-      imapPort?: number | null;
-      imapUser?: string | null;
-      imapPass?: string | null;
-      imapTls?: boolean | null;
-      encryption?: string;
-      imapFolder?: string | null;
-      pollInterval?: number | null;
-      autoReply?: boolean;
-    },
+    @Body() body: UpdateMailboxRequest,
     @CurrentUser() user: AuthUser,
   ) {
     this.ensureAdmin(user);
@@ -152,7 +132,21 @@ export class SystemMailboxController {
     }
 
     const service = new UpdateMailbox(this.mailboxRepository);
-    const mailbox = await service.execute({ id: existing.getId(), ...body });
+    const mailbox = await service.execute({
+      id: existing.getId(),
+      workspaceId: null,
+      address: body.address,
+      isActive: body.isActive,
+      imapHost: body.imapHost,
+      imapPort: body.imapPort,
+      imapUser: body.imapUser,
+      imapPass: body.imapPass,
+      imapTls: body.imapTls,
+      encryption: body.encryption,
+      imapFolder: body.imapFolder,
+      pollInterval: body.pollInterval,
+      autoReply: body.autoReply,
+    });
 
     return {
       id: mailbox.getId(),
@@ -205,14 +199,7 @@ export class SystemMailboxController {
 
   @Post('test-connection')
   async testConnection(
-    @Body() body: {
-      imapHost: string;
-      imapPort: number;
-      imapUser: string;
-      imapPass: string;
-      imapTls?: boolean;
-      encryption?: string;
-    },
+    @Body() body: TestMailboxConnectionRequest,
     @CurrentUser() user: AuthUser,
   ) {
     this.ensureAdmin(user);
