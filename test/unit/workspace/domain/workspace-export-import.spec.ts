@@ -263,6 +263,26 @@ describe('ImportWorkspace', () => {
     expect(result.participantsImported).toBe(1);
   });
 
+  it('does not duplicate canned responses whose title the target workspace already has', async () => {
+    const qr = new FakeQueryRunner((sql, params) => {
+      if (/FROM canned_responses WHERE/.test(sql)) return [{ id: 'cr-existing', title: 'Greeting' }];
+      return answer(sql, params);
+    });
+    const createdAt = '2026-01-01T00:00:00.000Z';
+    const data = emptyExport({
+      cannedResponses: [
+        { id: 'cr-1', title: 'Greeting', content: 'Hello', createdAt },
+        { id: 'cr-2', title: 'Closing', content: 'Bye', createdAt },
+        { id: 'cr-3', title: 'Closing', content: 'Bye again', createdAt },
+      ],
+    });
+
+    const { result } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    expect(qr.find(/INSERT INTO canned_responses/).map((q) => q.params[1])).toEqual(['Closing']);
+    expect(result.cannedResponsesImported).toBe(1);
+  });
+
   it('upgrades a 1.12 file that only carries slugs on tickets and derives a category name from the slug', async () => {
     const qr = new FakeQueryRunner(answer);
     const legacy = emptyExport({

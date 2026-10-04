@@ -272,12 +272,25 @@ export class ImportWorkspace {
         if (inserted.length) result.participantsImported++;
       }
 
-      // 8. Canned responses
+      // 8. Canned responses — reuse the target workspace's own by title, so a re-import adds none
+      const cannedIdMap = new Map<string, string>();
+      const existingCanned = await qr.query(
+        `SELECT id, title FROM canned_responses WHERE "workspaceId" = $1`, [targetWorkspaceId],
+      );
+      const cannedIdByTitle = new Map<string, string>(existingCanned.map((cr: any) => [cr.title, cr.id]));
       for (const cr of data.cannedResponses) {
+        const existingId = cannedIdByTitle.get(cr.title);
+        if (existingId) {
+          cannedIdMap.set(cr.id, existingId);
+          continue;
+        }
+        const newId = ulid();
         await qr.query(`
           INSERT INTO canned_responses (id, title, content, "workspaceId", "createdAt")
           VALUES ($1, $2, $3, $4, $5)
-        `, [ulid(), cr.title, cr.content, targetWorkspaceId, cr.createdAt]);
+        `, [newId, cr.title, cr.content, targetWorkspaceId, cr.createdAt]);
+        cannedIdMap.set(cr.id, newId);
+        cannedIdByTitle.set(cr.title, newId);
         result.cannedResponsesImported++;
       }
 
