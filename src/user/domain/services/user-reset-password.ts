@@ -18,6 +18,8 @@ export class ResetPassword {
     if (!user) throw new EntityNotFoundError('User not found');
 
     user.password = await this.passwordHasher.hash(props.newPassword);
+    // The reset link only reaches the account's inbox, so using it proves the address is theirs.
+    user.isEmailVerified = true;
     await this.repository.update(user);
   }
 }

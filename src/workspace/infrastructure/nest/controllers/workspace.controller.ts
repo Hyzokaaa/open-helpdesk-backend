@@ -16,6 +16,11 @@ import {
 import { FileInterceptor } from "@nestjs/platform-express";
 import { Response } from "express";
 import { DataSource } from "typeorm";
+import { JwtTokenService } from "../../../../shared/infrastructure/jwt-token-service";
+import { WorkspaceFrontendResolver } from "../../../../shared/infrastructure/workspace-frontend-resolver";
+import { EmailService } from "../../../../email/domain/email.service";
+import { EMAIL_SERVICE } from "../../../../email/email.constants";
+import { sendImportWelcomeEmails } from "../import-welcome-emails";
 import { CurrentUser } from "../../../../shared/nest/decorators/current-user.decorator";
 import { AuthUser } from "../../../../shared/nest/strategies/jwt.strategy";
 import { UlidGenerator } from "../../../../shared/infrastructure/ulid-generator";
@@ -105,6 +110,9 @@ export class WorkspaceController {
     private readonly dataSource: DataSource,
     @Inject() private readonly ticketCategoryRepository: TypeOrmTicketCategoryRepository,
     @Inject() private readonly creationSettingsRepository: TypeOrmWorkspaceCreationSettingsRepository,
+    @Inject() private readonly tokenService: JwtTokenService,
+    @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
+    @Inject() private readonly frontendResolver: WorkspaceFrontendResolver,
   ) {}
 
   @Post()
@@ -684,7 +692,14 @@ export class WorkspaceController {
     }
 
     const service = new ImportWorkspace(this.dataSource);
-    const result = await service.execute(workspaceId, data);
+    const { result, newMembers } = await service.execute(workspaceId, data);
+
+    const workspace = await this.workspaceRepository.findById(workspaceId);
+    await sendImportWelcomeEmails(
+      { tokenService: this.tokenService, emailService: this.emailService },
+      newMembers,
+      { name: workspace?.name ?? slug, frontendUrl: await this.frontendResolver.resolve(workspaceId) },
+    );
 
     const auditLog = new CreateAuditLogEntry(
       this.idGenerator,

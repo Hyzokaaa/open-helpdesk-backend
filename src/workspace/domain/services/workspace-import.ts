@@ -1,10 +1,9 @@
 import { DataSource } from 'typeorm';
 import { ulid } from 'ulid';
 import * as bcrypt from 'bcrypt';
+import { randomBytes } from 'crypto';
 import { WorkspaceExportData } from '../workspace-export';
 import { applyTransforms } from './workspace-export-transforms';
-
-const DEFAULT_PASSWORD = 'user1234';
 
 export interface ImportResult {
   usersCreated: number;
@@ -20,10 +19,22 @@ export interface ImportResult {
   auditLogImported: number;
 }
 
+/** A member of the imported workspace whose account was just created, to be invited to set a password. */
+export interface ImportedNewMember {
+  userId: string;
+  email: string;
+  firstName: string;
+}
+
+export interface ImportOutcome {
+  result: ImportResult;
+  newMembers: ImportedNewMember[];
+}
+
 export class ImportWorkspace {
   constructor(private readonly dataSource: DataSource) {}
 
-  async execute(targetWorkspaceId: string, rawData: WorkspaceExportData): Promise<ImportResult> {
+  async execute(targetWorkspaceId: string, rawData: WorkspaceExportData): Promise<ImportOutcome> {
     const data = applyTransforms(rawData);
     const qr = this.dataSource.createQueryRunner();
     await qr.connect();
@@ -35,6 +46,7 @@ export class ImportWorkspace {
       cannedResponsesImported: 0, customFieldsImported: 0, csatResponsesImported: 0,
       auditLogImported: 0,
     };
+    const newMembers: ImportedNewMember[] = [];
 
     try {
       // 1. Collect ALL referenced emails across the entire export
@@ -61,19 +73,24 @@ export class ImportWorkspace {
         for (const u of existingUsers) emailToUserId.set(u.email, u.id);
       }
 
-      // Create missing users — use member data if available, else minimal record
-      const hashedPassword = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+      // Create missing users. The file only names them, so nobody may sign in as them yet: the
+      // password is the hash of a random secret that is thrown away, and the email is not verified.
+      // Members are invited to set a password; people who only appear in the history (old
+      // reporters, authors) are created like inbound email senders and can recover access later.
+      const unusablePassword = await bcrypt.hash(randomBytes(32).toString('hex'), 10);
       const memberMap = new Map(data.users.map((u) => [u.email, u]));
       for (const email of allEmails) {
         if (!emailToUserId.has(email)) {
           const id = ulid();
           const member = memberMap.get(email);
+          const firstName = member?.firstName ?? email.split('@')[0];
           await qr.query(`
-            INSERT INTO users (id, email, password, "firstName", "lastName", "isActive", "isSystemAdmin", "isEmailVerified")
-            VALUES ($1, $2, $3, $4, $5, true, false, true)
-          `, [id, email, hashedPassword, member?.firstName ?? email.split('@')[0], member?.lastName ?? '']);
+            INSERT INTO users (id, email, password, "firstName", "lastName", "isActive", "isSystemAdmin", "isEmailVerified", "autoCreated")
+            VALUES ($1, $2, $3, $4, $5, true, false, false, $6)
+          `, [id, email, unusablePassword, firstName, member?.lastName ?? '', !member]);
           emailToUserId.set(email, id);
           result.usersCreated++;
+          if (member) newMembers.push({ userId: id, email, firstName });
         }
       }
 
@@ -251,7 +268,7 @@ export class ImportWorkspace {
       }
 
       await qr.commitTransaction();
-      return result;
+      return { result, newMembers };
     } catch (error) {
       await qr.rollbackTransaction();
       throw error;

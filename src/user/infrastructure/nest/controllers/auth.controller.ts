@@ -329,7 +329,7 @@ export class AuthController {
   }
 
   private async handleOAuthCallback(req: Request, res: Response) {
-    const oauthUser = req.user as { email: string; firstName: string; lastName: string; authProvider: string };
+    const oauthUser = req.user as { email: string; firstName: string; lastName: string; authProvider: string; emailVerified: boolean };
     const redirectUrl = await this.resolveRedirectUrl(req.query?.state as string);
 
     try {
@@ -340,6 +340,7 @@ export class AuthController {
         firstName: oauthUser.firstName,
         lastName: oauthUser.lastName,
         authProvider: oauthUser.authProvider,
+        emailVerified: oauthUser.emailVerified,
       });
 
       const user = await this.userRepository.findByEmail(oauthUser.email);

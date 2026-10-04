@@ -29,7 +29,7 @@ export class MicrosoftStrategy extends PassportStrategy(Strategy, 'microsoft') {
     _accessToken: string,
     _refreshToken: string,
     profile: MicrosoftProfile,
-    done: (err: Error | null, user?: Record<string, string>) => void,
+    done: (err: Error | null, user?: Record<string, string | boolean>) => void,
   ): void {
     const email = profile.emails?.[0]?.value;
     if (!email) {
@@ -42,6 +42,8 @@ export class MicrosoftStrategy extends PassportStrategy(Strategy, 'microsoft') {
       firstName: profile.name?.givenName || profile.displayName || '',
       lastName: profile.name?.familyName || '',
       authProvider: 'microsoft',
+      // The profile email of a Microsoft account can be set without proving the address is owned.
+      emailVerified: false,
     };
     done(null, user);
   }

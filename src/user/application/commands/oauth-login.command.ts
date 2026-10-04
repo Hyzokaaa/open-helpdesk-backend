@@ -7,6 +7,7 @@ interface Props {
   firstName: string;
   lastName: string;
   authProvider: string;
+  emailVerified: boolean;
 }
 
 export interface OAuthLoginResponse {
@@ -28,6 +29,7 @@ export class OAuthLoginCommand implements Command<Props, OAuthLoginResponse> {
       firstName: props.firstName,
       lastName: props.lastName,
       authProvider: props.authProvider,
+      emailVerified: props.emailVerified,
     });
 
     // The redirect URL ends up in browser history and logs, so it carries a short-lived code

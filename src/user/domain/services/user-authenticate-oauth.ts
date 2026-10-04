@@ -8,6 +8,8 @@ interface AuthenticateOAuthProps {
   firstName: string;
   lastName: string;
   authProvider: string;
+  /** Whether the provider itself vouches that the address belongs to the person signing in. */
+  emailVerified: boolean;
 }
 
 export class AuthenticateOAuth {
@@ -23,6 +25,10 @@ export class AuthenticateOAuth {
     if (existing) {
       if (!existing.isActive) {
         throw new Error('Account is deactivated');
+      }
+      if (props.emailVerified && !existing.isEmailVerified) {
+        existing.isEmailVerified = true;
+        await this.repository.update(existing);
       }
       return existing;
     }
