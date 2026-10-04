@@ -2,6 +2,7 @@ import { ConflictError } from '../../../shared/domain/errors';
 import { IdGenerator } from '../../../shared/domain/id-generator';
 import { PasswordHasher } from '../../../shared/domain/password-hasher';
 import { User } from '../entities/user';
+import { normalizeUserName } from '../user-name';
 import { UserRepository } from '../repositories/user.repository';
 
 interface CreateUserProps {
@@ -33,8 +34,8 @@ export class CreateUser {
       id: this.idGenerator.create(),
       email: props.email,
       password: hashedPassword,
-      firstName: props.firstName,
-      lastName: props.lastName,
+      firstName: normalizeUserName(props.firstName),
+      lastName: normalizeUserName(props.lastName),
       isActive: true,
       isSystemAdmin: props.isSystemAdmin ?? false,
       isEmailVerified: props.isEmailVerified ?? true,

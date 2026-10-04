@@ -1,6 +1,7 @@
 import { IdGenerator } from '../../../shared/domain/id-generator';
 import { PasswordHasher } from '../../../shared/domain/password-hasher';
 import { User } from '../entities/user';
+import { normalizeUserName } from '../user-name';
 import { UserRepository } from '../repositories/user.repository';
 
 interface AuthenticateOAuthProps {
@@ -42,8 +43,8 @@ export class AuthenticateOAuth {
       id: this.idGenerator.create(),
       email: props.email,
       password: hashedPassword,
-      firstName: props.firstName,
-      lastName: props.lastName,
+      firstName: normalizeUserName(props.firstName),
+      lastName: normalizeUserName(props.lastName),
       isActive: true,
       isSystemAdmin: false,
       isEmailVerified: true,

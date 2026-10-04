@@ -50,6 +50,7 @@ import { CreateAccountForUser } from '../../../../account/domain/services/accoun
 import { StorageService } from '../../../../shared/domain/storage-service';
 import { STORAGE_SERVICE } from '../../../../shared/shared.module';
 import { RegisterUserRequest } from '../dto/register-user.request';
+import { UpdateUserNameRequest } from '../dto/update-user-name.request';
 import { SortDto } from '../../../../shared/nest/dto/sort.dto';
 
 const MIME_TO_EXT: Record<string, string> = {
@@ -85,7 +86,7 @@ export class UserController {
 
   @Patch('me/name')
   async updateName(
-    @Body() body: { firstName: string; lastName: string },
+    @Body() body: UpdateUserNameRequest,
     @CurrentUser() authUser: AuthUser,
   ) {
     const existing = await this.userRepository.findById(authUser.userId);
@@ -106,7 +107,7 @@ export class UserController {
       workspaceId: null,
       metadata: {
         before: { firstName: existing?.firstName, lastName: existing?.lastName },
-        after: { firstName: body.firstName, lastName: body.lastName },
+        after: { firstName: result.firstName, lastName: result.lastName },
       },
       category: AuditCategory.USER,
       level: AuditLevel.INFO,
