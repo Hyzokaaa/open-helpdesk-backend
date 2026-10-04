@@ -1569,3 +1569,111 @@ describe('applyTransforms 1.16', () => {
     expect(preview.settings.branding).toEqual({ appName: null, appSubtitle: null, logo: true, icon: false });
   });
 });
+
+describe('ImportWorkspace files are stored before the transaction', () => {
+  const at = '2026-01-01T00:00:00.000Z';
+  const base: Answer = (sql) => {
+    if (/FROM users WHERE email = ANY/.test(sql)) return [{ id: 'u-1', email: 'alice@example.com' }];
+    if (/MAX\("ticketNumber"\)/.test(sql)) return [{ max: 0 }];
+    return [];
+  };
+  const data = (extra: Partial<WorkspaceExportData> = {}) => emptyExport({
+    users: [{ email: 'alice@example.com', firstName: 'A', lastName: 'A', role: 'admin' }],
+    tickets: [ticket('src-t', null)],
+    attachments: [{ id: 'a', fileName: 'a.pdf', originalName: 'a.pdf', mimeType: 'application/pdf', size: 1, file: 'files/a', ticketId: 'src-t', commentId: null, uploadedByEmail: null, createdAt: at }],
+    ...extra,
+  });
+  const files = archiveOf({ 'files/a': Buffer.from('aaa'), 'files/logo': Buffer.from('png') });
+
+  class RecordingQueryRunner extends FakeQueryRunner {
+    constructor(answer: Answer, private readonly events: string[]) { super(answer); }
+    async startTransaction() { this.events.push('begin'); }
+  }
+
+  it('uploads every file before the transaction, and so before the ticket number lock', async () => {
+    const events: string[] = [];
+    const qr = new RecordingQueryRunner((sql, params) => {
+      if (/pg_advisory_xact_lock/.test(sql)) events.push('lock');
+      if (/INSERT INTO attachments/.test(sql)) events.push('insert');
+      return base(sql, params);
+    }, events);
+    const storage = new FakeS3Storage();
+    const put = storage.putStream.bind(storage);
+    storage.putStream = async (...args) => { events.push('put'); await put(...args); };
+
+    const { result } = await new ImportWorkspace(dataSourceOf(qr), storage).execute('ws-target', data(), { files });
+
+    expect(events).toEqual(['put', 'begin', 'lock', 'insert']);
+    const [insert] = qr.find(/INSERT INTO attachments/);
+    expect(storage.read(insert.params[5] as string)?.toString()).toBe('aaa');
+    expect(result.attachmentsImported).toBe(1);
+  });
+
+  it('uploads nothing for an attachment whose ticket is already imported, or an organization that has a logo', async () => {
+    const qr = new FakeQueryRunner((sql, params) => {
+      if (/FROM tickets WHERE "workspaceId"/.test(sql)) return [{ id: 't-existing', name: 'Ticket src-t', reporterId: 'u-1', createdAt: at }];
+      if (/FROM organizations WHERE "workspaceId"/.test(sql)) return [{ id: 'org-here', name: 'Globex', logo: 'organizations/org-here/logo.png' }];
+      return base(sql, params);
+    });
+    const storage = new FakeS3Storage();
+    const { result } = await new ImportWorkspace(dataSourceOf(qr), storage).execute('ws-target', data({
+      organizations: [{ id: 'src-org', name: 'Globex', description: null, notes: null, domains: [], createdAt: at, logoFile: { file: 'files/logo', fileName: 'logo.png', mimeType: 'image/png', size: 3 } }],
+    }), { files });
+
+    expect(storage.uploadedKeys).toEqual([]);
+    expect(result).toMatchObject({ ticketsImported: 0, attachmentsImported: 0 });
+    expect(qr.find(/UPDATE organizations SET logo/)).toHaveLength(0);
+  });
+
+  it('creates a new organization with the id its logo key was stored under', async () => {
+    const qr = new FakeQueryRunner(base);
+    const storage = new FakeS3Storage();
+    await new ImportWorkspace(dataSourceOf(qr), storage).execute('ws-target', data({
+      organizations: [{ id: 'src-org', name: 'Globex', description: null, notes: null, domains: [], createdAt: at, logoFile: { file: 'files/logo', fileName: 'logo.png', mimeType: 'image/png', size: 3 } }],
+    }), { files });
+
+    const orgId = qr.find(/INSERT INTO organizations/)[0].params[0];
+    expect(qr.find(/UPDATE organizations SET logo/)[0].params).toEqual([orgId, `organizations/${orgId}/logo.png`]);
+    expect(storage.hasFile(`organizations/${orgId}/logo.png`)).toBe(true);
+  });
+
+  it('deletes after commit an object stored for a row the transaction ended up not inserting', async () => {
+    let ticketReads = 0;
+    const qr = new FakeQueryRunner((sql, params) => {
+      // Empty when the files are planned, then the ticket appears before the transaction reads it
+      if (/FROM tickets WHERE "workspaceId"/.test(sql) && ticketReads++ > 0) {
+        return [{ id: 't-existing', name: 'Ticket src-t', reporterId: 'u-1', createdAt: at }];
+      }
+      return base(sql, params);
+    });
+    const storage = new FakeS3Storage();
+    const { result } = await new ImportWorkspace(dataSourceOf(qr), storage).execute('ws-target', data(), { files });
+
+    expect(qr.committed).toBe(true);
+    expect(result.attachmentsImported).toBe(0);
+    expect(storage.uploadedKeys).toHaveLength(1);
+    expect(storage.deletedKeys).toEqual(storage.uploadedKeys);
+    expect(storage.keys()).toEqual([]);
+  });
+
+  it('deletes what it stored and never opens the transaction when an upload fails', async () => {
+    const events: string[] = [];
+    const qr = new RecordingQueryRunner(base, events);
+    const storage = new FakeS3Storage();
+    const two = archiveOf({ 'files/a': Buffer.from('a'), 'files/b': Buffer.from('b') });
+    const put = storage.putStream.bind(storage);
+    storage.putStream = async (key, stream, mime, size) => {
+      if (storage.uploadedKeys.length === 1) throw new Error('storage is down');
+      await put(key, stream, mime, size);
+    };
+    const twoAttachments = data();
+    twoAttachments.attachments.push({ ...twoAttachments.attachments[0], id: 'b', file: 'files/b' });
+
+    await expect(new ImportWorkspace(dataSourceOf(qr), storage).execute('ws-target', twoAttachments, { files: two }))
+      .rejects.toThrow('storage is down');
+
+    expect(events).toEqual([]);
+    expect(storage.keys()).toEqual([]);
+    expect(storage.deletedKeys).toHaveLength(2);
+  });
+});
