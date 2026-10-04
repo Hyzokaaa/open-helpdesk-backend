@@ -88,6 +88,22 @@ export class ExportWorkspace {
         WHERE t."workspaceId" = $1 AND t."deletedAt" IS NULL
       `, [workspaceId]);
 
+      const descriptionEdits = await qr.query(`
+        SELECT e."ticketId", e.content, e."editedById", e."createdAt"
+        FROM ticket_description_edits e JOIN tickets t ON t.id = e."ticketId"
+        WHERE t."workspaceId" = $1 AND t."deletedAt" IS NULL
+        ORDER BY e."createdAt"
+      `, [workspaceId]);
+
+      const commentEdits = await qr.query(`
+        SELECT e."commentId", e.content, e."editedById", e."createdAt"
+        FROM comment_edits e
+        JOIN comments c ON c.id = e."commentId"
+        JOIN tickets t ON t.id = c."ticketId"
+        WHERE t."workspaceId" = $1 AND t."deletedAt" IS NULL
+        ORDER BY e."createdAt"
+      `, [workspaceId]);
+
       const attachments = await qr.query(`
         SELECT a.id, a."fileName", a."originalName", a."mimeType", a.size, a."s3Key",
           a."ticketId", a."commentId", a."uploadedById", a."createdAt"
@@ -134,6 +150,7 @@ export class ExportWorkspace {
       }
       for (const a of attachments) refer(a.uploadedById);
       for (const dm of departmentMembers) refer(dm.userId);
+      for (const e of [...descriptionEdits, ...commentEdits]) refer(e.editedById);
       for (const p of participants) refer(p.userId);
       for (const a of auditLog) refer(a.userId);
       if (referenced.size) {
@@ -238,6 +255,18 @@ export class ExportWorkspace {
           authorEmail: emailFor(c.authorId),
           mentionedUserIds: c.mentionedUserIds,
           createdAt: c.createdAt?.toISOString(),
+        })),
+        descriptionEdits: descriptionEdits.map((e: any) => ({
+          ticketId: e.ticketId,
+          content: e.content,
+          editedByEmail: emailFor(e.editedById),
+          createdAt: e.createdAt?.toISOString(),
+        })),
+        commentEdits: commentEdits.map((e: any) => ({
+          commentId: e.commentId,
+          content: e.content,
+          editedByEmail: emailFor(e.editedById),
+          createdAt: e.createdAt?.toISOString(),
         })),
         attachments: attachments.map((a: any) => ({
           id: a.id,

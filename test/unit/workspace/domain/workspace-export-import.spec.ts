@@ -53,6 +53,8 @@ function emptyExport(overrides: Partial<WorkspaceExportData> = {}): WorkspaceExp
     projects: [],
     tickets: [],
     comments: [],
+    descriptionEdits: [],
+    commentEdits: [],
     attachments: [],
     participants: [],
     cannedResponses: [],
@@ -291,6 +293,25 @@ describe('ExportWorkspace', () => {
       source: 'email', registeredByEmail: 'agent@example.com',
       originDate: '2025-12-31T00:00:00.000Z', descriptionEditedAt: '2026-01-01T00:00:00.000Z',
     });
+  });
+
+  it('exports description and comment edits of live tickets with the editor email', async () => {
+    const qr = new FakeQueryRunner((sql, params) => {
+      if (/FROM ticket_description_edits e/.test(sql)) return [{ ticketId: 't-1', content: 'old desc', editedById: 'u-1', createdAt }];
+      if (/FROM comment_edits e/.test(sql)) return [{ commentId: 'c-1', content: 'old comment', editedById: 'u-gone', createdAt }];
+      if (/FROM workspace_members wm JOIN users u/.test(sql)) {
+        return [{ id: 'u-1', email: 'a@example.com', firstName: 'A', lastName: 'A', isActive: true, role: 'agent', organizationId: null }];
+      }
+      return answer(sql, params);
+    });
+    const result = await new ExportWorkspace(dataSourceOf(qr)).execute('ws-1');
+
+    for (const table of ['ticket_description_edits', 'comment_edits']) {
+      const [query] = qr.find(new RegExp(`FROM ${table} e`));
+      expect(query.sql).toMatch(/t\."workspaceId" = \$1 AND t\."deletedAt" IS NULL/);
+    }
+    expect(result.descriptionEdits).toEqual([{ ticketId: 't-1', content: 'old desc', editedByEmail: 'a@example.com', createdAt: '2026-01-01T00:00:00.000Z' }]);
+    expect(result.commentEdits).toEqual([{ commentId: 'c-1', content: 'old comment', editedByEmail: null, createdAt: '2026-01-01T00:00:00.000Z' }]);
   });
 
   it('scopes the categories query to the exported workspace', async () => {
@@ -919,6 +940,54 @@ describe('ImportWorkspace ticket fields', () => {
   });
 });
 
+describe('ImportWorkspace edit history', () => {
+  const at = '2026-01-01T00:00:00.000Z';
+
+  it('imports edits only for tickets and comments created in this run, remapping ids, editor and mentions', async () => {
+    const qr = new FakeQueryRunner((sql) => {
+      if (/FROM users WHERE email = ANY/.test(sql)) return [{ id: 'u-1', email: 'alice@example.com' }];
+      if (/MAX\("ticketNumber"\)/.test(sql)) return [{ max: 0 }];
+      if (/SELECT id, name, "reporterId", "createdAt" FROM tickets/.test(sql)) {
+        return [{ id: 'existing-t', name: 'Ticket t-old', reporterId: 'u-1', createdAt: at }];
+      }
+      return [];
+    });
+    const data = emptyExport({
+      users: [{ id: 'src-alice', email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' }],
+      tickets: [ticket('t-new', null), ticket('t-old', null)],
+      comments: [{ id: 'c-1', content: 'now', ticketId: 't-new', authorEmail: 'alice@example.com', mentionedUserIds: [], createdAt: at }],
+      descriptionEdits: [
+        { ticketId: 't-new', content: 'first desc', editedByEmail: 'alice@example.com', createdAt: at },
+        { ticketId: 't-old', content: 'already there', editedByEmail: 'alice@example.com', createdAt: at },
+        { ticketId: 't-new', content: 'orphan', editedByEmail: null, createdAt: at },
+      ],
+      commentEdits: [
+        { commentId: 'c-1', content: 'hi @[Alice](src-alice) @[Ghost](src-ghost)', editedByEmail: 'alice@example.com', createdAt: at },
+        { commentId: 'c-unknown', content: 'x', editedByEmail: 'alice@example.com', createdAt: at },
+      ],
+    });
+
+    const { result } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    const [ticketInsert] = qr.find(/INSERT INTO tickets/);
+    const [commentInsert] = qr.find(/INSERT INTO comments/);
+    const descInserts = qr.find(/INSERT INTO ticket_description_edits/);
+    expect(descInserts.map((q) => q.params.slice(1))).toEqual([['first desc', ticketInsert.params[0], 'u-1', at]]);
+    const commentEditInserts = qr.find(/INSERT INTO comment_edits/);
+    expect(commentEditInserts.map((q) => q.params.slice(1))).toEqual([['hi @[Alice](u-1) @Ghost', commentInsert.params[0], 'u-1', at]]);
+    expect(qr.queries.indexOf(commentInsert)).toBeLessThan(qr.queries.indexOf(commentEditInserts[0]));
+    expect(result.descriptionEditsImported).toBe(1);
+    expect(result.commentEditsImported).toBe(1);
+  });
+
+  it('rejects an edit without content', async () => {
+    const qr = new FakeQueryRunner(() => []);
+    const data = emptyExport({ commentEdits: [{ commentId: 'c', editedByEmail: null, createdAt: at } as never] });
+    await expect(new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data))
+      .rejects.toThrow('Invalid export file: commentEdits[0].content must be text');
+  });
+});
+
 describe('ImportWorkspace settings overwrite', () => {
   const answer: Answer = (sql) => (/MAX\("ticketNumber"\)/.test(sql) ? [{ max: 0 }] : []);
   const source = () => emptyExport({
@@ -976,7 +1045,7 @@ describe('ImportWorkspace settings overwrite', () => {
   });
 });
 
-const NEW_IN_1_15 = ['organizations', 'departments', 'projects'] as const;
+const NEW_IN_1_15 = ['organizations', 'departments', 'projects', 'descriptionEdits', 'commentEdits'] as const;
 
 describe('applyTransforms', () => {
   it('upgrades 1.12.0 to the current version by adding an empty categories list and normalising missing categories to null', () => {

@@ -40,6 +40,8 @@ const TRANSFORMS: Record<string, Transform> = {
     if (!data.organizations) data.organizations = [];
     if (!data.departments) data.departments = [];
     if (!data.projects) data.projects = [];
+    if (!data.descriptionEdits) data.descriptionEdits = [];
+    if (!data.commentEdits) data.commentEdits = [];
     if (data.workspace && typeof data.workspace === 'object') {
       if (data.workspace.appName === undefined) data.workspace.appName = null;
       if (data.workspace.appSubtitle === undefined) data.workspace.appSubtitle = null;

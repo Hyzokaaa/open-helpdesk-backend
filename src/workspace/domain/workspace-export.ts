@@ -101,6 +101,24 @@ export interface WorkspaceExportComment {
   createdAt: string;
 }
 
+/** A past version of a ticket description. Since 1.15. */
+export interface WorkspaceExportDescriptionEdit {
+  ticketId: string;
+  content: string;
+  /** Null if the editor no longer exists; such an edit cannot be imported. */
+  editedByEmail: string | null;
+  createdAt: string;
+}
+
+/** A past version of a comment. Since 1.15. */
+export interface WorkspaceExportCommentEdit {
+  commentId: string;
+  content: string;
+  /** Null if the editor no longer exists; such an edit cannot be imported. */
+  editedByEmail: string | null;
+  createdAt: string;
+}
+
 export interface WorkspaceExportAttachment {
   id: string;
   fileName: string;
@@ -180,6 +198,8 @@ export interface WorkspaceExportData {
   projects: WorkspaceExportProject[];
   tickets: WorkspaceExportTicket[];
   comments: WorkspaceExportComment[];
+  descriptionEdits: WorkspaceExportDescriptionEdit[];
+  commentEdits: WorkspaceExportCommentEdit[];
   attachments: WorkspaceExportAttachment[];
   participants: WorkspaceExportParticipant[];
   cannedResponses: WorkspaceExportCannedResponse[];

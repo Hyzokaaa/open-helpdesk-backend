@@ -28,6 +28,8 @@ export interface ImportResult {
   commentsImported: number;
   /** Comments not imported because their author is missing from the file or no longer exists. */
   commentsSkipped: number;
+  descriptionEditsImported: number;
+  commentEditsImported: number;
   attachmentsImported: number;
   participantsImported: number;
   cannedResponsesImported: number;
@@ -197,6 +199,14 @@ function validateExportData(data: WorkspaceExportData): void {
     if (typeof c.content !== 'string') fail(`${p}.content`, 'must be text');
     date(c, p, 'createdAt');
   });
+  for (const [section, idField] of [['descriptionEdits', 'ticketId'], ['commentEdits', 'commentId']] as const) {
+    each(section, data[section], (e, p) => {
+      text(e, p, idField);
+      if (typeof e.content !== 'string') fail(`${p}.content`, 'must be text');
+      optionalText(e, p, 'editedByEmail');
+      date(e, p, 'createdAt');
+    });
+  }
   each('attachments', data.attachments, (a, p) => {
     text(a, p, 'id');
     optionalText(a, p, 'ticketId');
@@ -260,7 +270,7 @@ export class ImportWorkspace {
 
     const result: ImportResult = {
       usersCreated: 0, membersAdded: 0, organizationsImported: 0, departmentsImported: 0, tagsImported: 0, categoriesImported: 0, projectsImported: 0, ticketsImported: 0,
-      commentsImported: 0, commentsSkipped: 0, attachmentsImported: 0, participantsImported: 0,
+      commentsImported: 0, commentsSkipped: 0, descriptionEditsImported: 0, commentEditsImported: 0, attachmentsImported: 0, participantsImported: 0,
       cannedResponsesImported: 0, customFieldsImported: 0, csatResponsesImported: 0,
       auditLogImported: 0, settingsApplied: [],
     };
@@ -300,6 +310,7 @@ export class ImportWorkspace {
       }
       for (const c of data.comments) { if (c.authorEmail) allEmailsSet.add(c.authorEmail); }
       for (const a of data.attachments) { if (a.uploadedByEmail) allEmailsSet.add(a.uploadedByEmail); }
+      for (const e of [...data.descriptionEdits, ...data.commentEdits]) { if (e.editedByEmail) allEmailsSet.add(e.editedByEmail); }
       for (const p of data.participants) { if (p.userEmail) allEmailsSet.add(p.userEmail); }
       for (const d of data.departments) for (const email of d.memberEmails) allEmailsSet.add(email);
       // System and anonymous portal events have no user; they keep a null userId on import
@@ -357,10 +368,20 @@ export class ImportWorkspace {
           if (!sourceUserIdMap.has(id)) unmappedIds.add(id);
         }
       }
+      for (const e of data.commentEdits) {
+        for (const id of extractMentions.execute(e.content ?? '')) {
+          if (!sourceUserIdMap.has(id)) unmappedIds.add(id);
+        }
+      }
       if (unmappedIds.size) {
         const sameInstance = await qr.query(`SELECT id FROM users WHERE id = ANY($1)`, [[...unmappedIds]]);
         for (const u of sameInstance) sourceUserIdMap.set(u.id, u.id);
       }
+      // Mentions point at target users; a mention of someone unknown here degrades to plain text
+      const remapMentionMarkup = (content: string) => content.replace(MENTION_MARKUP, (_markup: string, name: string, id: string) => {
+        const targetId = sourceUserIdMap.get(id);
+        return targetId ? `@[${name}](${targetId})` : `@${name}`;
+      });
 
       // 1b. Organizations — before members and tickets, which point at them. One with the same
       // name in the target workspace is reused. The logo file is not carried.
@@ -638,22 +659,41 @@ export class ImportWorkspace {
           continue;
         }
         const newId = ulid();
-        // Mentions point at target users; a mention of someone unknown here degrades to plain text
         const mentioned = new Set<string>();
         for (const id of mentionedIdsOf(c.mentionedUserIds)) {
           const targetId = sourceUserIdMap.get(id);
           if (targetId) mentioned.add(targetId);
         }
-        const content = (c.content ?? '').replace(MENTION_MARKUP, (_markup: string, name: string, id: string) => {
-          const targetId = sourceUserIdMap.get(id);
-          return targetId ? `@[${name}](${targetId})` : `@${name}`;
-        });
+        const content = remapMentionMarkup(c.content ?? '');
         await qr.query(`
           INSERT INTO comments (id, content, "ticketId", "authorId", "mentionedUserIds", "createdAt")
           VALUES ($1, $2, $3, $4, $5, $6)
         `, [newId, content, newTicketId, authorId, [...mentioned].join(','), c.createdAt]);
         commentIdMap.set(c.id, newId);
         result.commentsImported++;
+      }
+
+      // 5b. Edit history — only for tickets and comments created by this run, so a re-import
+      // adds none. editedById is NOT NULL: an edit whose editor no longer exists is skipped.
+      for (const e of data.descriptionEdits) {
+        const ticketId = ticketIdMap.get(e.ticketId);
+        const editorId = userIdFor(e.editedByEmail);
+        if (!ticketId || !editorId) continue;
+        await qr.query(`
+          INSERT INTO ticket_description_edits (id, content, "ticketId", "editedById", "createdAt")
+          VALUES ($1, $2, $3, $4, $5)
+        `, [ulid(), e.content, ticketId, editorId, e.createdAt]);
+        result.descriptionEditsImported++;
+      }
+      for (const e of data.commentEdits) {
+        const commentId = commentIdMap.get(e.commentId);
+        const editorId = userIdFor(e.editedByEmail);
+        if (!commentId || !editorId) continue;
+        await qr.query(`
+          INSERT INTO comment_edits (id, content, "commentId", "editedById", "createdAt")
+          VALUES ($1, $2, $3, $4, $5)
+        `, [ulid(), remapMentionMarkup(e.content), commentId, editorId, e.createdAt]);
+        result.commentEditsImported++;
       }
 
       // 6. Attachments
