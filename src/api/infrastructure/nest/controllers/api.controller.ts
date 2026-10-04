@@ -60,6 +60,10 @@ import { AddWorkspaceMember } from '../../../../workspace/domain/services/worksp
 import { WorkspaceRole } from '../../../../workspace/domain/enums/workspace-role.enum';
 import { JwtTokenService } from '../../../../shared/infrastructure/jwt-token-service';
 import { BcryptPasswordHasher } from '../../../../shared/infrastructure/bcrypt-password-hasher';
+import { EnsureTicketReferences } from '../../../../ticket/domain/services/ticket-ensure-references';
+import { EnsureTicketAssignee } from '../../../../ticket/domain/services/ticket-ensure-assignee';
+import { TypeOrmTicketCategoryRepository } from '../../../../project/infrastructure/typeorm/repositories/typeorm-ticket-category.repository';
+import { TypeOrmTagRepository } from '../../../../tag/infrastructure/typeorm/repositories/typeorm-tag.repository';
 
 @Controller('api/v1')
 @ApiKeyAuth()
@@ -80,6 +84,8 @@ export class ApiController {
     @Inject() private readonly tokenService: JwtTokenService,
     @Inject() private readonly passwordHasher: BcryptPasswordHasher,
     @Inject() private readonly participantRepository: TypeOrmTicketParticipantRepository,
+    @Inject() private readonly ticketCategoryRepository: TypeOrmTicketCategoryRepository,
+    @Inject() private readonly tagRepository: TypeOrmTagRepository,
     config: ConfigService,
   ) {
     this.tokenExchangeTtl = tokenExchangeTtlFromConfig(config);
@@ -148,7 +154,7 @@ export class ApiController {
     const service = new CreateTicket(this.idGenerator, this.ticketRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     const validateCustomFields = new ValidateCustomFieldValues(this.customFieldDefinitionRepository);
-    const command = new CreateTicketCommand(service, ensurePermission, this.userRepository, this.eventPublisher, auditLog, validateCustomFields);
+    const command = new CreateTicketCommand(service, ensurePermission, this.userRepository, this.eventPublisher, auditLog, validateCustomFields, undefined, this.createEnsureReferences());
     return command.execute({
       name: body.name,
       description: body.description ?? '',
@@ -203,7 +209,7 @@ export class ApiController {
       if (!ticket || ticket.workspaceId !== workspace.getId()) throw new EntityNotFoundError('Ticket not found');
       const assignee = body.assigneeId ? await this.userRepository.findById(body.assigneeId) : null;
       const prevAssignee = ticket.assigneeId ? await this.userRepository.findById(ticket.assigneeId) : null;
-      const assignCommand = new AssignTicketCommand(assignService, this.ticketRepository, ensurePermission, this.eventPublisher, auditLog);
+      const assignCommand = new AssignTicketCommand(assignService, this.ticketRepository, ensurePermission, this.eventPublisher, auditLog, new EnsureTicketAssignee(this.memberRepository));
       await assignCommand.execute({
         ticketId: id,
         assigneeId: body.assigneeId,
@@ -226,7 +232,7 @@ export class ApiController {
       const updateService = new UpdateTicket(this.ticketRepository);
       const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
       const validateCustomFields = new ValidateCustomFieldValues(this.customFieldDefinitionRepository);
-      const updateCommand = new UpdateTicketCommand(updateService, this.ticketRepository, ensurePermission, auditLog, validateCustomFields);
+      const updateCommand = new UpdateTicketCommand(updateService, this.ticketRepository, ensurePermission, auditLog, validateCustomFields, this.createEnsureReferences());
       return updateCommand.execute({
         ticketId: id,
         workspaceId: workspace.getId(),
@@ -373,6 +379,11 @@ export class ApiController {
   private resolveWorkspaceId(user: AuthUser): string {
     if (user.workspaceId) return user.workspaceId;
     throw new ForbiddenException('API key authentication required for this endpoint, or use workspace-scoped endpoints');
+  }
+
+  /** Category and tag ids sent by an integration must belong to the key's own workspace. */
+  private createEnsureReferences(): EnsureTicketReferences {
+    return new EnsureTicketReferences(this.ticketCategoryRepository, undefined, undefined, undefined, this.tagRepository);
   }
 
   private requireScope(user: AuthUser, scope: ApiKeyScope): void {
