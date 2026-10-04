@@ -272,9 +272,9 @@ export class UserController {
   }
 
   @Get()
-  list(@Query() sort: SortDto) {
+  list(@Query() sort: SortDto, @CurrentUser() user: AuthUser) {
     const query = new ListUsersQuery(this.userRepository);
-    return query.execute({ sort });
+    return query.execute({ sort, requestingUserIsAdmin: user.isSystemAdmin });
   }
 
   @Throttle({ default: { ttl: 60000, limit: 3 } })
