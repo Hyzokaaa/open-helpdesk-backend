@@ -61,6 +61,7 @@ export class AuthController {
   private readonly googleEnabled: boolean;
   private readonly microsoftEnabled: boolean;
   private readonly sessionPolicy: SessionPolicy;
+  private readonly oauthLinkUnverifiedEmails: boolean;
 
   constructor(
     @Inject() private readonly userRepository: TypeOrmUserRepository,
@@ -80,6 +81,7 @@ export class AuthController {
     this.googleEnabled = !!config.get('GOOGLE_CLIENT_ID');
     this.microsoftEnabled = !!config.get('MICROSOFT_CLIENT_ID');
     this.sessionPolicy = sessionPolicyFromConfig(config);
+    this.oauthLinkUnverifiedEmails = config.get('OAUTH_LINK_UNVERIFIED_EMAILS') === 'true';
   }
 
   private createSignAccessToken(): SignAccessToken {
@@ -334,7 +336,9 @@ export class AuthController {
     const redirectUrl = await this.resolveRedirectUrl(req.query?.state as string);
 
     try {
-      const service = new AuthenticateOAuth(this.idGenerator, this.userRepository, this.passwordHasher);
+      const service = new AuthenticateOAuth(this.idGenerator, this.userRepository, this.passwordHasher, {
+        linkUnverifiedEmails: this.oauthLinkUnverifiedEmails,
+      });
       const command = new OAuthLoginCommand(service, this.tokenService);
       const result = await command.execute({
         email: oauthUser.email,
@@ -358,6 +362,12 @@ export class AuthController {
           level: AuditLevel.INFO,
           source: 'ui',
         });
+
+        // An address the provider did not vouch for must be confirmed before the account is usable
+        if (!user.isEmailVerified) {
+          const verification = new ResendVerificationCommand(this.userRepository, this.tokenService, this.emailService);
+          await verification.execute({ userId: user.getId(), frontendUrl: redirectUrl }).catch(() => undefined);
+        }
       }
 
       return res.redirect(`${redirectUrl}/auth/callback?code=${encodeURIComponent(result.code)}`);

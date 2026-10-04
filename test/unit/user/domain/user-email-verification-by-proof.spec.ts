@@ -38,8 +38,8 @@ describe('Email verification by proof of the address', () => {
       expect((await users.findById('user-1'))!.isEmailVerified).toBe(true);
     });
 
-    it('leaves it unverified when the provider does not', async () => {
-      await signIn(false);
+    it('neither signs in nor verifies the account when the provider does not vouch for the address', async () => {
+      await expect(signIn(false)).rejects.toThrow();
       expect((await users.findById('user-1'))!.isEmailVerified).toBe(false);
     });
   });
