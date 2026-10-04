@@ -130,6 +130,15 @@ export class ExportWorkspace {
         FROM csat_responses cs WHERE cs."workspaceId" = $1
       `, [workspaceId]);
 
+      const kbCategories = await qr.query(
+        `SELECT id, name, slug, icon, position, "createdAt" FROM kb_categories WHERE "workspaceId" = $1 ORDER BY position`, [workspaceId],
+      );
+
+      const kbArticles = await qr.query(`
+        SELECT id, title, slug, content, status, position, "categoryId", "createdById", "createdAt", "updatedAt"
+        FROM kb_articles WHERE "workspaceId" = $1 ORDER BY position
+      `, [workspaceId]);
+
       const auditLog = await qr.query(`
         SELECT a.action, a."entityType", a."entityId", a."userId", a.metadata,
           a.category, a.level, a.source, a."createdAt"
@@ -153,6 +162,7 @@ export class ExportWorkspace {
       for (const e of [...descriptionEdits, ...commentEdits]) refer(e.editedById);
       for (const p of participants) refer(p.userId);
       for (const a of auditLog) refer(a.userId);
+      for (const a of kbArticles) refer(a.createdById);
       if (referenced.size) {
         const others = await qr.query(
           `SELECT id, email, "firstName", "lastName", "isActive" FROM users WHERE id = ANY($1)`, [[...referenced]],
@@ -306,6 +316,26 @@ export class ExportWorkspace {
           rating: cs.rating,
           respondedAt: cs.respondedAt?.toISOString() ?? null,
           createdAt: cs.createdAt?.toISOString(),
+        })),
+        kbCategories: kbCategories.map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          slug: c.slug,
+          icon: c.icon ?? null,
+          position: c.position,
+          createdAt: c.createdAt?.toISOString(),
+        })),
+        kbArticles: kbArticles.map((a: any) => ({
+          id: a.id,
+          title: a.title,
+          slug: a.slug,
+          content: a.content,
+          status: a.status,
+          position: a.position,
+          categoryId: a.categoryId,
+          createdByEmail: emailFor(a.createdById),
+          createdAt: a.createdAt?.toISOString(),
+          updatedAt: a.updatedAt?.toISOString() ?? null,
         })),
         auditLog: auditLog.map((a: any) => ({
           action: a.action,

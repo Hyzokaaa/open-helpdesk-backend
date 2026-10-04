@@ -60,6 +60,8 @@ function emptyExport(overrides: Partial<WorkspaceExportData> = {}): WorkspaceExp
     cannedResponses: [],
     customFields: [],
     csatResponses: [],
+    kbCategories: [],
+    kbArticles: [],
     auditLog: [],
     ...overrides,
   };
@@ -312,6 +314,26 @@ describe('ExportWorkspace', () => {
     }
     expect(result.descriptionEdits).toEqual([{ ticketId: 't-1', content: 'old desc', editedByEmail: 'a@example.com', createdAt: '2026-01-01T00:00:00.000Z' }]);
     expect(result.commentEdits).toEqual([{ commentId: 'c-1', content: 'old comment', editedByEmail: null, createdAt: '2026-01-01T00:00:00.000Z' }]);
+  });
+
+  it('exports KB categories and articles with the author email', async () => {
+    const qr = new FakeQueryRunner((sql, params) => {
+      if (/FROM kb_categories WHERE/.test(sql)) return [{ id: 'kc-1', name: 'Start', slug: 'start', icon: 'book', position: 0, createdAt }];
+      if (/FROM kb_articles WHERE/.test(sql)) {
+        return [{ id: 'ka-1', title: 'Hello', slug: 'hello', content: '<p>Hi</p>', status: 'published', position: 1, categoryId: 'kc-1', createdById: 'u-1', createdAt, updatedAt: createdAt }];
+      }
+      if (/FROM workspace_members wm JOIN users u/.test(sql)) {
+        return [{ id: 'u-1', email: 'a@example.com', firstName: 'A', lastName: 'A', isActive: true, role: 'agent', organizationId: null }];
+      }
+      return answer(sql, params);
+    });
+    const result = await new ExportWorkspace(dataSourceOf(qr)).execute('ws-1');
+
+    expect(result.kbCategories).toEqual([{ id: 'kc-1', name: 'Start', slug: 'start', icon: 'book', position: 0, createdAt: '2026-01-01T00:00:00.000Z' }]);
+    expect(result.kbArticles).toEqual([{
+      id: 'ka-1', title: 'Hello', slug: 'hello', content: '<p>Hi</p>', status: 'published', position: 1, categoryId: 'kc-1',
+      createdByEmail: 'a@example.com', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    }]);
   });
 
   it('scopes the categories query to the exported workspace', async () => {
@@ -988,6 +1010,64 @@ describe('ImportWorkspace edit history', () => {
   });
 });
 
+describe('ImportWorkspace knowledge base', () => {
+  const at = '2026-01-01T00:00:00.000Z';
+  const article = (id: string, slug: string, categoryId: string, content = '<p>ok</p>') => ({
+    id, title: `Title ${slug}`, slug, content, status: 'published', position: 2, categoryId,
+    createdByEmail: 'alice@example.com' as string | null, createdAt: at, updatedAt: at,
+  });
+
+  it('reuses categories by slug, skips articles whose slug exists, sanitizes content and remaps audit', async () => {
+    const qr = new FakeQueryRunner((sql) => {
+      if (/FROM users WHERE email = ANY/.test(sql)) return [{ id: 'u-1', email: 'alice@example.com' }];
+      if (/FROM kb_categories WHERE/.test(sql)) return [{ id: 'kc-existing', slug: 'start' }];
+      if (/FROM kb_articles WHERE/.test(sql)) return [{ id: 'ka-existing', slug: 'hello' }];
+      if (/MAX\("ticketNumber"\)/.test(sql)) return [{ max: 0 }];
+      return [];
+    });
+    const data = emptyExport({
+      users: [{ email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' }],
+      kbCategories: [
+        { id: 'src-start', name: 'Start', slug: 'start', icon: null, position: 0, createdAt: at },
+        { id: 'src-faq', name: 'FAQ', slug: 'faq', icon: 'help', position: 1, createdAt: at },
+      ],
+      kbArticles: [
+        article('src-hello', 'hello', 'src-start'),
+        article('src-xss', 'xss', 'src-faq', '<h2>Q</h2><script>alert(1)</script><a href="javascript:alert(1)">x</a><img src="https://x/y.png" alt="y">'),
+        { ...article('src-orphan', 'orphan', 'src-faq'), createdByEmail: null },
+      ],
+      auditLog: [
+        { action: 'kb-article-created', entityType: 'kb-article', entityId: 'src-xss', userEmail: null, metadata: null, createdAt: at },
+        { action: 'kb-category-created', entityType: 'kb-category', entityId: 'src-start', userEmail: null, metadata: null, createdAt: '2026-01-02T00:00:00.000Z' },
+        { action: 'kb-article-updated', entityType: 'kb-article', entityId: 'src-hello', userEmail: null, metadata: null, createdAt: '2026-01-03T00:00:00.000Z' },
+      ],
+    });
+
+    const { result } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    const categoryInserts = qr.find(/INSERT INTO kb_categories/);
+    expect(categoryInserts.map((q) => q.params.slice(1, 6))).toEqual([['FAQ', 'faq', 'help', 1, 'ws-target']]);
+    const articleInserts = qr.find(/INSERT INTO kb_articles/);
+    expect(articleInserts).toHaveLength(1);
+    const [articleId, title, slug, content, status, position, categoryId, workspaceId, createdById] = articleInserts[0].params;
+    expect([title, slug, status, position, categoryId, workspaceId, createdById])
+      .toEqual(['Title xss', 'xss', 'published', 2, categoryInserts[0].params[0], 'ws-target', 'u-1']);
+    expect(content).toContain('<h2>Q</h2>');
+    expect(content).toContain('<img src="https://x/y.png" alt="y"');
+    expect(content).not.toMatch(/<script|javascript:/);
+    expect(qr.find(/INSERT INTO audit_log_entries/).map((q) => q.params[3])).toEqual([articleId, 'kc-existing', 'ka-existing']);
+    expect(result.kbCategoriesImported).toBe(1);
+    expect(result.kbArticlesImported).toBe(1);
+  });
+
+  it('rejects an article with an unknown status', async () => {
+    const qr = new FakeQueryRunner(() => []);
+    const data = emptyExport({ kbArticles: [{ ...article('a', 'a', 'c'), status: 'archived' }] });
+    await expect(new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data))
+      .rejects.toThrow('Invalid export file: kbArticles[0].status must be one of: draft, published');
+  });
+});
+
 describe('ImportWorkspace settings overwrite', () => {
   const answer: Answer = (sql) => (/MAX\("ticketNumber"\)/.test(sql) ? [{ max: 0 }] : []);
   const source = () => emptyExport({
@@ -1045,7 +1125,7 @@ describe('ImportWorkspace settings overwrite', () => {
   });
 });
 
-const NEW_IN_1_15 = ['organizations', 'departments', 'projects', 'descriptionEdits', 'commentEdits'] as const;
+const NEW_IN_1_15 = ['organizations', 'departments', 'projects', 'descriptionEdits', 'commentEdits', 'kbCategories', 'kbArticles'] as const;
 
 describe('applyTransforms', () => {
   it('upgrades 1.12.0 to the current version by adding an empty categories list and normalising missing categories to null', () => {

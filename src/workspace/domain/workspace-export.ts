@@ -164,6 +164,33 @@ export interface WorkspaceExportCsat {
   createdAt: string;
 }
 
+/** Since 1.15. */
+export interface WorkspaceExportKbCategory {
+  id: string;
+  name: string;
+  slug: string;
+  icon: string | null;
+  position: number;
+  createdAt: string;
+}
+
+/** Since 1.15. */
+export interface WorkspaceExportKbArticle {
+  id: string;
+  title: string;
+  slug: string;
+  /** Stored HTML; sanitized again on import. */
+  content: string;
+  status: string;
+  position: number;
+  /** Source KB category id, resolved against `kbCategories`. */
+  categoryId: string;
+  /** Null if the author no longer exists; such an article cannot be imported. */
+  createdByEmail: string | null;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
 export interface WorkspaceExportAuditEntry {
   action: string;
   entityType: string;
@@ -205,5 +232,7 @@ export interface WorkspaceExportData {
   cannedResponses: WorkspaceExportCannedResponse[];
   customFields: WorkspaceExportCustomField[];
   csatResponses: WorkspaceExportCsat[];
+  kbCategories: WorkspaceExportKbCategory[];
+  kbArticles: WorkspaceExportKbArticle[];
   auditLog: WorkspaceExportAuditEntry[];
 }

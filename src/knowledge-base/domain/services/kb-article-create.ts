@@ -7,7 +7,7 @@ import { KbCategoryRepository } from '../repositories/kb-category.repository';
 import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { sanitizeHtml } from '../../../shared/domain/sanitize-html';
 
-const KB_SANITIZE_OPTIONS = {
+export const KB_SANITIZE_OPTIONS = {
   extraTags: ['h2', 'h3', 'img'],
   extraAttrs: { img: ['src', 'alt'] },
   extraSelfClosing: ['img'],

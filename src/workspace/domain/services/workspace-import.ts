@@ -13,6 +13,9 @@ import { TicketDiscardReason } from '../../../ticket/domain/enums/ticket-discard
 import { TicketSource } from '../../../ticket/domain/enums/ticket-source.enum';
 import { ParticipantRole } from '../../../ticket/domain/enums/participant-role.enum';
 import { CustomFieldType } from '../../../custom-field/domain/enums/custom-field-type.enum';
+import { KbArticleStatus } from '../../../knowledge-base/domain/enums/kb-article-status.enum';
+import { KB_SANITIZE_OPTIONS } from '../../../knowledge-base/domain/services/kb-article-create';
+import { sanitizeHtml } from '../../../shared/domain/sanitize-html';
 import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 
@@ -35,6 +38,8 @@ export interface ImportResult {
   cannedResponsesImported: number;
   customFieldsImported: number;
   csatResponsesImported: number;
+  kbCategoriesImported: number;
+  kbArticlesImported: number;
   auditLogImported: number;
   /** The target workspace settings this import overwrote, as asked by the caller. */
   settingsApplied: ImportSetting[];
@@ -237,6 +242,28 @@ function validateExportData(data: WorkspaceExportData): void {
       fail(`${p}.rating`, 'must be a whole number from 1 to 5 or null');
     }
   });
+  const optionalPosition = (row: any, path: string) => {
+    if (row.position != null && !Number.isInteger(row.position)) fail(`${path}.position`, 'must be a whole number');
+  };
+  each('kbCategories', data.kbCategories, (c, p) => {
+    text(c, p, 'id');
+    text(c, p, 'name');
+    text(c, p, 'slug');
+    optionalText(c, p, 'icon');
+    optionalPosition(c, p);
+  });
+  each('kbArticles', data.kbArticles, (a, p) => {
+    text(a, p, 'id');
+    text(a, p, 'title');
+    text(a, p, 'slug');
+    text(a, p, 'categoryId');
+    if (typeof a.content !== 'string') fail(`${p}.content`, 'must be text');
+    member(a, p, 'status', oneOf(KbArticleStatus));
+    optionalPosition(a, p);
+    optionalText(a, p, 'createdByEmail');
+    date(a, p, 'createdAt');
+    optionalDate(a, p, 'updatedAt');
+  });
   each('auditLog', data.auditLog, (a, p) => {
     text(a, p, 'action');
     text(a, p, 'entityType');
@@ -272,7 +299,7 @@ export class ImportWorkspace {
       usersCreated: 0, membersAdded: 0, organizationsImported: 0, departmentsImported: 0, tagsImported: 0, categoriesImported: 0, projectsImported: 0, ticketsImported: 0,
       commentsImported: 0, commentsSkipped: 0, descriptionEditsImported: 0, commentEditsImported: 0, attachmentsImported: 0, participantsImported: 0,
       cannedResponsesImported: 0, customFieldsImported: 0, csatResponsesImported: 0,
-      auditLogImported: 0, settingsApplied: [],
+      kbCategoriesImported: 0, kbArticlesImported: 0, auditLogImported: 0, settingsApplied: [],
     };
     const newMembers: ImportedNewMember[] = [];
 
@@ -312,6 +339,7 @@ export class ImportWorkspace {
       for (const a of data.attachments) { if (a.uploadedByEmail) allEmailsSet.add(a.uploadedByEmail); }
       for (const e of [...data.descriptionEdits, ...data.commentEdits]) { if (e.editedByEmail) allEmailsSet.add(e.editedByEmail); }
       for (const p of data.participants) { if (p.userEmail) allEmailsSet.add(p.userEmail); }
+      for (const a of data.kbArticles) { if (a.createdByEmail) allEmailsSet.add(a.createdByEmail); }
       for (const d of data.departments) for (const email of d.memberEmails) allEmailsSet.add(email);
       // System and anonymous portal events have no user; they keep a null userId on import
       for (const a of data.auditLog) { if (a.userEmail) allEmailsSet.add(a.userEmail); }
@@ -760,6 +788,55 @@ export class ImportWorkspace {
         result.csatResponsesImported++;
       }
 
+      // 10b. Knowledge base — categories reused by slug; an article whose slug the target
+      // workspace already has is skipped. Content is sanitized as the KB create service does.
+      const kbCategoryIdMap = new Map<string, string>();
+      const existingKbCategories = await qr.query(
+        `SELECT id, slug FROM kb_categories WHERE "workspaceId" = $1`, [targetWorkspaceId],
+      );
+      const kbCategoryIdBySlug = new Map<string, string>(existingKbCategories.map((c: any) => [c.slug, c.id]));
+      for (const c of data.kbCategories) {
+        let targetId = kbCategoryIdBySlug.get(c.slug);
+        if (!targetId) {
+          targetId = ulid();
+          const createdAt = c.createdAt ?? new Date().toISOString();
+          await qr.query(`
+            INSERT INTO kb_categories (id, name, slug, icon, position, "workspaceId", "createdAt", "updatedAt")
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          `, [targetId, c.name, c.slug, c.icon ?? null, c.position ?? 0, targetWorkspaceId, createdAt, createdAt]);
+          kbCategoryIdBySlug.set(c.slug, targetId);
+          result.kbCategoriesImported++;
+        }
+        kbCategoryIdMap.set(c.id, targetId);
+      }
+      const kbArticleIdMap = new Map<string, string>();
+      const existingKbArticles = await qr.query(
+        `SELECT id, slug FROM kb_articles WHERE "workspaceId" = $1`, [targetWorkspaceId],
+      );
+      const kbArticleIdBySlug = new Map<string, string>(existingKbArticles.map((a: any) => [a.slug, a.id]));
+      for (const a of data.kbArticles) {
+        const existingId = kbArticleIdBySlug.get(a.slug);
+        if (existingId) {
+          kbArticleIdMap.set(a.id, existingId);
+          continue;
+        }
+        // categoryId and createdById are NOT NULL
+        const categoryId = kbCategoryIdMap.get(a.categoryId);
+        const createdById = userIdFor(a.createdByEmail);
+        if (!categoryId || !createdById) continue;
+        const newId = ulid();
+        await qr.query(`
+          INSERT INTO kb_articles (id, title, slug, content, status, position, "categoryId", "workspaceId", "createdById", "createdAt", "updatedAt")
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        `, [
+          newId, a.title, a.slug, sanitizeHtml(a.content, KB_SANITIZE_OPTIONS), a.status, a.position ?? 0,
+          categoryId, targetWorkspaceId, createdById, a.createdAt, a.updatedAt ?? a.createdAt,
+        ]);
+        kbArticleIdBySlug.set(a.slug, newId);
+        kbArticleIdMap.set(a.id, newId);
+        result.kbArticlesImported++;
+      }
+
       // 11. Audit log — skip entries already imported, like tickets, so a second import adds no history
       const auditKey = (action: string, entityType: string, userId: string | null, createdAt: string | Date) =>
         `${action}|${entityType}|${userId ?? ''}|${new Date(createdAt).toISOString().slice(0, 19)}`;
@@ -770,7 +847,7 @@ export class ImportWorkspace {
         existingAudit.map((e: any) => auditKey(e.action, e.entityType, e.userId, e.createdAt)),
       );
       // Entries point at what this import created (or reused). Entity types the import does not
-      // carry (departments, mailboxes, KB...) keep their source id.
+      // carry (mailboxes, webhooks, email rules...) keep their source id.
       const categoryIdMap = new Map<string, string>();
       for (const c of data.categories) {
         const targetId = categoryIdBySlug.get(c.slug);
@@ -790,6 +867,8 @@ export class ImportWorkspace {
         organization: organizationIdMap,
         department: departmentIdMap,
         project: projectIdMap,
+        'kb-category': kbCategoryIdMap,
+        'kb-article': kbArticleIdMap,
         user: sourceUserIdMap,
         workspace: workspaceIdMap,
       };
