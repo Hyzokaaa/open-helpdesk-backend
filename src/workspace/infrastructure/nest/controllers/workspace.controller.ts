@@ -92,6 +92,12 @@ import {
 import { Public } from "../../../../shared/nest/decorators/public.decorator";
 import { ExportWorkspaceRequest } from "../dto/export-workspace.request";
 import {
+  downloadExportLink,
+  forgetExportDownload,
+  recallExportDownload,
+  rememberExportDownload,
+} from "../../export-link-download";
+import {
   assertExportPassword,
   decodeExport,
   deriveExportKey,
@@ -718,7 +724,7 @@ export class WorkspaceController {
       permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
       isSystemAdmin: user.isSystemAdmin,
     });
-    const { data } = await this.readImportSource(req, file, body);
+    const { data } = await this.readImportSource(req, file, body, `${workspaceId}:${user.userId}`);
     return buildImportPreview(data);
   }
 
@@ -744,7 +750,8 @@ export class WorkspaceController {
       isSystemAdmin: user.isSystemAdmin,
     });
 
-    const { data, source } = await this.readImportSource(req, file, body);
+    const downloadKey = `${workspaceId}:${user.userId}`;
+    const { data, source } = await this.readImportSource(req, file, body, downloadKey);
 
     const service = new ImportWorkspace(this.dataSource);
     const overwriteKeys = [overwrite ?? []].flat()
@@ -752,6 +759,7 @@ export class WorkspaceController {
       .map((key) => key.trim())
       .filter(Boolean);
     const { result, newMembers } = await service.execute(workspaceId, data, { overwrite: overwriteKeys });
+    forgetExportDownload(downloadKey);
 
     const workspace = await this.workspaceRepository.findById(workspaceId);
     await sendImportWelcomeEmails(
@@ -1464,6 +1472,7 @@ export class WorkspaceController {
     req: Request,
     file: Express.Multer.File | undefined,
     body: any,
+    cacheKey: string,
   ): Promise<{ data: WorkspaceExportData; source: "file" | "url" | "direct" }> {
     const fields = body && typeof body === "object" ? body : {};
     const password = typeof fields.password === "string" ? fields.password : undefined;
@@ -1478,17 +1487,19 @@ export class WorkspaceController {
       return { data: (await decodeExport(file.buffer, password)) as WorkspaceExportData, source: "file" };
     }
     if (url) {
-      const bytes = await this.fetchExportBytes(url);
+      const bytes = await this.fetchExportBytes(url, cacheKey);
       return { data: (await decodeExport(bytes, password)) as WorkspaceExportData, source: "url" };
     }
     return { data: fields as WorkspaceExportData, source: "direct" };
   }
 
-  private async fetchExportBytes(url: string): Promise<Buffer> {
-    const response = await fetch(url);
-    if (!response.ok)
-      throw new DomainValidationError(`Could not download the export (HTTP ${response.status})`);
-    return Buffer.from(await response.arrayBuffer());
+  /** An export link's bytes, reusing the ones a preview already downloaded (links are single use). */
+  private async fetchExportBytes(url: string, cacheKey: string): Promise<Buffer> {
+    const remembered = recallExportDownload(cacheKey, url);
+    if (remembered) return remembered;
+    const bytes = await downloadExportLink(url);
+    rememberExportDownload(cacheKey, url, bytes);
+    return bytes;
   }
 
   private async resolveWorkspaceId(slug: string): Promise<string> {
