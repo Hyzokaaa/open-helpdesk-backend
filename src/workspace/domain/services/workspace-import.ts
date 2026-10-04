@@ -294,8 +294,19 @@ export class ImportWorkspace {
         result.csatResponsesImported++;
       }
 
-      // 11. Audit log
+      // 11. Audit log — skip entries already imported, like tickets, so a second import adds no history
+      const auditKey = (action: string, entityType: string, userId: string | null, createdAt: string | Date) =>
+        `${action}|${entityType}|${userId ?? ''}|${new Date(createdAt).toISOString().slice(0, 19)}`;
+      const existingAudit = await qr.query(
+        `SELECT action, "entityType", "userId", "createdAt" FROM audit_log_entries WHERE "workspaceId" = $1`, [targetWorkspaceId],
+      );
+      const existingAuditKeys = new Set<string>(
+        existingAudit.map((e: any) => auditKey(e.action, e.entityType, e.userId, e.createdAt)),
+      );
       for (const a of data.auditLog) {
+        const key = auditKey(a.action, a.entityType, userIdFor(a.userEmail), a.createdAt);
+        if (existingAuditKeys.has(key)) continue;
+        existingAuditKeys.add(key);
         const entityId = a.entityType === 'ticket'
           ? (ticketIdMap.get(a.entityId) ?? a.entityId)
           : a.entityId;

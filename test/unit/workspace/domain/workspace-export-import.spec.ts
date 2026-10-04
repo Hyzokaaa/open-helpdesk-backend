@@ -190,6 +190,26 @@ describe('ImportWorkspace', () => {
     expect(qr.committed).toBe(true);
   });
 
+  it('does not import the same audit entries twice', async () => {
+    const createdAt = '2026-01-01T00:00:00.000Z';
+    const qr = new FakeQueryRunner((sql, params) => {
+      if (/FROM audit_log_entries WHERE/.test(sql)) return [{ action: 'ticket-created', entityType: 'ticket', userId: 'u-1', createdAt }];
+      return answer(sql, params);
+    });
+    const data = emptyExport({
+      users: [{ email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' }],
+      auditLog: [
+        { action: 'ticket-created', entityType: 'ticket', entityId: 'y', userEmail: 'alice@example.com', metadata: null, createdAt },
+        { action: 'ticket-updated', entityType: 'ticket', entityId: 'y', userEmail: 'alice@example.com', metadata: null, createdAt },
+      ],
+    });
+
+    const { result } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    expect(qr.find(/INSERT INTO audit_log_entries/).map((q) => q.params[1])).toEqual(['ticket-updated']);
+    expect(result.auditLogImported).toBe(1);
+  });
+
   it('upgrades a 1.12 file that only carries slugs on tickets and derives a category name from the slug', async () => {
     const qr = new FakeQueryRunner(answer);
     const legacy = emptyExport({
