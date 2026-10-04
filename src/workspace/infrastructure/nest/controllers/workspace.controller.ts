@@ -10,12 +10,13 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   Res,
   UploadedFile,
   UseInterceptors,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
-import { Response } from "express";
+import { Request, Response } from "express";
 import { DataSource } from "typeorm";
 import { JwtTokenService } from "../../../../shared/infrastructure/jwt-token-service";
 import { WorkspaceFrontendResolver } from "../../../../shared/infrastructure/workspace-frontend-resolver";
@@ -25,7 +26,7 @@ import { sendImportWelcomeEmails } from "../import-welcome-emails";
 import { CurrentUser } from "../../../../shared/nest/decorators/current-user.decorator";
 import { AuthUser } from "../../../../shared/nest/strategies/jwt.strategy";
 import { UlidGenerator } from "../../../../shared/infrastructure/ulid-generator";
-import { EntityNotFoundError } from "../../../../shared/domain/errors";
+import { DomainValidationError, EntityNotFoundError } from "../../../../shared/domain/errors";
 import { slugify } from "../../../../shared/domain/slugify";
 import { CreateWorkspace } from "../../../domain/services/workspace-create";
 import { AddWorkspaceMember } from "../../../domain/services/workspace-add-member";
@@ -78,7 +79,12 @@ import { AddMemberRequest } from "../dto/add-member.request";
 import { SortDto } from "../../../../shared/nest/dto/sort.dto";
 import { ConfigService } from "@nestjs/config";
 import { ExportWorkspace } from "../../../domain/services/workspace-export";
-import { ImportWorkspace } from "../../../domain/services/workspace-import";
+import {
+  buildImportPreview,
+  ImportPreview,
+  ImportWorkspace,
+} from "../../../domain/services/workspace-import";
+import { WorkspaceExportData } from "../../../domain/workspace-export";
 import {
   createExportToken,
   validateExportToken,
@@ -87,6 +93,7 @@ import { Public } from "../../../../shared/nest/decorators/public.decorator";
 import { ExportWorkspaceRequest } from "../dto/export-workspace.request";
 import {
   assertExportPassword,
+  decodeExport,
   deriveExportKey,
   encodeExport,
   encodeExportWithKey,
@@ -100,6 +107,9 @@ import { EnsureCanCreateWorkspace } from "../../../domain/services/workspace-ens
 import { TypeOrmWorkspaceCreationSettingsRepository } from "../../typeorm/repositories/typeorm-workspace-creation-settings.repository";
 import { workspaceCreationPolicy } from "../workspace-creation-policy";
 import { imageUploadOptions, LOGO_IMAGE_MIMES } from "../../../../shared/infrastructure/nest/image-upload-options";
+
+/** Import uploads are held in memory (Multer's default storage), capped while they stream in. */
+const IMPORT_UPLOAD_OPTIONS = { limits: { fileSize: 100 * 1024 * 1024, files: 1 } };
 
 @Controller("workspaces")
 export class WorkspaceController {
@@ -688,11 +698,38 @@ export class WorkspaceController {
     res.send(bytes);
   }
 
-  @Post(":slug/import")
-  async importWorkspace(
+  @Post(":slug/import/preview")
+  @HttpCode(200)
+  @UseInterceptors(FileInterceptor("file", IMPORT_UPLOAD_OPTIONS))
+  async previewImport(
     @Param("slug") slug: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
     @Body() body: any,
     @CurrentUser() user: AuthUser,
+    @Req() req: Request,
+  ): Promise<ImportPreview> {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(
+      this.memberRepository,
+    );
+    await ensurePermission.execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+    const { data } = await this.readImportSource(req, file, body);
+    return buildImportPreview(data);
+  }
+
+  @Post(":slug/import")
+  @UseInterceptors(FileInterceptor("file", IMPORT_UPLOAD_OPTIONS))
+  async importWorkspace(
+    @Param("slug") slug: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body() body: any,
+    @CurrentUser() user: AuthUser,
+    @Req() req: Request,
     // Comma list of target settings to overwrite: palette, sla, description, branding
     @Query("overwrite") overwrite?: string | string[],
   ) {
@@ -707,14 +744,7 @@ export class WorkspaceController {
       isSystemAdmin: user.isSystemAdmin,
     });
 
-    // Support URL-based import: { url: "https://..." }
-    let data = body;
-    if (body.url && typeof body.url === "string") {
-      const response = await fetch(body.url);
-      if (!response.ok)
-        throw new Error(`Failed to fetch export from URL: ${response.status}`);
-      data = await response.json();
-    }
+    const { data, source } = await this.readImportSource(req, file, body);
 
     const service = new ImportWorkspace(this.dataSource);
     const overwriteKeys = [overwrite ?? []].flat()
@@ -740,7 +770,7 @@ export class WorkspaceController {
       entityId: workspaceId,
       userId: user.userId,
       workspaceId,
-      metadata: { source: body.url ? "url" : "direct", imported: result },
+      metadata: { source, imported: result },
       category: AuditCategory.WORKSPACE,
       level: AuditLevel.INFO,
       source: "ui",
@@ -1424,6 +1454,41 @@ export class WorkspaceController {
     }
 
     return { icon: null };
+  }
+
+  /**
+   * The export an import or preview reads: a multipart `file` or `url` (exactly one, with an
+   * optional `password`), or, for JSON requests, the export object itself or `{ url, password? }`.
+   */
+  private async readImportSource(
+    req: Request,
+    file: Express.Multer.File | undefined,
+    body: any,
+  ): Promise<{ data: WorkspaceExportData; source: "file" | "url" | "direct" }> {
+    const fields = body && typeof body === "object" ? body : {};
+    const password = typeof fields.password === "string" ? fields.password : undefined;
+    const url = typeof fields.url === "string" && fields.url.trim() ? fields.url.trim() : undefined;
+    const multipart = req.is("multipart/form-data") === "multipart/form-data";
+
+    if (multipart) {
+      if (file && url) throw new DomainValidationError("Send either a file or a URL, not both");
+      if (!file && !url) throw new DomainValidationError("Send an export file or a URL");
+    }
+    if (file) {
+      return { data: (await decodeExport(file.buffer, password)) as WorkspaceExportData, source: "file" };
+    }
+    if (url) {
+      const bytes = await this.fetchExportBytes(url);
+      return { data: (await decodeExport(bytes, password)) as WorkspaceExportData, source: "url" };
+    }
+    return { data: fields as WorkspaceExportData, source: "direct" };
+  }
+
+  private async fetchExportBytes(url: string): Promise<Buffer> {
+    const response = await fetch(url);
+    if (!response.ok)
+      throw new DomainValidationError(`Could not download the export (HTTP ${response.status})`);
+    return Buffer.from(await response.arrayBuffer());
   }
 
   private async resolveWorkspaceId(slug: string): Promise<string> {

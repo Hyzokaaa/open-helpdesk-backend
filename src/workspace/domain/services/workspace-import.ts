@@ -284,13 +284,79 @@ function slugToName(slug: string): string {
     .join(' ');
 }
 
+/** Upgrades an export to the current version and checks its shape; throws DomainValidationError. */
+export function prepareImportData(rawData: WorkspaceExportData): WorkspaceExportData {
+  const data = applyTransforms(rawData);
+  validateExportData(data);
+  return data;
+}
+
+/** A value an import can apply: null, undefined and '' count as absent, as in ImportWorkspace. */
+const present = (v: unknown) => v !== null && v !== undefined && v !== '';
+
+export interface ImportPreview {
+  /** The version the file was exported with, before any upgrade. */
+  version: string;
+  counts: {
+    tickets: number;
+    comments: number;
+    users: number;
+    categories: number;
+    organizations: number;
+    departments: number;
+    projects: number;
+    kbArticles: number;
+    customFields: number;
+    cannedResponses: number;
+  };
+  /** The workspace settings the file carries a value for; null or false when it has none. */
+  settings: {
+    palette: string | null;
+    sla: boolean;
+    description: string | null;
+    branding: { appName: string | null; appSubtitle: string | null } | null;
+  };
+}
+
+/** What importing this export would bring in, checked exactly as the import checks it. */
+export function buildImportPreview(rawData: WorkspaceExportData): ImportPreview {
+  const fileVersion = rawData && typeof rawData === 'object' ? (rawData as { version?: unknown }).version : undefined;
+  const data = prepareImportData(rawData);
+  const count = (rows: unknown) => (Array.isArray(rows) ? rows.length : 0);
+  const ws = data.workspace;
+  const palette = ws.metadata?.palette;
+  const text = (v: unknown) => (present(v) ? (v as string) : null);
+  return {
+    version: typeof fileVersion === 'string' ? fileVersion : data.version,
+    counts: {
+      tickets: count(data.tickets),
+      comments: count(data.comments),
+      users: count(data.users),
+      categories: count(data.categories),
+      organizations: count(data.organizations),
+      departments: count(data.departments),
+      projects: count(data.projects),
+      kbArticles: count(data.kbArticles),
+      customFields: count(data.customFields),
+      cannedResponses: count(data.cannedResponses),
+    },
+    settings: {
+      palette: present(palette) ? String(palette) : null,
+      sla: present(ws.slaPolicy),
+      description: text(ws.description),
+      branding: present(ws.appName) || present(ws.appSubtitle)
+        ? { appName: text(ws.appName), appSubtitle: text(ws.appSubtitle) }
+        : null,
+    },
+  };
+}
+
 export class ImportWorkspace {
   constructor(private readonly dataSource: DataSource) {}
 
   async execute(targetWorkspaceId: string, rawData: WorkspaceExportData, options: ImportOptions = {}): Promise<ImportOutcome> {
     const settings = overwriteSettingsOf(options.overwrite);
-    const data = applyTransforms(rawData);
-    validateExportData(data);
+    const data = prepareImportData(rawData);
     const qr = this.dataSource.createQueryRunner();
     await qr.connect();
     await qr.startTransaction();
@@ -307,7 +373,6 @@ export class ImportWorkspace {
       // 0. Workspace settings — only the ones the caller asked to overwrite, and only when the file
       // carries a value: asking to overwrite something the file lacks must not clear the target's
       const ws = data.workspace;
-      const present = (v: unknown) => v !== null && v !== undefined && v !== '';
       const params: unknown[] = [targetWorkspaceId];
       const sets: string[] = [];
       const set = (assignment: (param: string) => string, value: unknown) => {

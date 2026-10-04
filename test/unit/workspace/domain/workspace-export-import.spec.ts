@@ -1,6 +1,6 @@
 import { DataSource } from 'typeorm';
 import { ExportWorkspace } from '../../../../src/workspace/domain/services/workspace-export';
-import { ImportWorkspace } from '../../../../src/workspace/domain/services/workspace-import';
+import { buildImportPreview, ImportWorkspace } from '../../../../src/workspace/domain/services/workspace-import';
 import { applyTransforms, CURRENT_VERSION } from '../../../../src/workspace/domain/services/workspace-export-transforms';
 import { WorkspaceExportData } from '../../../../src/workspace/domain/workspace-export';
 import { DomainValidationError } from '../../../../src/shared/domain/errors';
@@ -1247,5 +1247,52 @@ describe('ImportWorkspace validation', () => {
     expect((await importError(emptyExport({
       csatResponses: [{ ticketId: 't-1', rating: 6, respondedAt: null, createdAt: '2026-01-01T00:00:00.000Z' }],
     }))).message).toBe('Invalid export file: csatResponses[0].rating must be a whole number from 1 to 5 or null');
+  });
+});
+
+describe('buildImportPreview', () => {
+  const alice = { email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' };
+
+  it('counts what the file carries and reports the version it was exported with', () => {
+    const legacy = emptyExport({
+      version: '1.14.0',
+      users: [alice] as WorkspaceExportData['users'],
+      tickets: [ticket('t-1', null), ticket('t-2', null)],
+    }) as Partial<WorkspaceExportData>;
+    for (const section of NEW_IN_1_15) delete legacy[section];
+
+    const preview = buildImportPreview(legacy as WorkspaceExportData);
+
+    expect(preview.version).toBe('1.14.0');
+    expect(preview.counts).toEqual({
+      tickets: 2, comments: 0, users: 1, categories: 0, organizations: 0, departments: 0,
+      projects: 0, kbArticles: 0, customFields: 0, cannedResponses: 0,
+    });
+  });
+
+  it('reports a setting as absent when the file has no value for it', () => {
+    const preview = buildImportPreview(emptyExport({
+      workspace: { name: 'Acme', description: '', slaPolicy: null, metadata: { palette: '' }, appName: null, appSubtitle: '' },
+    }));
+    expect(preview.settings).toEqual({ palette: null, sla: false, description: null, branding: null });
+  });
+
+  it('reports the settings the file carries', () => {
+    const preview = buildImportPreview(emptyExport({
+      workspace: {
+        name: 'Acme', description: 'Support desk', slaPolicy: { firstResponseHours: 4 },
+        metadata: { palette: 'ocean' }, appName: 'Acme Help', appSubtitle: null,
+      },
+    }));
+    expect(preview.settings).toEqual({
+      palette: 'ocean', sla: true, description: 'Support desk',
+      branding: { appName: 'Acme Help', appSubtitle: null },
+    });
+  });
+
+  it('rejects a file the import would reject', () => {
+    expect(() => buildImportPreview(emptyExport({ version: '9.0.0' }))).toThrow(DomainValidationError);
+    expect(() => buildImportPreview({ ...emptyExport(), tickets: 'nope' } as unknown as WorkspaceExportData))
+      .toThrow(DomainValidationError);
   });
 });
