@@ -82,6 +82,11 @@ export interface WorkspaceExportTicket {
   departmentId?: string | null;
   /** Source project id, resolved against `projects`. Since 1.15. */
   projectId?: string | null;
+  /** Since 1.15; absent in older files, which import as 'ui'. The mailbox is not carried. */
+  source?: string;
+  registeredByEmail?: string | null;
+  originDate?: string | null;
+  descriptionEditedAt?: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 }

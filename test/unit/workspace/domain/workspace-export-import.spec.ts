@@ -272,6 +272,27 @@ describe('ExportWorkspace', () => {
     expect(result.tickets[0].projectId).toBe('p-1');
   });
 
+  it('exports the ticket source, registrar, origin date and description edit date, but not the mailbox', async () => {
+    const origin = new Date('2025-12-31T00:00:00.000Z');
+    const qr = new FakeQueryRunner((sql, params) => {
+      if (/FROM tickets t/.test(sql)) {
+        return [{
+          id: 't-1', name: 'T', status: 'open', category: null, reporterId: 'u-1', tagIds: [], createdAt, updatedAt: createdAt,
+          source: 'email', registeredById: 'u-agent', originDate: origin, descriptionEditedAt: createdAt,
+        }];
+      }
+      if (/FROM users WHERE id = ANY/.test(sql)) return [{ id: 'u-agent', email: 'agent@example.com', firstName: 'Ag', lastName: 'E' }];
+      return answer(sql, params);
+    });
+    const result = await new ExportWorkspace(dataSourceOf(qr)).execute('ws-1');
+
+    expect(qr.find(/FROM tickets t/)[0].sql).not.toMatch(/mailboxId/);
+    expect(result.tickets[0]).toMatchObject({
+      source: 'email', registeredByEmail: 'agent@example.com',
+      originDate: '2025-12-31T00:00:00.000Z', descriptionEditedAt: '2026-01-01T00:00:00.000Z',
+    });
+  });
+
   it('scopes the categories query to the exported workspace', async () => {
     const qr = new FakeQueryRunner(answer);
     await new ExportWorkspace(dataSourceOf(qr)).execute('ws-1');
@@ -846,6 +867,55 @@ describe('ImportWorkspace projects', () => {
     expect(audit.params[3]).toBe(appId);
     expect(JSON.parse(audit.params[6] as string)).toEqual({ projectId: 'proj-existing' });
     expect(result.projectsImported).toBe(1);
+  });
+});
+
+describe('ImportWorkspace ticket fields', () => {
+  const answer: Answer = (sql) => {
+    if (/FROM users WHERE email = ANY/.test(sql)) return [{ id: 'u-1', email: 'alice@example.com' }];
+    if (/MAX\("ticketNumber"\)/.test(sql)) return [{ max: 0 }];
+    return [];
+  };
+
+  it('carries source, registrar, origin date and description edit date, leaving the mailbox empty', async () => {
+    const qr = new FakeQueryRunner(answer);
+    const data = emptyExport({
+      users: [{ email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' }],
+      tickets: [{
+        ...ticket('t-1', null), source: 'portal', registeredByEmail: 'alice@example.com',
+        originDate: '2025-12-31T00:00:00.000Z', descriptionEditedAt: '2026-01-02T00:00:00.000Z',
+      }],
+    });
+
+    await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    const [insert] = qr.find(/INSERT INTO tickets/);
+    expect(insert.sql).toMatch(/source, "registeredById", "originDate", "descriptionEditedAt"/);
+    expect(insert.sql).not.toMatch(/mailboxId/);
+    expect(insert.params.slice(23)).toEqual(['portal', 'u-1', '2025-12-31T00:00:00.000Z', '2026-01-02T00:00:00.000Z']);
+  });
+
+  it('imports a ticket from an older file as created from the UI with no registrar', async () => {
+    const qr = new FakeQueryRunner(answer);
+    const data = emptyExport({
+      version: '1.14.0',
+      users: [{ email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' }],
+      tickets: [ticket('t-1', null)],
+    });
+
+    await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    expect(qr.find(/INSERT INTO tickets/)[0].params.slice(23)).toEqual(['ui', null, null, null]);
+  });
+
+  it('rejects an unknown ticket source', async () => {
+    const qr = new FakeQueryRunner(answer);
+    const data = emptyExport({
+      users: [{ email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' }],
+      tickets: [{ ...ticket('t-1', null), source: 'fax' }],
+    });
+    await expect(new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data))
+      .rejects.toThrow('Invalid export file: tickets[0].source must be one of: ui, email, portal, api');
   });
 });
 

@@ -10,6 +10,7 @@ import { WorkspaceRole } from '../enums/workspace-role.enum';
 import { TicketPriority } from '../../../ticket/domain/enums/ticket-priority.enum';
 import { TicketStatus } from '../../../ticket/domain/enums/ticket-status.enum';
 import { TicketDiscardReason } from '../../../ticket/domain/enums/ticket-discard-reason.enum';
+import { TicketSource } from '../../../ticket/domain/enums/ticket-source.enum';
 import { ParticipantRole } from '../../../ticket/domain/enums/participant-role.enum';
 import { CustomFieldType } from '../../../custom-field/domain/enums/custom-field-type.enum';
 import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
@@ -181,6 +182,10 @@ function validateExportData(data: WorkspaceExportData): void {
     optionalText(t, p, 'organizationId');
     optionalText(t, p, 'departmentId');
     optionalText(t, p, 'projectId');
+    member(t, p, 'source', oneOf(TicketSource), true);
+    optionalText(t, p, 'registeredByEmail');
+    optionalDate(t, p, 'originDate');
+    optionalDate(t, p, 'descriptionEditedAt');
     if (t.customFields != null && (typeof t.customFields !== 'object' || Array.isArray(t.customFields))) {
       fail(`${p}.customFields`, 'must be an object');
     }
@@ -291,6 +296,7 @@ export class ImportWorkspace {
         allEmailsSet.add(t.reporterEmail);
         if (t.assigneeEmail) allEmailsSet.add(t.assigneeEmail);
         if (t.resolvedByEmail) allEmailsSet.add(t.resolvedByEmail);
+        if (t.registeredByEmail) allEmailsSet.add(t.registeredByEmail);
       }
       for (const c of data.comments) { if (c.authorEmail) allEmailsSet.add(c.authorEmail); }
       for (const a of data.attachments) { if (a.uploadedByEmail) allEmailsSet.add(a.uploadedByEmail); }
@@ -592,8 +598,9 @@ export class ImportWorkspace {
             "customFields", "discardReason", "portalToken",
             "firstResponseAt", "resolvedAt", "resolvedById",
             "firstResponseBreached", "resolutionBreached", "createdAt", "updatedAt",
-            "organizationId", "departmentId", "projectId"
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+            "organizationId", "departmentId", "projectId",
+            source, "registeredById", "originDate", "descriptionEditedAt"
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
         `, [
           newId, t.name, t.description, t.priority, t.status, categoryIdFor(t.category),
           targetWorkspaceId, userIdFor(t.reporterEmail), userIdFor(t.assigneeEmail), ticketNumber,
@@ -601,6 +608,7 @@ export class ImportWorkspace {
           t.firstResponseAt, t.resolvedAt, userIdFor(t.resolvedByEmail),
           t.firstResponseBreached, t.resolutionBreached, t.createdAt, t.updatedAt,
           organizationIdFor(t.organizationId), departmentIdFor(t.departmentId), projectIdFor(t.projectId),
+          t.source ?? TicketSource.UI, userIdFor(t.registeredByEmail ?? null), t.originDate ?? null, t.descriptionEditedAt ?? null,
         ]);
         ticketIdMap.set(t.id, newId);
 

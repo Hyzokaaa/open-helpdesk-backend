@@ -71,7 +71,8 @@ export class ExportWorkspace {
           t."reporterId", t."assigneeId", t."ticketNumber", t."customFields",
           t."discardReason", t."portalToken", t."firstResponseAt", t."resolvedAt",
           t."resolvedById", t."firstResponseBreached", t."resolutionBreached",
-          t."organizationId", t."departmentId", t."projectId", t."createdAt", t."updatedAt",
+          t."organizationId", t."departmentId", t."projectId", t.source, t."registeredById",
+          t."originDate", t."descriptionEditedAt", t."createdAt", t."updatedAt",
           COALESCE(array_agg(tt."tagsId") FILTER (WHERE tt."tagsId" IS NOT NULL), '{}') as "tagIds"
         FROM tickets t
         LEFT JOIN ticket_categories tc ON tc.id = t."categoryId"
@@ -125,7 +126,7 @@ export class ExportWorkspace {
       const users = new Map<string, any>(members.map((m: any) => [m.id, m]));
       const referenced = new Set<string>();
       const refer = (id: string | null | undefined) => { if (id && !users.has(id)) referenced.add(id); };
-      for (const t of tickets) { refer(t.reporterId); refer(t.assigneeId); refer(t.resolvedById); }
+      for (const t of tickets) { refer(t.reporterId); refer(t.assigneeId); refer(t.resolvedById); refer(t.registeredById); }
       for (const c of comments) {
         c.mentionedUserIds = mentionedIdsOf(c.mentionedUserIds);
         refer(c.authorId);
@@ -223,6 +224,10 @@ export class ExportWorkspace {
           organizationId: t.organizationId ?? null,
           departmentId: t.departmentId ?? null,
           projectId: t.projectId ?? null,
+          source: t.source ?? 'ui',
+          registeredByEmail: emailFor(t.registeredById),
+          originDate: t.originDate?.toISOString() ?? null,
+          descriptionEditedAt: t.descriptionEditedAt?.toISOString() ?? null,
           createdAt: t.createdAt?.toISOString() ?? null,
           updatedAt: t.updatedAt?.toISOString() ?? null,
         })),
