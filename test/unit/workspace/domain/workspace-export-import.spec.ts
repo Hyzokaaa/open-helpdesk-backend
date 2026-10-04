@@ -483,6 +483,78 @@ describe('ImportWorkspace', () => {
     expect(commentInsert.params[4]).toBe('u-bob,local-carol');
   });
 
+  it('points audit entries and their metadata at the ids the import created, keeping ids of entities it does not carry', async () => {
+    const qr = new FakeQueryRunner((sql, params) => {
+      if (/FROM users WHERE email = ANY/.test(sql)) return [{ id: 'u-1', email: 'alice@example.com' }, { id: 'u-bob', email: 'bob@example.com' }];
+      if (/FROM tags WHERE/.test(sql)) return [{ id: 'tag-existing', name: 'vip' }];
+      return answer(sql, params);
+    });
+    const at = (n: number) => `2026-01-01T00:00:0${n}.000Z`;
+    const data = emptyExport({
+      users: [
+        { id: 'src-alice', email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' },
+        { id: 'src-bob', email: 'bob@example.com', firstName: 'Bob', lastName: 'B', role: 'agent' },
+      ],
+      tags: [{ id: 'src-tag', name: 'vip', color: null, createdAt: at(0) }],
+      categories: [{ id: 'src-cat', name: 'Bug', slug: 'bug', color: 'red', createdAt: at(0) }],
+      customFields: [{ id: 'src-cf', name: 'Plan', type: 'text', options: null, position: 0, required: false, createdAt: at(0) }],
+      cannedResponses: [{ id: 'src-cr', title: 'Hi', content: 'Hello', createdAt: at(0) }],
+      tickets: [ticket('src-t', 'bug')],
+      comments: [{ id: 'src-c', content: 'x', ticketId: 'src-t', authorEmail: 'alice@example.com', mentionedUserIds: [], createdAt: at(0) }],
+      attachments: [{ id: 'src-a', fileName: 'f', originalName: 'f', mimeType: 'text/plain', size: 1, s3Key: 'k', ticketId: 'src-t', commentId: null, uploadedByEmail: null, createdAt: at(0) }],
+      csatResponses: [{ id: 'src-csat', ticketId: 'src-t', rating: 5, respondedAt: null, createdAt: at(0) }],
+      auditLog: [
+        ['ticket', 'src-t'], ['comment', 'src-c'], ['attachment', 'src-a'], ['tag', 'src-tag'],
+        ['ticket-category', 'src-cat'], ['custom-field', 'src-cf'], ['canned-response', 'src-cr'],
+        ['csat', 'src-csat'], ['user', 'src-bob'], ['workspace', 'src-ws'], ['department', 'src-dept'],
+      ].map(([entityType, entityId], i) => ({
+        action: `action-${i}`, entityType, entityId, userEmail: 'alice@example.com',
+        metadata: i === 0 ? { ticketId: 'src-t', commentId: 'src-c', targetUserId: 'src-bob', departmentId: 'src-dept', name: 'n' } : null,
+        createdAt: at(1),
+      })),
+    });
+
+    await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    const idOf = (table: string) => qr.find(new RegExp(`INSERT INTO ${table}`))[0].params[0];
+    const audit = qr.find(/INSERT INTO audit_log_entries/);
+    expect(audit.map((q) => [q.params[2], q.params[3]])).toEqual([
+      ['ticket', idOf('tickets')],
+      ['comment', idOf('comments')],
+      ['attachment', idOf('attachments')],
+      ['tag', 'tag-existing'],
+      ['ticket-category', 'cat-existing'],
+      ['custom-field', idOf('custom_field_definitions')],
+      ['canned-response', idOf('canned_responses')],
+      ['csat', idOf('csat_responses')],
+      ['user', 'u-bob'],
+      ['workspace', 'ws-target'],
+      ['department', 'src-dept'],
+    ]);
+    expect(JSON.parse(audit[0].params[6] as string)).toEqual({
+      ticketId: idOf('tickets'), commentId: idOf('comments'), targetUserId: 'u-bob', departmentId: 'src-dept', name: 'n',
+    });
+  });
+
+  it('anchors audit entries of a ticket skipped as already imported to the existing ticket', async () => {
+    const qr = new FakeQueryRunner((sql, params) => {
+      if (/SELECT id, name, "reporterId", "createdAt" FROM tickets/.test(sql)) {
+        return [{ id: 'existing-t', name: 'Ticket src-t', reporterId: 'u-1', createdAt: '2026-01-01T00:00:00.000Z' }];
+      }
+      return answer(sql, params);
+    });
+    const data = emptyExport({
+      users: [{ email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' }],
+      tickets: [ticket('src-t', null)],
+      auditLog: [{ action: 'ticket-created', entityType: 'ticket', entityId: 'src-t', userEmail: null, metadata: null, createdAt: '2026-01-01T00:00:00.000Z' }],
+    });
+
+    await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    expect(qr.find(/INSERT INTO tickets/)).toHaveLength(0);
+    expect(qr.find(/INSERT INTO audit_log_entries/)[0].params[3]).toBe('existing-t');
+  });
+
   it('upgrades a 1.12 file that only carries slugs on tickets and derives a category name from the slug', async () => {
     const qr = new FakeQueryRunner(answer);
     const legacy = emptyExport({

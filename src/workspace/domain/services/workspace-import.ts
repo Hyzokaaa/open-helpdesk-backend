@@ -254,11 +254,13 @@ export class ImportWorkspace {
 
       // Build set of existing tickets to detect duplicates
       const existingTickets = await qr.query(
-        `SELECT name, "reporterId", "createdAt" FROM tickets WHERE "workspaceId" = $1 AND "deletedAt" IS NULL`, [targetWorkspaceId],
+        `SELECT id, name, "reporterId", "createdAt" FROM tickets WHERE "workspaceId" = $1 AND "deletedAt" IS NULL`, [targetWorkspaceId],
       );
-      const existingTicketKeys = new Set(
-        existingTickets.map((t: any) => `${t.name}|${t.reporterId}|${new Date(t.createdAt).toISOString().slice(0, 19)}`),
+      const existingTicketKeys = new Map<string, string>(
+        existingTickets.map((t: any) => [`${t.name}|${t.reporterId}|${new Date(t.createdAt).toISOString().slice(0, 19)}`, t.id]),
       );
+      // A ticket skipped as already imported still anchors its audit entries to the existing ticket
+      const alreadyImportedTicketIds = new Map<string, string>();
 
       // Numbers are reassigned in the original order, whatever order the file lists tickets in
       const ticketsInOrder = [...data.tickets].sort(
@@ -267,7 +269,11 @@ export class ImportWorkspace {
       for (const t of ticketsInOrder) {
         const reporterId = userIdFor(t.reporterEmail);
         const ticketKey = `${t.name}|${reporterId}|${t.createdAt ? new Date(t.createdAt).toISOString().slice(0, 19) : ''}`;
-        if (existingTicketKeys.has(ticketKey)) continue;
+        const existingTicketId = existingTicketKeys.get(ticketKey);
+        if (existingTicketId) {
+          alreadyImportedTicketIds.set(t.id, existingTicketId);
+          continue;
+        }
 
         const newId = ulid();
         ticketNumber++;
@@ -329,14 +335,17 @@ export class ImportWorkspace {
       }
 
       // 6. Attachments
+      const attachmentIdMap = new Map<string, string>();
       for (const a of data.attachments) {
         const newTicketId = a.ticketId ? ticketIdMap.get(a.ticketId) : null;
         const newCommentId = a.commentId ? commentIdMap.get(a.commentId) : null;
         if (a.ticketId && !newTicketId) continue;
+        const newAttachmentId = ulid();
         await qr.query(`
           INSERT INTO attachments (id, "fileName", "originalName", "mimeType", size, "s3Key", "ticketId", "commentId", "uploadedById", "createdAt")
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        `, [ulid(), a.fileName, a.originalName, a.mimeType, a.size, a.s3Key, newTicketId, newCommentId, userIdFor(a.uploadedByEmail), a.createdAt]);
+        `, [newAttachmentId, a.fileName, a.originalName, a.mimeType, a.size, a.s3Key, newTicketId, newCommentId, userIdFor(a.uploadedByEmail), a.createdAt]);
+        attachmentIdMap.set(a.id, newAttachmentId);
         result.attachmentsImported++;
       }
 
@@ -376,13 +385,16 @@ export class ImportWorkspace {
       }
 
       // 10. CSAT responses
+      const csatIdMap = new Map<string, string>();
       for (const cs of data.csatResponses) {
         const newTicketId = ticketIdMap.get(cs.ticketId);
         if (!newTicketId) continue;
+        const newCsatId = ulid();
         await qr.query(`
           INSERT INTO csat_responses (id, "ticketId", "workspaceId", token, rating, "respondedAt", "createdAt")
           VALUES ($1, $2, $3, $4, $5, $6, $7)
-        `, [ulid(), newTicketId, targetWorkspaceId, ulid(), cs.rating, cs.respondedAt, cs.createdAt]);
+        `, [newCsatId, newTicketId, targetWorkspaceId, ulid(), cs.rating, cs.respondedAt, cs.createdAt]);
+        if (cs.id) csatIdMap.set(cs.id, newCsatId);
         result.csatResponsesImported++;
       }
 
@@ -395,18 +407,62 @@ export class ImportWorkspace {
       const existingAuditKeys = new Set<string>(
         existingAudit.map((e: any) => auditKey(e.action, e.entityType, e.userId, e.createdAt)),
       );
+      // Entries point at what this import created (or reused). Entity types the import does not
+      // carry (departments, mailboxes, KB...) keep their source id.
+      const categoryIdMap = new Map<string, string>();
+      for (const c of data.categories) {
+        const targetId = categoryIdBySlug.get(c.slug);
+        if (targetId) categoryIdMap.set(c.id, targetId);
+      }
+      const auditTicketIdMap = new Map([...alreadyImportedTicketIds, ...ticketIdMap]);
+      const workspaceIdMap = { get: () => targetWorkspaceId };
+      const entityIdMaps: Record<string, { get(id: string): string | undefined }> = {
+        ticket: auditTicketIdMap,
+        comment: commentIdMap,
+        attachment: attachmentIdMap,
+        tag: tagIdMap,
+        'ticket-category': categoryIdMap,
+        'custom-field': customFieldIdMap,
+        'canned-response': cannedIdMap,
+        csat: csatIdMap,
+        user: sourceUserIdMap,
+        workspace: workspaceIdMap,
+      };
+      const metadataIdMaps: Record<string, { get(id: string): string | undefined }> = {
+        ticketId: auditTicketIdMap,
+        commentId: commentIdMap,
+        attachmentId: attachmentIdMap,
+        tagId: tagIdMap,
+        categoryId: categoryIdMap,
+        workspaceId: workspaceIdMap,
+        userId: sourceUserIdMap,
+        assigneeId: sourceUserIdMap,
+        previousAssigneeId: sourceUserIdMap,
+        memberUserId: sourceUserIdMap,
+        participantUserId: sourceUserIdMap,
+        requesterId: sourceUserIdMap,
+        targetUserId: sourceUserIdMap,
+      };
+      const remapMetadata = (metadata: Record<string, unknown> | null) => {
+        if (!metadata || typeof metadata !== 'object') return metadata;
+        const remapped = { ...metadata };
+        for (const [key, map] of Object.entries(metadataIdMaps)) {
+          const value = remapped[key];
+          if (typeof value === 'string') remapped[key] = map.get(value) ?? value;
+        }
+        return remapped;
+      };
+
       for (const a of data.auditLog) {
         const key = auditKey(a.action, a.entityType, userIdFor(a.userEmail), a.createdAt);
         if (existingAuditKeys.has(key)) continue;
         existingAuditKeys.add(key);
-        const entityId = a.entityType === 'ticket'
-          ? (ticketIdMap.get(a.entityId) ?? a.entityId)
-          : a.entityId;
+        const entityId = entityIdMaps[a.entityType]?.get(a.entityId) ?? a.entityId;
         await qr.query(`
           INSERT INTO audit_log_entries (id, action, "entityType", "entityId", "userId", "workspaceId", metadata, category, level, source, "createdAt")
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         `, [
-          ulid(), a.action, a.entityType, entityId, userIdFor(a.userEmail), targetWorkspaceId, JSON.stringify(a.metadata),
+          ulid(), a.action, a.entityType, entityId, userIdFor(a.userEmail), targetWorkspaceId, JSON.stringify(remapMetadata(a.metadata)),
           a.category ?? 'ticket', a.level ?? 'info', a.source ?? null, a.createdAt,
         ]);
         result.auditLogImported++;

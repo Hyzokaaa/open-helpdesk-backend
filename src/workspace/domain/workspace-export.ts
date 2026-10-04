@@ -94,6 +94,8 @@ export interface WorkspaceExportCustomField {
 }
 
 export interface WorkspaceExportCsat {
+  /** Source id, so audit entries about the response can follow it. Since 1.14. */
+  id?: string;
   ticketId: string;
   rating: number | null;
   respondedAt: string | null;

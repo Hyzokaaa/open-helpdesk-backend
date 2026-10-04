@@ -84,7 +84,7 @@ export class ExportWorkspace {
       );
 
       const csatResponses = await qr.query(`
-        SELECT cs."ticketId", cs.rating, cs."respondedAt", cs."createdAt"
+        SELECT cs.id, cs."ticketId", cs.rating, cs."respondedAt", cs."createdAt"
         FROM csat_responses cs WHERE cs."workspaceId" = $1
       `, [workspaceId]);
 
@@ -209,6 +209,7 @@ export class ExportWorkspace {
           createdAt: cf.createdAt?.toISOString(),
         })),
         csatResponses: csatResponses.map((cs: any) => ({
+          id: cs.id,
           ticketId: cs.ticketId,
           rating: cs.rating,
           respondedAt: cs.respondedAt?.toISOString() ?? null,
