@@ -11,6 +11,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { imageUploadOptions, LOGO_IMAGE_MIMES } from '../../../../shared/infrastructure/nest/image-upload-options';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
@@ -113,7 +114,7 @@ export class SystemBrandingController {
   }
 
   @Post('branding/logo')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', imageUploadOptions(1024 * 1024, LOGO_IMAGE_MIMES)))
   async uploadLogo(
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: AuthUser,
@@ -161,7 +162,7 @@ export class SystemBrandingController {
   }
 
   @Post('branding/icon')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', imageUploadOptions(512 * 1024, LOGO_IMAGE_MIMES)))
   async uploadIcon(
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: AuthUser,
