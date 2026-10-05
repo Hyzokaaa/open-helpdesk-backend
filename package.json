@@ -1,6 +1,6 @@
 {
   "name": "open-helpdesk-core",
-  "version": "1.22.0",
+  "version": "1.22.1",
   "description": "Open Helpdesk - Multi-tenant ticket system",
   "license": "AGPL-3.0",
   "main": "dist/app.module.js",
@@ -40,6 +40,7 @@
     "@nestjs/platform-express": "^10.4.0",
     "@nestjs/platform-socket.io": "^10.4.22",
     "@nestjs/schedule": "^4.1.2",
+    "@nestjs/swagger": "^7.4.2",
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/typeorm": "^10.0.2",
     "@nestjs/websockets": "^10.4.22",

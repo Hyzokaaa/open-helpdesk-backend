@@ -1,3 +1,4 @@
+import { TicketSource } from '../../../../src/ticket/domain/enums/ticket-source.enum';
 import { EntityNotFoundError } from '../../../../src/shared/domain/errors';
 import { WorkspaceRole } from '../../../../src/workspace/domain/enums/workspace-role.enum';
 import { UpdateTicket } from '../../../../src/ticket/domain/services/ticket-update';
@@ -33,7 +34,7 @@ describe('A ticket only points at things in its own workspace', () => {
   const create = () => new CreateTicketCommand(
     new CreateTicket(w.ids, w.tickets), w.ensurePermission(), w.users, new FakeEventPublisher(), w.auditLog(), validateCustomFields(), undefined, references(),
   );
-  const base = { ticketId: 'ticket-a', workspaceId: WS_A, userId: 'admin-a', isSystemAdmin: false };
+  const base = { ticketId: 'ticket-a', workspaceId: WS_A, workspaceName: 'A', workspaceSlug: 'a', userId: 'admin-a', isSystemAdmin: false };
 
   beforeEach(async () => {
     w = new TicketWorld();
@@ -92,5 +93,18 @@ describe('A ticket only points at things in its own workspace', () => {
       workspaceId: WS_A, workspaceName: 'A', workspaceSlug: 'a', userId: 'admin-a', userEmail: 'admin-a@example.com', isSystemAdmin: false,
     });
     expect((await w.tickets.findById(id))!.projectId).toBe('proj-a');
+  });
+
+  it('reports the channel a ticket came through in its created event', async () => {
+    const events = new FakeEventPublisher();
+    const command = new CreateTicketCommand(
+      new CreateTicket(w.ids, w.tickets), w.ensurePermission(), w.users, events, w.auditLog(), validateCustomFields(), undefined, references(),
+    );
+    await command.execute({
+      name: 'x', description: 'y', priority: TicketPriority.LOW, categoryId: 'cat-a', tagIds: [], source: TicketSource.API,
+      workspaceId: WS_A, workspaceName: 'A', workspaceSlug: 'a', userId: 'admin-a', userEmail: 'admin-a@example.com', isSystemAdmin: false,
+    });
+    const created = events.events.find((e) => e.event === 'ticket.created')!.data as { source: string };
+    expect(created.source).toBe('api');
   });
 });

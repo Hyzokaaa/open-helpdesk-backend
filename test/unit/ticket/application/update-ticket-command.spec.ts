@@ -61,6 +61,8 @@ describe('UpdateTicketCommand', () => {
     const result = await command.execute({
       ticketId: 'ticket-1',
       workspaceId: 'ws-1',
+      workspaceName: 'Workspace',
+      workspaceSlug: 'ws',
       userId: 'admin-1',
       isSystemAdmin: false,
       name: 'Updated name',
@@ -76,6 +78,8 @@ describe('UpdateTicketCommand', () => {
     const result = await command.execute({
       ticketId: 'ticket-1',
       workspaceId: 'ws-1',
+      workspaceName: 'Workspace',
+      workspaceSlug: 'ws',
       userId: 'agent-1',
       isSystemAdmin: false,
       name: 'Should be ignored',
@@ -93,6 +97,8 @@ describe('UpdateTicketCommand', () => {
       command.execute({
         ticketId: 'ticket-1',
         workspaceId: 'ws-1',
+      workspaceName: 'Workspace',
+      workspaceSlug: 'ws',
         userId: 'other-reporter',
         isSystemAdmin: false,
         description: 'hack',

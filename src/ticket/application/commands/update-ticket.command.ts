@@ -12,9 +12,15 @@ import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
 import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 import { ValidateCustomFieldValues } from '../../../custom-field/domain/services/custom-field-validate-values';
-import { ResolveTicketReferenceLabels, TicketReferenceValues } from '../../domain/services/ticket-resolve-reference-labels';
+import { ResolveTicketReferenceLabels, TicketReferenceLabels, TicketReferenceValues } from '../../domain/services/ticket-resolve-reference-labels';
+import { EventPublisher } from '../../../shared/domain/event-publisher';
+import { TicketFieldChange, TicketUpdatedEvent } from '../../../email/domain/events';
+import { formatTicketNumber } from '../../domain/ticket-number';
 
 const REFERENCE_FIELDS = ['categoryId', 'departmentId', 'organizationId', 'projectId'] as const;
+
+/** Order in which changed fields are listed in the ticket.updated event. */
+const EVENT_FIELDS = ['name', 'description', 'priority', 'categoryId', 'departmentId', 'organizationId', 'projectId', 'tagIds', 'customFields'] as const;
 
 function sameIds(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;
@@ -25,6 +31,8 @@ function sameIds(a: string[], b: string[]): boolean {
 interface Props {
   ticketId: string;
   workspaceId: string;
+  workspaceName: string;
+  workspaceSlug: string;
   userId: string;
   isSystemAdmin: boolean;
   name?: string;
@@ -54,6 +62,7 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
     private readonly validateCustomFields: ValidateCustomFieldValues,
     private readonly ensureReferences?: EnsureTicketReferences,
     private readonly resolveLabels?: ResolveTicketReferenceLabels,
+    private readonly eventPublisher?: EventPublisher,
   ) {}
 
   async execute(props: Props): Promise<UpdateTicketResponse> {
@@ -84,6 +93,8 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
 
     const before: Record<string, unknown> = { name: ticket.name, priority: ticket.priority, categoryId: ticket.categoryId, departmentId: ticket.departmentId, organizationId: ticket.organizationId, projectId: ticket.projectId };
     const tagIdsBefore = [...ticket.tagIds];
+    const descriptionBefore = ticket.description;
+    const customFieldsBefore = { ...(ticket.customFields ?? {}) };
 
     let validatedCustomFields: Record<string, unknown> | undefined;
     if (props.customFields && canEditCustomFields) {
@@ -141,7 +152,7 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
     }
 
     // Names captured now, so the entry stays readable after a rename or delete
-    const labels: Record<string, unknown> = {};
+    const labels: { beforeLabels?: TicketReferenceLabels; afterLabels?: TicketReferenceLabels } = {};
     if (this.resolveLabels && Object.keys(changedAfter).length > 0) {
       const [beforeLabels, afterLabels] = await Promise.all([
         this.resolveLabels.execute({ workspaceId: props.workspaceId, values: changedBefore }),
@@ -163,11 +174,55 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
       metadata: { ticketName: updated.name, before, after, ...labels },
     });
 
+    if (this.eventPublisher) {
+      const changes = this.changedFields(
+        { ...before, description: descriptionBefore, customFields: customFieldsBefore },
+        { ...after, description: updated.description, customFields: { ...(updated.customFields ?? {}) } },
+        labels,
+      );
+      // An edit that changed nothing is not an update
+      if (changes.length > 0) {
+        const event: TicketUpdatedEvent = {
+          ticketId: updated.getId(),
+          ticketNumber: formatTicketNumber(updated.ticketNumber),
+          ticketName: updated.name,
+          updatedById: props.userId,
+          changes,
+          workspaceId: props.workspaceId,
+          workspaceName: props.workspaceName,
+          workspaceSlug: props.workspaceSlug,
+        };
+        this.eventPublisher.emit('ticket.updated', event);
+      }
+    }
+
     return {
       id: updated.getId(),
       name: updated.name,
       priority: updated.priority,
       categoryId: updated.categoryId,
     };
+  }
+
+  /** The fields whose value differs, before and after, with the reference names the audit entry resolved. */
+  private changedFields(
+    before: Record<string, unknown>,
+    after: Record<string, unknown>,
+    labels: { beforeLabels?: TicketReferenceLabels; afterLabels?: TicketReferenceLabels },
+  ): TicketFieldChange[] {
+    const changes: TicketFieldChange[] = [];
+    for (const field of EVENT_FIELDS) {
+      const was = field === 'tagIds' ? before.tagIds : before[field] ?? null;
+      const now = field === 'tagIds' ? after.tagIds : after[field] ?? null;
+      // tagIds is only present on both sides when the set changed
+      if (field === 'tagIds' ? was === undefined : JSON.stringify(was) === JSON.stringify(now)) continue;
+      const change: TicketFieldChange = { field, before: was, after: now };
+      const beforeLabel = labels.beforeLabels?.[field as keyof TicketReferenceLabels];
+      const afterLabel = labels.afterLabels?.[field as keyof TicketReferenceLabels];
+      if (beforeLabel !== undefined) change.beforeLabel = beforeLabel;
+      if (afterLabel !== undefined) change.afterLabel = afterLabel;
+      changes.push(change);
+    }
+    return changes;
   }
 }
