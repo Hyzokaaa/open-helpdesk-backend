@@ -792,9 +792,11 @@ export class WorkspaceController {
     @Req() req: Request,
     // Comma list of target settings to overwrite: palette, sla, description, branding
     @Query("overwrite") overwrite?: string | string[],
+    // "true" completes tickets the workspace already has, adding only what they lack
+    @Query("completeExisting") completeExisting?: string,
   ) {
     try {
-      return await this.runImport(slug, file, body, user, req, overwrite);
+      return await this.runImport(slug, file, body, user, req, overwrite, completeExisting === "true");
     } finally {
       await this.discardUpload(file);
     }
@@ -807,6 +809,7 @@ export class WorkspaceController {
     user: AuthUser,
     req: Request,
     overwrite?: string | string[],
+    completeExisting = false,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
     const ensurePermission = new EnsureWorkspacePermission(
@@ -839,7 +842,7 @@ export class WorkspaceController {
           },
         }
         : undefined;
-      return { source, ...(await service.execute(workspaceId, data, { overwrite: overwriteKeys, files })) };
+      return { source, ...(await service.execute(workspaceId, data, { overwrite: overwriteKeys, files, completeExisting })) };
     });
     forgetExportDownload(downloadKey);
 
@@ -860,7 +863,7 @@ export class WorkspaceController {
       entityId: workspaceId,
       userId: user.userId,
       workspaceId,
-      metadata: { source, imported: result },
+      metadata: { source, completeExisting, imported: result },
       category: AuditCategory.WORKSPACE,
       level: AuditLevel.INFO,
       source: "ui",

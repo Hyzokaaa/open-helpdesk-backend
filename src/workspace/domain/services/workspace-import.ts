@@ -32,8 +32,17 @@ export interface ImportResult {
   categoriesImported: number;
   projectsImported: number;
   ticketsImported: number;
-  /** Tickets not imported because the workspace already has them (same name, reporter and creation second). */
+  /**
+   * Tickets the workspace already has (by identity, else same name, reporter and creation second)
+   * that were left as they are: the option to complete them was off, or they lacked nothing.
+   */
   ticketsAlreadyPresent: number;
+  /**
+   * Tickets the workspace already had that this import completed (completeExisting): at least one
+   * empty field filled, or a tag, comment, edit, attachment or participant added. What it added
+   * is counted in the other counters too.
+   */
+  ticketsCompleted: number;
   commentsImported: number;
   /** Comments not imported because their author is missing from the file or no longer exists. */
   commentsSkipped: number;
@@ -42,7 +51,7 @@ export interface ImportResult {
   attachmentsImported: number;
   /** Attachments not imported because the file does not carry their bytes (older exports, or missing at export time). */
   attachmentsSkipped: number;
-  /** Attachments carried in the file but not imported because their ticket already existed here. */
+  /** Attachments carried in the file but not imported because their ticket already existed here and was not completed. */
   attachmentsOfExistingTickets: number;
   participantsImported: number;
   cannedResponsesImported: number;
@@ -75,6 +84,11 @@ export interface ImportOptions {
   overwrite?: string[];
   /** The archive's files. Without them (plain JSON, format 1) no attachment or logo is imported. */
   files?: ImportArchiveFiles;
+  /**
+   * Complete tickets the workspace already has instead of leaving them alone: fill only their
+   * empty fields and add the children they lack. Nothing already there is changed or removed.
+   */
+  completeExisting?: boolean;
 }
 
 /** Same types and sizes the branding and organization logo uploads accept. */
@@ -206,6 +220,41 @@ function matchTickets(
 }
 
 const EXISTING_TICKETS_SQL = `SELECT id, name, "reporterId", "createdAt" FROM tickets WHERE "workspaceId" = $1 AND "deletedAt" IS NULL`;
+
+/**
+ * The children (comments, edits, attachments) tickets being completed already have, by parent. A
+ * file child is already there if identity finds one of the parent's own children, else if one has
+ * the same natural key (content imported before links existed). Each existing child stands for
+ * one file child at most.
+ */
+class ExistingChildren<T extends { id: string }> {
+  private readonly byParent = new Map<string, T[]>();
+  private readonly taken = new Set<string>();
+
+  constructor(rows: T[], parentOf: (row: T) => string) {
+    for (const row of rows) {
+      const parent = parentOf(row);
+      if (!this.byParent.has(parent)) this.byParent.set(parent, []);
+      this.byParent.get(parent)!.push(row);
+    }
+  }
+
+  find(identity: ImportIdentity, type: ImportLinkType, originId: string | null, parentId: string, sameKey: (row: T) => boolean): string | undefined {
+    const rows = this.byParent.get(parentId) ?? [];
+    const found = identity.find(type, originId, (id) => rows.some((r) => r.id === id))
+      ?? rows.find((r) => !this.taken.has(r.id) && sameKey(r))?.id;
+    if (found) this.taken.add(found);
+    return found;
+  }
+}
+
+type ExistingAttachment = { id: string; ticketId: string; originalName: string; size: number | string };
+
+const EXISTING_ATTACHMENTS_SQL = `SELECT id, "ticketId", "originalName", size FROM attachments WHERE "ticketId" = ANY($1)`;
+
+/** An attachment's natural key: the name it is shown under and its size. */
+const sameAttachment = (a: WorkspaceExportAttachment) => (row: ExistingAttachment) =>
+  row.originalName === (a.originalName || a.fileName || 'file') && Number(row.size) === Number(a.size);
 
 /** The markup ExtractMentions reads: `@[Display Name](userId)`. */
 const MENTION_MARKUP = /@\[([^\]]+)\]\(([^)]+)\)/g;
@@ -546,6 +595,7 @@ export class ImportWorkspace {
 
   async execute(targetWorkspaceId: string, rawData: WorkspaceExportData, options: ImportOptions = {}): Promise<ImportOutcome> {
     const settings = overwriteSettingsOf(options.overwrite);
+    const complete = options.completeExisting === true;
     const data = prepareImportData(rawData);
     const qr = this.dataSource.createQueryRunner();
     await qr.connect();
@@ -560,7 +610,7 @@ export class ImportWorkspace {
     const result: ImportResult = {
       usersCreated: 0, membersAdded: 0, organizationsImported: 0, departmentsImported: 0, tagsImported: 0, categoriesImported: 0, projectsImported: 0, ticketsImported: 0,
       ticketsAlreadyPresent: 0, commentsImported: 0, commentsSkipped: 0, descriptionEditsImported: 0, commentEditsImported: 0, attachmentsImported: 0, attachmentsSkipped: 0,
-      attachmentsOfExistingTickets: 0, participantsImported: 0,
+      ticketsCompleted: 0, attachmentsOfExistingTickets: 0, participantsImported: 0,
       cannedResponsesImported: 0, customFieldsImported: 0, csatResponsesImported: 0,
       kbCategoriesImported: 0, kbArticlesImported: 0, auditLogImported: 0, settingsApplied: [],
     };
@@ -568,7 +618,7 @@ export class ImportWorkspace {
 
     try {
       // Files are stored before the transaction starts, so no lock is held while bytes move
-      const stored = await this.storeArchiveFiles(qr, targetWorkspaceId, data, settings, options.files, storedKeys);
+      const stored = await this.storeArchiveFiles(qr, targetWorkspaceId, data, settings, options.files, storedKeys, complete);
       await qr.startTransaction();
       try {
         // 0. Workspace settings — only the ones the caller asked to overwrite, and only when the file
@@ -974,7 +1024,6 @@ export class ImportWorkspace {
           if (existingTicketId) {
             alreadyImportedTicketIds.set(t.id, existingTicketId);
             links.record(LINK.ticket, originOf(t), existingTicketId);
-            result.ticketsAlreadyPresent++;
             continue;
           }
 
@@ -1015,14 +1064,107 @@ export class ImportWorkspace {
           result.ticketsImported++;
         }
 
-        // 5. Comments — map old ID → new ID
+        // 4b. Completing tickets already here, when asked: only what they lack is added. A field is
+        // filled only while empty (and in SQL only if it still is); `source` only replaces 'ui', the
+        // default every ticket gets, with the channel the file names; a custom field value only
+        // adds a key the ticket does not have; tags are only added. Name, description, status,
+        // priority, assignee, category, reporter, number and dates already set are never touched.
+        // Children (comments, edits, attachments, participants) are completed further down.
+        const completing = new Map<string, string>(complete ? alreadyImportedTicketIds : []);
+        const completingIds = [...new Set(completing.values())];
+        const completedTickets = new Set<string>();
+        if (completingIds.length) {
+          const rows = await qr.query(`
+            SELECT id, "departmentId", "projectId", "organizationId", "registeredById", "originDate",
+              "descriptionEditedAt", source, "customFields"
+            FROM tickets WHERE id = ANY($1)
+          `, [completingIds]);
+          const current = new Map<string, any>(rows.map((r: any) => [r.id, r]));
+          const tagsOf = new Map<string, Set<string>>();
+          for (const r of await qr.query(`SELECT "ticketsId", "tagsId" FROM ticket_tag WHERE "ticketsId" = ANY($1)`, [completingIds])) {
+            if (!tagsOf.has(r.ticketsId)) tagsOf.set(r.ticketsId, new Set());
+            tagsOf.get(r.ticketsId)!.add(r.tagsId);
+          }
+          for (const t of ticketsInOrder) {
+            const targetId = completing.get(t.id);
+            const row = targetId ? current.get(targetId) : undefined;
+            if (!targetId || !row) continue;
+            const params: unknown[] = [targetId];
+            const sets: string[] = [];
+            const fill = (column: string, value: unknown) => {
+              if (row[column] != null || !present(value)) return;
+              params.push(value);
+              sets.push(`"${column}" = COALESCE("${column}", $${params.length})`);
+              row[column] = value;
+            };
+            fill('departmentId', departmentIdFor(t.departmentId));
+            fill('projectId', projectIdFor(t.projectId));
+            fill('organizationId', organizationIdFor(t.organizationId));
+            fill('registeredById', userIdFor(t.registeredByEmail ?? null));
+            fill('originDate', t.originDate);
+            fill('descriptionEditedAt', t.descriptionEditedAt);
+            if ((row.source ?? TicketSource.UI) === TicketSource.UI && present(t.source) && t.source !== TicketSource.UI) {
+              params.push(t.source);
+              sets.push(`source = CASE WHEN source = '${TicketSource.UI}' THEN $${params.length} ELSE source END`);
+              row.source = t.source;
+            }
+            const values = row.customFields && typeof row.customFields === 'object' ? row.customFields : {};
+            const missing = Object.fromEntries(
+              Object.entries(remapCustomFields(t.customFields)).filter(([key, value]) => !(key in values) && present(value)),
+            );
+            if (Object.keys(missing).length) {
+              params.push(JSON.stringify(missing));
+              // jsonb || keeps the right-hand value of a key both sides have: the ticket's own wins
+              sets.push(`"customFields" = $${params.length}::jsonb || COALESCE("customFields", '{}'::jsonb)`);
+              row.customFields = { ...missing, ...values };
+            }
+            if (sets.length) {
+              await qr.query(`UPDATE tickets SET ${sets.join(', ')} WHERE id = $1`, params);
+              completedTickets.add(targetId);
+            }
+            if (!tagsOf.has(targetId)) tagsOf.set(targetId, new Set());
+            const tags = tagsOf.get(targetId)!;
+            for (const oldTagId of t.tagIds) {
+              const tagId = tagIdMap.get(oldTagId);
+              if (!tagId || tags.has(tagId)) continue;
+              await qr.query(
+                `INSERT INTO ticket_tag ("ticketsId", "tagsId") VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+                [targetId, tagId],
+              );
+              tags.add(tagId);
+              completedTickets.add(targetId);
+            }
+          }
+        }
+
+        // 5. Comments — map old ID → new ID. On a ticket being completed, a comment already there
+        // (by identity, else same author and second) is mapped to, not added again.
         const commentIdMap = new Map<string, string>();
+        const existingComments = new ExistingChildren<{ id: string; ticketId: string; authorId: string; createdAt: Date }>(
+          completingIds.length
+            ? await qr.query(`SELECT id, "ticketId", "authorId", "createdAt" FROM comments WHERE "ticketId" = ANY($1)`, [completingIds])
+            : [],
+          (c) => c.ticketId,
+        );
+        /** Existing comments of completed tickets that file comments were mapped to. */
+        const matchedCommentIds = new Set<string>();
         for (const c of data.comments) {
-          const newTicketId = ticketIdMap.get(c.ticketId);
+          const completingTicketId = completing.get(c.ticketId);
+          const newTicketId = ticketIdMap.get(c.ticketId) ?? completingTicketId;
           // comments.authorId is NOT NULL: a comment whose author no longer exists has nobody to
           // belong to, and attributing it to someone else would misrepresent who wrote it
           const authorId = userIdFor(c.authorEmail);
           if (!newTicketId) continue;
+          if (completingTicketId) {
+            const existingId = existingComments.find(identity, LINK.comment, originOf(c), completingTicketId,
+              (row) => row.authorId === authorId && secondOf(row.createdAt) === secondOf(c.createdAt));
+            if (existingId) {
+              commentIdMap.set(c.id, existingId);
+              matchedCommentIds.add(existingId);
+              links.record(LINK.comment, originOf(c), existingId);
+              continue;
+            }
+          }
           if (!authorId) {
             result.commentsSkipped++;
             continue;
@@ -1041,15 +1183,37 @@ export class ImportWorkspace {
           `, [newId, content, newTicketId, authorId, [...mentioned].join(','), c.createdAt]);
           commentIdMap.set(c.id, newId);
           links.record(LINK.comment, originOf(c), newId);
+          if (completingTicketId) completedTickets.add(completingTicketId);
           result.commentsImported++;
         }
 
-        // 5b. Edit history — only for tickets and comments created by this run, so a re-import
-        // adds none. editedById is NOT NULL: an edit whose editor no longer exists is skipped.
+        // 5b. Edit history — for tickets and comments created by this run, and the ones being
+        // completed, where an edit already there (by identity, else same editor and second) is not
+        // added again; so a plain re-import adds none. editedById is NOT NULL: an edit whose editor
+        // no longer exists is skipped.
+        type ExistingEdit = { id: string; parentId: string; editedById: string; createdAt: Date };
+        const sameEdit = (e: { createdAt: string }, editorId: string | null) =>
+          (row: ExistingEdit) => row.editedById === editorId && secondOf(row.createdAt) === secondOf(e.createdAt);
+        const existingDescriptionEdits = new ExistingChildren<ExistingEdit>(
+          completingIds.length
+            ? await qr.query(`SELECT id, "ticketId" AS "parentId", "editedById", "createdAt" FROM ticket_description_edits WHERE "ticketId" = ANY($1)`, [completingIds])
+            : [],
+          (e) => e.parentId,
+        );
         for (const e of data.descriptionEdits) {
-          const ticketId = ticketIdMap.get(e.ticketId);
+          const completingTicketId = completing.get(e.ticketId);
+          const ticketId = ticketIdMap.get(e.ticketId) ?? completingTicketId;
           const editorId = userIdFor(e.editedByEmail);
-          if (!ticketId || !editorId) continue;
+          if (!ticketId) continue;
+          if (completingTicketId) {
+            const existingId = existingDescriptionEdits.find(identity, LINK.descriptionEdit, originOf(e), completingTicketId, sameEdit(e, editorId));
+            if (existingId) {
+              links.record(LINK.descriptionEdit, originOf(e), existingId);
+              continue;
+            }
+          }
+          if (!editorId) continue;
+          if (completingTicketId) completedTickets.add(completingTicketId);
           const editId = ulid();
           await qr.query(`
             INSERT INTO ticket_description_edits (id, content, "ticketId", "editedById", "createdAt")
@@ -1058,10 +1222,27 @@ export class ImportWorkspace {
           links.record(LINK.descriptionEdit, originOf(e), editId);
           result.descriptionEditsImported++;
         }
+        const existingCommentEdits = new ExistingChildren<ExistingEdit>(
+          matchedCommentIds.size
+            ? await qr.query(`SELECT id, "commentId" AS "parentId", "editedById", "createdAt" FROM comment_edits WHERE "commentId" = ANY($1)`, [[...matchedCommentIds]])
+            : [],
+          (e) => e.parentId,
+        );
+        const ticketOfComment = new Map(data.comments.map((c) => [c.id, c.ticketId]));
         for (const e of data.commentEdits) {
           const commentId = commentIdMap.get(e.commentId);
           const editorId = userIdFor(e.editedByEmail);
-          if (!commentId || !editorId) continue;
+          if (!commentId) continue;
+          if (matchedCommentIds.has(commentId)) {
+            const existingId = existingCommentEdits.find(identity, LINK.commentEdit, originOf(e), commentId, sameEdit(e, editorId));
+            if (existingId) {
+              links.record(LINK.commentEdit, originOf(e), existingId);
+              continue;
+            }
+          }
+          if (!editorId) continue;
+          const completingTicketId = completing.get(ticketOfComment.get(e.commentId) ?? '');
+          if (completingTicketId) completedTickets.add(completingTicketId);
           const editId = ulid();
           await qr.query(`
             INSERT INTO comment_edits (id, content, "commentId", "editedById", "createdAt")
@@ -1071,11 +1252,25 @@ export class ImportWorkspace {
           result.commentEditsImported++;
         }
 
-        // 6. Attachments
+        // 6. Attachments — on a ticket being completed, one already there (by identity, else same
+        // name and size) is mapped to, not added again
         const attachmentIdMap = new Map<string, string>();
+        const existingAttachments = new ExistingChildren<ExistingAttachment>(
+          completingIds.length ? await qr.query(EXISTING_ATTACHMENTS_SQL, [completingIds]) : [],
+          (a) => a.ticketId,
+        );
         for (const a of data.attachments) {
-          const newTicketId = a.ticketId ? ticketIdMap.get(a.ticketId) : null;
+          const completingTicketId = a.ticketId ? completing.get(a.ticketId) : undefined;
+          const newTicketId = a.ticketId ? (ticketIdMap.get(a.ticketId) ?? completingTicketId) : null;
           const newCommentId = a.commentId ? commentIdMap.get(a.commentId) : null;
+          if (completingTicketId) {
+            const existingId = existingAttachments.find(identity, LINK.attachment, originOf(a), completingTicketId, sameAttachment(a));
+            if (existingId) {
+              attachmentIdMap.set(a.id, existingId);
+              links.record(LINK.attachment, originOf(a), existingId);
+              continue;
+            }
+          }
           if (a.ticketId && !newTicketId) {
             // Counted here, where the transaction decides, rather than in the upload planning: the
             // planning only avoids storing these files, and a ticket appearing in between would
@@ -1100,12 +1295,14 @@ export class ImportWorkspace {
           `, [newAttachmentId, a.fileName || originalName, originalName, a.mimeType || 'application/octet-stream', size, key, newTicketId, newCommentId, userIdFor(a.uploadedByEmail), a.createdAt]);
           attachmentIdMap.set(a.id, newAttachmentId);
           links.record(LINK.attachment, originOf(a), newAttachmentId);
+          if (completingTicketId) completedTickets.add(completingTicketId);
           result.attachmentsImported++;
         }
 
-        // 7. Participants
+        // 7. Participants — the unique constraint keeps one already there from being added again
         for (const p of data.participants) {
-          const newTicketId = ticketIdMap.get(p.ticketId);
+          const completingTicketId = completing.get(p.ticketId);
+          const newTicketId = ticketIdMap.get(p.ticketId) ?? completingTicketId;
           const userId = userIdFor(p.userEmail);
           if (!newTicketId || !userId) continue;
           const inserted = await qr.query(`
@@ -1113,8 +1310,15 @@ export class ImportWorkspace {
             VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING RETURNING id
           `, [ulid(), newTicketId, userId, p.role]);
           // ON CONFLICT DO NOTHING returns no row when the participant was already there
-          if (inserted.length) result.participantsImported++;
+          if (inserted.length) {
+            result.participantsImported++;
+            if (completingTicketId) completedTickets.add(completingTicketId);
+          }
         }
+
+        // A ticket matched here counts as completed when something was added to it, else as present
+        result.ticketsCompleted = completedTickets.size;
+        result.ticketsAlreadyPresent = [...alreadyImportedTicketIds.values()].filter((id) => !completedTickets.has(id)).length;
 
         // 8. Canned responses — reuse the target workspace's own by identity, else by title, so a
         // re-import adds none
@@ -1326,6 +1530,7 @@ export class ImportWorkspace {
     settings: ImportSetting[],
     files: ImportArchiveFiles | undefined,
     storedKeys: string[],
+    completeExisting = false,
   ): Promise<StoredFiles> {
     const stored: StoredFiles = { attachments: new Map(), organizations: new Map(), workspaceLogo: null, workspaceIcon: null };
     const archive = this.storage ? files : undefined;
@@ -1381,7 +1586,8 @@ export class ImportWorkspace {
     }
 
     // Attachments of tickets the import will create; a ticket already here (matched as the
-    // transaction matches it) brings none
+    // transaction matches it) brings none, unless it is being completed: then only the ones it
+    // does not have yet, decided as the transaction decides
     const carried = data.attachments.filter((a) => sizeOf(a.file) !== null);
     if (carried.length) {
       const reporters = [...new Set(data.tickets.map((t) => t.reporterEmail))];
@@ -1389,10 +1595,17 @@ export class ImportWorkspace {
         (await qr.query(`SELECT id, email FROM users WHERE email = ANY($1)`, [reporters])).map((u: any) => [u.email, u.id]),
       );
       const existingTickets = await qr.query(EXISTING_TICKETS_SQL, [targetWorkspaceId]);
-      const matches = matchTickets(data.tickets, existingTickets, await identityNow(), (email) => reporterIds.get(email) ?? null);
+      const ids = await identityNow();
+      const matches = matchTickets(data.tickets, existingTickets, ids, (email) => reporterIds.get(email) ?? null);
+      const matchedIds = [...new Set(matches.values())];
+      const existing = completeExisting && matchedIds.length
+        ? new ExistingChildren<ExistingAttachment>(await qr.query(EXISTING_ATTACHMENTS_SQL, [matchedIds]), (a) => a.ticketId)
+        : undefined;
       const fileTickets = new Set(data.tickets.map((t) => t.id));
       for (const a of carried) {
-        if (!a.ticketId || !fileTickets.has(a.ticketId) || matches.has(a.ticketId)) continue;
+        if (!a.ticketId || !fileTickets.has(a.ticketId)) continue;
+        const matched = matches.get(a.ticketId);
+        if (matched && (!existing || existing.find(ids, LINK.attachment, originOf(a), matched, sameAttachment(a)))) continue;
         const id = ulid();
         const size = sizeOf(a.file)!;
         const key = attachmentStorageKey(id, a.originalName || a.fileName || 'file');

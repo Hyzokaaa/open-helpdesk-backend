@@ -1958,3 +1958,243 @@ describe('ImportWorkspace identity', () => {
     await expect(new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data)).rejects.toThrow(/tickets\[0\]\.originId/);
   });
 });
+
+describe('ImportWorkspace completeExisting', () => {
+  const at = '2026-01-01T00:00:00.000Z';
+  const alice = { email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' };
+  /** The ticket already in the target, matched through its link to the file's ticket. */
+  const here = {
+    links: [importLink('ticket', 't-origin', 'existing-t')],
+    tickets: [{ id: 'existing-t', name: 'Renamed here', reporterId: 'u-1', createdAt: at }],
+  };
+  const fileTicket = (extra: Partial<WorkspaceExportData['tickets'][number]> = {}) => ({ ...ticket('t-src', null), originId: 't-origin', ...extra });
+  const details = (extra: Record<string, unknown> = {}) => ({
+    id: 'existing-t', departmentId: null, projectId: null, organizationId: null, registeredById: null,
+    originDate: null, descriptionEditedAt: null, source: 'ui', customFields: {}, ...extra,
+  });
+  const run = async (rows: TableRows, data: WorkspaceExportData, completeExisting = true) => {
+    const qr = new FakeQueryRunner(answerFrom({ ...here, ...rows }));
+    const { result } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data, { completeExisting });
+    return { qr, result };
+  };
+
+  it('fills only the empty fields of a ticket already here and never overwrites one that is set', async () => {
+    const { qr, result } = await run({
+      ticketDetails: [details({ projectId: 'p-here', originDate: new Date('2020-01-01T00:00:00.000Z'), customFields: { 'cf-here': 'keep' } })],
+      departments: [{ id: 'dep-here', name: 'Billing' }],
+      projects: [{ id: 'p-other', name: 'Website' }],
+      customFields: [{ id: 'cf-here', name: 'Plan', type: 'text' }, { id: 'cf-two', name: 'Seats', type: 'number' }],
+    }, emptyExport({
+      users: [alice],
+      departments: [{ id: 'd-src', name: 'Billing', description: null, memberEmails: [], createdAt: at }],
+      projects: [{ id: 'p-src', name: 'Website', description: null, categorySlugs: [], createdAt: at }],
+      customFields: [
+        { id: 'cf-src-1', name: 'Plan', type: 'text', options: null, position: 0, required: false, createdAt: at },
+        { id: 'cf-src-2', name: 'Seats', type: 'number', options: null, position: 1, required: false, createdAt: at },
+      ],
+      tickets: [fileTicket({
+        name: 'Other name', status: 'resolved', priority: 'high', assigneeEmail: 'alice@example.com',
+        departmentId: 'd-src', projectId: 'p-src', registeredByEmail: 'alice@example.com',
+        originDate: '2024-01-01T00:00:00.000Z', descriptionEditedAt: '2026-02-01T00:00:00.000Z',
+        customFields: { 'cf-src-1': 'overwrite me', 'cf-src-2': 5 },
+      })],
+    }));
+
+    expect(qr.find(/INSERT INTO tickets/)).toHaveLength(0);
+    const updates = qr.find(/UPDATE tickets SET/);
+    expect(updates).toHaveLength(1);
+    const [{ sql, params }] = updates;
+    expect(params[0]).toBe('existing-t');
+    expect(sql).toMatch(/WHERE id = \$1$/);
+    for (const column of ['departmentId', 'registeredById', 'descriptionEditedAt']) {
+      expect(sql).toMatch(new RegExp(`"${column}" = COALESCE\\("${column}", \\$\\d+\\)`));
+    }
+    for (const untouched of ['"projectId"', '"originDate"', 'name', 'status', 'priority', '"assigneeId"', '"categoryId"', '"reporterId"', '"ticketNumber"', 'source']) {
+      expect(sql).not.toMatch(new RegExp(`${untouched} =`));
+    }
+    expect(params).toEqual(expect.arrayContaining(['dep-here', 'u-1', '2026-02-01T00:00:00.000Z']));
+    // Only the key the ticket lacks, and the ticket's own value wins in SQL too
+    expect(sql).toMatch(/"customFields" = \$\d+::jsonb \|\| COALESCE\("customFields", '\{\}'::jsonb\)/);
+    expect(params).toContain(JSON.stringify({ 'cf-two': 5 }));
+    expect(result).toMatchObject({ ticketsImported: 0, ticketsCompleted: 1, ticketsAlreadyPresent: 0 });
+  });
+
+  it('replaces source only when the ticket has the default ui and the file names another channel', async () => {
+    const changed = await run({ ticketDetails: [details({ source: 'ui' })] }, emptyExport({ users: [alice], tickets: [fileTicket({ source: 'email' })] }));
+    const [update] = changed.qr.find(/UPDATE tickets SET/);
+    expect(update.sql).toMatch(/source = CASE WHEN source = 'ui' THEN \$2 ELSE source END/);
+    expect(update.params).toEqual(['existing-t', 'email']);
+
+    const kept = await run({ ticketDetails: [details({ source: 'portal' })] }, emptyExport({ users: [alice], tickets: [fileTicket({ source: 'email' })] }));
+    expect(kept.qr.find(/UPDATE tickets SET/)).toHaveLength(0);
+    const same = await run({ ticketDetails: [details({ source: 'ui' })] }, emptyExport({ users: [alice], tickets: [fileTicket({ source: 'ui' })] }));
+    expect(same.qr.find(/UPDATE tickets SET/)).toHaveLength(0);
+    expect(same.result).toMatchObject({ ticketsCompleted: 0, ticketsAlreadyPresent: 1 });
+  });
+
+  it('adds only the tags the ticket lacks', async () => {
+    const { qr, result } = await run({
+      ticketDetails: [details()],
+      ticketTags: [{ ticketsId: 'existing-t', tagsId: 'tag-a' }],
+      tags: [{ id: 'tag-a', name: 'a' }, { id: 'tag-b', name: 'b' }],
+    }, emptyExport({
+      users: [alice],
+      tags: [{ id: 'src-a', name: 'a', color: null, createdAt: at }, { id: 'src-b', name: 'b', color: null, createdAt: at }],
+      tickets: [fileTicket({ tagIds: ['src-a', 'src-b'] })],
+    }));
+
+    expect(qr.find(/INSERT INTO ticket_tag/).map((q) => q.params)).toEqual([['existing-t', 'tag-b']]);
+    expect(result.ticketsCompleted).toBe(1);
+  });
+
+  it('adds the comments, edits and participants the ticket lacks, matching legacy ones by author or editor and second', async () => {
+    const later = '2026-01-02T00:00:00.000Z';
+    let participantInserts = 0;
+    const qr = new FakeQueryRunner((sql, params) => {
+      if (/INSERT INTO ticket_participants/.test(sql)) return participantInserts++ === 0 ? [] : [{ id: 'p-new' }];
+      return answerFrom({
+        ...here,
+        links: [...here.links, importLink('comment', 'c-linked', 'existing-c1')],
+        ticketDetails: [details()],
+        comments: [
+          { id: 'existing-c1', ticketId: 'existing-t', authorId: 'u-1', createdAt: new Date('2025-01-01T00:00:00.000Z') },
+          // Imported before links existed: same author, same second
+          { id: 'existing-c2', ticketId: 'existing-t', authorId: 'u-1', createdAt: new Date('2026-01-01T00:00:00.400Z') },
+        ],
+        descriptionEdits: [{ id: 'existing-e1', parentId: 'existing-t', editedById: 'u-1', createdAt: new Date(at) }],
+        commentEdits: [{ id: 'existing-ce1', parentId: 'existing-c2', editedById: 'u-1', createdAt: new Date(at) }],
+      })(sql, params);
+    });
+    const comment = (id: string, createdAt: string) => ({ id, originId: id, content: id, ticketId: 't-src', authorEmail: 'alice@example.com', mentionedUserIds: [], createdAt });
+    const data = emptyExport({
+      users: [alice],
+      tickets: [fileTicket()],
+      comments: [comment('c-linked', later), comment('c-legacy', at), comment('c-new', later)],
+      descriptionEdits: [
+        { id: 'e-legacy', ticketId: 't-src', content: 'old', editedByEmail: 'alice@example.com', createdAt: at },
+        { id: 'e-new', ticketId: 't-src', content: 'older', editedByEmail: 'alice@example.com', createdAt: later },
+      ],
+      commentEdits: [
+        { id: 'ce-legacy', commentId: 'c-legacy', content: 'x', editedByEmail: 'alice@example.com', createdAt: at },
+        { id: 'ce-new', commentId: 'c-legacy', content: 'y', editedByEmail: 'alice@example.com', createdAt: later },
+        { id: 'ce-on-new', commentId: 'c-new', content: 'z', editedByEmail: 'alice@example.com', createdAt: later },
+      ],
+      participants: [
+        { ticketId: 't-src', userEmail: 'alice@example.com', role: 'follower' },
+        { ticketId: 't-src', userEmail: 'alice@example.com', role: 'collaborator' },
+      ],
+    });
+
+    const { result } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data, { completeExisting: true });
+
+    const commentInserts = qr.find(/INSERT INTO comments/);
+    expect(commentInserts.map((q) => [q.params[1], q.params[2]])).toEqual([['c-new', 'existing-t']]);
+    const newCommentId = commentInserts[0].params[0];
+    expect(qr.find(/INSERT INTO ticket_description_edits/).map((q) => [q.params[1], q.params[2]])).toEqual([['older', 'existing-t']]);
+    expect(qr.find(/INSERT INTO comment_edits/).map((q) => [q.params[1], q.params[2]])).toEqual([['y', 'existing-c2'], ['z', newCommentId]]);
+    expect(result).toMatchObject({
+      commentsImported: 1, descriptionEditsImported: 1, commentEditsImported: 2, participantsImported: 1,
+      ticketsCompleted: 1, ticketsAlreadyPresent: 0,
+    });
+    // What was already there is linked too, so the next import matches it by identity
+    expect(linksWritten(qr)).toEqual(expect.arrayContaining([
+      ['comment', 'c-legacy', 'existing-c2'],
+      ['comment', 'c-new', newCommentId],
+      ['ticket-description-edit', 'e-legacy', 'existing-e1'],
+      ['comment-edit', 'ce-legacy', 'existing-ce1'],
+    ]));
+    expect(qr.find(/UPDATE comments|DELETE FROM/)).toHaveLength(0);
+  });
+
+  it('adds nothing on a third import once every child is linked', async () => {
+    const { qr, result } = await run({
+      links: [...here.links, importLink('comment', 'c-1', 'existing-c1'), importLink('ticket-description-edit', 'e-1', 'existing-e1')],
+      ticketDetails: [details({ source: 'email', departmentId: 'x' })],
+      comments: [{ id: 'existing-c1', ticketId: 'existing-t', authorId: 'u-1', createdAt: new Date('2020-01-01T00:00:00.000Z') }],
+      descriptionEdits: [{ id: 'existing-e1', parentId: 'existing-t', editedById: 'u-1', createdAt: new Date('2020-01-01T00:00:00.000Z') }],
+    }, emptyExport({
+      users: [alice],
+      tickets: [fileTicket({ source: 'email' })],
+      comments: [{ id: 'c-1', content: 'hi', ticketId: 't-src', authorEmail: 'alice@example.com', mentionedUserIds: [], createdAt: at }],
+      descriptionEdits: [{ id: 'e-1', ticketId: 't-src', content: 'old', editedByEmail: 'alice@example.com', createdAt: at }],
+    }));
+
+    expect(qr.find(/INSERT INTO (comments|ticket_description_edits|tickets)\b|UPDATE tickets/)).toHaveLength(0);
+    expect(result).toMatchObject({ ticketsCompleted: 0, ticketsAlreadyPresent: 1, commentsImported: 0 });
+  });
+
+  it('leaves tickets already here alone when the option is off, as before', async () => {
+    const { qr, result } = await run({ ticketDetails: [details()] }, emptyExport({
+      users: [alice],
+      tickets: [fileTicket({ source: 'email', registeredByEmail: 'alice@example.com' })],
+      comments: [{ id: 'c-1', content: 'hi', ticketId: 't-src', authorEmail: 'alice@example.com', mentionedUserIds: [], createdAt: at }],
+      participants: [{ ticketId: 't-src', userEmail: 'alice@example.com', role: 'follower' }],
+      attachments: [{ id: 'a', fileName: 'a', originalName: 'a', mimeType: 'text/plain', size: 1, file: 'files/a', ticketId: 't-src', commentId: null, uploadedByEmail: null, createdAt: at }],
+    }), false);
+
+    expect(qr.find(/UPDATE tickets|INSERT INTO comments|INSERT INTO ticket_participants|FROM tickets WHERE id = ANY/)).toHaveLength(0);
+    expect(result).toMatchObject({ ticketsCompleted: 0, ticketsAlreadyPresent: 1, attachmentsOfExistingTickets: 1, commentsImported: 0 });
+  });
+
+  describe('attachments', () => {
+    const attachment = (id: string, originalName: string, size: number, file: string) => ({
+      id, originId: id, fileName: originalName, originalName, mimeType: 'application/pdf', size, file,
+      ticketId: 't-src', commentId: null, uploadedByEmail: null, createdAt: at,
+    });
+    const data = (extra: Partial<WorkspaceExportData> = {}) => emptyExport({
+      users: [alice],
+      tickets: [fileTicket()],
+      attachments: [attachment('a-legacy', 'a.pdf', 3, 'files/a'), attachment('a-new', 'b.pdf', 2, 'files/b')],
+      ...extra,
+    });
+    const files = archiveOf({ 'files/a': Buffer.from('aaa'), 'files/b': Buffer.from('bb') });
+    const rows = {
+      ...here,
+      ticketDetails: [details()],
+      attachments: [{ id: 'existing-a', ticketId: 'existing-t', originalName: 'a.pdf', size: 3 }],
+    };
+
+    it('stores only the files the ticket lacks, under fresh keys, and adds them to it', async () => {
+      const qr = new FakeQueryRunner(answerFrom(rows));
+      const storage = new FakeS3Storage();
+
+      const { result } = await new ImportWorkspace(dataSourceOf(qr), storage).execute('ws-target', data(), { files, completeExisting: true });
+
+      expect(storage.uploadedKeys).toHaveLength(1);
+      const [insert] = qr.find(/INSERT INTO attachments/);
+      const [newId, , originalName, , size, key, ticketId] = insert.params as string[];
+      expect([originalName, size, ticketId]).toEqual(['b.pdf', 2, 'existing-t']);
+      expect(key).toBe(`attachments/${newId}/b.pdf`);
+      expect(storage.uploadedKeys).toEqual([key]);
+      expect(storage.read(key)?.toString()).toBe('bb');
+      expect(qr.find(/INSERT INTO attachments/)).toHaveLength(1);
+      expect(result).toMatchObject({ attachmentsImported: 1, attachmentsOfExistingTickets: 0, ticketsCompleted: 1 });
+      expect(linksWritten(qr)).toEqual(expect.arrayContaining([['attachment', 'a-legacy', 'existing-a'], ['attachment', 'a-new', newId]]));
+    });
+
+    it('deletes the files it stored for a completed ticket when the transaction rolls back', async () => {
+      const qr = new FakeQueryRunner((sql, params) => {
+        if (/INSERT INTO workspace_import_links/.test(sql)) throw new Error('database went away');
+        return answerFrom(rows)(sql, params);
+      });
+      const storage = new FakeS3Storage();
+
+      await expect(new ImportWorkspace(dataSourceOf(qr), storage).execute('ws-target', data(), { files, completeExisting: true }))
+        .rejects.toThrow('database went away');
+
+      expect(qr.rolledBack).toBe(true);
+      expect(storage.uploadedKeys).toHaveLength(1);
+      expect(storage.keys()).toEqual([]);
+    });
+
+    it('stores nothing for a ticket already here when the option is off', async () => {
+      const qr = new FakeQueryRunner(answerFrom(rows));
+      const storage = new FakeS3Storage();
+
+      const { result } = await new ImportWorkspace(dataSourceOf(qr), storage).execute('ws-target', data(), { files });
+
+      expect(storage.uploadedKeys).toEqual([]);
+      expect(result).toMatchObject({ attachmentsImported: 0, attachmentsOfExistingTickets: 2 });
+    });
+  });
+});
