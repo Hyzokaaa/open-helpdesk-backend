@@ -56,7 +56,7 @@ async function bootstrap() {
         callback(null, false);
       }
     },
-    exposedHeaders: ["X-Unread-Count", "Date"],
+    exposedHeaders: ["X-Unread-Count", "Date", "Content-Disposition"],
   });
 
   await app.listen(process.env.PORT ?? 3000);

@@ -1,19 +1,22 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { IsAcceptablePassword } from './is-acceptable-password';
+import { USER_NAME_MAX_LENGTH } from '../../../domain/user-name';
 
 export class SignupUserRequest {
   @IsEmail()
   email!: string;
 
-  @IsString()
-  @MinLength(6)
+  @IsAcceptablePassword()
   password!: string;
 
   @IsString()
   @IsNotEmpty()
+  @MaxLength(USER_NAME_MAX_LENGTH)
   firstName!: string;
 
   @IsString()
   @IsNotEmpty()
+  @MaxLength(USER_NAME_MAX_LENGTH)
   lastName!: string;
 
   @IsString()

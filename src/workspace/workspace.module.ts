@@ -20,6 +20,10 @@ import { WorkspaceInvitationController } from './infrastructure/nest/controllers
 import { WorkspaceImportController } from './infrastructure/nest/controllers/workspace-import.controller';
 import { InvitationPublicController } from './infrastructure/nest/controllers/invitation-public.controller';
 import { DomainCheckController } from './infrastructure/nest/controllers/domain-check.controller';
+import { WorkspaceCreationSettingsController } from './infrastructure/nest/controllers/workspace-creation-settings.controller';
+import { WorkspaceCreationSettingsModel } from './infrastructure/typeorm/models/workspace-creation-settings.model';
+import { WorkspaceImportLinkModel } from './infrastructure/typeorm/models/workspace-import-link.model';
+import { TypeOrmWorkspaceCreationSettingsRepository } from './infrastructure/typeorm/repositories/typeorm-workspace-creation-settings.repository';
 import { WorkspaceFrontendResolver } from '../shared/infrastructure/workspace-frontend-resolver';
 
 @Module({
@@ -30,10 +34,10 @@ import { WorkspaceFrontendResolver } from '../shared/infrastructure/workspace-fr
     AuditLogModule,
     MailboxModule,
     forwardRef(() => ProjectModule),
-    TypeOrmModule.forFeature([WorkspaceModel, WorkspaceMemberModel, WorkspaceInvitationModel, WorkspaceEmailSenderModel]),
+    TypeOrmModule.forFeature([WorkspaceModel, WorkspaceMemberModel, WorkspaceInvitationModel, WorkspaceEmailSenderModel, WorkspaceCreationSettingsModel, WorkspaceImportLinkModel]),
   ],
-  controllers: [WorkspaceController, WorkspaceInvitationController, WorkspaceImportController, InvitationPublicController, DomainCheckController],
-  providers: [TypeOrmWorkspaceRepository, TypeOrmWorkspaceMemberRepository, TypeOrmWorkspaceInvitationRepository, TypeOrmWorkspaceEmailSenderRepository, WorkspaceFrontendResolver],
-  exports: [TypeOrmWorkspaceRepository, TypeOrmWorkspaceMemberRepository, TypeOrmWorkspaceInvitationRepository, TypeOrmWorkspaceEmailSenderRepository, WorkspaceFrontendResolver],
+  controllers: [WorkspaceController, WorkspaceInvitationController, WorkspaceImportController, InvitationPublicController, DomainCheckController, WorkspaceCreationSettingsController],
+  providers: [TypeOrmWorkspaceRepository, TypeOrmWorkspaceMemberRepository, TypeOrmWorkspaceInvitationRepository, TypeOrmWorkspaceEmailSenderRepository, TypeOrmWorkspaceCreationSettingsRepository, WorkspaceFrontendResolver],
+  exports: [TypeOrmWorkspaceRepository, TypeOrmWorkspaceMemberRepository, TypeOrmWorkspaceInvitationRepository, TypeOrmWorkspaceEmailSenderRepository, TypeOrmWorkspaceCreationSettingsRepository, WorkspaceFrontendResolver],
 })
 export class WorkspaceModule {}

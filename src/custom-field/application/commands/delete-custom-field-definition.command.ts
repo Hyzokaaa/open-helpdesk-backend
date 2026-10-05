@@ -24,6 +24,6 @@ export class DeleteCustomFieldDefinitionCommand implements Command<Props, void> 
       isSystemAdmin: props.isSystemAdmin,
     });
 
-    await this.deleteDefinition.execute({ id: props.id });
+    await this.deleteDefinition.execute({ id: props.id, workspaceId: props.workspaceId });
   }
 }

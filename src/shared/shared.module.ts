@@ -31,11 +31,6 @@ function buildOAuthProviders(): Provider[] {
     providers.push(GoogleStrategy);
   }
 
-  if (process.env.MICROSOFT_CLIENT_ID) {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { MicrosoftStrategy } = require('./nest/strategies/microsoft.strategy');
-    providers.push(MicrosoftStrategy);
-  }
 
   return providers;
 }

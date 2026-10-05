@@ -15,12 +15,12 @@ describe('DeleteTag', () => {
   it('should delete an existing tag', async () => {
     repository.seed(new Tag({ id: 'tag-1', name: 'bug', color: null, workspaceId: 'ws-1' }));
 
-    await service.execute({ id: 'tag-1' });
+    await service.execute({ id: 'tag-1', workspaceId: 'ws-1' });
 
     expect(await repository.findById('tag-1')).toBeNull();
   });
 
   it('should throw EntityNotFoundError when tag does not exist', async () => {
-    await expect(service.execute({ id: 'nope' })).rejects.toThrow(EntityNotFoundError);
+    await expect(service.execute({ id: 'nope', workspaceId: 'ws-1' })).rejects.toThrow(EntityNotFoundError);
   });
 });

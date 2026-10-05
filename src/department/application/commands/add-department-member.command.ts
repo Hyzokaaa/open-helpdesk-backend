@@ -34,6 +34,7 @@ export class AddDepartmentMemberCommand implements Command<Props, AddDepartmentM
     const member = await this.addMember.execute({
       departmentId: props.departmentId,
       userId: props.userId,
+      workspaceId: props.workspaceId,
     });
 
     return { id: member.getId(), departmentId: member.departmentId, userId: member.userId };

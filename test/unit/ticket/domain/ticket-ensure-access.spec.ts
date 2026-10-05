@@ -5,7 +5,7 @@ import { TicketParticipant } from '../../../../src/ticket/domain/entities/ticket
 import { WorkspaceMember } from '../../../../src/workspace/domain/entities/workspace-member';
 import { WorkspaceRole } from '../../../../src/workspace/domain/enums/workspace-role.enum';
 import { ParticipantRole } from '../../../../src/ticket/domain/enums/participant-role.enum';
-import { AccessDeniedError } from '../../../../src/shared/domain/errors';
+import { AccessDeniedError, EntityNotFoundError } from '../../../../src/shared/domain/errors';
 import { TicketPriority } from '../../../../src/ticket/domain/enums/ticket-priority.enum';
 import { TicketStatus } from '../../../../src/ticket/domain/enums/ticket-status.enum';
 
@@ -43,8 +43,8 @@ function makeMember(userId: string, role: WorkspaceRole, workspaceId = 'ws-1') {
   return new WorkspaceMember({ id: `mem-${userId}`, workspaceId, userId, role });
 }
 
-function makeParticipant(ticketId: string, userId: string) {
-  return new TicketParticipant({ id: `part-${userId}`, ticketId, userId, role: ParticipantRole.FOLLOWER });
+function makeParticipant(ticketId: string, userId: string, role = ParticipantRole.FOLLOWER) {
+  return new TicketParticipant({ id: `part-${userId}`, ticketId, userId, role });
 }
 
 describe('EnsureTicketAccess', () => {
@@ -62,6 +62,8 @@ describe('EnsureTicketAccess', () => {
   });
 
   it('should return full for system admin', async () => {
+    await ticketRepo.create(makeTicket());
+
     const result = await service.execute({
       ticketId: 'ticket-1', userId: 'admin', workspaceId: 'ws-1', isSystemAdmin: true,
     });
@@ -145,5 +147,56 @@ describe('EnsureTicketAccess', () => {
     await expect(
       service.ensureFull({ ticketId: 'ticket-1', userId: 'agent-2', workspaceId: 'ws-1', isSystemAdmin: false }),
     ).rejects.toThrow(AccessDeniedError);
+  });
+
+  it('gives collaborators what followers get until their role is decided', async () => {
+    memberRepo.seed(makeMember('agent-2', WorkspaceRole.AGENT));
+    await ticketRepo.create(makeTicket({ assigneeId: 'agent-1' }));
+    participantRepo.seed(makeParticipant('ticket-1', 'agent-2', ParticipantRole.COLLABORATOR));
+
+    const result = await service.execute({ ticketId: 'ticket-1', userId: 'agent-2', workspaceId: 'ws-1', isSystemAdmin: false });
+    expect(result).toBe('readonly');
+  });
+
+  it('lets read-only participants contribute, but not anyone without access', async () => {
+    memberRepo.seed(makeMember('agent-2', WorkspaceRole.AGENT));
+    memberRepo.seed(makeMember('agent-3', WorkspaceRole.AGENT));
+    await ticketRepo.create(makeTicket({ assigneeId: 'agent-1' }));
+    participantRepo.seed(makeParticipant('ticket-1', 'agent-2'));
+
+    await expect(
+      service.ensureCanContribute({ ticketId: 'ticket-1', userId: 'agent-2', workspaceId: 'ws-1', isSystemAdmin: false }),
+    ).resolves.toBe('readonly');
+    await expect(
+      service.ensureCanContribute({ ticketId: 'ticket-1', userId: 'agent-3', workspaceId: 'ws-1', isSystemAdmin: false }),
+    ).rejects.toThrow(AccessDeniedError);
+  });
+
+  describe('tickets outside the workspace', () => {
+    it('does not grant a workspace admin access to a ticket of another workspace', async () => {
+      memberRepo.seed(makeMember('admin-user', WorkspaceRole.ADMIN));
+      await ticketRepo.create(makeTicket({ workspaceId: 'ws-2' }));
+
+      await expect(
+        service.execute({ ticketId: 'ticket-1', userId: 'admin-user', workspaceId: 'ws-1', isSystemAdmin: false }),
+      ).rejects.toThrow(EntityNotFoundError);
+    });
+
+    it('does not grant a user access to a ticket of another workspace', async () => {
+      memberRepo.seed(makeMember('user-1', WorkspaceRole.USER));
+      await ticketRepo.create(makeTicket({ workspaceId: 'ws-2', reporterId: 'someone-else' }));
+
+      await expect(
+        service.execute({ ticketId: 'ticket-1', userId: 'user-1', workspaceId: 'ws-1', isSystemAdmin: false }),
+      ).rejects.toThrow(EntityNotFoundError);
+    });
+
+    it('does not grant access to a ticket that does not exist', async () => {
+      memberRepo.seed(makeMember('user-1', WorkspaceRole.USER));
+
+      await expect(
+        service.execute({ ticketId: 'missing', userId: 'user-1', workspaceId: 'ws-1', isSystemAdmin: false }),
+      ).rejects.toThrow(EntityNotFoundError);
+    });
   });
 });

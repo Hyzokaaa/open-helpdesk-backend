@@ -2,9 +2,12 @@ import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { Query } from '../../../shared/domain/query';
 import { WorkspaceRepository } from '../../domain/repositories/workspace.repository';
 import { MailboxRepository } from '../../../mailbox/domain/repositories/mailbox.repository';
+import { EnsureWorkspacePermission } from '../../domain/services/workspace-ensure-permission';
 
 interface Props {
   slug: string;
+  userId: string;
+  isSystemAdmin: boolean;
 }
 
 export interface WorkspaceResponse {
@@ -27,6 +30,7 @@ export interface WorkspaceResponse {
 export class GetWorkspaceQuery implements Query<Props, WorkspaceResponse> {
   constructor(
     private readonly repository: WorkspaceRepository,
+    private readonly ensurePermission: EnsureWorkspacePermission,
     private readonly mailboxRepository?: MailboxRepository,
   ) {}
 
@@ -35,6 +39,13 @@ export class GetWorkspaceQuery implements Query<Props, WorkspaceResponse> {
     if (!workspace) {
       throw new EntityNotFoundError('Workspace not found');
     }
+
+    // Membership only: the public branding a non-member needs comes from /internal/resolve-domain.
+    await this.ensurePermission.execute({
+      workspaceId: workspace.getId(),
+      userId: props.userId,
+      isSystemAdmin: props.isSystemAdmin,
+    });
 
     const mailbox = this.mailboxRepository
       ? await this.mailboxRepository.findByWorkspaceId(workspace.getId())

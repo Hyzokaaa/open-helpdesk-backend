@@ -79,7 +79,7 @@ export class KbController {
     const workspaceId = await this.resolveWorkspaceId(slug);
     await this.ensurePermission(workspaceId, user, PERMISSIONS.KB_CATEGORY_MANAGE);
     const service = new UpdateKbCategory(this.categoryRepository);
-    const category = await service.execute({ id, name: body.name, icon: body.icon });
+    const category = await service.execute({ id, workspaceId, name: body.name, icon: body.icon });
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({
       action: AuditAction.KB_CATEGORY_UPDATED,
@@ -105,7 +105,7 @@ export class KbController {
     await this.ensurePermission(workspaceId, user, PERMISSIONS.KB_CATEGORY_MANAGE);
     const existingCategory = await this.categoryRepository.findById(id);
     const service = new DeleteKbCategory(this.categoryRepository);
-    await service.execute(id);
+    await service.execute(id, workspaceId);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({
       action: AuditAction.KB_CATEGORY_DELETED,
@@ -129,7 +129,7 @@ export class KbController {
     const workspaceId = await this.resolveWorkspaceId(slug);
     await this.ensurePermission(workspaceId, user, PERMISSIONS.KB_CATEGORY_MANAGE);
     const service = new ReorderKbCategories(this.categoryRepository);
-    await service.execute(body.ids);
+    await service.execute(body.ids, workspaceId);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({
       action: AuditAction.KB_CATEGORY_REORDERED,
@@ -197,7 +197,7 @@ export class KbController {
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
     await this.ensurePermission(workspaceId, user, PERMISSIONS.KB_ARTICLE_CREATE);
-    const service = new CreateKbArticle(this.idGenerator, this.articleRepository);
+    const service = new CreateKbArticle(this.idGenerator, this.articleRepository, this.categoryRepository);
     const article = await service.execute({
       title: body.title, content: body.content, categoryId: body.categoryId,
       workspaceId, createdById: user.userId, status: body.status as any,
@@ -226,8 +226,8 @@ export class KbController {
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
     await this.ensurePermission(workspaceId, user, PERMISSIONS.KB_ARTICLE_EDIT);
-    const service = new UpdateKbArticle(this.articleRepository);
-    const article = await service.execute({ id, title: body.title, content: body.content, status: body.status as any, categoryId: body.categoryId });
+    const service = new UpdateKbArticle(this.articleRepository, this.categoryRepository);
+    const article = await service.execute({ id, workspaceId, title: body.title, content: body.content, status: body.status as any, categoryId: body.categoryId });
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({
       action: AuditAction.KB_ARTICLE_UPDATED,
@@ -253,7 +253,7 @@ export class KbController {
     await this.ensurePermission(workspaceId, user, PERMISSIONS.KB_ARTICLE_DELETE);
     const existingArticle = await this.articleRepository.findById(id);
     const service = new DeleteKbArticle(this.articleRepository);
-    await service.execute(id);
+    await service.execute(id, workspaceId);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({
       action: AuditAction.KB_ARTICLE_DELETED,
@@ -277,7 +277,7 @@ export class KbController {
     const workspaceId = await this.resolveWorkspaceId(slug);
     await this.ensurePermission(workspaceId, user, PERMISSIONS.KB_ARTICLE_EDIT);
     const service = new ReorderKbArticles(this.articleRepository);
-    await service.execute(body.ids);
+    await service.execute(body.ids, workspaceId);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({
       action: AuditAction.KB_ARTICLE_REORDERED,

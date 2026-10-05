@@ -32,7 +32,7 @@ describe('CreateUser', () => {
   it('should default isEmailVerified to true', async () => {
     const user = await service.execute({
       email: 'admin@example.com',
-      password: 'pass',
+      password: 'password1',
       firstName: 'Admin',
       lastName: 'User',
     });
@@ -43,7 +43,7 @@ describe('CreateUser', () => {
   it('should respect isEmailVerified when set to false', async () => {
     const user = await service.execute({
       email: 'signup@example.com',
-      password: 'pass',
+      password: 'password1',
       firstName: 'Signup',
       lastName: 'User',
       isEmailVerified: false,
@@ -71,7 +71,7 @@ describe('CreateUser', () => {
     await expect(
       service.execute({
         email: 'test@example.com',
-        password: 'pass',
+        password: 'password1',
         firstName: 'New',
         lastName: 'User',
       }),

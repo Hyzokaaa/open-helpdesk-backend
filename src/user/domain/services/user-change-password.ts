@@ -2,6 +2,7 @@ import { InvalidCredentialsError } from '../../../shared/domain/errors';
 import { PasswordHasher } from '../../../shared/domain/password-hasher';
 import { UserRepository } from '../repositories/user.repository';
 import { EntityNotFoundError } from '../../../shared/domain/errors';
+import { ensurePasswordAcceptable } from '../password-policy';
 
 interface ChangePasswordProps {
   userId: string;
@@ -24,6 +25,7 @@ export class ChangePassword {
       throw new InvalidCredentialsError('Current password is incorrect');
     }
 
+    ensurePasswordAcceptable(props.newPassword);
     user.password = await this.passwordHasher.hash(props.newPassword);
     await this.repository.update(user);
   }

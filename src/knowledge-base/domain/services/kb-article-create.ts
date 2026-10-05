@@ -3,9 +3,11 @@ import { slugify } from '../../../shared/domain/slugify';
 import { KbArticle } from '../entities/kb-article';
 import { KbArticleStatus } from '../enums/kb-article-status.enum';
 import { KbArticleRepository } from '../repositories/kb-article.repository';
+import { KbCategoryRepository } from '../repositories/kb-category.repository';
+import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { sanitizeHtml } from '../../../shared/domain/sanitize-html';
 
-const KB_SANITIZE_OPTIONS = {
+export const KB_SANITIZE_OPTIONS = {
   extraTags: ['h2', 'h3', 'img'],
   extraAttrs: { img: ['src', 'alt'] },
   extraSelfClosing: ['img'],
@@ -24,9 +26,14 @@ export class CreateKbArticle {
   constructor(
     private readonly idGenerator: IdGenerator,
     private readonly repository: KbArticleRepository,
+    private readonly categoryRepository: KbCategoryRepository,
   ) {}
 
   async execute(props: Props): Promise<KbArticle> {
+    // The article is listed under its category, so the category must be one of this workspace.
+    const category = await this.categoryRepository.findById(props.categoryId);
+    if (!category || category.workspaceId !== props.workspaceId) throw new EntityNotFoundError('Category not found');
+
     let slug = slugify(props.title);
     const existing = await this.repository.findBySlugAndWorkspaceId(slug, props.workspaceId);
     if (existing) slug = `${slug}-${this.idGenerator.create().substring(0, 4).toLowerCase()}`;

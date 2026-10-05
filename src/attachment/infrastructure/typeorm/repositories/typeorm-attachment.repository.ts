@@ -42,10 +42,10 @@ export class TypeOrmAttachmentRepository implements AttachmentRepository {
     return models.map((m) => this.toDomain(m));
   }
 
-  async claimStagedAttachments(tokens: string[], ticketId: string): Promise<void> {
+  async claimStagedAttachments(tokens: string[], ticketId: string, uploadedById: string): Promise<void> {
     if (tokens.length === 0) return;
     await this.repository.update(
-      { token: In(tokens) },
+      { token: In(tokens), uploadedById },
       { ticketId, token: null, stagedAt: null },
     );
   }

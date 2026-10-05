@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { IdGenerator } from '../../../shared/domain/id-generator';
 import { StorageService } from '../../../shared/domain/storage-service';
 import { Attachment } from '../entities/attachment';
+import { attachmentStorageKey } from '../attachment-storage-key';
 import { AttachmentRepository } from '../repositories/attachment.repository';
 
 interface StageAttachmentProps {
@@ -22,7 +23,7 @@ export class StageAttachment {
   async execute(props: StageAttachmentProps): Promise<Attachment> {
     const id = this.idGenerator.create();
     const token = randomUUID();
-    const s3Key = `attachments/${id}/${props.originalName}`;
+    const s3Key = attachmentStorageKey(id, props.originalName);
 
     await this.storage.upload(props.buffer, s3Key, props.mimeType);
 

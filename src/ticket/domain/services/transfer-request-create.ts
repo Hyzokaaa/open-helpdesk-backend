@@ -9,6 +9,7 @@ const TRANSFER_TTL = 48 * 60 * 60 * 1000; // 48 hours
 
 interface CreateTransferRequestProps {
   ticketId: string;
+  workspaceId: string;
   requesterId: string;
   targetUserId: string;
 }
@@ -22,7 +23,7 @@ export class CreateTransferRequest {
 
   async execute(props: CreateTransferRequestProps): Promise<TransferRequest> {
     const ticket = await this.ticketRepository.findById(props.ticketId);
-    if (!ticket) throw new EntityNotFoundError('Ticket not found');
+    if (!ticket || ticket.workspaceId !== props.workspaceId) throw new EntityNotFoundError('Ticket not found');
 
     if (ticket.assigneeId !== props.requesterId && ticket.reporterId !== props.requesterId) {
       throw new DomainValidationError('You can only transfer tickets assigned to you or created by you');

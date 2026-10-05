@@ -4,6 +4,8 @@ import { CustomFieldDefinitionRepository } from '../repositories/custom-field-de
 
 interface UpdateCustomFieldDefinitionProps {
   id: string;
+  /** The workspace of the caller; an item of any other workspace is not found. */
+  workspaceId: string;
   name?: string;
   options?: string[] | null;
   required?: boolean;
@@ -14,7 +16,7 @@ export class UpdateCustomFieldDefinition {
 
   async execute(props: UpdateCustomFieldDefinitionProps): Promise<CustomFieldDefinition> {
     const definition = await this.repository.findById(props.id);
-    if (!definition) {
+    if (!definition || definition.workspaceId !== props.workspaceId) {
       throw new EntityNotFoundError('Custom field definition not found');
     }
 

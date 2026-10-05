@@ -44,7 +44,7 @@ describe('PickupTicket', () => {
   it('should assign the user and set status to pending', async () => {
     await repository.create(makeTicket());
 
-    const result = await service.execute({ ticketId: 'ticket-1', userId: 'agent-1' });
+    const result = await service.execute({ ticketId: 'ticket-1', workspaceId: 'ws-1', userId: 'agent-1' });
 
     expect(result.assigneeId).toBe('agent-1');
     expect(result.status).toBe(TicketStatus.PENDING);
@@ -53,7 +53,7 @@ describe('PickupTicket', () => {
   it('should assign and set status to in-progress when specified', async () => {
     await repository.create(makeTicket());
 
-    const result = await service.execute({ ticketId: 'ticket-1', userId: 'agent-1', status: TicketStatus.IN_PROGRESS });
+    const result = await service.execute({ ticketId: 'ticket-1', workspaceId: 'ws-1', userId: 'agent-1', status: TicketStatus.IN_PROGRESS });
 
     expect(result.assigneeId).toBe('agent-1');
     expect(result.status).toBe(TicketStatus.IN_PROGRESS);
@@ -62,7 +62,7 @@ describe('PickupTicket', () => {
   it('should assign and set status to resolved when specified', async () => {
     await repository.create(makeTicket());
 
-    const result = await service.execute({ ticketId: 'ticket-1', userId: 'agent-1', status: TicketStatus.RESOLVED });
+    const result = await service.execute({ ticketId: 'ticket-1', workspaceId: 'ws-1', userId: 'agent-1', status: TicketStatus.RESOLVED });
 
     expect(result.assigneeId).toBe('agent-1');
     expect(result.status).toBe(TicketStatus.RESOLVED);
@@ -72,7 +72,7 @@ describe('PickupTicket', () => {
     await repository.create(makeTicket());
 
     await expect(
-      service.execute({ ticketId: 'ticket-1', userId: 'agent-1', status: TicketStatus.DISCARDED }),
+      service.execute({ ticketId: 'ticket-1', workspaceId: 'ws-1', userId: 'agent-1', status: TicketStatus.DISCARDED }),
     ).rejects.toThrow(DomainValidationError);
   });
 
@@ -80,7 +80,7 @@ describe('PickupTicket', () => {
     await repository.create(makeTicket());
 
     await expect(
-      service.execute({ ticketId: 'ticket-1', userId: 'agent-1', status: TicketStatus.OPEN }),
+      service.execute({ ticketId: 'ticket-1', workspaceId: 'ws-1', userId: 'agent-1', status: TicketStatus.OPEN }),
     ).rejects.toThrow(DomainValidationError);
   });
 
@@ -88,7 +88,7 @@ describe('PickupTicket', () => {
     await repository.create(makeTicket({ status: TicketStatus.PENDING }));
 
     await expect(
-      service.execute({ ticketId: 'ticket-1', userId: 'agent-1' }),
+      service.execute({ ticketId: 'ticket-1', workspaceId: 'ws-1', userId: 'agent-1' }),
     ).rejects.toThrow(DomainValidationError);
   });
 });

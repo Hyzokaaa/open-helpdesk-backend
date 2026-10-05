@@ -1,15 +1,17 @@
 import { randomBytes } from 'crypto';
-import { DomainValidationError, EntityNotFoundError } from '../../../shared/domain/errors';
+import { AccessDeniedError, DomainValidationError, EntityNotFoundError } from '../../../shared/domain/errors';
 import { Workspace } from '../entities/workspace';
 import { WorkspaceRepository } from '../repositories/workspace.repository';
 
 interface SetCustomDomainProps {
   workspaceId: string;
   domain: string | null;
+  /** Marks the domain verified without the DNS proof. Only system admins may ask for it. */
   autoVerify?: boolean;
+  isSystemAdmin?: boolean;
 }
 
-const DOMAIN_REGEX = /^(?!-)[a-zA-Z0-9-]{1,63}(?<!-)(\.[a-zA-Z0-9-]{1,63})*\.[a-zA-Z]{2,}$/;
+export const DOMAIN_REGEX = /^(?!-)[a-zA-Z0-9-]{1,63}(?<!-)(\.[a-zA-Z0-9-]{1,63})*\.[a-zA-Z]{2,}$/;
 
 export class SetCustomDomain {
   constructor(
@@ -18,6 +20,10 @@ export class SetCustomDomain {
   ) {}
 
   async execute(props: SetCustomDomainProps): Promise<Workspace> {
+    if (props.autoVerify && !props.isSystemAdmin) {
+      throw new AccessDeniedError('Only system administrators can skip the DNS verification of a custom domain');
+    }
+
     const workspace = await this.repository.findById(props.workspaceId);
     if (!workspace) throw new EntityNotFoundError('Workspace not found');
 

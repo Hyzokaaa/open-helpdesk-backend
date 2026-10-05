@@ -4,6 +4,8 @@ import { EmailRuleRepository } from '../repositories/email-rule.repository';
 
 interface UpdateEmailRuleProps {
   id: string;
+  /** The workspace of the caller; an item of any other workspace is not found. */
+  workspaceId: string;
   name?: string;
   isActive?: boolean;
   mailboxIds?: string[];
@@ -16,7 +18,7 @@ export class UpdateEmailRule {
 
   async execute(props: UpdateEmailRuleProps): Promise<EmailRule> {
     const rule = await this.repository.findById(props.id);
-    if (!rule) throw new EntityNotFoundError('Email rule not found');
+    if (!rule || rule.workspaceId !== props.workspaceId) throw new EntityNotFoundError('Email rule not found');
 
     if (props.name !== undefined) rule.name = props.name;
     if (props.isActive !== undefined) rule.isActive = props.isActive;

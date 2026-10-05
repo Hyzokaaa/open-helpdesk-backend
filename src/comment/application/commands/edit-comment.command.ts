@@ -1,15 +1,17 @@
 import { Command } from '../../../shared/domain/command';
 import { EditComment } from '../../domain/services/comment-edit';
+import { EnsureTicketAccess } from '../../../ticket/domain/services/ticket-ensure-access';
 import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
 import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
+import { commentPreview } from '../../domain/comment-preview';
 
 interface Props {
   commentId: string;
   content: string;
   userId: string;
-  isAdmin: boolean;
+  isSystemAdmin: boolean;
   workspaceId: string;
   ticketId: string;
 }
@@ -23,15 +25,23 @@ export interface EditCommentResponse {
 export class EditCommentCommand implements Command<Props, EditCommentResponse> {
   constructor(
     private readonly editComment: EditComment,
+    private readonly ensureTicketAccess: EnsureTicketAccess,
     private readonly createAuditLog: CreateAuditLogEntry,
   ) {}
 
   async execute(props: Props): Promise<EditCommentResponse> {
+    await this.ensureTicketAccess.ensureCanContribute({
+      ticketId: props.ticketId,
+      userId: props.userId,
+      workspaceId: props.workspaceId,
+      isSystemAdmin: props.isSystemAdmin,
+    });
+
     const comment = await this.editComment.execute({
       commentId: props.commentId,
+      ticketId: props.ticketId,
       content: props.content,
       userId: props.userId,
-      isAdmin: props.isAdmin,
     });
 
     await this.createAuditLog.execute({
@@ -43,7 +53,7 @@ export class EditCommentCommand implements Command<Props, EditCommentResponse> {
       entityId: props.ticketId,
       userId: props.userId,
       workspaceId: props.workspaceId,
-      metadata: { commentId: comment.getId() },
+      metadata: { commentId: comment.getId(), content: commentPreview(comment.content) },
     });
 
     return {

@@ -24,6 +24,6 @@ export class ReorderCustomFieldDefinitionsCommand implements Command<Props, void
       isSystemAdmin: props.isSystemAdmin,
     });
 
-    await this.reorder.execute(props.items);
+    await this.reorder.execute(props.items, props.workspaceId);
   }
 }

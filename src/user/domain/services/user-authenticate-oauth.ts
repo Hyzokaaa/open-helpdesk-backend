@@ -1,6 +1,8 @@
+import { AccessDeniedError } from '../../../shared/domain/errors';
 import { IdGenerator } from '../../../shared/domain/id-generator';
 import { PasswordHasher } from '../../../shared/domain/password-hasher';
 import { User } from '../entities/user';
+import { normalizeUserName } from '../user-name';
 import { UserRepository } from '../repositories/user.repository';
 
 interface AuthenticateOAuthProps {
@@ -8,13 +10,15 @@ interface AuthenticateOAuthProps {
   firstName: string;
   lastName: string;
   authProvider: string;
+  /** Whether the provider itself vouches that the address belongs to the person signing in. */
+  emailVerified: boolean;
 }
 
 export class AuthenticateOAuth {
   constructor(
     private readonly idGenerator: IdGenerator,
     private readonly repository: UserRepository,
-    private readonly passwordHasher: PasswordHasher,
+    private readonly passwordHasher: PasswordHasher
   ) {}
 
   async execute(props: AuthenticateOAuthProps): Promise<User> {
@@ -23,6 +27,16 @@ export class AuthenticateOAuth {
     if (existing) {
       if (!existing.isActive) {
         throw new Error('Account is deactivated');
+      }
+      // Only a provider that vouches for the address may open an account registered with it
+      if (!props.emailVerified) {
+        throw new AccessDeniedError(
+          'This email is already registered. Sign in with your password instead.',
+        );
+      }
+      if (props.emailVerified && !existing.isEmailVerified) {
+        existing.isEmailVerified = true;
+        await this.repository.update(existing);
       }
       return existing;
     }
@@ -36,11 +50,12 @@ export class AuthenticateOAuth {
       id: this.idGenerator.create(),
       email: props.email,
       password: hashedPassword,
-      firstName: props.firstName,
-      lastName: props.lastName,
+      firstName: normalizeUserName(props.firstName),
+      lastName: normalizeUserName(props.lastName),
       isActive: true,
       isSystemAdmin: false,
-      isEmailVerified: true,
+      // Unverified addresses go through the usual email verification before the account is usable
+      isEmailVerified: props.emailVerified,
       language: 'en',
       theme: 'system',
       autoCreated: false,

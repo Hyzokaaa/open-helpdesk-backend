@@ -10,6 +10,8 @@ interface Props {
   lastName: string;
   role: WorkspaceRole;
   workspaceId: string;
+  /** Whether the API key may also create and sign in supervisors and admins. */
+  allowElevatedRoles: boolean;
 }
 
 export interface ExchangeTokenResponse {
@@ -30,6 +32,9 @@ export class ExchangeTokenCommand implements Command<Props, ExchangeTokenRespons
       email: props.email,
       firstName: props.firstName,
       lastName: props.lastName,
+      workspaceId: props.workspaceId,
+      role: props.role,
+      allowElevatedRoles: props.allowElevatedRoles,
     });
 
     try {

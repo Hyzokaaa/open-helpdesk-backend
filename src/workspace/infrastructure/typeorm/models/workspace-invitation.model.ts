@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   ManyToOne,
   PrimaryColumn,
 } from 'typeorm';
@@ -9,6 +10,7 @@ import { WorkspaceModel } from './workspace.model';
 import { UserModel } from '../../../../user/infrastructure/typeorm/models/user.model';
 
 @Entity('workspace_invitations')
+@Index('IDX_workspace_invitations_workspace', ['workspaceId'])
 export class WorkspaceInvitationModel {
   @PrimaryColumn()
   id!: string;

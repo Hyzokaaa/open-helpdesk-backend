@@ -3,6 +3,8 @@ import { OrganizationRepository } from '../repositories/organization.repository'
 
 interface DeleteOrganizationProps {
   id: string;
+  /** The workspace of the caller; an item of any other workspace is not found. */
+  workspaceId: string;
 }
 
 export class DeleteOrganization {
@@ -10,7 +12,7 @@ export class DeleteOrganization {
 
   async execute(props: DeleteOrganizationProps): Promise<void> {
     const org = await this.repository.findById(props.id);
-    if (!org) throw new EntityNotFoundError('Organization not found');
+    if (!org || org.workspaceId !== props.workspaceId) throw new EntityNotFoundError('Organization not found');
 
     await this.repository.softDelete(props.id);
   }

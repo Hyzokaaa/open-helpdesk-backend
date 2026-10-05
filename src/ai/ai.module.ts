@@ -5,11 +5,12 @@ import { OpenAICompatibleAIService } from './infrastructure/openai-compatible-ai
 import { AIController } from './infrastructure/nest/controllers/ai.controller';
 import { AiUsageModel } from './infrastructure/typeorm/models/ai-usage.model';
 import { TypeOrmAiUsageRepository } from './infrastructure/typeorm/repositories/typeorm-ai-usage.repository';
+import { WorkspaceModule } from '../workspace/workspace.module';
 
 const aiEnabled = !!process.env.AI_API_KEY;
 
 @Module({
-  imports: aiEnabled ? [TypeOrmModule.forFeature([AiUsageModel])] : [],
+  imports: aiEnabled ? [TypeOrmModule.forFeature([AiUsageModel]), WorkspaceModule] : [],
   controllers: aiEnabled ? [AIController] : [],
   providers: aiEnabled ? [
     {

@@ -22,6 +22,7 @@ import { ResolveTicketStakeholders } from '../../notification/domain/services/no
 import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
 import { WorkspaceFrontendResolver } from '../../shared/infrastructure/workspace-frontend-resolver';
+import { htmlToPlainText } from '../../shared/domain/sanitize-plain-text';
 
 @Injectable()
 export class NewCommentHandler {
@@ -58,7 +59,8 @@ export class NewCommentHandler {
     if (users.length === 0) return;
 
     const cleanContent = event.commentContent.replace(/@\[([^\]]+)\]\([^)]+\)/g, '@$1');
-    const preview = cleanContent.length > 200 ? cleanContent.substring(0, 200) + '...' : cleanContent;
+    // Plain text, truncated after the tags are gone; the template escapes it.
+    const preview = htmlToPlainText(cleanContent, 200);
 
     const dispatch = new DispatchNotifications(this.idGenerator, this.notificationRepository, this.preferenceRepository);
     const { emailRecipients } = await dispatch.execute({

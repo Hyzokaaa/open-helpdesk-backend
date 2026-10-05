@@ -34,7 +34,8 @@ export class TicketCategoryController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
-    await this.ensurePermission(workspaceId, user, PERMISSIONS.PROJECT_VIEW);
+    // Anyone who can file a ticket must be able to pick its category, the USER role included
+    await this.ensurePermission(workspaceId, user, PERMISSIONS.TICKET_CREATE);
 
     const all = await this.categoryRepository.findByWorkspaceId(workspaceId);
     const projectCategoryIds = projectId
@@ -94,7 +95,13 @@ export class TicketCategoryController {
     await this.ensurePermission(workspaceId, user, PERMISSIONS.PROJECT_MANAGE);
 
     const service = new UpdateTicketCategory(this.categoryRepository);
-    const category = await service.execute({ id: categoryId, ...body });
+    const category = await service.execute({
+      id: categoryId,
+      workspaceId,
+      name: body.name,
+      slug: body.slug,
+      color: body.color,
+    });
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({
@@ -125,7 +132,7 @@ export class TicketCategoryController {
     if (!existing) throw new EntityNotFoundError('Category not found');
 
     const service = new DeleteTicketCategory(this.categoryRepository);
-    await service.execute(categoryId);
+    await service.execute(categoryId, workspaceId);
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({

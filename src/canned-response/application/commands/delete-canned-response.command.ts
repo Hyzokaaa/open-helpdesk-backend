@@ -24,6 +24,6 @@ export class DeleteCannedResponseCommand implements Command<Props, void> {
       isSystemAdmin: props.isSystemAdmin,
     });
 
-    await this.deleteCannedResponse.execute({ id: props.id });
+    await this.deleteCannedResponse.execute({ id: props.id, workspaceId: props.workspaceId });
   }
 }

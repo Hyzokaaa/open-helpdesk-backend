@@ -2,12 +2,14 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   ManyToOne,
   PrimaryColumn,
 } from 'typeorm';
 import { WorkspaceModel } from '../../../../workspace/infrastructure/typeorm/models/workspace.model';
 
 @Entity('custom_field_definitions')
+@Index('IDX_custom_field_definitions_workspace', ['workspaceId'])
 export class CustomFieldDefinitionModel {
   @PrimaryColumn()
   id!: string;
