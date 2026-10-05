@@ -22,9 +22,13 @@ export function findInstalledProduct(
   releases: ProductRelease[],
   backend: string,
   client: string | null,
+  latest: ProductRelease | null = null,
 ): string | null {
   if (!client) return null;
-  const matches = releases
+  // The manifest is served through a CDN that can lag a fresh release by minutes, while the latest
+  // release comes straight from the GitHub API; counting it too keeps the two from disagreeing
+  const candidates = latest ? [...releases, latest] : releases;
+  const matches = candidates
     .filter((r) => r.components.backend === backend && r.components.client === client)
     .map((r) => r.product);
   if (matches.length === 0) return null;
