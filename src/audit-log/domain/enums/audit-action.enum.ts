@@ -25,9 +25,15 @@ export enum AuditAction {
   WORKSPACE_DELETED = 'workspace-deleted',
   WORKSPACE_PALETTE_UPDATED = 'workspace-palette-updated',
   WORKSPACE_SLA_UPDATED = 'workspace-sla-updated',
+  /** No longer emitted: older entries were written after an import finished. See WORKSPACE_IMPORT_COMPLETED. */
   WORKSPACE_IMPORT_STARTED = 'workspace-import-started',
+  WORKSPACE_IMPORT_COMPLETED = 'workspace-import-completed',
+  WORKSPACE_IMPORT_FAILED = 'workspace-import-failed',
   WORKSPACE_MEMBERS_IMPORTED = 'workspace-members-imported',
+  WORKSPACE_EXPORTED = 'workspace-exported',
+  /** An export link was created; the file itself is built when the link is downloaded. */
   WORKSPACE_EXPORT_CREATED = 'workspace-export-created',
+  WORKSPACE_EXPORT_LINK_DOWNLOADED = 'workspace-export-link-downloaded',
   WORKSPACE_SYSTEM_MAILBOX_TOGGLED = 'workspace-system-mailbox-toggled',
   WORKSPACE_CUSTOM_DOMAIN_SET = 'workspace-custom-domain-set',
   WORKSPACE_CUSTOM_DOMAIN_VERIFIED = 'workspace-custom-domain-verified',

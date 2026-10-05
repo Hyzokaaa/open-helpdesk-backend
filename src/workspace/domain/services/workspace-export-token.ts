@@ -41,7 +41,7 @@ export function createExportToken(
   return { token, expiresAt: new Date(expiresAt) };
 }
 
-export function validateExportToken(token: string): ExportTokenEntry | null {
+export function validateExportToken(token: string): (ExportTokenEntry & { expiresAt: Date }) | null {
   const entry = tokens.get(token);
   if (!entry) return null;
   if (entry.expiresAt < Date.now()) {
@@ -50,5 +50,10 @@ export function validateExportToken(token: string): ExportTokenEntry | null {
   }
   // Single use — delete after validation
   tokens.delete(token);
-  return { workspaceId: entry.workspaceId, encryption: entry.encryption, includeCredentials: entry.includeCredentials };
+  return {
+    workspaceId: entry.workspaceId,
+    encryption: entry.encryption,
+    includeCredentials: entry.includeCredentials,
+    expiresAt: new Date(entry.expiresAt),
+  };
 }

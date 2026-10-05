@@ -1,7 +1,7 @@
 import { DataSource } from 'typeorm';
 import { Readable } from 'stream';
 import { ExportWorkspace } from '../../../../src/workspace/domain/services/workspace-export';
-import { buildImportPreview, ImportArchiveFiles, ImportWorkspace } from '../../../../src/workspace/domain/services/workspace-import';
+import { buildImportPreview, ImportArchiveFiles, ImportWorkspace, withCustomDomainConflict } from '../../../../src/workspace/domain/services/workspace-import';
 import { FakeS3Storage } from '../../../mocks/fake-s3-storage';
 import { applyTransforms, CURRENT_VERSION } from '../../../../src/workspace/domain/services/workspace-export-transforms';
 import { WorkspaceExportData } from '../../../../src/workspace/domain/workspace-export';
@@ -487,7 +487,10 @@ describe('export tokens', () => {
     const without = createExportToken('ws-1', key);
 
     expect(validateExportToken(withCredentials.token)?.includeCredentials).toBe(true);
-    expect(validateExportToken(without.token)?.includeCredentials).toBe(false);
+    const entry = validateExportToken(without.token);
+    expect(entry?.includeCredentials).toBe(false);
+    // The expiry the link was created with, for the audit entry of its download
+    expect(entry?.expiresAt.getTime()).toBe(without.expiresAt.getTime());
     // Single use
     expect(validateExportToken(withCredentials.token)).toBeNull();
   });
@@ -1444,7 +1447,7 @@ describe('buildImportPreview', () => {
     const preview = buildImportPreview(emptyExport({
       workspace: { name: 'Acme', description: '', slaPolicy: null, metadata: { palette: '' }, appName: null, appSubtitle: '' },
     }));
-    expect(preview.settings).toEqual({ palette: null, sla: false, description: null, branding: null, name: 'Acme', emailSender: null, customDomain: null });
+    expect(preview.settings).toEqual({ palette: null, sla: false, description: null, branding: null, name: 'Acme', emailSender: null, customDomain: null, customDomainConflict: false });
   });
 
   it('reports the settings the file carries', () => {
@@ -1457,7 +1460,7 @@ describe('buildImportPreview', () => {
     expect(preview.settings).toEqual({
       palette: 'ocean', sla: true, description: 'Support desk',
       branding: { appName: 'Acme Help', appSubtitle: null, logo: false, icon: false },
-      name: 'Acme', emailSender: null, customDomain: null,
+      name: 'Acme', emailSender: null, customDomain: null, customDomainConflict: false,
     });
   });
 
@@ -1481,6 +1484,24 @@ describe('buildImportPreview', () => {
 
     const withoutPassword = buildImportPreview(emptyExport({ emailSender: sender }));
     expect(withoutPassword.settings.emailSender).toEqual({ fromAddress: 'no-reply@acme.com', hasCredentials: false });
+  });
+
+  it('reports a custom domain another workspace here already uses, checked as the import checks it', async () => {
+    const preview = buildImportPreview(emptyExport({ customDomain: 'Help.Acme.com' }));
+    const taken = new FakeQueryRunner((sql) => (/FROM workspaces w WHERE lower\(w\."customDomain"\)/.test(sql) ? [{ id: 'ws-other', name: 'Other', isMember: false }] : []));
+
+    const conflicted = await withCustomDomainConflict(taken, preview, 'ws-target');
+    expect(conflicted.settings.customDomainConflict).toBe(true);
+    const [check] = taken.queries;
+    expect(check.params.slice(0, 2)).toEqual(['help.acme.com', 'ws-target']);
+
+    const free = await withCustomDomainConflict(new FakeQueryRunner(() => []), preview, 'ws-target');
+    expect(free.settings.customDomainConflict).toBe(false);
+
+    // No domain in the file: nothing to check
+    const none = new FakeQueryRunner(() => [{ id: 'x', name: 'X', isMember: false }]);
+    expect((await withCustomDomainConflict(none, buildImportPreview(emptyExport()), 'ws-target')).settings.customDomainConflict).toBe(false);
+    expect(none.queries).toHaveLength(0);
   });
 
   it('rejects a file the import would reject', () => {
@@ -1915,7 +1936,7 @@ function answerFrom(rows: TableRows): Answer {
     if (/FROM email_rules WHERE/.test(sql)) return rows.emailRules ?? [];
     if (/FROM webhooks WHERE/.test(sql)) return rows.webhooks ?? [];
     if (/SELECT "customDomain" FROM workspaces WHERE id/.test(sql)) return rows.ownDomain ?? [];
-    if (/FROM workspaces WHERE lower\("customDomain"\)/.test(sql)) return rows.domainTaken ?? [];
+    if (/FROM workspaces w WHERE lower\(w\."customDomain"\)/.test(sql)) return rows.domainTaken ?? [];
     return [];
   };
 }
@@ -2568,14 +2589,37 @@ describe('ImportWorkspace configuration', () => {
       expect(result.customDomainSkipped).toBeNull();
     });
 
-    it('skips and reports a custom domain another workspace already uses', async () => {
-      const { qr, result } = await run({ domainTaken: [{ '?column?': 1 }] }, emptyExport({ customDomain: 'help.acme.com' }), { overwrite: ['customDomain'] });
+    it('skips a custom domain another workspace already uses, saying what to do without naming a workspace the importer is not in', async () => {
+      const { qr, result } = await run(
+        { domainTaken: [{ id: 'ws-other', name: 'Other Co', isMember: false }] },
+        emptyExport({ customDomain: 'help.acme.com' }),
+        { overwrite: ['customDomain'], importer: { userId: 'u-importer', isSystemAdmin: false } },
+      );
 
-      const [check] = qr.find(/lower\("customDomain"\)/);
-      expect(check.params).toEqual(['help.acme.com', 'ws-target']);
+      const [check] = qr.find(/lower\(w\."customDomain"\)/);
+      expect(check.params).toEqual(['help.acme.com', 'ws-target', 'u-importer']);
       expect(qr.find(/UPDATE workspaces/)).toHaveLength(0);
-      expect(result.customDomainSkipped).toBe('"help.acme.com" is already used by another workspace');
+      expect(result.customDomainSkipped).toBe(
+        '"help.acme.com" is used by another workspace. Remove it there (Settings → Custom Domain) and import again with only "Set the custom domain" ticked.',
+      );
       expect(result.settingsApplied).toEqual([]);
+    });
+
+    it('names the workspace that holds the custom domain to a member of it or a system admin', async () => {
+      const expected = '"help.acme.com" is used by workspace "Other Co". Remove it there (Settings → Custom Domain) and import again with only "Set the custom domain" ticked.';
+      const member = await run(
+        { domainTaken: [{ id: 'ws-other', name: 'Other Co', isMember: true }] },
+        emptyExport({ customDomain: 'help.acme.com' }),
+        { overwrite: ['customDomain'], importer: { userId: 'u-importer', isSystemAdmin: false } },
+      );
+      expect(member.result.customDomainSkipped).toBe(expected);
+
+      const admin = await run(
+        { domainTaken: [{ id: 'ws-other', name: 'Other Co', isMember: false }] },
+        emptyExport({ customDomain: 'help.acme.com' }),
+        { overwrite: ['customDomain'], importer: { userId: 'u-admin', isSystemAdmin: true } },
+      );
+      expect(admin.result.customDomainSkipped).toBe(expected);
     });
 
     it('skips the platform host and keeps a domain the workspace already has, verified as it is', async () => {

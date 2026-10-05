@@ -107,6 +107,49 @@ export interface ImportOptions {
   completeExisting?: boolean;
   /** The platform's own hostname, which a workspace cannot take as its custom domain. */
   primaryHost?: string;
+  /**
+   * Who runs the import. A custom domain held by another workspace is reported by that
+   * workspace's name only when they are a member of it or a system admin.
+   */
+  importer?: { userId: string; isSystemAdmin: boolean };
+}
+
+/** Runs SQL: a DataSource or a QueryRunner. */
+export interface SqlRunner {
+  query(sql: string, params?: unknown[]): Promise<any>;
+}
+
+/** Another workspace of this installation that uses a custom domain. */
+export interface CustomDomainOwner {
+  id: string;
+  name: string;
+  /** Whether the user asked about is a member of it. */
+  isMember: boolean;
+}
+
+/** The workspace other than `exceptWorkspaceId` whose custom domain is `domain` (any case), or null. */
+export async function findCustomDomainOwner(
+  runner: SqlRunner,
+  domain: string,
+  exceptWorkspaceId: string,
+  userId: string | null = null,
+): Promise<CustomDomainOwner | null> {
+  const rows = await runner.query(
+    `SELECT w.id, w.name, EXISTS (SELECT 1 FROM workspace_members m WHERE m."workspaceId" = w.id AND m."userId" = $3) AS "isMember" `
+    + `FROM workspaces w WHERE lower(w."customDomain") = $1 AND w.id <> $2 LIMIT 1`,
+    [domain.toLowerCase().trim(), exceptWorkspaceId, userId],
+  );
+  const row = rows?.[0];
+  return row ? { id: String(row.id), name: String(row.name ?? ''), isMember: row.isMember === true } : null;
+}
+
+/**
+ * Why an import did not set a custom domain another workspace uses, and what to do about it. The
+ * other workspace is named only to someone who may know it: a member of it or a system admin.
+ */
+export function customDomainInUseMessage(domain: string, owner: CustomDomainOwner, canSeeOwner: boolean): string {
+  const holder = canSeeOwner && owner.name ? `workspace "${owner.name}"` : 'another workspace';
+  return `"${domain}" is used by ${holder}. Remove it there (Settings → Custom Domain) and import again with only "Set the custom domain" ticked.`;
 }
 
 /** Same types and sizes the branding and organization logo uploads accept. */
@@ -619,6 +662,11 @@ export interface ImportPreview {
     /** The sender's from address; hasCredentials says whether its password travels (needed to apply it). */
     emailSender: { fromAddress: string | null; hasCredentials: boolean } | null;
     customDomain: string | null;
+    /**
+     * Whether another workspace of this installation already uses the file's custom domain, in
+     * which case the import skips it. Always false from buildImportPreview: see withCustomDomainConflict.
+     */
+    customDomainConflict: boolean;
   };
   /** Whether the file carries passwords and secrets. */
   credentialsIncluded: boolean;
@@ -681,9 +729,21 @@ export function buildImportPreview(
         }
         : null,
       customDomain: text(data.customDomain),
+      customDomainConflict: false,
     },
     credentialsIncluded: data.credentialsIncluded === true,
   };
+}
+
+/** The preview with customDomainConflict filled in, checked as the import checks it. */
+export async function withCustomDomainConflict(
+  runner: SqlRunner,
+  preview: ImportPreview,
+  targetWorkspaceId: string,
+): Promise<ImportPreview> {
+  const domain = preview.settings.customDomain;
+  const conflict = present(domain) && (await findCustomDomainOwner(runner, String(domain), targetWorkspaceId)) !== null;
+  return { ...preview, settings: { ...preview.settings, customDomainConflict: conflict } };
 }
 
 export class ImportWorkspace {
@@ -796,10 +856,11 @@ export class ImportWorkspace {
               result.settingsApplied.push(key);
               continue;
             }
-            const taken = await qr.query(
-              `SELECT 1 FROM workspaces WHERE lower("customDomain") = $1 AND id <> $2 LIMIT 1`, [domain, targetWorkspaceId],
-            );
-            if (taken.length) { skip(`"${domain}" is already used by another workspace`); continue; }
+            const owner = await findCustomDomainOwner(qr, domain, targetWorkspaceId, options.importer?.userId ?? null);
+            if (owner) {
+              skip(customDomainInUseMessage(domain, owner, owner.isMember || options.importer?.isSystemAdmin === true));
+              continue;
+            }
             // Unverified, with a new token generated as SetCustomDomain does: the DNS proof is redone here
             set((v) => `"customDomain" = ${v}`, domain);
             sets.push('"customDomainVerified" = false');

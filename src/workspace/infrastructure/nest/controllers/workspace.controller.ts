@@ -91,7 +91,16 @@ import {
   ImportArchiveFiles,
   ImportPreview,
   ImportWorkspace,
+  withCustomDomainConflict,
 } from "../../../domain/services/workspace-import";
+import { CURRENT_VERSION } from "../../../domain/services/workspace-export-transforms";
+import {
+  ExportSummary,
+  exportSummaryOf,
+  importFailureReason,
+  importSourceOf,
+  WorkspaceTransferAudit,
+} from "../../../application/workspace-transfer-audit";
 import { WorkspaceExportData } from "../../../domain/workspace-export";
 import {
   createExportToken,
@@ -723,16 +732,29 @@ export class WorkspaceController {
       isSystemAdmin: user.isSystemAdmin,
     });
     assertExportPassword(body.password);
-    await this.streamExportFile(res, slug, workspaceId, await deriveExportKey(body.password), body.includeCredentials === true);
+    const { summary, completed } = await this.streamExportFile(res, slug, workspaceId, await deriveExportKey(body.password), body.includeCredentials === true);
+    await this.transferAudit().exported({ workspaceId, userId: user.userId, summary, completed });
+  }
+
+  private transferAudit(): WorkspaceTransferAudit {
+    return new WorkspaceTransferAudit(new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository));
   }
 
   /**
    * Streams the .ohd file (format 2, with attachments and logos) as a download named after the
    * workspace and the day. Errors before the first byte go through the usual exception filter;
    * after it, the response can only be cut short, which the client sees as a failed download.
+   * Returns what the file carried, and whether it was written to the end.
    */
-  private async streamExportFile(res: Response, slug: string, workspaceId: string, context: ExportKeyContext, includeCredentials: boolean) {
+  private async streamExportFile(
+    res: Response,
+    slug: string,
+    workspaceId: string,
+    context: ExportKeyContext,
+    includeCredentials: boolean,
+  ): Promise<{ summary: ExportSummary; completed: boolean }> {
     const bundle = await new ExportWorkspace(this.dataSource, this.storage).prepare(workspaceId, { includeCredentials });
+    const summary = exportSummaryOf(bundle, includeCredentials);
     const files = bundle.files.map((file) => ({
       path: file.path,
       size: file.size,
@@ -746,9 +768,11 @@ export class WorkspaceController {
     );
     try {
       await writeExportArchive(res, bundle.data, files, context);
+      return { summary, completed: true };
     } catch (error) {
       this.logger.error(`Export of workspace ${workspaceId} failed midway: ${(error as Error)?.message}`);
       res.destroy();
+      return { summary, completed: false };
     }
   }
 
@@ -774,9 +798,10 @@ export class WorkspaceController {
         isSystemAdmin: user.isSystemAdmin,
       });
       // The whole file is decoded (and so verified) to count its files; the temp copy is dropped
-      return await this.withImportSource(req, file, body, `${workspaceId}:${user.userId}`, async ({ data, decoded }) =>
+      const preview = await this.withImportSource(req, file, body, `${workspaceId}:${user.userId}`, async ({ data, decoded }) =>
         buildImportPreview(data, { files: decoded?.files.size ?? 0, bytes: decoded?.filesBytes ?? 0 }),
       );
+      return await withCustomDomainConflict(this.dataSource, preview, workspaceId);
     } finally {
       await this.discardUpload(file);
     }
@@ -822,6 +847,64 @@ export class WorkspaceController {
       isSystemAdmin: user.isSystemAdmin,
     });
 
+    // From here on every outcome is audited: completed, or failed with the reason the user is shown
+    const startedAt = Date.now();
+    const sourceInfo = importSourceOf(
+      file?.originalname,
+      body && typeof body === "object" && typeof body.url === "string" ? body.url.trim() : null,
+    );
+    let outcome: Awaited<ReturnType<WorkspaceController["executeImport"]>>;
+    try {
+      outcome = await this.executeImport(workspaceId, file, body, user, req, overwrite, completeExisting);
+    } catch (error) {
+      try {
+        await this.transferAudit().importFailed({
+          workspaceId,
+          userId: user.userId,
+          source: sourceInfo,
+          reason: importFailureReason(error),
+          durationMs: Date.now() - startedAt,
+        });
+      } catch (auditError) {
+        this.logger.error(`Could not audit a failed import of workspace ${workspaceId}: ${(auditError as Error)?.message}`);
+      }
+      throw error;
+    }
+    const durationMs = Date.now() - startedAt;
+    const { formatVersion, result, newMembers, overwriteKeys } = outcome;
+
+    // The import is committed: what follows cannot make it a failed one
+    const workspace = await this.workspaceRepository.findById(workspaceId);
+    await sendImportWelcomeEmails(
+      { tokenService: this.tokenService, emailService: this.emailService },
+      newMembers,
+      { name: workspace?.name ?? slug, frontendUrl: await this.frontendResolver.resolve(workspaceId) },
+    );
+
+    await this.transferAudit().importCompleted({
+      workspaceId,
+      userId: user.userId,
+      source: sourceInfo,
+      formatVersion,
+      completeExisting,
+      overwrite: overwriteKeys,
+      result,
+      durationMs,
+    });
+
+    return result;
+  }
+
+  /** Decodes the export and imports it in one transaction; nothing after the commit happens here. */
+  private async executeImport(
+    workspaceId: string,
+    file: Express.Multer.File | undefined,
+    body: any,
+    user: AuthUser,
+    req: Request,
+    overwrite: string | string[] | undefined,
+    completeExisting: boolean,
+  ) {
     const downloadKey = `${workspaceId}:${user.userId}`;
     const overwriteKeys = [overwrite ?? []].flat()
       .flatMap((value) => String(value).split(","))
@@ -836,7 +919,10 @@ export class WorkspaceController {
       this.logger.warn(`Could not delete storage object ${key} after a workspace import: ${(error as Error)?.message}`),
     );
     // Nothing is written until the whole file has been decoded and verified into the temp directory
-    const { source, result, newMembers } = await this.withImportSource(req, file, body, downloadKey, async ({ data, source, decoded }) => {
+    const { formatVersion, result, newMembers } = await this.withImportSource(req, file, body, downloadKey, async ({ data, decoded }) => {
+      // Read before the import upgrades the data to the current version
+      const rawVersion = data && typeof data === "object" ? (data as { version?: unknown }).version : undefined;
+      const formatVersion = typeof rawVersion === "string" ? rawVersion : null;
       const files: ImportArchiveFiles | undefined = decoded
         ? {
           size: (path) => decoded.files.get(path)?.size ?? null,
@@ -847,34 +933,19 @@ export class WorkspaceController {
           },
         }
         : undefined;
-      return { source, ...(await service.execute(workspaceId, data, { overwrite: overwriteKeys, files, completeExisting, primaryHost })) };
+      return {
+        formatVersion,
+        ...(await service.execute(workspaceId, data, {
+          overwrite: overwriteKeys,
+          files,
+          completeExisting,
+          primaryHost,
+          importer: { userId: user.userId, isSystemAdmin: user.isSystemAdmin === true },
+        })),
+      };
     });
     forgetExportDownload(downloadKey);
-
-    const workspace = await this.workspaceRepository.findById(workspaceId);
-    await sendImportWelcomeEmails(
-      { tokenService: this.tokenService, emailService: this.emailService },
-      newMembers,
-      { name: workspace?.name ?? slug, frontendUrl: await this.frontendResolver.resolve(workspaceId) },
-    );
-
-    const auditLog = new CreateAuditLogEntry(
-      this.idGenerator,
-      this.auditLogRepository,
-    );
-    await auditLog.execute({
-      action: AuditAction.WORKSPACE_IMPORT_STARTED,
-      entityType: "workspace",
-      entityId: workspaceId,
-      userId: user.userId,
-      workspaceId,
-      metadata: { source, completeExisting, imported: result },
-      category: AuditCategory.WORKSPACE,
-      level: AuditLevel.INFO,
-      source: "ui",
-    });
-
-    return result;
+    return { formatVersion, result, newMembers, overwriteKeys };
   }
 
   @Post(":slug/export/token")
@@ -903,20 +974,12 @@ export class WorkspaceController {
     );
     const baseUrl = process.env.API_URL || process.env.BACKEND_URL || "";
 
-    const auditLog = new CreateAuditLogEntry(
-      this.idGenerator,
-      this.auditLogRepository,
-    );
-    await auditLog.execute({
-      action: AuditAction.WORKSPACE_EXPORT_CREATED,
-      entityType: "workspace",
-      entityId: workspaceId,
-      userId: user.userId,
+    await this.transferAudit().exportLinkCreated({
       workspaceId,
-      metadata: { includeCredentials },
-      category: AuditCategory.WORKSPACE,
-      level: AuditLevel.INFO,
-      source: "ui",
+      userId: user.userId,
+      formatVersion: CURRENT_VERSION,
+      includeCredentials,
+      expiresAt,
     });
 
     return {
@@ -930,6 +993,7 @@ export class WorkspaceController {
   async exportByToken(
     @Param("slug") slug: string,
     @Param("token") token: string,
+    @Req() req: Request,
     @Res() res: Response,
   ) {
     const entry = validateExportToken(token);
@@ -942,7 +1006,14 @@ export class WorkspaceController {
       res.status(404).json({ message: "Workspace not found" });
       return;
     }
-    await this.streamExportFile(res, slug, entry.workspaceId, entry.encryption, entry.includeCredentials);
+    const { summary, completed } = await this.streamExportFile(res, slug, entry.workspaceId, entry.encryption, entry.includeCredentials);
+    await this.transferAudit().exportLinkDownloaded({
+      workspaceId: entry.workspaceId,
+      summary,
+      completed,
+      expiresAt: entry.expiresAt,
+      ip: req.ip ?? null,
+    });
   }
 
   @Get(":slug/email-sender")
