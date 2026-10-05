@@ -61,6 +61,7 @@ import { WorkspaceRole } from '../../../../workspace/domain/enums/workspace-role
 import { JwtTokenService } from '../../../../shared/infrastructure/jwt-token-service';
 import { BcryptPasswordHasher } from '../../../../shared/infrastructure/bcrypt-password-hasher';
 import { EnsureTicketReferences } from '../../../../ticket/domain/services/ticket-ensure-references';
+import { ResolveTicketReferenceLabels } from '../../../../ticket/domain/services/ticket-resolve-reference-labels';
 import { EnsureTicketAssignee } from '../../../../ticket/domain/services/ticket-ensure-assignee';
 import { TypeOrmTicketCategoryRepository } from '../../../../project/infrastructure/typeorm/repositories/typeorm-ticket-category.repository';
 import { TypeOrmTagRepository } from '../../../../tag/infrastructure/typeorm/repositories/typeorm-tag.repository';
@@ -232,7 +233,7 @@ export class ApiController {
       const updateService = new UpdateTicket(this.ticketRepository);
       const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
       const validateCustomFields = new ValidateCustomFieldValues(this.customFieldDefinitionRepository);
-      const updateCommand = new UpdateTicketCommand(updateService, this.ticketRepository, ensurePermission, auditLog, validateCustomFields, this.createEnsureReferences());
+      const updateCommand = new UpdateTicketCommand(updateService, this.ticketRepository, ensurePermission, auditLog, validateCustomFields, this.createEnsureReferences(), this.createResolveLabels());
       return updateCommand.execute({
         ticketId: id,
         workspaceId: workspace.getId(),
@@ -384,6 +385,10 @@ export class ApiController {
   /** Category and tag ids sent by an integration must belong to the key's own workspace. */
   private createEnsureReferences(): EnsureTicketReferences {
     return new EnsureTicketReferences(this.ticketCategoryRepository, undefined, undefined, undefined, this.tagRepository);
+  }
+
+  private createResolveLabels(): ResolveTicketReferenceLabels {
+    return new ResolveTicketReferenceLabels(this.ticketCategoryRepository, undefined, undefined, undefined, this.tagRepository);
   }
 
   private requireScope(user: AuthUser, scope: ApiKeyScope): void {

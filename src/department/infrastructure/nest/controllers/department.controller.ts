@@ -198,7 +198,7 @@ export class DepartmentController {
       entityId: id,
       userId: user.userId,
       workspaceId,
-      metadata: { memberUserId: body.userId },
+      metadata: { memberUserId: body.userId, ...(await this.memberAuditLabels(id, body.userId, workspaceId)) },
       category: AuditCategory.CONFIG,
       level: AuditLevel.INFO,
       source: 'ui',
@@ -233,13 +233,25 @@ export class DepartmentController {
       entityId: id,
       userId: user.userId,
       workspaceId,
-      metadata: { memberUserId: userId },
+      metadata: { memberUserId: userId, ...(await this.memberAuditLabels(id, userId, workspaceId)) },
       category: AuditCategory.CONFIG,
       level: AuditLevel.INFO,
       source: 'ui',
     });
 
     return { removed: true };
+  }
+
+  /** The department and member by name, so a member change reads in the audit log without lookups. */
+  private async memberAuditLabels(departmentId: string, userId: string, workspaceId: string) {
+    const [department, member] = await Promise.all([
+      this.departmentRepository.findById(departmentId),
+      this.userRepository.findById(userId),
+    ]);
+    return {
+      name: department && department.workspaceId === workspaceId ? department.name : undefined,
+      target: member ? `${member.firstName} ${member.lastName} (${member.email})` : undefined,
+    };
   }
 
   private async resolveWorkspaceId(slug: string): Promise<string> {

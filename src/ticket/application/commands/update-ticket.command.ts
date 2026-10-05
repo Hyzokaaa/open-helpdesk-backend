@@ -12,6 +12,16 @@ import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
 import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 import { ValidateCustomFieldValues } from '../../../custom-field/domain/services/custom-field-validate-values';
+import { ResolveTicketReferenceLabels, TicketReferenceValues } from '../../domain/services/ticket-resolve-reference-labels';
+
+const REFERENCE_FIELDS = ['categoryId', 'departmentId', 'organizationId', 'projectId'] as const;
+
+function sameIds(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const set = new Set(a);
+  return b.every((id) => set.has(id));
+}
+
 interface Props {
   ticketId: string;
   workspaceId: string;
@@ -43,6 +53,7 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
     private readonly createAuditLog: CreateAuditLogEntry,
     private readonly validateCustomFields: ValidateCustomFieldValues,
     private readonly ensureReferences?: EnsureTicketReferences,
+    private readonly resolveLabels?: ResolveTicketReferenceLabels,
   ) {}
 
   async execute(props: Props): Promise<UpdateTicketResponse> {
@@ -71,7 +82,8 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
     const canEditTags = hasPermission(ctx.role, PERMISSIONS.TICKET_EDIT_TAGS);
     const canEditCustomFields = hasPermission(ctx.role, PERMISSIONS.TICKET_EDIT_DESCRIPTION);
 
-    const before = { name: ticket.name, priority: ticket.priority, categoryId: ticket.categoryId, departmentId: ticket.departmentId, organizationId: ticket.organizationId, projectId: ticket.projectId };
+    const before: Record<string, unknown> = { name: ticket.name, priority: ticket.priority, categoryId: ticket.categoryId, departmentId: ticket.departmentId, organizationId: ticket.organizationId, projectId: ticket.projectId };
+    const tagIdsBefore = [...ticket.tagIds];
 
     let validatedCustomFields: Record<string, unknown> | undefined;
     if (props.customFields && canEditCustomFields) {
@@ -110,7 +122,35 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
       editedById: props.userId,
     });
 
-    const after = { name: updated.name, priority: updated.priority, categoryId: updated.categoryId, departmentId: updated.departmentId, organizationId: updated.organizationId, projectId: updated.projectId };
+    const after: Record<string, unknown> = { name: updated.name, priority: updated.priority, categoryId: updated.categoryId, departmentId: updated.departmentId, organizationId: updated.organizationId, projectId: updated.projectId };
+
+    // Changed references, by id, plus the tag set when it changed
+    const changedBefore: TicketReferenceValues = {};
+    const changedAfter: TicketReferenceValues = {};
+    for (const field of REFERENCE_FIELDS) {
+      if ((before[field] ?? null) !== (after[field] ?? null)) {
+        changedBefore[field] = before[field] as string | null;
+        changedAfter[field] = after[field] as string | null;
+      }
+    }
+    if (!sameIds(tagIdsBefore, updated.tagIds)) {
+      before.tagIds = tagIdsBefore;
+      after.tagIds = [...updated.tagIds];
+      changedBefore.tagIds = tagIdsBefore;
+      changedAfter.tagIds = updated.tagIds;
+    }
+
+    // Names captured now, so the entry stays readable after a rename or delete
+    const labels: Record<string, unknown> = {};
+    if (this.resolveLabels && Object.keys(changedAfter).length > 0) {
+      const [beforeLabels, afterLabels] = await Promise.all([
+        this.resolveLabels.execute({ workspaceId: props.workspaceId, values: changedBefore }),
+        this.resolveLabels.execute({ workspaceId: props.workspaceId, values: changedAfter }),
+      ]);
+      labels.beforeLabels = beforeLabels;
+      labels.afterLabels = afterLabels;
+    }
+
     await this.createAuditLog.execute({
       action: AuditAction.TICKET_UPDATED,
       category: AuditCategory.TICKET,
@@ -120,7 +160,7 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
       entityId: updated.getId(),
       userId: props.userId,
       workspaceId: props.workspaceId,
-      metadata: { ticketName: updated.name, before, after },
+      metadata: { ticketName: updated.name, before, after, ...labels },
     });
 
     return {

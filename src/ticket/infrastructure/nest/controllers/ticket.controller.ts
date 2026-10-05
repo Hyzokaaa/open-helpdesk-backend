@@ -65,6 +65,7 @@ import { AddTicketParticipant } from '../../../domain/services/ticket-add-partic
 import { EnsureTicketAccess } from '../../../domain/services/ticket-ensure-access';
 import { EnsureTicketAssignee } from '../../../domain/services/ticket-ensure-assignee';
 import { EnsureTicketReferences } from '../../../domain/services/ticket-ensure-references';
+import { ResolveTicketReferenceLabels } from '../../../domain/services/ticket-resolve-reference-labels';
 import { TypeOrmTicketParticipantRepository } from '../../typeorm/repositories/typeorm-ticket-participant.repository';
 import { ParticipantRole } from '../../../domain/enums/participant-role.enum';
 import { BulkDeleteCommand } from '../../../application/commands/bulk-delete.command';
@@ -294,7 +295,7 @@ export class TicketController {
     const service = new UpdateTicket(this.ticketRepository, editDescription);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     const validateCustomFields = new ValidateCustomFieldValues(this.customFieldDefinitionRepository);
-    const command = new UpdateTicketCommand(service, this.ticketRepository, ensurePermission, auditLog, validateCustomFields, this.createEnsureReferences());
+    const command = new UpdateTicketCommand(service, this.ticketRepository, ensurePermission, auditLog, validateCustomFields, this.createEnsureReferences(), this.createResolveLabels());
     return command.execute({
       ticketId: id,
       workspaceId: workspace.getId(),
@@ -546,7 +547,7 @@ export class TicketController {
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new AddTicketParticipant(this.idGenerator, this.participantRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-    const command = new AddTicketParticipantCommand(service, this.createEnsureTicketAccess(), ensurePermission, this.memberRepository, auditLog);
+    const command = new AddTicketParticipantCommand(service, this.createEnsureTicketAccess(), ensurePermission, this.memberRepository, auditLog, this.userRepository);
     return command.execute({
       ticketId: id,
       workspaceId: workspace.getId(),
@@ -567,7 +568,7 @@ export class TicketController {
     const workspace = await this.resolveWorkspace(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-    const command = new RemoveTicketParticipantCommand(this.participantRepository, this.createEnsureTicketAccess(), ensurePermission, auditLog);
+    const command = new RemoveTicketParticipantCommand(this.participantRepository, this.createEnsureTicketAccess(), ensurePermission, auditLog, this.userRepository);
     return command.execute({
       ticketId: id,
       workspaceId: workspace.getId(),
@@ -617,6 +618,16 @@ export class TicketController {
 
   private createEnsureReferences() {
     return new EnsureTicketReferences(
+      this.ticketCategoryRepository,
+      this.departmentRepository,
+      this.projectRepository,
+      this.organizationRepository,
+      this.tagRepository,
+    );
+  }
+
+  private createResolveLabels() {
+    return new ResolveTicketReferenceLabels(
       this.ticketCategoryRepository,
       this.departmentRepository,
       this.projectRepository,

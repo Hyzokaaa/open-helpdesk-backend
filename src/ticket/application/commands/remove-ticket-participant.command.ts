@@ -7,6 +7,7 @@ import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-lo
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
 import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
+import { UserRepository } from '../../../user/domain/repositories/user.repository';
 
 interface Props {
   ticketId: string;
@@ -29,6 +30,7 @@ export class RemoveTicketParticipantCommand implements Command<Props, RemoveTick
     private readonly ensureTicketAccess: EnsureTicketAccess,
     private readonly ensurePermission: EnsureWorkspacePermission,
     private readonly createAuditLog: CreateAuditLogEntry,
+    private readonly userRepository?: UserRepository,
   ) {}
 
   async execute(props: Props): Promise<RemoveTicketParticipantResponse> {
@@ -57,9 +59,15 @@ export class RemoveTicketParticipantCommand implements Command<Props, RemoveTick
       entityId: props.ticketId,
       userId: props.userId,
       workspaceId: props.workspaceId,
-      metadata: { participantUserId: props.targetUserId },
+      metadata: { participantUserId: props.targetUserId, target: await this.targetLabel(props.targetUserId) },
     });
 
     return { removed: true };
+  }
+
+  /** Who was added or removed, by name and email, so the audit entry reads without a lookup. */
+  private async targetLabel(userId: string): Promise<string | undefined> {
+    const user = this.userRepository ? await this.userRepository.findById(userId) : null;
+    return user ? `${user.firstName} ${user.lastName} (${user.email})` : undefined;
   }
 }

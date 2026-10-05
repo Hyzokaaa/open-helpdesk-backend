@@ -10,6 +10,7 @@ import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-lo
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
 import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
+import { UserRepository } from '../../../user/domain/repositories/user.repository';
 
 interface Props {
   ticketId: string;
@@ -38,6 +39,7 @@ export class AddTicketParticipantCommand implements Command<Props, AddTicketPart
     private readonly ensurePermission: EnsureWorkspacePermission,
     private readonly memberRepository: WorkspaceMemberRepository,
     private readonly createAuditLog: CreateAuditLogEntry,
+    private readonly userRepository?: UserRepository,
   ) {}
 
   async execute(props: Props): Promise<AddTicketParticipantResponse> {
@@ -74,9 +76,15 @@ export class AddTicketParticipantCommand implements Command<Props, AddTicketPart
       entityId: props.ticketId,
       userId: props.userId,
       workspaceId: props.workspaceId,
-      metadata: { participantUserId: props.targetUserId, role: props.role },
+      metadata: { participantUserId: props.targetUserId, target: await this.targetLabel(props.targetUserId), role: props.role },
     });
 
     return { added: true };
+  }
+
+  /** Who was added or removed, by name and email, so the audit entry reads without a lookup. */
+  private async targetLabel(userId: string): Promise<string | undefined> {
+    const user = this.userRepository ? await this.userRepository.findById(userId) : null;
+    return user ? `${user.firstName} ${user.lastName} (${user.email})` : undefined;
   }
 }
