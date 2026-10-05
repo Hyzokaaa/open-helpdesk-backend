@@ -61,8 +61,12 @@ async function bootstrap() {
     exposedHeaders: ["X-Unread-Count", "Date", "Content-Disposition"],
   });
 
-  // Public API reference: Scalar page at /api/v1/docs, JSON at /api/v1/openapi.json, /docs redirects
-  setupApiDocs(app, { version: resolveBackendVersion(), serverUrl: process.env.API_URL });
+  // Public API document at /api/v1/openapi.json; /docs and /api/v1/docs redirect to the web app's /docs page
+  setupApiDocs(app, {
+    version: resolveBackendVersion(),
+    serverUrl: process.env.API_URL,
+    frontendUrl: process.env.FRONTEND_URL,
+  });
 
   await app.listen(process.env.PORT ?? 3000);
 }

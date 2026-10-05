@@ -1,6 +1,7 @@
 import { applyDecorators } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
+  ApiExtension,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOperation,
@@ -9,6 +10,7 @@ import {
 } from '@nestjs/swagger';
 import { ApiKeyScope } from '../../../../api-key/domain/enums/api-key-scope.enum';
 import { ApiErrorBody } from '../dto/api-responses';
+import { REQUIRED_SCOPE_EXTENSION } from './api-docs.constants';
 
 interface ScopedOperation {
   scope: ApiKeyScope;
@@ -33,6 +35,8 @@ export function ApiScopedOperation(op: ScopedOperation) {
   const description = [scopeRequirement(op.scope), op.description].filter(Boolean).join('\n\n');
   const decorators = [
     ApiOperation({ summary: op.summary, description }),
+    // Machine-readable copy of the scope sentence, for the docs page
+    ApiExtension(REQUIRED_SCOPE_EXTENSION, op.scope),
     ApiUnauthorizedResponse({ description: 'Missing `Authorization` header, expired key, or deactivated key creator.', type: ApiErrorBody }),
     ApiForbiddenResponse({
       description: `Unknown or revoked key, missing scope \`${op.scope}\`, or the key creator's workspace role does not allow it.`,

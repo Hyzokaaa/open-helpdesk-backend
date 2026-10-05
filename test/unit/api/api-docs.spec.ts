@@ -3,20 +3,20 @@ import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { OpenAPIObject } from '@nestjs/swagger';
 import { ApiController } from '../../../src/api/infrastructure/nest/controllers/api.controller';
-import { buildApiDocumentConfig, createApiDocument } from '../../../src/api/infrastructure/nest/openapi/api-docs';
 import {
-  buildApiReferenceConfiguration,
-  buildApiReferenceCsp,
-  renderApiReferencePage,
-} from '../../../src/api/infrastructure/nest/openapi/api-docs.page';
+  buildApiDocumentConfig,
+  createApiDocument,
+  docsPageUrl,
+  setupApiDocs,
+} from '../../../src/api/infrastructure/nest/openapi/api-docs';
 import {
-  API_DOCS_PATH,
-  API_DOCS_SCRIPT_PATH,
-  API_DOCS_SHORTCUTS,
+  API_DOCS_REDIRECTS,
   API_KEY_SECURITY_SCHEME,
   API_OPENAPI_JSON_PATH,
+  REQUIRED_SCOPE_EXTENSION,
+  SCOPES_EXTENSION,
 } from '../../../src/api/infrastructure/nest/openapi/api-docs.constants';
-import { ALL_API_KEY_SCOPES } from '../../../src/api-key/domain/enums/api-key-scope.enum';
+import { ALL_API_KEY_SCOPES, DEFAULT_API_KEY_SCOPES } from '../../../src/api-key/domain/enums/api-key-scope.enum';
 
 /** Holds the public controller alone; its repositories are stubbed, the document never calls them. */
 @Module({ controllers: [ApiController] })
@@ -46,11 +46,9 @@ describe('public API OpenAPI document', () => {
     await app.close();
   });
 
-  it('serves the docs under /api/v1, with /docs as a shortcut', () => {
-    expect(API_DOCS_PATH).toBe('api/v1/docs');
+  it('serves the document under /api/v1 and redirects the old docs links', () => {
     expect(API_OPENAPI_JSON_PATH).toBe('api/v1/openapi.json');
-    expect(API_DOCS_SHORTCUTS).toEqual(['/docs', '/docs/']);
-    expect(API_DOCS_SCRIPT_PATH).toBe('api/v1/docs/assets/scalar.js');
+    expect(API_DOCS_REDIRECTS).toEqual(['/docs', '/docs/', '/api/v1/docs', '/api/v1/docs/']);
   });
 
   it('documents only /api/v1 paths, all nine operations of the public controller', () => {
@@ -75,6 +73,7 @@ describe('public API OpenAPI document', () => {
       expect({ label, security: op.security }).toEqual({ label, security: [{ [API_KEY_SECURITY_SCHEME]: [] }] });
       const scope = /Requires scope `([^`]+)`/.exec(op.description ?? '')?.[1];
       expect({ label, known: ALL_API_KEY_SCOPES.includes(scope as any) }).toEqual({ label, known: true });
+      expect({ label, extension: op[REQUIRED_SCOPE_EXTENSION] }).toEqual({ label, extension: scope });
       expect({ label, statuses: ['401', '403', '429'].every((s) => op.responses[s]) }).toEqual({ label, statuses: true });
     }
   });
@@ -90,55 +89,72 @@ describe('public API OpenAPI document', () => {
     expect(config.servers).toEqual([{ url: 'https://api.example.com' }]);
   });
 
-  it('states only the current version, without promising a future one', () => {
-    expect(document.info.description).toContain('served under `/api/v1`');
-    expect(document.info.description).not.toMatch(/\/api\/v2|new version|breaking change/i);
+  it('keeps the guides out of the document and points to the docs page instead', () => {
+    expect(document.info.description).toContain('http://localhost:5173/docs');
+    expect(document.info.description).not.toMatch(/##|\/api\/v2|new version|breaking change/i);
+    const config = buildApiDocumentConfig({ version: '1.0.0', frontendUrl: 'https://help.example.com/' });
+    expect(config.info.description).toContain('https://help.example.com/docs');
   });
 
-  it('covers every scope in the guide', () => {
-    for (const scope of ALL_API_KEY_SCOPES) expect(document.info.description).toContain(`| \`${scope}\` |`);
+  it('lists every scope on the security scheme, marking the default ones', () => {
+    const scopes = (document.components?.securitySchemes?.[API_KEY_SECURITY_SCHEME] as any)[SCOPES_EXTENSION];
+    expect(scopes.map((s: any) => s.scope)).toEqual(ALL_API_KEY_SCOPES);
+    for (const s of scopes) {
+      expect(s.description).toEqual(expect.any(String));
+      expect(s.default).toBe(DEFAULT_API_KEY_SCOPES.includes(s.scope));
+    }
   });
 });
 
-describe('public API reference page', () => {
-  const html = renderApiReferencePage({ documentUrl: 'openapi.json', scriptUrl: 'docs/assets/scalar.js?v=1.0.0' });
+describe('public API docs routes', () => {
+  type Handler = (req: unknown, res: any) => void;
 
-  it('loads the self-hosted Scalar bundle and the local document, with no inline script', () => {
-    expect(html).toContain('<title>Open Helpdesk API</title>');
-    expect(html).toContain('<script src="docs/assets/scalar.js?v=1.0.0"></script>');
-    expect(html).toContain('data-url="openapi.json"');
-    // The configuration element is data, not an executable script
-    expect(html).toMatch(/<script id="api-reference" type="application\/json"[^>]*><\/script>/);
-  });
+  function fakeApp() {
+    const routes = new Map<string, Handler>();
+    const redirects: Array<{ status: number; url: string }> = [];
+    const http = {
+      get: (path: string, handler: Handler) => routes.set(path, handler),
+      redirect: (_res: unknown, status: number, url: string) => redirects.push({ status, url }),
+    };
+    return { routes, redirects, app: { getHttpAdapter: () => http } };
+  }
 
-  it('references no external script, stylesheet or font', () => {
-    expect(html).not.toMatch(/(src|href)="(https?:)?\/\//i);
-    expect(html).not.toMatch(/cdn|jsdelivr|unpkg/i);
-    expect(html).not.toMatch(/<link/i);
-  });
-
-  it('turns off Scalar features that call third-party services and keeps the API key in the browser', () => {
-    expect(buildApiReferenceConfiguration()).toMatchObject({
-      telemetry: false,
-      withDefaultFonts: false,
-      showDeveloperTools: 'never',
-      agent: { disabled: true },
-      mcp: { disabled: true },
-      persistAuth: true,
-      authentication: { preferredSecurityScheme: API_KEY_SECURITY_SCHEME },
-      defaultHttpClient: { targetKey: 'shell', clientKey: 'curl' },
+  function fakeResponse() {
+    const res = { headers: {} as Record<string, string>, body: undefined as unknown };
+    return Object.assign(res, {
+      set(name: string, value: string) { res.headers[name] = value; return this; },
+      json(body: unknown) { res.body = body; return this; },
     });
-    const hidden = buildApiReferenceConfiguration().hiddenClients as Record<string, boolean>;
-    for (const shown of ['shell', 'js', 'node', 'python', 'php']) expect(hidden[shown]).toBeUndefined();
+  }
+
+  let createDocument: jest.SpyInstance;
+
+  beforeEach(() => {
+    // Only the routes are under test here; the document itself is covered above
+    createDocument = jest.spyOn(require('@nestjs/swagger').SwaggerModule, 'createDocument').mockReturnValue({ openapi: '3.0.0' });
   });
 
-  it('allows only same-origin scripts and requests, plus the API origin when given', () => {
-    const csp = buildApiReferenceCsp();
-    expect(csp).toContain("default-src 'none'");
-    expect(csp).toContain("script-src 'self'");
-    expect(csp).not.toMatch(/script-src[^;]*(unsafe-inline|unsafe-eval|https?:)/);
-    expect(csp).toContain("connect-src 'self'");
-    expect(csp).toContain("frame-ancestors 'none'");
-    expect(buildApiReferenceCsp('https://api.example.com')).toContain("connect-src 'self' https://api.example.com");
+  afterEach(() => createDocument.mockRestore());
+
+  it('serves the JSON document readable from any origin', () => {
+    const { routes, app } = fakeApp();
+    setupApiDocs(app as any, { version: '1.0.0' });
+    const res = fakeResponse();
+    routes.get(`/${API_OPENAPI_JSON_PATH}`)!({}, res);
+    expect(res.headers['Access-Control-Allow-Origin']).toBe('*');
+    expect(res.body).toEqual({ openapi: '3.0.0' });
+  });
+
+  it('redirects /docs and /api/v1/docs to the docs page of the web app', () => {
+    const { routes, redirects, app } = fakeApp();
+    setupApiDocs(app as any, { version: '1.0.0', frontendUrl: 'https://help.example.com//' });
+    for (const path of ['/docs', '/docs/', '/api/v1/docs', '/api/v1/docs/']) routes.get(path)!({}, {});
+    expect(redirects).toEqual(Array(4).fill({ status: 302, url: 'https://help.example.com/docs' }));
+    expect(routes.has('/api/v1/docs/assets/scalar.js')).toBe(false);
+  });
+
+  it('falls back to the default frontend URL', () => {
+    expect(docsPageUrl()).toBe('http://localhost:5173/docs');
+    expect(docsPageUrl(' https://a.example.com/ ')).toBe('https://a.example.com/docs');
   });
 });

@@ -1,29 +1,53 @@
 import { INestApplication, Type } from '@nestjs/common';
 import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
-import { readFileSync } from 'fs';
-import { dirname, join } from 'path';
 import { ApiModule } from '../../../api.module';
-import { buildApiGuide } from './api-docs.guide';
 import {
-  API_DOCS_PATH,
-  API_DOCS_SCRIPT_PATH,
-  API_DOCS_SHORTCUTS,
+  ALL_API_KEY_SCOPES,
+  ApiKeyScope,
+  DEFAULT_API_KEY_SCOPES,
+} from '../../../../api-key/domain/enums/api-key-scope.enum';
+import {
+  API_DOCS_REDIRECTS,
   API_KEY_SECURITY_SCHEME,
   API_OPENAPI_JSON_PATH,
+  SCOPES_EXTENSION,
 } from './api-docs.constants';
-import { buildApiReferenceCsp, renderApiReferencePage } from './api-docs.page';
+import { DocumentedScope, SCOPE_DESCRIPTIONS } from './api-docs.scopes';
 
 export interface ApiDocsOptions {
   version: string;
   /** Public base URL of this backend (API_URL). Without it the document uses relative URLs. */
   serverUrl?: string;
+  /** Base URL of the web app (FRONTEND_URL), whose /docs page holds the guides and the reference. */
+  frontendUrl?: string;
+}
+
+const DEFAULT_FRONTEND_URL = 'http://localhost:5173';
+
+function withoutTrailingSlash(url?: string): string {
+  return url?.trim().replace(/\/+$/, '') ?? '';
+}
+
+/** The /docs page of the web app, where the old docs links redirect. */
+export function docsPageUrl(frontendUrl?: string): string {
+  return `${withoutTrailingSlash(frontendUrl) || DEFAULT_FRONTEND_URL}/docs`;
+}
+
+function documentedScopes(): DocumentedScope[] {
+  return ALL_API_KEY_SCOPES.map((scope) => ({
+    scope,
+    description: SCOPE_DESCRIPTIONS[scope],
+    default: (DEFAULT_API_KEY_SCOPES as ApiKeyScope[]).includes(scope),
+  }));
 }
 
 export function buildApiDocumentConfig(options: ApiDocsOptions): Omit<OpenAPIObject, 'paths'> {
   const builder = new DocumentBuilder()
     .setTitle('Open Helpdesk API')
-    .setDescription(buildApiGuide())
+    .setDescription(
+      `The public REST API of Open Helpdesk. Guides (authentication, scopes, errors, webhooks) and this reference: ${docsPageUrl(options.frontendUrl)}`,
+    )
     .setVersion(options.version)
     .addBearerAuth(
       { type: 'http', scheme: 'bearer', bearerFormat: 'ohd_...', description: 'API key (ohd_...)' },
@@ -34,14 +58,14 @@ export function buildApiDocumentConfig(options: ApiDocsOptions): Omit<OpenAPIObj
     .addTag('Members', 'The members of the key\'s workspace.')
     .addTag('Authentication', 'Delegated sign-in for your own users.');
 
-  const serverUrl = normalizeServerUrl(options.serverUrl);
+  const serverUrl = withoutTrailingSlash(options.serverUrl);
   if (serverUrl) builder.addServer(serverUrl);
 
-  return builder.build();
-}
-
-function normalizeServerUrl(url?: string): string {
-  return url?.trim().replace(/\/+$/, '') ?? '';
+  const config = builder.build();
+  // Every scope, including those no operation requires (auth:exchange:admin), for the scopes table
+  const scheme = config.components?.securitySchemes?.[API_KEY_SECURITY_SCHEME] as Record<string, unknown> | undefined;
+  if (scheme) scheme[SCOPES_EXTENSION] = documentedScopes();
+  return config;
 }
 
 /**
@@ -56,77 +80,22 @@ export function createApiDocument(
   return SwaggerModule.createDocument(app, buildApiDocumentConfig(options), { include: modules });
 }
 
-interface ScalarBundle {
-  file: string;
-  version: string;
-}
-
-/** The Scalar standalone browser bundle shipped in node_modules, served from this backend (no CDN). */
-function resolveScalarBundle(): ScalarBundle {
-  const dist = dirname(require.resolve('@scalar/api-reference'));
-  const pkg = JSON.parse(readFileSync(join(dist, '..', 'package.json'), 'utf8')) as { version: string };
-  return { file: join(dist, 'browser', 'standalone.js'), version: pkg.version };
-}
-
-function originOf(url: string): string | undefined {
-  try {
-    return url ? new URL(url).origin : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/** Last segment of a path, so page URLs stay relative and work behind a proxy prefix. */
-function lastSegment(path: string): string {
-  return path.slice(path.lastIndexOf('/') + 1);
-}
-
 /**
- * Serves the API reference page (Scalar), its script, the JSON document and the /docs
- * shortcut. These are plain Express routes registered outside Nest's router, so the global
- * guards (throttling, JWT, API key) do not run for them and they stay public.
+ * Serves the JSON document and redirects the docs links to the web app. These are plain
+ * Express routes registered outside Nest's router, so the global guards (throttling, JWT,
+ * API key) do not run for them and they stay public.
  */
 export function setupApiDocs(app: INestApplication, options: ApiDocsOptions): void {
   const document = createApiDocument(app, options);
-  const bundle = resolveScalarBundle();
-  const serverUrl = normalizeServerUrl(options.serverUrl);
-  const csp = buildApiReferenceCsp(originOf(serverUrl));
-
-  // Relative to /api/v1/docs, so they resolve the same with or without a proxy path prefix
-  const page = renderApiReferencePage({
-    documentUrl: lastSegment(API_OPENAPI_JSON_PATH),
-    scriptUrl: `${API_DOCS_SCRIPT_PATH.slice(API_DOCS_PATH.lastIndexOf('/') + 1)}?v=${encodeURIComponent(bundle.version)}`,
-  });
-
   const http = app.getHttpAdapter();
 
-  http.get(`/${API_DOCS_PATH}`, (req: Request, res: Response) => {
-    // A trailing slash would shift the relative URLs of the page
-    if (req.path.endsWith('/')) return res.redirect(301, `../${lastSegment(API_DOCS_PATH)}`);
-    res
-      .set({
-        'Content-Type': 'text/html; charset=utf-8',
-        'Content-Security-Policy': csp,
-        'X-Content-Type-Options': 'nosniff',
-        'Referrer-Policy': 'no-referrer',
-        'Cache-Control': 'no-cache',
-      })
-      .send(page);
-  });
-
-  http.get(`/${API_DOCS_SCRIPT_PATH}`, (_req: Request, res: Response) => {
-    res.set('X-Content-Type-Options', 'nosniff');
-    // The page requests it with ?v=<scalar version>, so an upgrade changes the URL
-    res.sendFile(bundle.file, { maxAge: '365d', immutable: true });
-  });
-
   http.get(`/${API_OPENAPI_JSON_PATH}`, (_req: Request, res: Response) => {
-    res.json(document);
+    // The document is public: any origin may read it, without credentials
+    res.set('Access-Control-Allow-Origin', '*').json(document);
   });
 
-  // With API_URL set the API may sit under a path behind a proxy, so the redirect follows it
-  const target = `${serverUrl}/${API_DOCS_PATH}`;
-  for (const path of API_DOCS_SHORTCUTS) {
+  const target = docsPageUrl(options.frontendUrl);
+  for (const path of API_DOCS_REDIRECTS) {
     http.get(path, (_req: unknown, res: unknown) => http.redirect(res, 302, target));
   }
 }
