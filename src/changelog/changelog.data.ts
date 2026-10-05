@@ -16,6 +16,34 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.25.1',
+    date: '2026-10-05',
+    categories: [
+      {
+        title: { en: 'API Documentation', es: 'Documentación de la API' },
+        features: [
+          { en: 'New API documentation at /docs on every installation, linked from Settings → API Keys', es: 'Nueva documentación de la API en /docs de cada instalación, enlazada desde Ajustes → API Keys' },
+          { en: 'Guides for getting started, authentication, scopes, rate limits, errors, delegated sign-in and webhooks, in English and Spanish', es: 'Guías de primeros pasos, autenticación, permisos, límites, errores, acceso delegado y webhooks, en inglés y español' },
+          { en: 'The endpoint reference is built from your own installation, with code samples and a built-in request tester', es: 'La referencia de endpoints se genera desde tu propia instalación, con ejemplos de código y un probador de peticiones integrado' },
+          { en: 'The OpenAPI document is available at /api/v1/openapi.json to generate API clients', es: 'El documento OpenAPI está disponible en /api/v1/openapi.json para generar clientes de la API' },
+        ],
+      },
+      {
+        title: { en: 'Webhooks', es: 'Webhooks' },
+        features: [
+          { en: 'Ticket updated and ticket deleted webhooks are now delivered, with the fields that changed', es: 'Los webhooks de ticket actualizado y ticket eliminado ahora se envían, con los campos que cambiaron' },
+          { en: 'Ticket created webhooks report the real channel, so tickets created through the API are no longer reported as created in the app', es: 'Los webhooks de ticket creado indican el canal real, así los tickets creados por la API ya no aparecen como creados en la app' },
+        ],
+      },
+      {
+        title: { en: 'Fixes', es: 'Correcciones' },
+        features: [
+          { en: 'The Updates page no longer shows a development build right after a new release is published', es: 'La página de Actualizaciones ya no muestra una versión de desarrollo justo después de publicarse una release' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.25.0',
     date: '2026-10-04',
     categories: [
