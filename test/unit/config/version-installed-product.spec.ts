@@ -1,4 +1,4 @@
-import { findInstalledProduct } from '../../../src/config/domain/services/version-installed-product';
+import { parseClientVersion, findInstalledProduct } from '../../../src/config/domain/services/version-installed-product';
 
 const releases = [
   { product: '1.24.0', components: { backend: '1.21.0', client: '1.21.0' } },
@@ -29,5 +29,17 @@ describe('findInstalledProduct', () => {
     const latest = { product: '1.25.0', components: { backend: '1.22.0', client: '1.22.0' } };
     expect(findInstalledProduct(releases, '1.22.0', '1.22.0', latest)).toBe('1.25.0');
     expect(findInstalledProduct(releases, '1.22.0', '1.21.0', latest)).toBeNull();
+  });
+});
+
+describe('parseClientVersion', () => {
+  it('accepts a real X.Y.Z version, so the installed product can be recognised', () => {
+    expect(parseClientVersion('1.22.1')).toBe('1.22.1');
+    expect(parseClientVersion(' 10.0.12 ')).toBe('10.0.12');
+  });
+  it('rejects anything else', () => {
+    for (const bad of [undefined, null, '', 'dev', '1.22', '1.22.1-beta', 'd.d.d', '1x22x1']) {
+      expect(parseClientVersion(bad)).toBeNull();
+    }
   });
 });

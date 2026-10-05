@@ -34,3 +34,9 @@ export function findInstalledProduct(
   if (matches.length === 0) return null;
   return matches.sort(compareVersions)[matches.length - 1];
 }
+
+/** The client version the browser reports, kept only when it is a plain X.Y.Z version. */
+export function parseClientVersion(value: string | undefined | null): string | null {
+  const version = value?.trim();
+  return version && /^\d+\.\d+\.\d+$/.test(version) ? version : null;
+}
