@@ -83,6 +83,11 @@ describe('public API OpenAPI document', () => {
     expect(config.servers).toEqual([{ url: 'https://api.example.com' }]);
   });
 
+  it('states only the current version, without promising a future one', () => {
+    expect(document.info.description).toContain('served under `/api/v1`');
+    expect(document.info.description).not.toMatch(/\/api\/v2|new version|breaking change/i);
+  });
+
   it('covers every scope in the guide', () => {
     for (const scope of ALL_API_KEY_SCOPES) expect(document.info.description).toContain(`| \`${scope}\` |`);
   });

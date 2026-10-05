@@ -168,6 +168,6 @@ The signature does not cover a timestamp header; check \`timestamp\` in the body
 
 ## Versioning
 
-\`/api/v1\` is stable: fields and endpoints may be added, but nothing is removed or changes meaning within v1. Breaking changes go to a new version (\`/api/v2\`) served alongside it.
+Every endpoint of this API is served under \`/api/v1\`.
 `.trim();
 }
