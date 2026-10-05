@@ -5,6 +5,7 @@ import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-lo
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
 import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
+import { commentPreview } from '../../domain/comment-preview';
 
 interface Props {
   commentId: string;
@@ -52,7 +53,7 @@ export class EditCommentCommand implements Command<Props, EditCommentResponse> {
       entityId: props.ticketId,
       userId: props.userId,
       workspaceId: props.workspaceId,
-      metadata: { commentId: comment.getId() },
+      metadata: { commentId: comment.getId(), content: commentPreview(comment.content) },
     });
 
     return {

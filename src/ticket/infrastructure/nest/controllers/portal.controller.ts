@@ -50,6 +50,7 @@ import { TypeOrmTicketCategoryRepository } from '../../../../project/infrastruct
 import { AutoEnrollOrganization } from '../../../../organization/domain/services/organization-auto-enroll';
 import { formatTicketNumber } from '../../../domain/ticket-number';
 import { ResolvePortalReporter } from '../../../domain/services/ticket-portal-resolve-reporter';
+import { commentPreview } from '../../../../comment/domain/comment-preview';
 
 /** Portal visitors have no account; their staged uploads are claimed only by portal tickets. */
 const PORTAL_UPLOADER = 'portal-anonymous';
@@ -314,7 +315,7 @@ export class PortalController {
       entityId: comment.getId(),
       userId: ticket.reporterId,
       workspaceId: ticket.workspaceId,
-      metadata: { ticketId: ticket.getId() },
+      metadata: { ticketId: ticket.getId(), ticketName: ticket.name, content: commentPreview(comment.content) },
     });
 
     // Tell the team, like any other reply: email to stakeholders, in-app notification and live update

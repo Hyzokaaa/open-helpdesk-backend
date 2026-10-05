@@ -15,6 +15,7 @@ import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 import { AddTicketParticipant } from '../../../ticket/domain/services/ticket-add-participant';
 import { ParticipantRole } from '../../../ticket/domain/enums/participant-role.enum';
 import { formatTicketNumber } from '../../../ticket/domain/ticket-number';
+import { commentPreview } from '../../domain/comment-preview';
 
 interface Props {
   content: string;
@@ -112,7 +113,7 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
       entityId: props.ticketId,
       userId: props.authorId,
       workspaceId: workspace.getId(),
-      metadata: { ticketName: ticket.name, commentId: comment.getId(), content: props.content },
+      metadata: { ticketName: ticket.name, commentId: comment.getId(), content: commentPreview(props.content) },
     });
 
     return {
