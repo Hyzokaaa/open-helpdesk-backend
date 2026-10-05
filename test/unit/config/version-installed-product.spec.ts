@@ -24,4 +24,10 @@ describe('findInstalledProduct', () => {
   it('returns null when the client version is unknown', () => {
     expect(findInstalledProduct(releases, '1.21.0', null)).toBeNull();
   });
+
+  it('recognises the latest release while the manifest has not caught up with it yet', () => {
+    const latest = { product: '1.25.0', components: { backend: '1.22.0', client: '1.22.0' } };
+    expect(findInstalledProduct(releases, '1.22.0', '1.22.0', latest)).toBe('1.25.0');
+    expect(findInstalledProduct(releases, '1.22.0', '1.21.0', latest)).toBeNull();
+  });
 });

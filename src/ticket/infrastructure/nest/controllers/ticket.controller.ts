@@ -259,11 +259,13 @@ export class TicketController {
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new DeleteTicket(this.ticketRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-    const deleteCommand = new DeleteTicketCommand(service, ensurePermission, this.ticketRepository, auditLog);
+    const deleteCommand = new DeleteTicketCommand(service, ensurePermission, this.ticketRepository, auditLog, this.eventPublisher);
     const command = new BulkDeleteCommand(deleteCommand);
     return command.execute({
       ticketIds: body.ticketIds,
       workspaceId: workspace.getId(),
+      workspaceName: workspace.name,
+      workspaceSlug: workspace.slug,
       userId: user.userId,
       isSystemAdmin: user.isSystemAdmin,
     });
@@ -295,10 +297,12 @@ export class TicketController {
     const service = new UpdateTicket(this.ticketRepository, editDescription);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     const validateCustomFields = new ValidateCustomFieldValues(this.customFieldDefinitionRepository);
-    const command = new UpdateTicketCommand(service, this.ticketRepository, ensurePermission, auditLog, validateCustomFields, this.createEnsureReferences(), this.createResolveLabels());
+    const command = new UpdateTicketCommand(service, this.ticketRepository, ensurePermission, auditLog, validateCustomFields, this.createEnsureReferences(), this.createResolveLabels(), this.eventPublisher);
     return command.execute({
       ticketId: id,
       workspaceId: workspace.getId(),
+      workspaceName: workspace.name,
+      workspaceSlug: workspace.slug,
       userId: user.userId,
       name: body.name,
       description: body.description,
@@ -386,8 +390,15 @@ export class TicketController {
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new DeleteTicket(this.ticketRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-    const command = new DeleteTicketCommand(service, ensurePermission, this.ticketRepository, auditLog);
-    return command.execute({ ticketId: id, workspaceId: workspace.getId(), userId: user.userId, isSystemAdmin: user.isSystemAdmin });
+    const command = new DeleteTicketCommand(service, ensurePermission, this.ticketRepository, auditLog, this.eventPublisher);
+    return command.execute({
+      ticketId: id,
+      workspaceId: workspace.getId(),
+      workspaceName: workspace.name,
+      workspaceSlug: workspace.slug,
+      userId: user.userId,
+      isSystemAdmin: user.isSystemAdmin,
+    });
   }
 
   @Post(':id/pickup')

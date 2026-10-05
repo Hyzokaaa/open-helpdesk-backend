@@ -10,8 +10,18 @@ import {
   Query,
   ForbiddenException,
 } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiExtraModels,
+  ApiOkResponse,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ApiKeyScope } from '../../../../api-key/domain/enums/api-key-scope.enum';
 import { Throttle } from '@nestjs/throttler';
+import { PUBLIC_API_THROTTLE } from '../../../../shared/nest/throttling/throttle.constants';
 import { ConfigService } from '@nestjs/config';
 import { tokenExchangeTtlFromConfig } from '../token-exchange-ttl';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
@@ -22,6 +32,8 @@ import { NestEventPublisher } from '../../../../shared/infrastructure/nest-event
 import { EntityNotFoundError } from '../../../../shared/domain/errors';
 import { CreateTicket } from '../../../../ticket/domain/services/ticket-create';
 import { TicketSource } from '../../../../ticket/domain/enums/ticket-source.enum';
+import { TicketStatus } from '../../../../ticket/domain/enums/ticket-status.enum';
+import { TicketPriority } from '../../../../ticket/domain/enums/ticket-priority.enum';
 import { UpdateTicket } from '../../../../ticket/domain/services/ticket-update';
 import { ChangeTicketStatus } from '../../../../ticket/domain/services/ticket-change-status';
 import { AssignTicket } from '../../../../ticket/domain/services/ticket-assign';
@@ -54,6 +66,19 @@ import { CreateApiTicketRequest } from '../dto/create-api-ticket.request';
 import { UpdateApiTicketRequest } from '../dto/update-api-ticket.request';
 import { CreateApiCommentRequest } from '../dto/create-api-comment.request';
 import { ExchangeTokenRequest } from '../dto/exchange-token.request';
+import {
+  API_RESPONSE_EXTRA_MODELS,
+  ApiCommentPage,
+  ApiCreatedComment,
+  ApiCreatedTicket,
+  ApiExchangedToken,
+  ApiMember,
+  ApiTicketDetail,
+  ApiTicketPage,
+  ApiUpdatedTicket,
+} from '../dto/api-responses';
+import { ApiScopedOperation } from '../openapi/api-operation.decorators';
+import { API_KEY_SECURITY_SCHEME } from '../openapi/api-docs.constants';
 import { ExchangeToken } from '../../../../user/domain/services/user-exchange-token';
 import { ExchangeTokenCommand } from '../../../../user/application/commands/exchange-token.command';
 import { AddWorkspaceMember } from '../../../../workspace/domain/services/workspace-add-member';
@@ -66,9 +91,15 @@ import { EnsureTicketAssignee } from '../../../../ticket/domain/services/ticket-
 import { TypeOrmTicketCategoryRepository } from '../../../../project/infrastructure/typeorm/repositories/typeorm-ticket-category.repository';
 import { TypeOrmTagRepository } from '../../../../tag/infrastructure/typeorm/repositories/typeorm-tag.repository';
 
+const TICKET_ID_PARAM = ApiParam({ name: 'id', description: 'Ticket id (ULID), not the TK- number.', example: '01JABCDEF0123456789ABCDEFG' });
+const PAGE_QUERY = ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number, from 1.', example: 1 });
+const LIMIT_QUERY = ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page, 1 to 100. Default 20.', example: 20 });
+
 @Controller('api/v1')
 @ApiKeyAuth()
-@Throttle({ default: { ttl: 60000, limit: 100 } })
+@ApiBearerAuth(API_KEY_SECURITY_SCHEME)
+@ApiExtraModels(...API_RESPONSE_EXTRA_MODELS)
+@Throttle({ default: PUBLIC_API_THROTTLE })
 export class ApiController {
   private readonly tokenExchangeTtl: string;
 
@@ -95,6 +126,30 @@ export class ApiController {
   // --- Tickets ---
 
   @Get('tickets')
+  @ApiTags('Tickets')
+  @ApiScopedOperation({
+    scope: ApiKeyScope.TICKETS_READ,
+    summary: 'List tickets',
+    description: "Paginated tickets of the key's workspace, newest first unless `sortBy` says otherwise. If the key creator's role only lets them see their own tickets, only those are returned.",
+    validates: true,
+  })
+  @ApiOkResponse({ type: ApiTicketPage })
+  @PAGE_QUERY
+  @LIMIT_QUERY
+  @ApiQuery({ name: 'search', required: false, description: 'Text searched in title and body. A ticket number (`TK-000042`, `42`) also matches that ticket.' })
+  @ApiQuery({ name: 'status', required: false, enum: TicketStatus, enumName: 'TicketStatus' })
+  @ApiQuery({ name: 'excludeStatus', required: false, description: 'Comma-separated statuses to leave out.', example: 'resolved,discarded' })
+  @ApiQuery({ name: 'priority', required: false, enum: TicketPriority, enumName: 'TicketPriority' })
+  @ApiQuery({ name: 'tagIds', required: false, description: 'Comma-separated tag ids; tickets with any of them match.' })
+  @ApiQuery({ name: 'assigneeId', required: false, description: 'User id of the assignee.' })
+  @ApiQuery({ name: 'reporterId', required: false, description: 'User id of who opened the ticket.' })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    enum: ['createdAt', 'ticketNumber', 'name', 'priority', 'status', 'categoryId', 'departmentId', 'organizationId'],
+    description: 'Sort field. Unknown values fall back to `createdAt`.',
+  })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['ASC', 'DESC'], description: 'Default `DESC`.' })
   async listTickets(
     @Query() filters: TicketFilterDto,
     @CurrentUser() user: AuthUser,
@@ -124,6 +179,10 @@ export class ApiController {
   }
 
   @Get('tickets/:id')
+  @ApiTags('Tickets')
+  @ApiScopedOperation({ scope: ApiKeyScope.TICKETS_READ, summary: 'Get a ticket', addressesTicket: true })
+  @TICKET_ID_PARAM
+  @ApiOkResponse({ type: ApiTicketDetail })
   async getTicket(
     @Param('id') id: string,
     @CurrentUser() user: AuthUser,
@@ -142,6 +201,14 @@ export class ApiController {
   }
 
   @Post('tickets')
+  @ApiTags('Tickets')
+  @ApiScopedOperation({
+    scope: ApiKeyScope.TICKETS_WRITE,
+    summary: 'Create a ticket',
+    description: "Opens a ticket in the key's workspace with source `api`, reported by the key creator. Category and tags must belong to the workspace, and required custom fields must be sent.",
+    validates: true,
+  })
+  @ApiCreatedResponse({ type: ApiCreatedTicket })
   async createTicket(
     @Body() body: CreateApiTicketRequest,
     @CurrentUser() user: AuthUser,
@@ -174,6 +241,16 @@ export class ApiController {
   }
 
   @Patch('tickets/:id')
+  @ApiTags('Tickets')
+  @ApiScopedOperation({
+    scope: ApiKeyScope.TICKETS_WRITE,
+    summary: 'Update a ticket',
+    description: 'Send only the fields to change. They are applied in this order, each as its own step: `status`, then `assigneeId`, then the remaining fields. A step that fails stops the request but does not undo the steps before it.\n\nThe response holds the updated fields when any field other than `status` or `assigneeId` was sent, and only the `id` otherwise.',
+    validates: true,
+    addressesTicket: true,
+  })
+  @TICKET_ID_PARAM
+  @ApiOkResponse({ type: ApiUpdatedTicket })
   async updateTicket(
     @Param('id') id: string,
     @Body() body: UpdateApiTicketRequest,
@@ -233,10 +310,12 @@ export class ApiController {
       const updateService = new UpdateTicket(this.ticketRepository);
       const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
       const validateCustomFields = new ValidateCustomFieldValues(this.customFieldDefinitionRepository);
-      const updateCommand = new UpdateTicketCommand(updateService, this.ticketRepository, ensurePermission, auditLog, validateCustomFields, this.createEnsureReferences(), this.createResolveLabels());
+      const updateCommand = new UpdateTicketCommand(updateService, this.ticketRepository, ensurePermission, auditLog, validateCustomFields, this.createEnsureReferences(), this.createResolveLabels(), this.eventPublisher);
       return updateCommand.execute({
         ticketId: id,
         workspaceId: workspace.getId(),
+        workspaceName: workspace.name,
+        workspaceSlug: workspace.slug,
         userId: user.userId,
         name: body.name,
         description: body.description,
@@ -252,19 +331,32 @@ export class ApiController {
   }
 
   @Delete('tickets/:id')
+  @ApiTags('Tickets')
+  @ApiScopedOperation({
+    scope: ApiKeyScope.TICKETS_WRITE,
+    summary: 'Delete a ticket',
+    description: "The key creator's role must allow deleting tickets.",
+    addressesTicket: true,
+  })
+  @TICKET_ID_PARAM
+  @ApiOkResponse({ description: 'Deleted. The body is empty.' })
   async deleteTicket(
     @Param('id') id: string,
     @CurrentUser() user: AuthUser,
   ) {
     this.requireScope(user, ApiKeyScope.TICKETS_WRITE);
     const workspaceId = this.resolveWorkspaceId(user);
+    const workspace = await this.workspaceRepository.findById(workspaceId);
+    if (!workspace) throw new EntityNotFoundError('Workspace not found');
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new DeleteTicket(this.ticketRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-    const command = new DeleteTicketCommand(service, ensurePermission, this.ticketRepository, auditLog);
+    const command = new DeleteTicketCommand(service, ensurePermission, this.ticketRepository, auditLog, this.eventPublisher);
     return command.execute({
       ticketId: id,
       workspaceId,
+      workspaceName: workspace.name,
+      workspaceSlug: workspace.slug,
       userId: user.userId,
       isSystemAdmin: user.isSystemAdmin,
     });
@@ -273,6 +365,12 @@ export class ApiController {
   // --- Comments ---
 
   @Get('tickets/:id/comments')
+  @ApiTags('Comments')
+  @ApiScopedOperation({ scope: ApiKeyScope.COMMENTS_READ, summary: 'List the comments of a ticket', validates: true, addressesTicket: true })
+  @TICKET_ID_PARAM
+  @PAGE_QUERY
+  @LIMIT_QUERY
+  @ApiOkResponse({ type: ApiCommentPage })
   async listComments(
     @Param('id') id: string,
     @Query() pagination: PaginationDto,
@@ -292,6 +390,16 @@ export class ApiController {
   }
 
   @Post('tickets/:id/comments')
+  @ApiTags('Comments')
+  @ApiScopedOperation({
+    scope: ApiKeyScope.COMMENTS_WRITE,
+    summary: 'Add a comment',
+    description: 'Adds a comment authored by the key creator, who must be able to contribute to the ticket.',
+    validates: true,
+    addressesTicket: true,
+  })
+  @TICKET_ID_PARAM
+  @ApiCreatedResponse({ type: ApiCreatedComment })
   async createComment(
     @Param('id') id: string,
     @Body() body: CreateApiCommentRequest,
@@ -325,6 +433,9 @@ export class ApiController {
   // --- Members ---
 
   @Get('members')
+  @ApiTags('Members')
+  @ApiScopedOperation({ scope: ApiKeyScope.MEMBERS_READ, summary: 'List workspace members', description: "Every member of the key's workspace, not paginated." })
+  @ApiOkResponse({ type: [ApiMember] })
   async listMembers(
     @CurrentUser() user: AuthUser,
   ) {
@@ -351,6 +462,14 @@ export class ApiController {
   // --- Auth Exchange ---
 
   @Post('auth/exchange')
+  @ApiTags('Authentication')
+  @ApiScopedOperation({
+    scope: ApiKeyScope.AUTH_EXCHANGE,
+    summary: 'Sign in a user (delegated sign-in)',
+    description: "Creates the user if no account has this email, adds them to the key's workspace and returns a session token for them. An existing account must already be a member of the workspace. Supervisors and admins, existing or new, also require scope `auth:exchange:admin`. System administrators and deactivated users are never signed in. See *Delegated sign-in* in the guide.",
+    validates: true,
+  })
+  @ApiCreatedResponse({ type: ApiExchangedToken })
   async exchangeToken(
     @Body() body: ExchangeTokenRequest,
     @CurrentUser() user: AuthUser,

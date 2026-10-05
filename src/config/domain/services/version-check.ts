@@ -54,7 +54,7 @@ export class VersionCheck {
     const data = await this.fetchVersions();
     return {
       backend: this.currentBackend,
-      currentProduct: findInstalledProduct(data.releases, this.currentBackend, currentClient),
+      currentProduct: findInstalledProduct(data.releases, this.currentBackend, currentClient, data.latestRelease),
       latestRelease: data.latestRelease,
       latestComponents: data.latestComponents,
     };

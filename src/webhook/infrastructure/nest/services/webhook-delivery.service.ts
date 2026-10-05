@@ -31,6 +31,16 @@ export class WebhookDeliveryService {
     await this.deliver('ticket.assigned', event);
   }
 
+  @OnEvent('ticket.updated')
+  async onTicketUpdated(event: BaseEvent): Promise<void> {
+    await this.deliver('ticket.updated', event);
+  }
+
+  @OnEvent('ticket.deleted')
+  async onTicketDeleted(event: BaseEvent): Promise<void> {
+    await this.deliver('ticket.deleted', event);
+  }
+
   @OnEvent('comment.created')
   async onCommentCreated(event: BaseEvent): Promise<void> {
     await this.deliver('comment.created', event);
