@@ -790,7 +790,7 @@ export class WorkspaceController {
     @Body() body: any,
     @CurrentUser() user: AuthUser,
     @Req() req: Request,
-    // Comma list of target settings to overwrite: palette, sla, description, branding
+    // Comma list of target settings to overwrite: palette, sla, description, branding, name, emailSender, customDomain
     @Query("overwrite") overwrite?: string | string[],
     // "true" completes tickets the workspace already has, adding only what they lack
     @Query("completeExisting") completeExisting?: string,
@@ -827,6 +827,11 @@ export class WorkspaceController {
       .flatMap((value) => String(value).split(","))
       .map((key) => key.trim())
       .filter(Boolean);
+    // A custom domain carried by the file may not be the platform's own hostname, as when set by hand
+    let primaryHost = "";
+    try {
+      primaryHost = new URL(this.config.get<string>("FRONTEND_URL", "")).hostname;
+    } catch {}
     const service = new ImportWorkspace(this.dataSource, this.storage, (key, error) =>
       this.logger.warn(`Could not delete storage object ${key} after a workspace import: ${(error as Error)?.message}`),
     );
@@ -842,7 +847,7 @@ export class WorkspaceController {
           },
         }
         : undefined;
-      return { source, ...(await service.execute(workspaceId, data, { overwrite: overwriteKeys, files, completeExisting })) };
+      return { source, ...(await service.execute(workspaceId, data, { overwrite: overwriteKeys, files, completeExisting, primaryHost })) };
     });
     forgetExportDownload(downloadKey);
 

@@ -22,6 +22,11 @@ import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 import { StorageService } from '../../../shared/domain/storage-service';
 import { attachmentStorageKey } from '../../../attachment/domain/attachment-storage-key';
 import { IMPORT_LINK_ID_MAX, IMPORT_LINK_TYPES, ImportLinkType } from '../workspace-import-link';
+import { MailboxType } from '../../../mailbox/domain/enums/mailbox-type.enum';
+import { EmailRuleConditionField } from '../../../email-rule/domain/enums/email-rule-condition-field.enum';
+import { EmailRuleOperator } from '../../../email-rule/domain/enums/email-rule-operator.enum';
+import { EmailRuleActionType } from '../../../email-rule/domain/enums/email-rule-action-type.enum';
+import { DOMAIN_REGEX } from './workspace-set-custom-domain';
 
 export interface ImportResult {
   usersCreated: number;
@@ -60,6 +65,15 @@ export interface ImportResult {
   kbCategoriesImported: number;
   kbArticlesImported: number;
   auditLogImported: number;
+  /** Mailboxes created, always paused; one with the same address here is reused as it is. */
+  mailboxesImported: number;
+  emailRulesImported: number;
+  /** Webhooks created, always inactive; one with the same URL here is reused as it is. */
+  webhooksImported: number;
+  /** Why the custom domain was not applied although asked for (e.g. another workspace uses it); else null. */
+  customDomainSkipped: string | null;
+  /** Whether the file carried passwords and secrets. */
+  credentialsIncluded: boolean;
   /** The target workspace settings this import overwrote, as asked by the caller. */
   settingsApplied: ImportSetting[];
 }
@@ -68,9 +82,11 @@ export interface ImportResult {
  * Workspace settings an import may overwrite in the target. None is touched unless asked for:
  * palette → metadata.palette (other metadata keys are kept), sla → slaPolicy,
  * description → description, branding → appName, appSubtitle, logo and icon (each when the file
- * carries it).
+ * carries it), name → name, emailSender → the workspace SMTP sender (only when the file carries
+ * its password: without one it could not send), customDomain → customDomain, unverified and with a
+ * new verification token (skipped when another workspace uses it).
  */
-export const IMPORT_SETTINGS = ['palette', 'sla', 'description', 'branding'] as const;
+export const IMPORT_SETTINGS = ['palette', 'sla', 'description', 'branding', 'name', 'emailSender', 'customDomain'] as const;
 export type ImportSetting = typeof IMPORT_SETTINGS[number];
 
 /** The files of a decoded .ohd archive, by archive path. */
@@ -89,6 +105,8 @@ export interface ImportOptions {
    * empty fields and add the children they lack. Nothing already there is changed or removed.
    */
   completeExisting?: boolean;
+  /** The platform's own hostname, which a workspace cannot take as its custom domain. */
+  primaryHost?: string;
 }
 
 /** Same types and sizes the branding and organization logo uploads accept. */
@@ -317,6 +335,7 @@ function validateExportData(data: WorkspaceExportData): void {
   if (!ws || typeof ws !== 'object' || Array.isArray(ws)) fail('"workspace"', 'must be an object');
   const isObjectOrNull = (v: unknown) => v == null || (typeof v === 'object' && !Array.isArray(v));
   if (ws.description != null && typeof ws.description !== 'string') fail('workspace.description', 'must be text or null');
+  optionalText(ws, 'workspace', 'name');
   if (!isObjectOrNull(ws.slaPolicy)) fail('workspace.slaPolicy', 'must be an object or null');
   if (!isObjectOrNull(ws.metadata)) fail('workspace.metadata', 'must be an object or null');
   if (ws.metadata?.palette != null && typeof ws.metadata.palette !== 'string') fail('workspace.metadata.palette', 'must be text or null');
@@ -390,6 +409,7 @@ function validateExportData(data: WorkspaceExportData): void {
     optionalText(t, p, 'registeredByEmail');
     optionalDate(t, p, 'originDate');
     optionalDate(t, p, 'descriptionEditedAt');
+    optionalText(t, p, 'mailboxOriginId');
     if (t.customFields != null && (typeof t.customFields !== 'object' || Array.isArray(t.customFields))) {
       fail(`${p}.customFields`, 'must be an object');
     }
@@ -464,9 +484,72 @@ function validateExportData(data: WorkspaceExportData): void {
     date(a, p, 'createdAt');
     optionalDate(a, p, 'updatedAt');
   });
+  // Workspace configuration (1.18)
+  const optionalInteger = (row: any, path: string, field: string, min: number, max = Number.MAX_SAFE_INTEGER) => {
+    const v = row[field];
+    if (v != null && !(Number.isInteger(v) && v >= min && v <= max)) fail(`${path}.${field}`, `must be a whole number from ${min}${max === Number.MAX_SAFE_INTEGER ? ' up' : ` to ${max}`} or null`);
+  };
+  const optionalBoolean = (row: any, path: string, field: string) => {
+    if (row[field] != null && typeof row[field] !== 'boolean') fail(`${path}.${field}`, 'must be true, false or absent');
+  };
+  const textList = (row: any, path: string, field: string, optional = false) => {
+    if (optional && row[field] == null) return;
+    if (!Array.isArray(row[field]) || !row[field].every((v: unknown) => typeof v === 'string')) fail(`${path}.${field}`, 'must be a list of text');
+  };
+  each('mailboxes', data.mailboxes, (m, p) => {
+    text(m, p, 'originId');
+    text(m, p, 'address');
+    member(m, p, 'type', oneOf(MailboxType));
+    for (const field of ['imapHost', 'imapUser', 'imapPass', 'encryption', 'imapFolder', 'addressMode', 'postProcessAction', 'postProcessFolder']) {
+      optionalText(m, p, field);
+    }
+    optionalInteger(m, p, 'imapPort', 1, 65535);
+    optionalInteger(m, p, 'pollInterval', 1);
+    textList(m, p, 'acceptedAddresses', true);
+    optionalBoolean(m, p, 'autoReply');
+  });
+  each('emailRules', data.emailRules, (r, p) => {
+    text(r, p, 'originId');
+    text(r, p, 'name');
+    optionalPosition(r, p);
+    optionalBoolean(r, p, 'isActive');
+    textList(r, p, 'mailboxOriginIds');
+    each(`${p}.conditions`, r.conditions, (c, cp) => {
+      member(c, cp, 'field', oneOf(EmailRuleConditionField));
+      member(c, cp, 'operator', oneOf(EmailRuleOperator));
+      if (typeof c.value !== 'string') fail(`${cp}.value`, 'must be text');
+    });
+    each(`${p}.actions`, r.actions, (a, ap) => {
+      member(a, ap, 'type', oneOf(EmailRuleActionType));
+      optionalText(a, ap, 'value');
+    });
+  });
+  const sender: any = data.emailSender;
+  if (sender != null) {
+    if (typeof sender !== 'object' || Array.isArray(sender)) fail('"emailSender"', 'must be an object or null');
+    text(sender, 'emailSender', 'smtpHost');
+    if (!(Number.isInteger(sender.smtpPort) && sender.smtpPort >= 1 && sender.smtpPort <= 65535)) fail('emailSender.smtpPort', 'must be a whole number from 1 to 65535');
+    if (typeof sender.smtpUser !== 'string') fail('emailSender.smtpUser', 'must be text');
+    text(sender, 'emailSender', 'smtpFrom');
+    for (const field of ['smtpPass', 'encryption', 'fromName', 'fromEmail']) optionalText(sender, 'emailSender', field);
+  }
+  each('webhooks', data.webhooks, (w, p) => {
+    text(w, p, 'originId');
+    text(w, p, 'url');
+    if (!/^https?:\/\//i.test(w.url)) fail(`${p}.url`, 'must be an http or https URL');
+    // events is a simple-array column: a comma would split an event in two
+    if (!Array.isArray(w.events) || !w.events.every((e: unknown) => isText(e) && !(e as string).includes(','))) {
+      fail(`${p}.events`, 'must be a list of event names');
+    }
+    optionalText(w, p, 'secret');
+  });
+  if (data.customDomain != null && typeof data.customDomain !== 'string') fail('"customDomain"', 'must be text or null');
+  if (typeof data.credentialsIncluded !== 'boolean') fail('"credentialsIncluded"', 'must be true or false');
+
   const identified = [
     'organizations', 'departments', 'tags', 'categories', 'projects', 'tickets', 'comments', 'descriptionEdits',
     'commentEdits', 'attachments', 'cannedResponses', 'customFields', 'kbCategories', 'kbArticles',
+    'mailboxes', 'emailRules', 'webhooks',
   ] as const;
   for (const section of identified) {
     each(section, data[section], (row, p) => {
@@ -612,7 +695,9 @@ export class ImportWorkspace {
       ticketsAlreadyPresent: 0, commentsImported: 0, commentsSkipped: 0, descriptionEditsImported: 0, commentEditsImported: 0, attachmentsImported: 0, attachmentsSkipped: 0,
       ticketsCompleted: 0, attachmentsOfExistingTickets: 0, participantsImported: 0,
       cannedResponsesImported: 0, customFieldsImported: 0, csatResponsesImported: 0,
-      kbCategoriesImported: 0, kbArticlesImported: 0, auditLogImported: 0, settingsApplied: [],
+      kbCategoriesImported: 0, kbArticlesImported: 0, auditLogImported: 0,
+      mailboxesImported: 0, emailRulesImported: 0, webhooksImported: 0, customDomainSkipped: null,
+      credentialsIncluded: data.credentialsIncluded === true, settingsApplied: [],
     };
     const newMembers: ImportedNewMember[] = [];
 
@@ -656,7 +741,51 @@ export class ImportWorkspace {
             result.settingsApplied.push(key);
             continue;
           }
-          if (key === 'palette' && present(ws.metadata?.palette)) {
+          if (key === 'emailSender') {
+            // Only a sender the file carries a password for: a workspace with a sender sends all its
+            // mail through it, so one that cannot authenticate would silently stop every email
+            const sender = data.emailSender;
+            if (!sender || !present(sender.smtpPass)) continue;
+            await qr.query(`
+              INSERT INTO workspace_email_senders (id, "workspaceId", "smtpHost", "smtpPort", "smtpUser", "smtpPass", "smtpFrom", encryption, "fromName", "fromEmail")
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+              ON CONFLICT ("workspaceId") DO UPDATE SET
+                "smtpHost" = EXCLUDED."smtpHost", "smtpPort" = EXCLUDED."smtpPort", "smtpUser" = EXCLUDED."smtpUser",
+                "smtpPass" = EXCLUDED."smtpPass", "smtpFrom" = EXCLUDED."smtpFrom", encryption = EXCLUDED.encryption,
+                "fromName" = EXCLUDED."fromName", "fromEmail" = EXCLUDED."fromEmail", "updatedAt" = now()
+            `, [
+              ulid(), targetWorkspaceId, sender.smtpHost, sender.smtpPort, sender.smtpUser, sender.smtpPass, sender.smtpFrom,
+              sender.encryption || 'tls', sender.fromName ?? null, sender.fromEmail ?? null,
+            ]);
+            result.settingsApplied.push(key);
+            continue;
+          }
+          if (key === 'customDomain') {
+            if (!present(data.customDomain)) continue;
+            const domain = String(data.customDomain).toLowerCase().trim();
+            const skip = (reason: string) => { result.customDomainSkipped = reason; };
+            if (!DOMAIN_REGEX.test(domain)) { skip(`"${domain}" is not a valid domain`); continue; }
+            if (options.primaryHost && options.primaryHost.toLowerCase() === domain) {
+              skip(`"${domain}" is the platform's own URL`);
+              continue;
+            }
+            const [own] = await qr.query(`SELECT "customDomain" FROM workspaces WHERE id = $1`, [targetWorkspaceId]);
+            // Already this workspace's domain: kept as it is, so a verified domain stays verified
+            if ((own?.customDomain ?? '').toLowerCase() === domain) {
+              result.settingsApplied.push(key);
+              continue;
+            }
+            const taken = await qr.query(
+              `SELECT 1 FROM workspaces WHERE lower("customDomain") = $1 AND id <> $2 LIMIT 1`, [domain, targetWorkspaceId],
+            );
+            if (taken.length) { skip(`"${domain}" is already used by another workspace`); continue; }
+            // Unverified, with a new token generated as SetCustomDomain does: the DNS proof is redone here
+            set((v) => `"customDomain" = ${v}`, domain);
+            sets.push('"customDomainVerified" = false');
+            set((v) => `"domainVerificationToken" = ${v}`, `oh-verify=${randomBytes(16).toString('hex')}`);
+          } else if (key === 'name' && present(ws.name)) {
+            set((v) => `name = ${v}`, ws.name);
+          } else if (key === 'palette' && present(ws.metadata?.palette)) {
             set((v) => `metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('palette', ${v}::text)`, ws.metadata?.palette);
           } else if (key === 'sla' && present(ws.slaPolicy)) {
             set((v) => `"slaPolicy" = ${v}`, JSON.stringify(ws.slaPolicy));
@@ -1000,6 +1129,98 @@ export class ImportWorkspace {
           return remapped;
         };
 
+        // 3e. Mailboxes — before tickets, which point at them. One the target workspace already has (by
+        // identity, else by address) is reused as it is; the rest are created paused, so nothing is
+        // polled until someone reviews and activates them here. Without a password in the file the
+        // IMAP password stays NULL, which the poller and the connection test treat as unconfigured.
+        const mailboxIdMap = new Map<string, string>();
+        /** File mailbox id (and origin id) → target id, for audit entries. */
+        const mailboxIdBySourceId = new Map<string, string>();
+        const existingMailboxes = await qr.query(
+          `SELECT id, address FROM mailboxes WHERE "workspaceId" = $1`, [targetWorkspaceId],
+        );
+        const existingMailboxIds = idsOf(existingMailboxes);
+        const mailboxIdByAddress = new Map<string, string>(existingMailboxes.map((m: any) => [String(m.address).toLowerCase(), m.id]));
+        for (const m of data.mailboxes) {
+          const origin = originOf(m);
+          let targetId = identity.find(LINK.mailbox, origin, (id) => existingMailboxIds.has(id))
+            ?? mailboxIdByAddress.get(m.address.toLowerCase());
+          if (!targetId) {
+            targetId = ulid();
+            await qr.query(`
+              INSERT INTO mailboxes (
+                id, address, "workspaceId", "isActive", type, "imapHost", "imapPort", "imapUser", "imapPass",
+                encryption, "imapFolder", "pollInterval", "addressMode", "acceptedAddresses", "autoReply",
+                "postProcessAction", "postProcessFolder"
+              ) VALUES ($1, $2, $3, false, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+            `, [
+              targetId, m.address, targetWorkspaceId, m.type, m.imapHost ?? null, m.imapPort ?? null, m.imapUser ?? null,
+              present(m.imapPass) ? m.imapPass : null, m.encryption || 'tls', m.imapFolder ?? 'INBOX', m.pollInterval ?? 30,
+              m.addressMode || 'address', JSON.stringify(m.acceptedAddresses ?? []), m.autoReply !== false,
+              m.postProcessAction || 'none', m.postProcessFolder ?? null,
+            ]);
+            mailboxIdByAddress.set(m.address.toLowerCase(), targetId);
+            result.mailboxesImported++;
+          }
+          if (origin) mailboxIdMap.set(origin, targetId);
+          for (const id of [m.id, origin]) if (id) mailboxIdBySourceId.set(id, targetId);
+          links.record(LINK.mailbox, origin, targetId);
+        }
+        const mailboxIdFor = (originId: string | null | undefined) => originId ? (mailboxIdMap.get(originId) ?? null) : null;
+
+        // 3f. Email rules — after mailboxes and the catalog their actions name. One the target
+        // workspace already has (by identity, else by name) is left as it is. Mailbox ids and action
+        // values are remapped to this workspace; what cannot be is dropped, so a rule never points
+        // at another workspace's rows. A rule limited to mailboxes none of which could be mapped
+        // would apply to every mailbox: it is created inactive instead.
+        const categoryIdBySourceId = new Map<string, string>();
+        for (const c of data.categories) {
+          const targetId = categoryIdByFileSlug.get(c.slug);
+          if (targetId) categoryIdBySourceId.set(c.id, targetId);
+        }
+        const remapAction = (action: { type: string; value?: string }): { type: string; value?: string } | null => {
+          const one = (map: { get(id: string): string | undefined }) => {
+            const targetId = action.value ? map.get(action.value) : undefined;
+            return targetId ? { type: action.type, value: targetId } : null;
+          };
+          switch (action.type) {
+            case EmailRuleActionType.SET_DEPARTMENT: return one(departmentIdMap);
+            case EmailRuleActionType.SET_CATEGORY: return one(categoryIdBySourceId);
+            case EmailRuleActionType.SET_ORGANIZATION: return one(organizationIdMap);
+            case EmailRuleActionType.ASSIGN_TO: return one(sourceUserIdMap);
+            case EmailRuleActionType.ADD_TAGS: {
+              const tagIds = (action.value ?? '').split(',').map((id) => tagIdMap.get(id)).filter((id): id is string => !!id);
+              return tagIds.length ? { type: action.type, value: tagIds.join(',') } : null;
+            }
+            default: return action.value == null ? { type: action.type } : { type: action.type, value: action.value };
+          }
+        };
+        const emailRuleIdBySourceId = new Map<string, string>();
+        const existingRules = await qr.query(`SELECT id, name FROM email_rules WHERE "workspaceId" = $1`, [targetWorkspaceId]);
+        const existingRuleIds = idsOf(existingRules);
+        const ruleIdByName = new Map<string, string>(existingRules.map((r: any) => [r.name, r.id]));
+        for (const r of data.emailRules) {
+          const origin = originOf(r);
+          let targetId = identity.find(LINK.emailRule, origin, (id) => existingRuleIds.has(id)) ?? ruleIdByName.get(r.name);
+          if (!targetId) {
+            targetId = ulid();
+            const mailboxIds = [...new Set(r.mailboxOriginIds.map((id) => mailboxIdMap.get(id)).filter((id): id is string => !!id))];
+            const widened = r.mailboxOriginIds.length > 0 && mailboxIds.length === 0;
+            const actions = r.actions.map(remapAction).filter((a): a is { type: string; value?: string } => !!a);
+            await qr.query(`
+              INSERT INTO email_rules (id, "workspaceId", name, position, "isActive", "mailboxIds", conditions, actions)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            `, [
+              targetId, targetWorkspaceId, r.name, r.position ?? 0, r.isActive !== false && !widened,
+              JSON.stringify(mailboxIds), JSON.stringify(r.conditions), JSON.stringify(actions),
+            ]);
+            ruleIdByName.set(r.name, targetId);
+            result.emailRulesImported++;
+          }
+          for (const id of [r.id, origin]) if (id) emailRuleIdBySourceId.set(id, targetId);
+          links.record(LINK.emailRule, origin, targetId);
+        }
+
         // 4. Tickets — map old ID → new ID, skip duplicates
         const ticketIdMap = new Map<string, string>();
         // Same lock as TypeOrmTicketRepository.create, so a ticket created meanwhile cannot take a number
@@ -1037,8 +1258,8 @@ export class ImportWorkspace {
               "firstResponseAt", "resolvedAt", "resolvedById",
               "firstResponseBreached", "resolutionBreached", "createdAt", "updatedAt",
               "organizationId", "departmentId", "projectId",
-              source, "registeredById", "originDate", "descriptionEditedAt"
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
+              source, "registeredById", "originDate", "descriptionEditedAt", "mailboxId"
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)
           `, [
             newId, t.name, sanitizeHtml(t.description ?? ''), t.priority, t.status, categoryIdFor(t.category),
             targetWorkspaceId, userIdFor(t.reporterEmail), userIdFor(t.assigneeEmail), ticketNumber,
@@ -1047,6 +1268,7 @@ export class ImportWorkspace {
             t.firstResponseBreached, t.resolutionBreached, t.createdAt, t.updatedAt,
             organizationIdFor(t.organizationId), departmentIdFor(t.departmentId), projectIdFor(t.projectId),
             t.source ?? TicketSource.UI, userIdFor(t.registeredByEmail ?? null), t.originDate ?? null, t.descriptionEditedAt ?? null,
+            mailboxIdFor(t.mailboxOriginId),
           ]);
           ticketIdMap.set(t.id, newId);
           links.record(LINK.ticket, originOf(t), newId);
@@ -1076,7 +1298,7 @@ export class ImportWorkspace {
         if (completingIds.length) {
           const rows = await qr.query(`
             SELECT id, "departmentId", "projectId", "organizationId", "registeredById", "originDate",
-              "descriptionEditedAt", source, "customFields"
+              "descriptionEditedAt", source, "customFields", "mailboxId"
             FROM tickets WHERE id = ANY($1)
           `, [completingIds]);
           const current = new Map<string, any>(rows.map((r: any) => [r.id, r]));
@@ -1103,6 +1325,7 @@ export class ImportWorkspace {
             fill('registeredById', userIdFor(t.registeredByEmail ?? null));
             fill('originDate', t.originDate);
             fill('descriptionEditedAt', t.descriptionEditedAt);
+            fill('mailboxId', mailboxIdFor(t.mailboxOriginId));
             if ((row.source ?? TicketSource.UI) === TicketSource.UI && present(t.source) && t.source !== TicketSource.UI) {
               params.push(t.source);
               sets.push(`source = CASE WHEN source = '${TicketSource.UI}' THEN $${params.length} ELSE source END`);
@@ -1347,6 +1570,29 @@ export class ImportWorkspace {
           result.cannedResponsesImported++;
         }
 
+        // 9. Webhooks — one the target workspace already has (by identity, else by URL) is left as it
+        // is; the rest are created inactive, so nothing is delivered until someone reviews them here.
+        // Without a secret in the file each gets a new random one, generated as CreateWebhook does.
+        const webhookIdBySourceId = new Map<string, string>();
+        const existingWebhooks = await qr.query(`SELECT id, url FROM webhooks WHERE "workspaceId" = $1`, [targetWorkspaceId]);
+        const existingWebhookIds = idsOf(existingWebhooks);
+        const webhookIdByUrl = new Map<string, string>(existingWebhooks.map((w: any) => [w.url, w.id]));
+        for (const w of data.webhooks) {
+          const origin = originOf(w);
+          let targetId = identity.find(LINK.webhook, origin, (id) => existingWebhookIds.has(id)) ?? webhookIdByUrl.get(w.url);
+          if (!targetId) {
+            targetId = ulid();
+            await qr.query(`
+              INSERT INTO webhooks (id, "workspaceId", url, events, secret, "isActive")
+              VALUES ($1, $2, $3, $4, $5, false)
+            `, [targetId, targetWorkspaceId, w.url, w.events.join(','), present(w.secret) ? w.secret : randomBytes(32).toString('hex')]);
+            webhookIdByUrl.set(w.url, targetId);
+            result.webhooksImported++;
+          }
+          for (const id of [w.id, origin]) if (id) webhookIdBySourceId.set(id, targetId);
+          links.record(LINK.webhook, origin, targetId);
+        }
+
         // 10. CSAT responses
         const csatIdMap = new Map<string, string>();
         for (const cs of data.csatResponses) {
@@ -1428,12 +1674,8 @@ export class ImportWorkspace {
           existingAudit.map((e: any) => auditKey(e.action, e.entityType, e.userId, e.createdAt)),
         );
         // Entries point at what this import created (or reused). Entity types the import does not
-        // carry (mailboxes, webhooks, email rules...) keep their source id.
-        const categoryIdMap = new Map<string, string>();
-        for (const c of data.categories) {
-          const targetId = categoryIdByFileSlug.get(c.slug);
-          if (targetId) categoryIdMap.set(c.id, targetId);
-        }
+        // carry (API keys, invitations...) keep their source id.
+        const categoryIdMap = categoryIdBySourceId;
         const auditTicketIdMap = new Map([...alreadyImportedTicketIds, ...ticketIdMap]);
         const workspaceIdMap = { get: () => targetWorkspaceId };
         const entityIdMaps: Record<string, { get(id: string): string | undefined }> = {
@@ -1450,6 +1692,9 @@ export class ImportWorkspace {
           project: projectIdMap,
           'kb-category': kbCategoryIdMap,
           'kb-article': kbArticleIdMap,
+          mailbox: mailboxIdBySourceId,
+          'email-rule': emailRuleIdBySourceId,
+          webhook: webhookIdBySourceId,
           user: sourceUserIdMap,
           workspace: workspaceIdMap,
         };
@@ -1462,6 +1707,8 @@ export class ImportWorkspace {
           organizationId: organizationIdMap,
           departmentId: departmentIdMap,
           projectId: projectIdMap,
+          mailboxId: mailboxIdBySourceId,
+          webhookId: webhookIdBySourceId,
           workspaceId: workspaceIdMap,
           userId: sourceUserIdMap,
           assigneeId: sourceUserIdMap,

@@ -11,7 +11,7 @@ interface SetCustomDomainProps {
   isSystemAdmin?: boolean;
 }
 
-const DOMAIN_REGEX = /^(?!-)[a-zA-Z0-9-]{1,63}(?<!-)(\.[a-zA-Z0-9-]{1,63})*\.[a-zA-Z]{2,}$/;
+export const DOMAIN_REGEX = /^(?!-)[a-zA-Z0-9-]{1,63}(?<!-)(\.[a-zA-Z0-9-]{1,63})*\.[a-zA-Z]{2,}$/;
 
 export class SetCustomDomain {
   constructor(

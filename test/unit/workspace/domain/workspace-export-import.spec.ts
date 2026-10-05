@@ -1089,7 +1089,7 @@ describe('ImportWorkspace ticket fields', () => {
     return [];
   };
 
-  it('carries source, registrar, origin date and description edit date, leaving the mailbox empty', async () => {
+  it('carries source, registrar, origin date and description edit date, leaving the mailbox empty without one in the file', async () => {
     const qr = new FakeQueryRunner(answer);
     const data = emptyExport({
       users: [{ email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' }],
@@ -1103,8 +1103,7 @@ describe('ImportWorkspace ticket fields', () => {
 
     const [insert] = qr.find(/INSERT INTO tickets/);
     expect(insert.sql).toMatch(/source, "registeredById", "originDate", "descriptionEditedAt"/);
-    expect(insert.sql).not.toMatch(/mailboxId/);
-    expect(insert.params.slice(23)).toEqual(['portal', 'u-1', '2025-12-31T00:00:00.000Z', '2026-01-02T00:00:00.000Z']);
+    expect(insert.params.slice(23)).toEqual(['portal', 'u-1', '2025-12-31T00:00:00.000Z', '2026-01-02T00:00:00.000Z', null]);
   });
 
   it('imports a ticket from an older file as created from the UI with no registrar', async () => {
@@ -1117,7 +1116,7 @@ describe('ImportWorkspace ticket fields', () => {
 
     await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
 
-    expect(qr.find(/INSERT INTO tickets/)[0].params.slice(23)).toEqual(['ui', null, null, null]);
+    expect(qr.find(/INSERT INTO tickets/)[0].params.slice(23)).toEqual(['ui', null, null, null, null]);
   });
 
   it('rejects an unknown ticket source', async () => {
@@ -1311,7 +1310,7 @@ describe('ImportWorkspace settings overwrite', () => {
   it('rejects an unknown overwrite key before touching the database', async () => {
     const qr = new FakeQueryRunner(answer);
     await expect(new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', source(), { overwrite: ['palette', 'logo'] }))
-      .rejects.toThrow(new DomainValidationError('Unknown overwrite setting: logo. Allowed: palette, sla, description, branding'));
+      .rejects.toThrow(new DomainValidationError('Unknown overwrite setting: logo. Allowed: palette, sla, description, branding, name, emailSender, customDomain'));
     expect(qr.queries).toHaveLength(0);
   });
 
@@ -1888,6 +1887,11 @@ function answerFrom(rows: TableRows): Answer {
     if (/FROM projects WHERE/.test(sql)) return rows.projects ?? [];
     if (/FROM custom_field_definitions WHERE/.test(sql)) return rows.customFields ?? [];
     if (/FROM ticket_categories WHERE/.test(sql)) return rows.categories ?? [];
+    if (/FROM mailboxes WHERE/.test(sql)) return rows.mailboxes ?? [];
+    if (/FROM email_rules WHERE/.test(sql)) return rows.emailRules ?? [];
+    if (/FROM webhooks WHERE/.test(sql)) return rows.webhooks ?? [];
+    if (/SELECT "customDomain" FROM workspaces WHERE id/.test(sql)) return rows.ownDomain ?? [];
+    if (/FROM workspaces WHERE lower\("customDomain"\)/.test(sql)) return rows.domainTaken ?? [];
     return [];
   };
 }
@@ -2306,6 +2310,286 @@ describe('ImportWorkspace completeExisting', () => {
 
       expect(storage.uploadedKeys).toEqual([]);
       expect(result).toMatchObject({ attachmentsImported: 0, attachmentsOfExistingTickets: 2 });
+    });
+  });
+});
+
+describe('ImportWorkspace configuration', () => {
+  const at = '2026-01-01T00:00:00.000Z';
+  const alice = { id: 'u-src', email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' };
+  const mailbox = (extra: Partial<WorkspaceExportData['mailboxes'][number]> = {}): WorkspaceExportData['mailboxes'][number] => ({
+    id: 'mb-src', originId: 'mb-origin', address: 'support@acme.com', type: 'imap', imapHost: 'imap.acme.com', imapPort: 993,
+    imapUser: 'support', encryption: 'tls', imapFolder: 'INBOX', pollInterval: 30, addressMode: 'all',
+    acceptedAddresses: [], autoReply: true, postProcessAction: 'none', postProcessFolder: null, ...extra,
+  });
+  const rule = (extra: Partial<WorkspaceExportData['emailRules'][number]> = {}): WorkspaceExportData['emailRules'][number] => ({
+    id: 'r-src', originId: 'r-origin', name: 'Billing', position: 2, isActive: true,
+    conditions: [{ field: 'subject', operator: 'contains', value: 'invoice' }],
+    actions: [], mailboxOriginIds: [], ...extra,
+  });
+  const run = async (rows: TableRows, data: WorkspaceExportData, options: Parameters<ImportWorkspace['execute']>[2] = {}) => {
+    const qr = new FakeQueryRunner(answerFrom(rows));
+    const { result } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data, options);
+    return { qr, result };
+  };
+
+  describe('mailboxes', () => {
+    it('creates mailboxes paused, with no IMAP password when the file carries none, and links them', async () => {
+      const { qr, result } = await run({}, emptyExport({ mailboxes: [mailbox()] }));
+
+      const [insert] = qr.find(/INSERT INTO mailboxes/);
+      expect(insert.sql).toMatch(/VALUES \(\$1, \$2, \$3, false,/);
+      const [id, address, workspaceId, type, host, port, user, pass] = insert.params;
+      expect([address, workspaceId, type, host, port, user, pass]).toEqual(['support@acme.com', 'ws-target', 'imap', 'imap.acme.com', 993, 'support', null]);
+      expect(result.mailboxesImported).toBe(1);
+      expect(result.credentialsIncluded).toBe(false);
+      expect(linksWritten(qr)).toContainEqual(['mailbox', 'mb-origin', id]);
+    });
+
+    it('stores the IMAP password a file with credentials carries, still paused', async () => {
+      const { qr, result } = await run({}, emptyExport({ credentialsIncluded: true, mailboxes: [mailbox({ imapPass: 'secret' })] }));
+
+      const [insert] = qr.find(/INSERT INTO mailboxes/);
+      expect(insert.params[7]).toBe('secret');
+      expect(insert.sql).toMatch(/\$3, false,/);
+      expect(result.credentialsIncluded).toBe(true);
+    });
+
+    it('reuses a mailbox of the target with the same address, leaving it untouched', async () => {
+      const { qr, result } = await run(
+        { mailboxes: [{ id: 'mb-here', address: 'Support@Acme.com' }] },
+        emptyExport({ mailboxes: [mailbox()] }),
+      );
+
+      expect(qr.find(/INSERT INTO mailboxes/)).toHaveLength(0);
+      expect(qr.find(/UPDATE mailboxes/)).toHaveLength(0);
+      expect(result.mailboxesImported).toBe(0);
+      expect(linksWritten(qr)).toContainEqual(['mailbox', 'mb-origin', 'mb-here']);
+    });
+
+    it('points new tickets at the target mailbox and fills the mailbox of a completed ticket only when empty', async () => {
+      const created = await run(
+        { mailboxes: [{ id: 'mb-here', address: 'support@acme.com' }] },
+        emptyExport({ users: [alice], mailboxes: [mailbox()], tickets: [{ ...ticket('t-1', null), mailboxOriginId: 'mb-origin' }] }),
+      );
+      const [ticketInsert] = created.qr.find(/INSERT INTO tickets/);
+      expect(ticketInsert.sql).toMatch(/"mailboxId"\n/);
+      expect(ticketInsert.params[27]).toBe('mb-here');
+
+      const here = {
+        mailboxes: [{ id: 'mb-here', address: 'support@acme.com' }],
+        links: [importLink('ticket', 't-origin', 'existing-t')],
+        tickets: [{ id: 'existing-t', name: 'Here', reporterId: 'u-1', createdAt: at }],
+      };
+      const fileTicket = { ...ticket('t-src', null), originId: 't-origin', mailboxOriginId: 'mb-origin' };
+      const details = (mailboxId: string | null) => [{ id: 'existing-t', source: 'ui', customFields: {}, mailboxId }];
+      const filled = await run({ ...here, ticketDetails: details(null) },
+        emptyExport({ users: [alice], mailboxes: [mailbox()], tickets: [fileTicket] }), { completeExisting: true });
+      const [update] = filled.qr.find(/UPDATE tickets SET/);
+      expect(update.sql).toMatch(/"mailboxId" = COALESCE\("mailboxId", \$2\)/);
+      expect(update.params).toEqual(['existing-t', 'mb-here']);
+
+      const kept = await run({ ...here, ticketDetails: details('mb-other') },
+        emptyExport({ users: [alice], mailboxes: [mailbox()], tickets: [fileTicket] }), { completeExisting: true });
+      expect(kept.qr.find(/UPDATE tickets SET/)).toHaveLength(0);
+    });
+
+    it('rejects a mailbox of an unknown type', async () => {
+      await expect(run({}, emptyExport({ mailboxes: [mailbox({ type: 'pop3' })] })))
+        .rejects.toThrow('Invalid export file: mailboxes[0].type must be one of: webhook, imap');
+    });
+  });
+
+  describe('email rules', () => {
+    it('remaps mailboxes and action values to the target, dropping what has no counterpart, and keeps isActive', async () => {
+      const { qr, result } = await run(
+        { departments: [{ id: 'dep-here', name: 'Billing' }], tags: [{ id: 'tag-here', name: 'vip' }] },
+        emptyExport({
+          users: [alice],
+          departments: [{ id: 'dep-src', name: 'Billing', description: null, memberEmails: [], createdAt: at }],
+          tags: [{ id: 'tag-src', name: 'vip', color: null, createdAt: at }],
+          mailboxes: [mailbox()],
+          emailRules: [rule({
+            isActive: false,
+            mailboxOriginIds: ['mb-origin', 'mb-unknown'],
+            actions: [
+              { type: 'set-department', value: 'dep-src' },
+              { type: 'add-tags', value: 'tag-src,tag-unknown' },
+              { type: 'assign-to', value: 'u-src' },
+              { type: 'set-organization', value: 'org-unknown' },
+              { type: 'set-priority', value: 'high' },
+            ],
+          })],
+        }),
+      );
+
+      const mailboxId = qr.find(/INSERT INTO mailboxes/)[0].params[0];
+      const [insert] = qr.find(/INSERT INTO email_rules/);
+      const [id, workspaceId, name, position, isActive, mailboxIds, conditions, actions] = insert.params as string[];
+      expect([workspaceId, name, position, isActive]).toEqual(['ws-target', 'Billing', 2, false]);
+      expect(JSON.parse(mailboxIds)).toEqual([mailboxId]);
+      expect(JSON.parse(conditions)).toEqual([{ field: 'subject', operator: 'contains', value: 'invoice' }]);
+      expect(JSON.parse(actions)).toEqual([
+        { type: 'set-department', value: 'dep-here' },
+        { type: 'add-tags', value: 'tag-here' },
+        { type: 'assign-to', value: 'u-1' },
+        { type: 'set-priority', value: 'high' },
+      ]);
+      expect(qr.queries.findIndex((q) => /INSERT INTO email_rules/.test(q.sql)))
+        .toBeGreaterThan(qr.queries.findIndex((q) => /INSERT INTO mailboxes/.test(q.sql)));
+      expect(result.emailRulesImported).toBe(1);
+      expect(linksWritten(qr)).toContainEqual(['email-rule', 'r-origin', id]);
+    });
+
+    it('creates inactive a rule limited to mailboxes none of which could be mapped, so it never widens to all', async () => {
+      const { qr } = await run({}, emptyExport({ emailRules: [rule({ isActive: true, mailboxOriginIds: ['mb-gone'] })] }));
+
+      const [insert] = qr.find(/INSERT INTO email_rules/);
+      expect(insert.params[4]).toBe(false);
+      expect(insert.params[5]).toBe('[]');
+    });
+
+    it('reuses a rule with the same name instead of duplicating it', async () => {
+      const { qr, result } = await run({ emailRules: [{ id: 'r-here', name: 'Billing' }] }, emptyExport({ emailRules: [rule()] }));
+
+      expect(qr.find(/INSERT INTO email_rules/)).toHaveLength(0);
+      expect(result.emailRulesImported).toBe(0);
+      expect(linksWritten(qr)).toContainEqual(['email-rule', 'r-origin', 'r-here']);
+    });
+
+    it('rejects a rule with an unknown action', async () => {
+      await expect(run({}, emptyExport({ emailRules: [rule({ actions: [{ type: 'forward' }] })] })))
+        .rejects.toThrow('Invalid export file: emailRules[0].actions[0].type must be one of');
+    });
+  });
+
+  describe('webhooks', () => {
+    const webhook = (extra: Partial<WorkspaceExportData['webhooks'][number]> = {}) => ({
+      id: 'wh-src', originId: 'wh-origin', url: 'https://hooks.acme.com/x', events: ['ticket.created', 'comment.created'], ...extra,
+    });
+
+    it('creates webhooks inactive with a new random secret when the file carries none', async () => {
+      const { qr, result } = await run({}, emptyExport({ webhooks: [webhook()] }));
+
+      const [insert] = qr.find(/INSERT INTO webhooks/);
+      expect(insert.sql).toMatch(/VALUES \(\$1, \$2, \$3, \$4, \$5, false\)/);
+      const [id, workspaceId, url, events, secret] = insert.params as string[];
+      expect([workspaceId, url, events]).toEqual(['ws-target', 'https://hooks.acme.com/x', 'ticket.created,comment.created']);
+      expect(secret).toMatch(/^[0-9a-f]{64}$/);
+      expect(result.webhooksImported).toBe(1);
+      expect(linksWritten(qr)).toContainEqual(['webhook', 'wh-origin', id]);
+    });
+
+    it('keeps the secret a file with credentials carries', async () => {
+      const { qr } = await run({}, emptyExport({ credentialsIncluded: true, webhooks: [webhook({ secret: 'hook-secret' })] }));
+      expect(qr.find(/INSERT INTO webhooks/)[0].params[4]).toBe('hook-secret');
+    });
+
+    it('reuses a webhook of the target with the same URL, leaving it untouched', async () => {
+      const { qr, result } = await run({ webhooks: [{ id: 'wh-here', url: 'https://hooks.acme.com/x' }] }, emptyExport({ webhooks: [webhook()] }));
+
+      expect(qr.find(/INSERT INTO webhooks|UPDATE webhooks/)).toHaveLength(0);
+      expect(result.webhooksImported).toBe(0);
+    });
+
+    it('rejects a webhook URL that is not http or https', async () => {
+      await expect(run({}, emptyExport({ webhooks: [webhook({ url: 'file:///etc/passwd' })] })))
+        .rejects.toThrow('Invalid export file: webhooks[0].url must be an http or https URL');
+    });
+  });
+
+  describe('email sender', () => {
+    const sender = (extra: Partial<NonNullable<WorkspaceExportData['emailSender']>> = {}) => ({
+      smtpHost: 'smtp.acme.com', smtpPort: 587, smtpUser: 'mailer', smtpFrom: 'no-reply@acme.com', encryption: 'tls',
+      fromName: 'Acme', fromEmail: null, ...extra,
+    });
+
+    it('is left alone unless emailSender is overwritten', async () => {
+      const { qr, result } = await run({}, emptyExport({ credentialsIncluded: true, emailSender: sender({ smtpPass: 'p' }) }));
+      expect(qr.find(/workspace_email_senders/)).toHaveLength(0);
+      expect(result.settingsApplied).toEqual([]);
+    });
+
+    it('replaces the target sender when overwritten and the file carries its password', async () => {
+      const { qr, result } = await run({}, emptyExport({ credentialsIncluded: true, emailSender: sender({ smtpPass: 'p' }) }), { overwrite: ['emailSender'] });
+
+      const [upsert] = qr.find(/INSERT INTO workspace_email_senders/);
+      expect(upsert.sql).toMatch(/ON CONFLICT \("workspaceId"\) DO UPDATE SET/);
+      expect(upsert.params.slice(1)).toEqual(['ws-target', 'smtp.acme.com', 587, 'mailer', 'p', 'no-reply@acme.com', 'tls', 'Acme', null]);
+      expect(result.settingsApplied).toEqual(['emailSender']);
+    });
+
+    it('is not applied without a password, so the workspace keeps sending through its current sender', async () => {
+      const { qr, result } = await run({}, emptyExport({ emailSender: sender() }), { overwrite: ['emailSender'] });
+      expect(qr.find(/workspace_email_senders/)).toHaveLength(0);
+      expect(result.settingsApplied).toEqual([]);
+    });
+  });
+
+  describe('custom domain and name', () => {
+    it('are left alone unless overwritten', async () => {
+      const { qr, result } = await run({}, emptyExport({ customDomain: 'help.acme.com' }));
+      expect(qr.find(/UPDATE workspaces/)).toHaveLength(0);
+      expect(result.customDomainSkipped).toBeNull();
+    });
+
+    it('sets the custom domain unverified with a new verification token, and the name', async () => {
+      const { qr, result } = await run({}, emptyExport({ customDomain: 'Help.Acme.com' }), { overwrite: ['customDomain', 'name'] });
+
+      const [update] = qr.find(/UPDATE workspaces/);
+      expect(update.sql).toBe('UPDATE workspaces SET name = $2, "customDomain" = $3, "customDomainVerified" = false, "domainVerificationToken" = $4 WHERE id = $1');
+      expect(update.params.slice(0, 3)).toEqual(['ws-target', 'Acme', 'help.acme.com']);
+      expect(update.params[3]).toMatch(/^oh-verify=[0-9a-f]{32}$/);
+      expect(result.settingsApplied).toEqual(['name', 'customDomain']);
+      expect(result.customDomainSkipped).toBeNull();
+    });
+
+    it('skips and reports a custom domain another workspace already uses', async () => {
+      const { qr, result } = await run({ domainTaken: [{ '?column?': 1 }] }, emptyExport({ customDomain: 'help.acme.com' }), { overwrite: ['customDomain'] });
+
+      const [check] = qr.find(/lower\("customDomain"\)/);
+      expect(check.params).toEqual(['help.acme.com', 'ws-target']);
+      expect(qr.find(/UPDATE workspaces/)).toHaveLength(0);
+      expect(result.customDomainSkipped).toBe('"help.acme.com" is already used by another workspace');
+      expect(result.settingsApplied).toEqual([]);
+    });
+
+    it('skips the platform host and keeps a domain the workspace already has, verified as it is', async () => {
+      const platform = await run({}, emptyExport({ customDomain: 'desk.example.com' }), { overwrite: ['customDomain'], primaryHost: 'desk.example.com' });
+      expect(platform.result.customDomainSkipped).toBe('"desk.example.com" is the platform\'s own URL');
+
+      const same = await run({ ownDomain: [{ customDomain: 'help.acme.com' }] }, emptyExport({ customDomain: 'help.acme.com' }), { overwrite: ['customDomain'] });
+      expect(same.qr.find(/UPDATE workspaces/)).toHaveLength(0);
+      expect(same.result.settingsApplied).toEqual(['customDomain']);
+    });
+  });
+
+  it('points audit entries about mailboxes and webhooks at the ones it created or reused', async () => {
+    const { qr } = await run({ webhooks: [{ id: 'wh-here', url: 'https://hooks.acme.com/x' }] }, emptyExport({
+      mailboxes: [mailbox()],
+      webhooks: [{ id: 'wh-src', originId: 'wh-src', url: 'https://hooks.acme.com/x', events: [] }],
+      auditLog: [
+        { action: 'mailbox-created', entityType: 'mailbox', entityId: 'mb-src', userEmail: null, metadata: { mailboxId: 'mb-src' }, createdAt: at },
+        { action: 'webhook-created', entityType: 'webhook', entityId: 'wh-src', userEmail: null, metadata: null, createdAt: at },
+      ],
+    }));
+
+    const mailboxId = qr.find(/INSERT INTO mailboxes/)[0].params[0];
+    const audits = qr.find(/INSERT INTO audit_log_entries/);
+    expect(audits.map((q) => q.params[3])).toEqual([mailboxId, 'wh-here']);
+    expect(JSON.parse(audits[0].params[6] as string)).toEqual({ mailboxId });
+  });
+
+  it('imports a 1.17 file, which carries no configuration, as before', async () => {
+    const legacy = emptyExport({ version: '1.17.0', users: [alice], tickets: [ticket('t-1', null)] }) as Partial<WorkspaceExportData>;
+    for (const section of ['mailboxes', 'emailRules', 'emailSender', 'webhooks', 'customDomain', 'credentialsIncluded'] as const) delete legacy[section];
+
+    const { qr, result } = await run({}, legacy as WorkspaceExportData, { overwrite: ['emailSender', 'customDomain', 'name'] });
+
+    expect(qr.find(/INSERT INTO (mailboxes|email_rules|webhooks|workspace_email_senders)/)).toHaveLength(0);
+    expect(result).toMatchObject({
+      ticketsImported: 1, mailboxesImported: 0, emailRulesImported: 0, webhooksImported: 0,
+      customDomainSkipped: null, credentialsIncluded: false, settingsApplied: ['name'],
     });
   });
 });
