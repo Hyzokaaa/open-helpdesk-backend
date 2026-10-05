@@ -16,6 +16,18 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.25.2',
+    date: '2026-10-05',
+    categories: [
+      {
+        title: { en: 'Fixes', es: 'Correcciones' },
+        features: [
+          { en: 'The Updates page shows the Open Helpdesk version you run again, instead of always reporting a development build', es: 'La página de Actualizaciones vuelve a mostrar la versión de Open Helpdesk que tienes instalada, en lugar de indicar siempre una versión de desarrollo' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.25.1',
     date: '2026-10-05',
     categories: [

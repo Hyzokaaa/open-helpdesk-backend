@@ -1,4 +1,5 @@
 import { Controller, Get, Query } from '@nestjs/common';
+import { parseClientVersion } from '../../../domain/services/version-installed-product';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { AccessDeniedError } from '../../../../shared/domain/errors';
@@ -20,6 +21,6 @@ export class SystemVersionController {
     }
 
     // Only a well-formed version is used to look up the installed product
-    return instance.execute(client && /^d+.d+.d+$/.test(client) ? client : null);
+    return instance.execute(parseClientVersion(client));
   }
 }
