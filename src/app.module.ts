@@ -5,6 +5,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { EventEmitterModule } from "@nestjs/event-emitter";
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 import { ScheduleModule } from "@nestjs/schedule";
+import { GLOBAL_THROTTLE } from "./shared/nest/throttling/throttle.constants";
 import { JwtAuthGuard } from "./shared/nest/guards/jwt-auth.guard";
 import { ApiKeyAuthGuard } from "./shared/nest/guards/api-key-auth.guard";
 import { EmailVerifiedGuard } from "./shared/nest/guards/email-verified.guard";
@@ -54,7 +55,7 @@ import { SystemMailboxController } from "./mailbox/infrastructure/nest/controlle
     ConfigModule.forRoot({ isGlobal: true }),
     EventEmitterModule.forRoot(),
     ScheduleModule.forRoot(),
-    ThrottlerModule.forRoot({ throttlers: [{ ttl: 60000, limit: 100 }] }),
+    ThrottlerModule.forRoot({ throttlers: [GLOBAL_THROTTLE] }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({

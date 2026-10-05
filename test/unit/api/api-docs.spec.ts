@@ -13,9 +13,16 @@ import {
   API_DOCS_REDIRECTS,
   API_KEY_SECURITY_SCHEME,
   API_OPENAPI_JSON_PATH,
+  NOT_DELIVERED_EXTENSION,
+  RATE_LIMIT_EXTENSION,
   REQUIRED_SCOPE_EXTENSION,
   SCOPES_EXTENSION,
+  WEBHOOK_DELIVERY_EXTENSION,
+  WEBHOOKS_EXTENSION,
 } from '../../../src/api/infrastructure/nest/openapi/api-docs.constants';
+import { WebhookEvent } from '../../../src/webhook/domain/enums/webhook-event.enum';
+import { deliveredWebhookEvents, WEBHOOK_SIGNATURE_HEADER } from '../../../src/api/infrastructure/nest/openapi/api-docs.webhooks';
+import { PUBLIC_API_THROTTLE } from '../../../src/shared/nest/throttling/throttle.constants';
 import { ALL_API_KEY_SCOPES, DEFAULT_API_KEY_SCOPES } from '../../../src/api-key/domain/enums/api-key-scope.enum';
 
 /** Holds the public controller alone; its repositories are stubbed, the document never calls them. */
@@ -96,6 +103,59 @@ describe('public API OpenAPI document', () => {
     expect(config.info.description).toContain('https://help.example.com/docs');
   });
 
+  it('lists every selectable webhook event, flagging those the delivery service does not send', () => {
+    const webhooks = (document as any)[WEBHOOKS_EXTENSION];
+    expect(Object.keys(webhooks)).toEqual(Object.values(WebhookEvent));
+    const delivered = new Set(deliveredWebhookEvents());
+    for (const event of Object.values(WebhookEvent)) {
+      const post = webhooks[event].post;
+      expect({ event, flagged: post[NOT_DELIVERED_EXTENSION] === true }).toEqual({ event, flagged: !delivered.has(event) });
+      expect(post.summary).toEqual(expect.any(String));
+      expect(post.description).toEqual(expect.any(String));
+    }
+  });
+
+  it('delivers every selectable webhook event today', () => {
+    expect(new Set(deliveredWebhookEvents())).toEqual(new Set(Object.values(WebhookEvent)));
+  });
+
+  it('gives each webhook event a payload schema present in components, naming the event and its data', () => {
+    const webhooks = (document as any)[WEBHOOKS_EXTENSION];
+    const schemas = document.components?.schemas as Record<string, any>;
+    for (const event of Object.values(WebhookEvent)) {
+      const ref: string = webhooks[event].post.requestBody.content['application/json'].schema.$ref;
+      const payload = schemas[ref.replace('#/components/schemas/', '')];
+      expect({ event, present: !!payload }).toEqual({ event, present: true });
+      expect(payload.required).toEqual(expect.arrayContaining(['event', 'data', 'timestamp']));
+      expect(payload.properties.event.enum).toEqual([event]);
+      const data = schemas[payload.properties.data.$ref.replace('#/components/schemas/', '')];
+      expect({ event, fields: Object.keys(data.properties) }).toEqual({ event, fields: expect.arrayContaining(['workspaceId', 'workspaceSlug', 'ticketId']) });
+    }
+  });
+
+  it('states the webhook delivery facts', () => {
+    const delivery = (document as any)[WEBHOOK_DELIVERY_EXTENSION];
+    expect(delivery).toMatchObject({ method: 'POST', timeoutMs: 10000, attempts: 1, retries: 0, successStatus: '2xx' });
+    expect(delivery.signature).toMatchObject({ header: WEBHOOK_SIGNATURE_HEADER, algorithm: 'HMAC-SHA256', encoding: 'hex' });
+    expect(delivery.headers.map((h: any) => h.name)).toEqual(['Content-Type', 'X-Webhook-Event', 'X-Webhook-Signature']);
+  });
+
+  it('states the rate limit the public API controller enforces', () => {
+    const rateLimit = (document as any)[RATE_LIMIT_EXTENSION];
+    expect(rateLimit).toMatchObject({
+      limit: PUBLIC_API_THROTTLE.limit,
+      windowSeconds: PUBLIC_API_THROTTLE.ttl / 1000,
+      scope: 'ip-per-endpoint',
+      perEndpoint: true,
+      storage: 'memory',
+      exceededStatus: 429,
+    });
+    const throttle = Reflect.getMetadata('THROTTLER:LIMITdefault', ApiController);
+    const ttl = Reflect.getMetadata('THROTTLER:TTLdefault', ApiController);
+    expect({ limit: throttle, ttl }).toEqual(PUBLIC_API_THROTTLE);
+    expect(rateLimit.headers.map((h: any) => h.name)).toEqual(['X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'Retry-After']);
+  });
+
   it('lists every scope on the security scheme, marking the default ones', () => {
     const scopes = (document.components?.securitySchemes?.[API_KEY_SECURITY_SCHEME] as any)[SCOPES_EXTENSION];
     expect(scopes.map((s: any) => s.scope)).toEqual(ALL_API_KEY_SCOPES);
@@ -142,7 +202,7 @@ describe('public API docs routes', () => {
     const res = fakeResponse();
     routes.get(`/${API_OPENAPI_JSON_PATH}`)!({}, res);
     expect(res.headers['Access-Control-Allow-Origin']).toBe('*');
-    expect(res.body).toEqual({ openapi: '3.0.0' });
+    expect(res.body).toMatchObject({ openapi: '3.0.0' });
   });
 
   it('redirects /docs and /api/v1/docs to the docs page of the web app', () => {

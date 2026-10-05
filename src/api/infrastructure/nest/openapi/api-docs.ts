@@ -11,8 +11,13 @@ import {
   API_DOCS_REDIRECTS,
   API_KEY_SECURITY_SCHEME,
   API_OPENAPI_JSON_PATH,
+  RATE_LIMIT_EXTENSION,
   SCOPES_EXTENSION,
+  WEBHOOK_DELIVERY_EXTENSION,
+  WEBHOOKS_EXTENSION,
 } from './api-docs.constants';
+import { buildWebhookDeliveryExtension, buildWebhooksExtension, WEBHOOK_PAYLOAD_MODELS } from './api-docs.webhooks';
+import { buildRateLimitExtension } from './api-docs.rate-limit';
 import { DocumentedScope, SCOPE_DESCRIPTIONS } from './api-docs.scopes';
 
 export interface ApiDocsOptions {
@@ -70,14 +75,23 @@ export function buildApiDocumentConfig(options: ApiDocsOptions): Omit<OpenAPIObj
 
 /**
  * Builds the document from the public API controller only, so internal app routes never
- * appear in it. `modules` exists for tests, which scan a stand-in module.
+ * appear in it, plus the webhook and rate limit extensions. `modules` exists for tests, which scan a stand-in module.
  */
 export function createApiDocument(
   app: INestApplication,
   options: ApiDocsOptions,
   modules: Type<unknown>[] = [ApiModule],
 ): OpenAPIObject {
-  return SwaggerModule.createDocument(app, buildApiDocumentConfig(options), { include: modules });
+  const document = SwaggerModule.createDocument(app, buildApiDocumentConfig(options), {
+    include: modules,
+    extraModels: WEBHOOK_PAYLOAD_MODELS,
+  });
+  // Facts the guides used to copy by hand: webhook events and payloads, delivery, rate limit
+  const extended = document as OpenAPIObject & Record<string, unknown>;
+  extended[WEBHOOKS_EXTENSION] = buildWebhooksExtension();
+  extended[WEBHOOK_DELIVERY_EXTENSION] = buildWebhookDeliveryExtension();
+  extended[RATE_LIMIT_EXTENSION] = buildRateLimitExtension();
+  return document;
 }
 
 /**

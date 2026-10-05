@@ -21,6 +21,7 @@ import {
 } from '@nestjs/swagger';
 import { ApiKeyScope } from '../../../../api-key/domain/enums/api-key-scope.enum';
 import { Throttle } from '@nestjs/throttler';
+import { PUBLIC_API_THROTTLE } from '../../../../shared/nest/throttling/throttle.constants';
 import { ConfigService } from '@nestjs/config';
 import { tokenExchangeTtlFromConfig } from '../token-exchange-ttl';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
@@ -98,7 +99,7 @@ const LIMIT_QUERY = ApiQuery({ name: 'limit', required: false, type: Number, des
 @ApiKeyAuth()
 @ApiBearerAuth(API_KEY_SECURITY_SCHEME)
 @ApiExtraModels(...API_RESPONSE_EXTRA_MODELS)
-@Throttle({ default: { ttl: 60000, limit: 100 } })
+@Throttle({ default: PUBLIC_API_THROTTLE })
 export class ApiController {
   private readonly tokenExchangeTtl: string;
 
