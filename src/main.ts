@@ -4,6 +4,8 @@ import { json } from "body-parser";
 import { AppModule } from "./app.module";
 import { ensureDatabase } from "./shared/infrastructure/ensure-database";
 import { DomainExceptionFilter } from "./shared/nest/filters/domain-exception.filter";
+import { setupApiDocs } from "./api/infrastructure/nest/openapi/api-docs";
+import { resolveBackendVersion } from "./config/infrastructure/nest/resolve-backend-version";
 
 async function bootstrap() {
   await ensureDatabase();
@@ -58,6 +60,9 @@ async function bootstrap() {
     },
     exposedHeaders: ["X-Unread-Count", "Date", "Content-Disposition"],
   });
+
+  // Public API reference: Swagger UI at /api/v1/docs, JSON at /api/v1/openapi.json, /docs redirects
+  setupApiDocs(app, { version: resolveBackendVersion(), serverUrl: process.env.API_URL });
 
   await app.listen(process.env.PORT ?? 3000);
 }
