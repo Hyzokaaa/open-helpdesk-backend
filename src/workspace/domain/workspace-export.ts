@@ -116,8 +116,10 @@ export interface WorkspaceExportTicket {
   departmentId?: string | null;
   /** Source project id, resolved against `projects`. Since 1.15. */
   projectId?: string | null;
-  /** Since 1.15; absent in older files, which import as 'ui'. The mailbox is not carried. */
+  /** Since 1.15; absent in older files, which import as 'ui'. */
   source?: string;
+  /** Origin id of the ticket's mailbox, resolved against `mailboxes`. Since 1.18. */
+  mailboxOriginId?: string | null;
   registeredByEmail?: string | null;
   originDate?: string | null;
   descriptionEditedAt?: string | null;
@@ -263,6 +265,69 @@ export interface WorkspaceExportAuditEntry {
   createdAt: string;
 }
 
+/**
+ * A mailbox of the workspace (never the platform's system mailbox). Since 1.18. The IMAP password
+ * travels only in an export made with credentials; the import always creates mailboxes paused.
+ */
+export interface WorkspaceExportMailbox {
+  /** Source id, so audit entries about the mailbox can follow it. */
+  id?: string;
+  originId: string;
+  address: string;
+  type: string;
+  imapHost: string | null;
+  imapPort: number | null;
+  imapUser: string | null;
+  /** Only in an export made with credentials. */
+  imapPass?: string | null;
+  encryption: string;
+  imapFolder: string | null;
+  pollInterval: number | null;
+  addressMode: string;
+  acceptedAddresses: string[];
+  autoReply: boolean;
+  postProcessAction: string;
+  postProcessFolder: string | null;
+}
+
+/** Since 1.18. Action values name source ids (department, category, tags, user, organization). */
+export interface WorkspaceExportEmailRule {
+  /** Source id, so audit entries about the rule can follow it. */
+  id?: string;
+  originId: string;
+  name: string;
+  position: number;
+  isActive: boolean;
+  conditions: { field: string; operator: string; value: string }[];
+  actions: { type: string; value?: string }[];
+  /** Origin ids of the mailboxes the rule is limited to; empty means every mailbox. */
+  mailboxOriginIds: string[];
+}
+
+/** The workspace's own SMTP sender. Since 1.18. */
+export interface WorkspaceExportEmailSender {
+  smtpHost: string;
+  smtpPort: number;
+  smtpUser: string;
+  /** Only in an export made with credentials. */
+  smtpPass?: string;
+  smtpFrom: string;
+  encryption: string;
+  fromName: string | null;
+  fromEmail: string | null;
+}
+
+/** Since 1.18. The import always creates webhooks inactive. */
+export interface WorkspaceExportWebhook {
+  /** Source id, so audit entries about the webhook can follow it. */
+  id?: string;
+  originId: string;
+  url: string;
+  events: string[];
+  /** Only in an export made with credentials. */
+  secret?: string;
+}
+
 export interface WorkspaceExportData {
   version: string;
   exportedAt: string;
@@ -296,6 +361,14 @@ export interface WorkspaceExportData {
   kbCategories: WorkspaceExportKbCategory[];
   kbArticles: WorkspaceExportKbArticle[];
   auditLog: WorkspaceExportAuditEntry[];
+  /** Since 1.18. API keys are never exported. */
+  mailboxes: WorkspaceExportMailbox[];
+  emailRules: WorkspaceExportEmailRule[];
+  emailSender: WorkspaceExportEmailSender | null;
+  webhooks: WorkspaceExportWebhook[];
+  customDomain: string | null;
+  /** True when the export carries passwords and secrets (mailboxes, email sender, webhooks). Since 1.18. */
+  credentialsIncluded: boolean;
   /** Files the source storage no longer had when this export was made. Since 1.16. */
   missingFiles?: WorkspaceExportMissingFile[];
 }

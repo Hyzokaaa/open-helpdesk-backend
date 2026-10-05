@@ -18,6 +18,9 @@ export const IMPORT_LINK_TYPES = {
   cannedResponse: 'canned-response',
   kbCategory: 'kb-category',
   kbArticle: 'kb-article',
+  mailbox: 'mailbox',
+  emailRule: 'email-rule',
+  webhook: 'webhook',
 } as const;
 
 export type ImportLinkType = typeof IMPORT_LINK_TYPES[keyof typeof IMPORT_LINK_TYPES];

@@ -6,6 +6,7 @@ import { FakeS3Storage } from '../../../mocks/fake-s3-storage';
 import { applyTransforms, CURRENT_VERSION } from '../../../../src/workspace/domain/services/workspace-export-transforms';
 import { WorkspaceExportData } from '../../../../src/workspace/domain/workspace-export';
 import { DomainValidationError } from '../../../../src/shared/domain/errors';
+import { createExportToken, validateExportToken } from '../../../../src/workspace/domain/services/workspace-export-token';
 
 interface RecordedQuery {
   sql: string;
@@ -73,6 +74,12 @@ function emptyExport(overrides: Partial<WorkspaceExportData> = {}): WorkspaceExp
     kbCategories: [],
     kbArticles: [],
     auditLog: [],
+    mailboxes: [],
+    emailRules: [],
+    emailSender: null,
+    webhooks: [],
+    customDomain: null,
+    credentialsIncluded: false,
     ...overrides,
   };
 }
@@ -285,24 +292,26 @@ describe('ExportWorkspace', () => {
     expect(result.tickets[0].projectId).toBe('p-1');
   });
 
-  it('exports the ticket source, registrar, origin date and description edit date, but not the mailbox', async () => {
+  it('exports the ticket source, registrar, origin date, description edit date and mailbox origin id', async () => {
     const origin = new Date('2025-12-31T00:00:00.000Z');
     const qr = new FakeQueryRunner((sql, params) => {
       if (/FROM tickets t/.test(sql)) {
         return [{
           id: 't-1', name: 'T', status: 'open', category: null, reporterId: 'u-1', tagIds: [], createdAt, updatedAt: createdAt,
-          source: 'email', registeredById: 'u-agent', originDate: origin, descriptionEditedAt: createdAt,
+          source: 'email', registeredById: 'u-agent', originDate: origin, descriptionEditedAt: createdAt, mailboxId: 'mb-1',
         }];
       }
       if (/FROM users WHERE id = ANY/.test(sql)) return [{ id: 'u-agent', email: 'agent@example.com', firstName: 'Ag', lastName: 'E' }];
+      if (/FROM workspace_import_links/.test(sql)) return [{ entityType: 'mailbox', sourceId: 'mb-origin', targetId: 'mb-1' }];
       return answer(sql, params);
     });
     const result = await new ExportWorkspace(dataSourceOf(qr)).execute('ws-1');
 
-    expect(qr.find(/FROM tickets t/)[0].sql).not.toMatch(/mailboxId/);
+    expect(qr.find(/FROM tickets t/)[0].sql).toMatch(/t."mailboxId"/);
     expect(result.tickets[0]).toMatchObject({
       source: 'email', registeredByEmail: 'agent@example.com',
       originDate: '2025-12-31T00:00:00.000Z', descriptionEditedAt: '2026-01-01T00:00:00.000Z',
+      mailboxOriginId: 'mb-origin',
     });
   });
 
@@ -379,6 +388,108 @@ describe('ExportWorkspace', () => {
     const [categoriesQuery] = qr.find(/FROM ticket_categories WHERE/);
     expect(categoriesQuery.sql).toMatch(/"workspaceId" = \$1/);
     expect(categoriesQuery.params).toEqual(['ws-1']);
+  });
+});
+
+describe('ExportWorkspace configuration', () => {
+  const createdAt = new Date('2026-01-01T00:00:00.000Z');
+  const configured: Answer = (sql) => {
+    if (/FROM workspaces WHERE id/.test(sql)) {
+      return [{ name: 'Acme', description: 'd', slaPolicy: null, metadata: null, customDomain: 'help.acme.com' }];
+    }
+    if (/FROM mailboxes WHERE/.test(sql)) {
+      return [{
+        id: 'mb-1', address: 'support@acme.com', type: 'imap', imapHost: 'imap.acme.com', imapPort: 993, imapUser: 'support',
+        imapPass: 'imap-secret', encryption: 'tls', imapFolder: 'INBOX', pollInterval: 30, addressMode: 'all',
+        acceptedAddresses: ['help@acme.com'], autoReply: true, postProcessAction: 'none', postProcessFolder: null,
+      }];
+    }
+    if (/FROM email_rules WHERE/.test(sql)) {
+      return [{
+        id: 'r-1', name: 'Spam', position: 0, isActive: true, mailboxIds: ['mb-1'],
+        conditions: [{ field: 'from', operator: 'contains', value: 'spam' }], actions: [{ type: 'reject' }],
+      }];
+    }
+    if (/FROM workspace_email_senders WHERE/.test(sql)) {
+      return [{ smtpHost: 'smtp.acme.com', smtpPort: 587, smtpUser: 'mailer', smtpPass: 'smtp-secret', smtpFrom: 'no-reply@acme.com', encryption: 'tls', fromName: 'Acme', fromEmail: null }];
+    }
+    if (/FROM webhooks WHERE/.test(sql)) {
+      return [{ id: 'wh-1', url: 'https://hooks.acme.com/x', events: 'ticket.created,comment.created', secret: 'hook-secret', createdAt }];
+    }
+    return [];
+  };
+
+  it('exports mailboxes, email rules, the sender, webhooks and the custom domain without any secret by default', async () => {
+    const qr = new FakeQueryRunner(configured);
+    const result = await new ExportWorkspace(dataSourceOf(qr)).execute('ws-1');
+
+    for (const pattern of [/FROM mailboxes WHERE/, /FROM workspace_email_senders WHERE/, /FROM webhooks WHERE/]) {
+      const [query] = qr.find(pattern);
+      expect(query.sql).toMatch(/"workspaceId" = \$1/);
+      expect(query.params).toEqual(['ws-1']);
+      expect(query.sql).not.toMatch(/imapPass|smtpPass|secret/);
+    }
+    expect(result.credentialsIncluded).toBe(false);
+    expect(result.customDomain).toBe('help.acme.com');
+    expect(result.mailboxes).toEqual([{
+      id: 'mb-1', originId: 'mb-1', address: 'support@acme.com', type: 'imap', imapHost: 'imap.acme.com', imapPort: 993,
+      imapUser: 'support', encryption: 'tls', imapFolder: 'INBOX', pollInterval: 30, addressMode: 'all',
+      acceptedAddresses: ['help@acme.com'], autoReply: true, postProcessAction: 'none', postProcessFolder: null,
+    }]);
+    expect(result.emailRules).toEqual([{
+      id: 'r-1', originId: 'r-1', name: 'Spam', position: 0, isActive: true,
+      conditions: [{ field: 'from', operator: 'contains', value: 'spam' }], actions: [{ type: 'reject' }], mailboxOriginIds: ['mb-1'],
+    }]);
+    expect(result.emailSender).toEqual({
+      smtpHost: 'smtp.acme.com', smtpPort: 587, smtpUser: 'mailer', smtpFrom: 'no-reply@acme.com', encryption: 'tls', fromName: 'Acme', fromEmail: null,
+    });
+    expect(result.webhooks).toEqual([{ id: 'wh-1', originId: 'wh-1', url: 'https://hooks.acme.com/x', events: ['ticket.created', 'comment.created'] }]);
+    expect(JSON.stringify(result)).not.toMatch(/imap-secret|smtp-secret|hook-secret/);
+  });
+
+  it('carries the passwords and secrets only when asked to include credentials', async () => {
+    const qr = new FakeQueryRunner(configured);
+    const result = await new ExportWorkspace(dataSourceOf(qr)).execute('ws-1', { includeCredentials: true });
+
+    expect(result.credentialsIncluded).toBe(true);
+    expect(result.mailboxes[0].imapPass).toBe('imap-secret');
+    expect(result.emailSender?.smtpPass).toBe('smtp-secret');
+    expect(result.webhooks[0].secret).toBe('hook-secret');
+  });
+
+  it('remaps rule mailboxes to their origin ids and exports a null sender when the workspace has none', async () => {
+    const qr = new FakeQueryRunner((sql, params) => {
+      if (/FROM workspace_import_links/.test(sql)) return [{ entityType: 'mailbox', sourceId: 'mb-origin', targetId: 'mb-1' }];
+      if (/FROM workspace_email_senders WHERE/.test(sql)) return [];
+      return configured(sql, params);
+    });
+    const result = await new ExportWorkspace(dataSourceOf(qr)).execute('ws-1');
+
+    expect(result.mailboxes[0].originId).toBe('mb-origin');
+    expect(result.emailRules[0].mailboxOriginIds).toEqual(['mb-origin']);
+    expect(result.emailSender).toBeNull();
+  });
+
+  it('never exports API keys, even with credentials', async () => {
+    const qr = new FakeQueryRunner(configured);
+    const result = await new ExportWorkspace(dataSourceOf(qr)).execute('ws-1', { includeCredentials: true });
+
+    expect(qr.find(/api_keys/)).toHaveLength(0);
+    expect(Object.keys(result).filter((key) => /api/i.test(key))).toEqual([]);
+  });
+});
+
+describe('export tokens', () => {
+  const key = { key: Buffer.alloc(32), salt: Buffer.alloc(16), iterations: 1 };
+
+  it('remember whether their download includes credentials, off by default', () => {
+    const withCredentials = createExportToken('ws-1', key, true);
+    const without = createExportToken('ws-1', key);
+
+    expect(validateExportToken(withCredentials.token)?.includeCredentials).toBe(true);
+    expect(validateExportToken(without.token)?.includeCredentials).toBe(false);
+    // Single use
+    expect(validateExportToken(withCredentials.token)).toBeNull();
   });
 });
 
@@ -1597,7 +1708,7 @@ describe('applyTransforms 1.17', () => {
       descriptionEdits: [{ ticketId: 't-1', content: 'c', editedByEmail: null, createdAt: '2026-01-01T00:00:00.000Z' }],
     });
     const upgraded = applyTransforms(legacy);
-    expect(upgraded.version).toBe('1.17.0');
+    expect(upgraded.version).toBe(CURRENT_VERSION);
     expect(upgraded.tickets[0].originId).toBe('t-1');
     expect(upgraded.tags[0].originId).toBe('tag-1');
     expect(upgraded.descriptionEdits[0]).not.toHaveProperty('originId');

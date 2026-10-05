@@ -13,6 +13,8 @@ export interface ExportTokenKey {
 export interface ExportTokenEntry {
   workspaceId: string;
   encryption: ExportTokenKey;
+  /** Whether the download carries passwords and secrets, as asked when the link was created. */
+  includeCredentials: boolean;
 }
 
 interface TokenEntry extends ExportTokenEntry {
@@ -25,6 +27,7 @@ const tokens = new Map<string, TokenEntry>();
 export function createExportToken(
   workspaceId: string,
   encryption: ExportTokenKey,
+  includeCredentials = false,
 ): { token: string; expiresAt: Date } {
   // Cleanup expired tokens
   const now = Date.now();
@@ -34,7 +37,7 @@ export function createExportToken(
 
   const token = randomBytes(32).toString('hex');
   const expiresAt = now + TOKEN_TTL;
-  tokens.set(token, { workspaceId, encryption, expiresAt });
+  tokens.set(token, { workspaceId, encryption, includeCredentials, expiresAt });
   return { token, expiresAt: new Date(expiresAt) };
 }
 
@@ -47,5 +50,5 @@ export function validateExportToken(token: string): ExportTokenEntry | null {
   }
   // Single use — delete after validation
   tokens.delete(token);
-  return { workspaceId: entry.workspaceId, encryption: entry.encryption };
+  return { workspaceId: entry.workspaceId, encryption: entry.encryption, includeCredentials: entry.includeCredentials };
 }

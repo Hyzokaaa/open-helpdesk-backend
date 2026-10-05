@@ -8,8 +8,8 @@ import { IMPORT_LINK_TYPES as LINK, ImportLinkType } from '../workspace-import-l
 
 const extractMentions = new ExtractMentions();
 
-/** comments.mentionedUserIds is a simple-array column, which raw SQL returns as comma-joined text. */
-function mentionedIdsOf(value: unknown): string[] {
+/** A simple-array column (comments.mentionedUserIds, webhooks.events), which raw SQL returns as comma-joined text. */
+function simpleArrayOf(value: unknown): string[] {
   if (Array.isArray(value)) return value;
   return typeof value === 'string' && value ? value.split(',') : [];
 }
@@ -45,12 +45,20 @@ const MIME_BY_EXTENSION: Record<string, string> = {
 
 const STAT_CONCURRENCY = 8;
 
+export interface ExportOptions {
+  /**
+   * Carry the passwords and secrets of the workspace configuration (mailbox IMAP passwords, the
+   * email sender's SMTP password, webhook secrets). Off by default: without it they are absent.
+   */
+  includeCredentials?: boolean;
+}
+
 export class ExportWorkspace {
   /** Without storage, files are listed as carried without checking them (no bytes can follow). */
   constructor(private readonly dataSource: DataSource, private readonly storage?: StorageService) {}
 
-  async execute(workspaceId: string): Promise<WorkspaceExportData> {
-    return (await this.prepare(workspaceId)).data;
+  async execute(workspaceId: string, options: ExportOptions = {}): Promise<WorkspaceExportData> {
+    return (await this.prepare(workspaceId, options)).data;
   }
 
   /**
@@ -58,9 +66,9 @@ export class ExportWorkspace {
    * file gets an archive path. A file storage no longer has stays as metadata with `file: null`
    * and is listed in `missingFiles`, so one lost object never fails the whole export.
    */
-  async prepare(workspaceId: string): Promise<WorkspaceExportBundle> {
+  async prepare(workspaceId: string, options: ExportOptions = {}): Promise<WorkspaceExportBundle> {
     const references: FileReference[] = [];
-    const data = await this.collect(workspaceId, references);
+    const data = await this.collect(workspaceId, references, options.includeCredentials === true);
 
     const sizes: (number | null | undefined)[] = new Array(references.length).fill(undefined);
     if (this.storage) {
@@ -92,7 +100,7 @@ export class ExportWorkspace {
     return { data, files };
   }
 
-  private async collect(workspaceId: string, references: FileReference[]): Promise<WorkspaceExportData> {
+  private async collect(workspaceId: string, references: FileReference[], includeCredentials: boolean): Promise<WorkspaceExportData> {
     /** A logo or icon: stored under a key ending in its image extension, its type kept nowhere else. */
     const imageFile = (key: string, missing: Omit<WorkspaceExportMissingFile, 'fileName'>): WorkspaceExportFile => {
       const fileName = key.split('/').pop() || 'image';
@@ -116,7 +124,7 @@ export class ExportWorkspace {
 
     try {
       const workspace = await qr.query(
-        `SELECT name, description, "slaPolicy", metadata, "appName", "appSubtitle", logo, icon FROM workspaces WHERE id = $1`, [workspaceId],
+        `SELECT name, description, "slaPolicy", metadata, "appName", "appSubtitle", logo, icon, "customDomain" FROM workspaces WHERE id = $1`, [workspaceId],
       );
       if (!workspace.length) throw new Error('Workspace not found');
       const ws = workspace[0];
@@ -167,7 +175,7 @@ export class ExportWorkspace {
           t."reporterId", t."assigneeId", t."ticketNumber", t."customFields",
           t."discardReason", t."portalToken", t."firstResponseAt", t."resolvedAt",
           t."resolvedById", t."firstResponseBreached", t."resolutionBreached",
-          t."organizationId", t."departmentId", t."projectId", t.source, t."registeredById",
+          t."organizationId", t."departmentId", t."projectId", t.source, t."registeredById", t."mailboxId",
           t."originDate", t."descriptionEditedAt", t."createdAt", t."updatedAt",
           COALESCE(array_agg(tt."tagsId") FILTER (WHERE tt."tagsId" IS NOT NULL), '{}') as "tagIds"
         FROM tickets t
@@ -241,6 +249,27 @@ export class ExportWorkspace {
         FROM audit_log_entries a WHERE a."workspaceId" = $1 ORDER BY a."createdAt"
       `, [workspaceId]);
 
+      // Workspace configuration. Only this workspace's mailboxes: the platform's system mailbox has no
+      // workspace. Passwords and secrets are read only when the export carries them. API keys never
+      // travel: they are credentials of this installation.
+      const mailboxes = await qr.query(`
+        SELECT id, address, type, "imapHost", "imapPort", "imapUser", ${includeCredentials ? '"imapPass", ' : ''}encryption,
+          "imapFolder", "pollInterval", "addressMode", "acceptedAddresses", "autoReply", "postProcessAction", "postProcessFolder"
+        FROM mailboxes WHERE "workspaceId" = $1 ORDER BY "createdAt", id
+      `, [workspaceId]);
+      const emailRules = await qr.query(`
+        SELECT id, name, position, "isActive", conditions, actions, "mailboxIds"
+        FROM email_rules WHERE "workspaceId" = $1 ORDER BY position, "createdAt"
+      `, [workspaceId]);
+      const senders = await qr.query(`
+        SELECT "smtpHost", "smtpPort", "smtpUser", ${includeCredentials ? '"smtpPass", ' : ''}"smtpFrom", encryption, "fromName", "fromEmail"
+        FROM workspace_email_senders WHERE "workspaceId" = $1
+      `, [workspaceId]);
+      const webhooks = await qr.query(`
+        SELECT id, url, events, ${includeCredentials ? 'secret, ' : ''}"createdAt"
+        FROM webhooks WHERE "workspaceId" = $1 ORDER BY "createdAt", id
+      `, [workspaceId]);
+
       // An entity this workspace got from an import keeps the identity it had in the file, so the
       // next import elsewhere (or back where it came from) recognises it; anything else is its own
       // origin. The earliest link wins when several files brought the same entity.
@@ -263,7 +292,7 @@ export class ExportWorkspace {
       const refer = (id: string | null | undefined) => { if (id && !users.has(id)) referenced.add(id); };
       for (const t of tickets) { refer(t.reporterId); refer(t.assigneeId); refer(t.resolvedById); refer(t.registeredById); }
       for (const c of comments) {
-        c.mentionedUserIds = mentionedIdsOf(c.mentionedUserIds);
+        c.mentionedUserIds = simpleArrayOf(c.mentionedUserIds);
         refer(c.authorId);
         for (const id of [...c.mentionedUserIds, ...extractMentions.execute(c.content ?? '')]) refer(id);
       }
@@ -371,6 +400,7 @@ export class ExportWorkspace {
           departmentId: t.departmentId ?? null,
           projectId: t.projectId ?? null,
           source: t.source ?? 'ui',
+          mailboxOriginId: t.mailboxId ? originOf(LINK.mailbox, t.mailboxId) : null,
           registeredByEmail: emailFor(t.registeredById),
           originDate: t.originDate?.toISOString() ?? null,
           descriptionEditedAt: t.descriptionEditedAt?.toISOString() ?? null,
@@ -486,6 +516,55 @@ export class ExportWorkspace {
           source: a.source ?? null,
           createdAt: a.createdAt?.toISOString(),
         })),
+        mailboxes: mailboxes.map((m: any) => ({
+          id: m.id,
+          originId: originOf(LINK.mailbox, m.id),
+          address: m.address,
+          type: m.type,
+          imapHost: m.imapHost ?? null,
+          imapPort: m.imapPort ?? null,
+          imapUser: m.imapUser ?? null,
+          ...(includeCredentials ? { imapPass: m.imapPass ?? null } : {}),
+          encryption: m.encryption,
+          imapFolder: m.imapFolder ?? null,
+          pollInterval: m.pollInterval ?? null,
+          addressMode: m.addressMode,
+          acceptedAddresses: Array.isArray(m.acceptedAddresses) ? m.acceptedAddresses : [],
+          autoReply: m.autoReply !== false,
+          postProcessAction: m.postProcessAction,
+          postProcessFolder: m.postProcessFolder ?? null,
+        })),
+        emailRules: emailRules.map((r: any) => ({
+          id: r.id,
+          originId: originOf(LINK.emailRule, r.id),
+          name: r.name,
+          position: r.position,
+          isActive: r.isActive !== false,
+          conditions: Array.isArray(r.conditions) ? r.conditions : [],
+          actions: Array.isArray(r.actions) ? r.actions : [],
+          mailboxOriginIds: (Array.isArray(r.mailboxIds) ? r.mailboxIds : []).map((id: string) => originOf(LINK.mailbox, id)),
+        })),
+        emailSender: senders.length
+          ? {
+            smtpHost: senders[0].smtpHost,
+            smtpPort: senders[0].smtpPort,
+            smtpUser: senders[0].smtpUser,
+            ...(includeCredentials ? { smtpPass: senders[0].smtpPass } : {}),
+            smtpFrom: senders[0].smtpFrom,
+            encryption: senders[0].encryption,
+            fromName: senders[0].fromName ?? null,
+            fromEmail: senders[0].fromEmail ?? null,
+          }
+          : null,
+        webhooks: webhooks.map((w: any) => ({
+          id: w.id,
+          originId: originOf(LINK.webhook, w.id),
+          url: w.url,
+          events: simpleArrayOf(w.events),
+          ...(includeCredentials ? { secret: w.secret } : {}),
+        })),
+        customDomain: ws.customDomain ?? null,
+        credentialsIncluded: includeCredentials,
       };
     } finally {
       await qr.release();

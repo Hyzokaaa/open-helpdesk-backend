@@ -93,11 +93,30 @@ const TRANSFORMS: Record<string, Transform> = {
     data.version = '1.17.0';
     return data;
   },
-  '1.17.0': (data) => data,
+  '1.17.0': (data) => {
+    // 1.17 → 1.18: the workspace configuration travels too (mailboxes, email rules, the email
+    // sender, webhooks, the custom domain). An older file carries none of it and no credentials.
+    withConfigurationSections(data);
+    data.version = '1.18.0';
+    return data;
+  },
+  // A 1.18 file written by hand may leave out the configuration sections: they count as empty
+  '1.18.0': (data) => withConfigurationSections(data),
 };
 
-const VERSION_ORDER = ['1.11.0', '1.12.0', '1.13.0', '1.14.0', '1.15.0', '1.16.0', '1.17.0'];
-const CURRENT_VERSION = '1.17.0';
+/** Fills the 1.18 configuration sections a file lacks, leaving the ones it carries. */
+function withConfigurationSections(data: WorkspaceExportData): WorkspaceExportData {
+  if (data.mailboxes === undefined) data.mailboxes = [];
+  if (data.emailRules === undefined) data.emailRules = [];
+  if (data.emailSender === undefined) data.emailSender = null;
+  if (data.webhooks === undefined) data.webhooks = [];
+  if (data.customDomain === undefined) data.customDomain = null;
+  if (data.credentialsIncluded === undefined) data.credentialsIncluded = false;
+  return data;
+}
+
+const VERSION_ORDER = ['1.11.0', '1.12.0', '1.13.0', '1.14.0', '1.15.0', '1.16.0', '1.17.0', '1.18.0'];
+const CURRENT_VERSION = '1.18.0';
 const MIN_VERSION = '1.11.0';
 
 /** Sections every supported version has; the transforms walk some of them. */

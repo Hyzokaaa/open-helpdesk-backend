@@ -723,7 +723,7 @@ export class WorkspaceController {
       isSystemAdmin: user.isSystemAdmin,
     });
     assertExportPassword(body.password);
-    await this.streamExportFile(res, slug, workspaceId, await deriveExportKey(body.password));
+    await this.streamExportFile(res, slug, workspaceId, await deriveExportKey(body.password), body.includeCredentials === true);
   }
 
   /**
@@ -731,8 +731,8 @@ export class WorkspaceController {
    * workspace and the day. Errors before the first byte go through the usual exception filter;
    * after it, the response can only be cut short, which the client sees as a failed download.
    */
-  private async streamExportFile(res: Response, slug: string, workspaceId: string, context: ExportKeyContext) {
-    const bundle = await new ExportWorkspace(this.dataSource, this.storage).prepare(workspaceId);
+  private async streamExportFile(res: Response, slug: string, workspaceId: string, context: ExportKeyContext, includeCredentials: boolean) {
+    const bundle = await new ExportWorkspace(this.dataSource, this.storage).prepare(workspaceId, { includeCredentials });
     const files = bundle.files.map((file) => ({
       path: file.path,
       size: file.size,
@@ -890,9 +890,11 @@ export class WorkspaceController {
     });
     assertExportPassword(body.password);
     // Keep the derived key, not the password: the file is built and encrypted when it is downloaded
+    const includeCredentials = body.includeCredentials === true;
     const { token, expiresAt } = createExportToken(
       workspaceId,
       await deriveExportKey(body.password),
+      includeCredentials,
     );
     const baseUrl = process.env.API_URL || process.env.BACKEND_URL || "";
 
@@ -906,7 +908,7 @@ export class WorkspaceController {
       entityId: workspaceId,
       userId: user.userId,
       workspaceId,
-      metadata: {},
+      metadata: { includeCredentials },
       category: AuditCategory.WORKSPACE,
       level: AuditLevel.INFO,
       source: "ui",
@@ -935,7 +937,7 @@ export class WorkspaceController {
       res.status(404).json({ message: "Workspace not found" });
       return;
     }
-    await this.streamExportFile(res, slug, entry.workspaceId, entry.encryption);
+    await this.streamExportFile(res, slug, entry.workspaceId, entry.encryption, entry.includeCredentials);
   }
 
   @Get(":slug/email-sender")
