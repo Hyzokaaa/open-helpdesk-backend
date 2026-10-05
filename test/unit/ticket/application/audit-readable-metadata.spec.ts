@@ -56,7 +56,7 @@ describe('readable audit metadata', () => {
     new UpdateTicket(w.tickets), w.tickets, w.ensurePermission(), w.auditLog(),
     new ValidateCustomFieldValues({ findByWorkspaceId: async () => [] } as any), undefined, labels(),
   );
-  const base = { ticketId: 'ticket-a', workspaceId: WS_A, userId: 'admin-a', isSystemAdmin: false };
+  const base = { ticketId: 'ticket-a', workspaceId: WS_A, workspaceName: 'Workspace A', workspaceSlug: 'ws-a', userId: 'admin-a', isSystemAdmin: false };
   const lastMetadata = () => w.audit.entries[w.audit.entries.length - 1].metadata as Record<string, any>;
 
   beforeEach(async () => {

@@ -4,6 +4,8 @@ import { DeleteTicketCommand } from './delete-ticket.command';
 interface Props {
   ticketIds: string[];
   workspaceId: string;
+  workspaceName: string;
+  workspaceSlug: string;
   userId: string;
   isSystemAdmin: boolean;
 }
@@ -27,6 +29,8 @@ export class BulkDeleteCommand implements Command<Props, BulkResult[]> {
         await this.deleteCommand.execute({
           ticketId,
           workspaceId: props.workspaceId,
+          workspaceName: props.workspaceName,
+          workspaceSlug: props.workspaceSlug,
           userId: props.userId,
           isSystemAdmin: props.isSystemAdmin,
         });

@@ -33,7 +33,7 @@ describe('A ticket only points at things in its own workspace', () => {
   const create = () => new CreateTicketCommand(
     new CreateTicket(w.ids, w.tickets), w.ensurePermission(), w.users, new FakeEventPublisher(), w.auditLog(), validateCustomFields(), undefined, references(),
   );
-  const base = { ticketId: 'ticket-a', workspaceId: WS_A, userId: 'admin-a', isSystemAdmin: false };
+  const base = { ticketId: 'ticket-a', workspaceId: WS_A, workspaceName: 'A', workspaceSlug: 'a', userId: 'admin-a', isSystemAdmin: false };
 
   beforeEach(async () => {
     w = new TicketWorld();

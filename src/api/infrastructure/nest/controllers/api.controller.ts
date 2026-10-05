@@ -309,10 +309,12 @@ export class ApiController {
       const updateService = new UpdateTicket(this.ticketRepository);
       const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
       const validateCustomFields = new ValidateCustomFieldValues(this.customFieldDefinitionRepository);
-      const updateCommand = new UpdateTicketCommand(updateService, this.ticketRepository, ensurePermission, auditLog, validateCustomFields, this.createEnsureReferences(), this.createResolveLabels());
+      const updateCommand = new UpdateTicketCommand(updateService, this.ticketRepository, ensurePermission, auditLog, validateCustomFields, this.createEnsureReferences(), this.createResolveLabels(), this.eventPublisher);
       return updateCommand.execute({
         ticketId: id,
         workspaceId: workspace.getId(),
+        workspaceName: workspace.name,
+        workspaceSlug: workspace.slug,
         userId: user.userId,
         name: body.name,
         description: body.description,
@@ -343,13 +345,17 @@ export class ApiController {
   ) {
     this.requireScope(user, ApiKeyScope.TICKETS_WRITE);
     const workspaceId = this.resolveWorkspaceId(user);
+    const workspace = await this.workspaceRepository.findById(workspaceId);
+    if (!workspace) throw new EntityNotFoundError('Workspace not found');
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new DeleteTicket(this.ticketRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-    const command = new DeleteTicketCommand(service, ensurePermission, this.ticketRepository, auditLog);
+    const command = new DeleteTicketCommand(service, ensurePermission, this.ticketRepository, auditLog, this.eventPublisher);
     return command.execute({
       ticketId: id,
       workspaceId,
+      workspaceName: workspace.name,
+      workspaceSlug: workspace.slug,
       userId: user.userId,
       isSystemAdmin: user.isSystemAdmin,
     });

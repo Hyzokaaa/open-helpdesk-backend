@@ -74,3 +74,35 @@ export interface TransferRequestResolvedEvent {
   workspaceName: string;
   workspaceSlug: string;
 }
+
+/** One edited ticket field. Reference fields (and tags) also carry their display names when known. */
+export interface TicketFieldChange {
+  field: 'name' | 'description' | 'priority' | 'categoryId' | 'departmentId' | 'organizationId' | 'projectId' | 'tagIds' | 'customFields';
+  before: unknown;
+  after: unknown;
+  beforeLabel?: string;
+  afterLabel?: string;
+}
+
+/** Emitted after a ticket edit that changed at least one field. Consumed by webhooks only. */
+export interface TicketUpdatedEvent {
+  ticketId: string;
+  ticketNumber: string;
+  ticketName: string;
+  updatedById: string;
+  changes: TicketFieldChange[];
+  workspaceId: string;
+  workspaceName: string;
+  workspaceSlug: string;
+}
+
+/** Emitted after a ticket was deleted (soft delete). Consumed by webhooks only. */
+export interface TicketDeletedEvent {
+  ticketId: string;
+  ticketNumber: string;
+  ticketName: string;
+  deletedById: string;
+  workspaceId: string;
+  workspaceName: string;
+  workspaceSlug: string;
+}
