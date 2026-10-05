@@ -114,7 +114,8 @@ export class CreateTicketCommand implements Command<Props, CreateTicketResponse>
       workspaceId: props.workspaceId,
       workspaceName: props.workspaceName,
       workspaceSlug: props.workspaceSlug,
-      source: 'ui',
+      // The channel the ticket came through, so integrations can tell API-created tickets apart
+      source: props.source ?? TicketSource.UI,
     };
     this.eventPublisher.emit('ticket.created', event);
 
@@ -122,7 +123,7 @@ export class CreateTicketCommand implements Command<Props, CreateTicketResponse>
       action: AuditAction.TICKET_CREATED,
       category: AuditCategory.TICKET,
       level: AuditLevel.INFO,
-      source: 'ui',
+      source: props.source === TicketSource.API ? 'api' : 'ui',
       entityType: 'ticket',
       entityId: ticket.getId(),
       userId: props.userId,
