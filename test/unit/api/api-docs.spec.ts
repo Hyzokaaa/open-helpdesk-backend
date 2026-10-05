@@ -5,7 +5,13 @@ import { OpenAPIObject } from '@nestjs/swagger';
 import { ApiController } from '../../../src/api/infrastructure/nest/controllers/api.controller';
 import { buildApiDocumentConfig, createApiDocument } from '../../../src/api/infrastructure/nest/openapi/api-docs';
 import {
+  buildApiReferenceConfiguration,
+  buildApiReferenceCsp,
+  renderApiReferencePage,
+} from '../../../src/api/infrastructure/nest/openapi/api-docs.page';
+import {
   API_DOCS_PATH,
+  API_DOCS_SCRIPT_PATH,
   API_DOCS_SHORTCUTS,
   API_KEY_SECURITY_SCHEME,
   API_OPENAPI_JSON_PATH,
@@ -44,6 +50,7 @@ describe('public API OpenAPI document', () => {
     expect(API_DOCS_PATH).toBe('api/v1/docs');
     expect(API_OPENAPI_JSON_PATH).toBe('api/v1/openapi.json');
     expect(API_DOCS_SHORTCUTS).toEqual(['/docs', '/docs/']);
+    expect(API_DOCS_SCRIPT_PATH).toBe('api/v1/docs/assets/scalar.js');
   });
 
   it('documents only /api/v1 paths, all nine operations of the public controller', () => {
@@ -90,5 +97,48 @@ describe('public API OpenAPI document', () => {
 
   it('covers every scope in the guide', () => {
     for (const scope of ALL_API_KEY_SCOPES) expect(document.info.description).toContain(`| \`${scope}\` |`);
+  });
+});
+
+describe('public API reference page', () => {
+  const html = renderApiReferencePage({ documentUrl: 'openapi.json', scriptUrl: 'docs/assets/scalar.js?v=1.0.0' });
+
+  it('loads the self-hosted Scalar bundle and the local document, with no inline script', () => {
+    expect(html).toContain('<title>Open Helpdesk API</title>');
+    expect(html).toContain('<script src="docs/assets/scalar.js?v=1.0.0"></script>');
+    expect(html).toContain('data-url="openapi.json"');
+    // The configuration element is data, not an executable script
+    expect(html).toMatch(/<script id="api-reference" type="application\/json"[^>]*><\/script>/);
+  });
+
+  it('references no external script, stylesheet or font', () => {
+    expect(html).not.toMatch(/(src|href)="(https?:)?\/\//i);
+    expect(html).not.toMatch(/cdn|jsdelivr|unpkg/i);
+    expect(html).not.toMatch(/<link/i);
+  });
+
+  it('turns off Scalar features that call third-party services and keeps the API key in the browser', () => {
+    expect(buildApiReferenceConfiguration()).toMatchObject({
+      telemetry: false,
+      withDefaultFonts: false,
+      showDeveloperTools: 'never',
+      agent: { disabled: true },
+      mcp: { disabled: true },
+      persistAuth: true,
+      authentication: { preferredSecurityScheme: API_KEY_SECURITY_SCHEME },
+      defaultHttpClient: { targetKey: 'shell', clientKey: 'curl' },
+    });
+    const hidden = buildApiReferenceConfiguration().hiddenClients as Record<string, boolean>;
+    for (const shown of ['shell', 'js', 'node', 'python', 'php']) expect(hidden[shown]).toBeUndefined();
+  });
+
+  it('allows only same-origin scripts and requests, plus the API origin when given', () => {
+    const csp = buildApiReferenceCsp();
+    expect(csp).toContain("default-src 'none'");
+    expect(csp).toContain("script-src 'self'");
+    expect(csp).not.toMatch(/script-src[^;]*(unsafe-inline|unsafe-eval|https?:)/);
+    expect(csp).toContain("connect-src 'self'");
+    expect(csp).toContain("frame-ancestors 'none'");
+    expect(buildApiReferenceCsp('https://api.example.com')).toContain("connect-src 'self' https://api.example.com");
   });
 });

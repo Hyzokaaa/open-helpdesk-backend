@@ -61,7 +61,7 @@ async function bootstrap() {
     exposedHeaders: ["X-Unread-Count", "Date", "Content-Disposition"],
   });
 
-  // Public API reference: Swagger UI at /api/v1/docs, JSON at /api/v1/openapi.json, /docs redirects
+  // Public API reference: Scalar page at /api/v1/docs, JSON at /api/v1/openapi.json, /docs redirects
   setupApiDocs(app, { version: resolveBackendVersion(), serverUrl: process.env.API_URL });
 
   await app.listen(process.env.PORT ?? 3000);
