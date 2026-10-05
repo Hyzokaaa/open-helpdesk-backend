@@ -1,4 +1,5 @@
 import { t } from './i18n';
+import { escapeAttr } from '../../shared/domain/sanitize-html';
 
 export function emailLayout(lang: string, content: string): string {
   return `
@@ -18,9 +19,10 @@ export function emailLayout(lang: string, content: string): string {
 </html>`.trim();
 }
 
+/** `url` is the raw URL; it is escaped here for the attribute. */
 export function buttonHtml(lang: string, url: string): string {
   return `
 <div style="text-align: center; margin: 30px 0;">
-  <a href="${url}" style="background-color: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">${t('email.viewTicket', lang)}</a>
+  <a href="${escapeAttr(url)}" style="background-color: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">${t('email.viewTicket', lang)}</a>
 </div>`;
 }

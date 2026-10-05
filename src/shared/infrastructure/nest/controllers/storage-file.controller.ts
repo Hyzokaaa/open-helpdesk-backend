@@ -1,37 +1,10 @@
 import { Controller, Get, Inject, NotFoundException, Param, Query, Res, ForbiddenException } from '@nestjs/common';
 import { Response } from 'express';
 import { promises as fs } from 'fs';
-import { extname } from 'path';
 import { Public } from '../../../nest/decorators/public.decorator';
 import { FilesystemStorageService } from '../../filesystem-storage.service';
+import { fileDelivery } from '../../file-delivery';
 import { ConfigService } from '@nestjs/config';
-
-const MIME_MAP: Record<string, string> = {
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.svg': 'image/svg+xml',
-  '.webp': 'image/webp',
-  '.pdf': 'application/pdf',
-  '.txt': 'text/plain',
-  '.json': 'application/json',
-  '.html': 'text/html',
-  '.css': 'text/css',
-  '.js': 'application/javascript',
-  '.zip': 'application/zip',
-  '.doc': 'application/msword',
-  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  '.xls': 'application/vnd.ms-excel',
-  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  '.csv': 'text/csv',
-  '.eml': 'message/rfc822',
-};
-
-function getMimeType(filePath: string): string {
-  const ext = extname(filePath).toLowerCase();
-  return MIME_MAP[ext] || 'application/octet-stream';
-}
 
 @Public()
 @Controller('storage')
@@ -64,15 +37,24 @@ export class StorageFileController {
       throw new ForbiddenException('Invalid or expired link');
     }
 
-    const filePath = this.filesystemStorage.getFilePath(key);
+    let filePath: string;
     try {
+      filePath = this.filesystemStorage.getFilePath(key);
       await fs.access(filePath);
     } catch {
       throw new NotFoundException();
     }
 
-    const mimeType = getMimeType(filePath);
-    res.setHeader('Content-Type', mimeType);
+    // Files are served from the app's own origin, where the session lives: only types that cannot
+    // run script are displayed, everything else is downloaded, and the response may not be sniffed
+    // into something else. The PDF viewer does not load in a sandboxed document, so PDFs skip it.
+    const delivery = fileDelivery(key);
+    res.setHeader('Content-Type', delivery.contentType);
+    res.setHeader('Content-Disposition', delivery.contentDisposition);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    if (delivery.contentType !== 'application/pdf') {
+      res.setHeader('Content-Security-Policy', 'sandbox');
+    }
     res.setHeader('Cache-Control', 'private, max-age=3600');
 
     const fileBuffer = await fs.readFile(filePath);

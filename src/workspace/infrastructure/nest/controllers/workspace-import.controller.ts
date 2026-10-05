@@ -34,7 +34,7 @@ import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit
 import { AuditAction } from '../../../../audit-log/domain/enums/audit-action.enum';
 import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
-import { importWelcomeEmail } from '../../../../email/templates/import-welcome.template';
+import { sendImportWelcomeEmails } from '../import-welcome-emails';
 import { WorkspaceFrontendResolver } from '../../../../shared/infrastructure/workspace-frontend-resolver';
 
 @Controller('workspaces')
@@ -128,25 +128,11 @@ export class WorkspaceImportController {
       isSystemAdmin: user.isSystemAdmin,
     });
 
-    for (const created of result.createdUsers) {
-      const token = this.tokenService.sign(
-        { sub: created.userId, type: 'password-reset' },
-        { expiresIn: '24h' },
-      );
-      const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
-      try {
-        await this.emailService.send(importWelcomeEmail({
-          to: created.email,
-          firstName: created.firstName,
-          workspaceName: workspace.name,
-          resetUrl,
-          workspaceUrl: frontendUrl,
-          lang: 'en',
-        }));
-      } catch {
-        // Email failure should not fail the import
-      }
-    }
+    await sendImportWelcomeEmails(
+      { tokenService: this.tokenService, emailService: this.emailService },
+      result.createdUsers,
+      { name: workspace.name, frontendUrl },
+    );
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({

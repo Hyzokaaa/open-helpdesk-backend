@@ -8,6 +8,9 @@ import { TransferRequestRepository } from '../repositories/transfer-request.repo
 
 interface AcceptTransferRequestProps {
   requestId: string;
+  /** The ticket the caller addressed; a request of another ticket is not found. */
+  ticketId: string;
+  workspaceId: string;
   userId: string;
 }
 
@@ -24,7 +27,10 @@ export class AcceptTransferRequest {
 
   async execute(props: AcceptTransferRequestProps): Promise<AcceptResult> {
     const request = await this.transferRequestRepository.findById(props.requestId);
-    if (!request) throw new EntityNotFoundError('Transfer request not found');
+    if (!request || request.ticketId !== props.ticketId) throw new EntityNotFoundError('Transfer request not found');
+
+    const ticket = await this.ticketRepository.findById(request.ticketId);
+    if (!ticket || ticket.workspaceId !== props.workspaceId) throw new EntityNotFoundError('Ticket not found');
 
     if (request.targetUserId !== props.userId) {
       throw new AccessDeniedError('Only the target user can accept this transfer');
@@ -40,9 +46,6 @@ export class AcceptTransferRequest {
       await this.transferRequestRepository.update(request);
       throw new DomainValidationError('Transfer request has expired');
     }
-
-    const ticket = await this.ticketRepository.findById(request.ticketId);
-    if (!ticket) throw new EntityNotFoundError('Ticket not found');
 
     ticket.assigneeId = request.targetUserId;
     if (ticket.status === TicketStatus.OPEN) {

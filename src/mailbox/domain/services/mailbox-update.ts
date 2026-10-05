@@ -4,6 +4,8 @@ import { MailboxRepository } from '../repositories/mailbox.repository';
 
 interface UpdateMailboxProps {
   id: string;
+  /** The caller's workspace; `null` for the platform (system) mailbox. The update is refused when the mailbox belongs elsewhere. */
+  workspaceId: string | null;
   address?: string;
   isActive?: boolean;
   imapHost?: string | null;
@@ -17,6 +19,8 @@ interface UpdateMailboxProps {
   addressMode?: string;
   acceptedAddresses?: string[];
   autoReply?: boolean;
+  postProcessAction?: string;
+  postProcessFolder?: string | null;
 }
 
 export class UpdateMailbox {
@@ -24,7 +28,9 @@ export class UpdateMailbox {
 
   async execute(props: UpdateMailboxProps): Promise<Mailbox> {
     const mailbox = await this.repository.findById(props.id);
-    if (!mailbox) throw new EntityNotFoundError('Mailbox not found');
+    if (!mailbox || mailbox.workspaceId !== props.workspaceId) {
+      throw new EntityNotFoundError('Mailbox not found');
+    }
 
     if (props.address !== undefined) mailbox.address = props.address;
     if (props.isActive !== undefined) mailbox.isActive = props.isActive;
@@ -39,6 +45,8 @@ export class UpdateMailbox {
     if (props.addressMode !== undefined) mailbox.addressMode = props.addressMode;
     if (props.acceptedAddresses !== undefined) mailbox.acceptedAddresses = props.acceptedAddresses;
     if (props.autoReply !== undefined) mailbox.autoReply = props.autoReply;
+    if (props.postProcessAction !== undefined) mailbox.postProcessAction = props.postProcessAction;
+    if (props.postProcessFolder !== undefined) mailbox.postProcessFolder = props.postProcessFolder;
 
     await this.repository.update(mailbox);
     return mailbox;

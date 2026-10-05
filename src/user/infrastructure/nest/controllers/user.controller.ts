@@ -36,6 +36,9 @@ import { ChangePassword } from '../../../domain/services/user-change-password';
 import { ChangePasswordCommand } from '../../../application/commands/change-password.command';
 import { RevokeUserSessions } from '../../../domain/services/user-sessions-revoke';
 import { TypeOrmUserSessionRepository } from '../../typeorm/repositories/typeorm-user-session.repository';
+import { ConfigService } from '@nestjs/config';
+import { TypeOrmWorkspaceCreationSettingsRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-creation-settings.repository';
+import { workspaceCreationPolicy } from '../../../../workspace/infrastructure/nest/workspace-creation-policy';
 import { TypeOrmUserRepository } from '../../typeorm/repositories/typeorm-user.repository';
 import { TypeOrmAccountRepository } from '../../../../account/infrastructure/typeorm/repositories/typeorm-account.repository';
 import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
@@ -47,7 +50,11 @@ import { CreateAccountForUser } from '../../../../account/domain/services/accoun
 import { StorageService } from '../../../../shared/domain/storage-service';
 import { STORAGE_SERVICE } from '../../../../shared/shared.module';
 import { RegisterUserRequest } from '../dto/register-user.request';
+import { UpdateUserNameRequest } from '../dto/update-user-name.request';
+import { ChangePasswordRequest } from '../dto/change-password.request';
 import { SortDto } from '../../../../shared/nest/dto/sort.dto';
+import { imageUploadOptions, RASTER_IMAGE_MIMES } from '../../../../shared/infrastructure/nest/image-upload-options';
+import { normalizeUserName } from '../../../domain/user-name';
 
 const MIME_TO_EXT: Record<string, string> = {
   'image/png': '.png',
@@ -65,18 +72,24 @@ export class UserController {
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
     @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
     @Inject() private readonly sessionRepository: TypeOrmUserSessionRepository,
+    @Inject() private readonly creationSettingsRepository: TypeOrmWorkspaceCreationSettingsRepository,
+    private readonly config: ConfigService,
   ) {}
 
   @SkipEmailVerification()
   @Get('me')
   me(@CurrentUser() user: AuthUser) {
-    const query = new GetUserProfileQuery(this.userRepository, this.storage);
+    const query = new GetUserProfileQuery(
+      this.userRepository,
+      this.storage,
+      workspaceCreationPolicy(this.creationSettingsRepository, this.config),
+    );
     return query.execute({ userId: user.userId });
   }
 
   @Patch('me/name')
   async updateName(
-    @Body() body: { firstName: string; lastName: string },
+    @Body() body: UpdateUserNameRequest,
     @CurrentUser() authUser: AuthUser,
   ) {
     const existing = await this.userRepository.findById(authUser.userId);
@@ -97,7 +110,7 @@ export class UserController {
       workspaceId: null,
       metadata: {
         before: { firstName: existing?.firstName, lastName: existing?.lastName },
-        after: { firstName: body.firstName, lastName: body.lastName },
+        after: { firstName: result.firstName, lastName: result.lastName },
       },
       category: AuditCategory.USER,
       level: AuditLevel.INFO,
@@ -234,7 +247,7 @@ export class UserController {
 
   @Patch('me/password')
   async changePassword(
-    @Body() body: { currentPassword: string; newPassword: string },
+    @Body() body: ChangePasswordRequest,
     @CurrentUser() authUser: AuthUser,
   ) {
     const service = new ChangePassword(this.userRepository, this.passwordHasher);
@@ -263,9 +276,9 @@ export class UserController {
   }
 
   @Get()
-  list(@Query() sort: SortDto) {
+  list(@Query() sort: SortDto, @CurrentUser() user: AuthUser) {
     const query = new ListUsersQuery(this.userRepository);
-    return query.execute({ sort });
+    return query.execute({ sort, requestingUserIsAdmin: user.isSystemAdmin });
   }
 
   @Throttle({ default: { ttl: 60000, limit: 3 } })
@@ -323,13 +336,13 @@ export class UserController {
 
     if (body.firstName !== undefined) {
       before.firstName = existing.firstName;
-      existing.firstName = body.firstName;
-      after.firstName = body.firstName;
+      existing.firstName = normalizeUserName(body.firstName);
+      after.firstName = existing.firstName;
     }
     if (body.lastName !== undefined) {
       before.lastName = existing.lastName;
-      existing.lastName = body.lastName;
-      after.lastName = body.lastName;
+      existing.lastName = normalizeUserName(body.lastName);
+      after.lastName = existing.lastName;
     }
     if (body.email !== undefined && body.email.toLowerCase() !== existing.email.toLowerCase()) {
       const emailTaken = await this.userRepository.findByEmail(body.email);
@@ -392,7 +405,7 @@ export class UserController {
   }
 
   @Post('me/avatar')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', imageUploadOptions(1024 * 1024, RASTER_IMAGE_MIMES)))
   async uploadAvatar(
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() authUser: AuthUser,

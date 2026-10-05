@@ -24,7 +24,8 @@ import { AuditLevel } from '../../audit-log/domain/enums/audit-level.enum';
 import { ResolveTicketStakeholders } from '../../notification/domain/services/notification-resolve-ticket-stakeholders';
 import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
-import { WorkspaceFrontendResolver } from '../../shared/infrastructure/workspace-frontend-resolver';
+import { WorkspaceFrontendResolver } from '../../shared/infrastructure/workspace-frontend-resolver';
+import { TypeOrmTicketCategoryRepository } from '../../project/infrastructure/typeorm/repositories/typeorm-ticket-category.repository';
 
 @Injectable()
 export class TicketCreatedHandler {
@@ -43,6 +44,7 @@ export class TicketCreatedHandler {
     private readonly auditLogRepository: TypeOrmAuditLogRepository,
     private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
     private readonly frontendResolver: WorkspaceFrontendResolver,
+    private readonly categoryRepository: TypeOrmTicketCategoryRepository,
   ) {}
 
   @OnEvent('ticket.created')
@@ -91,12 +93,15 @@ export class TicketCreatedHandler {
       : null;
     const emailDomain = mailbox ? mailbox.address.split('@')[1] : null;
     const sender = await this.emailSenderRepository.findByWorkspaceId(event.workspaceId);
+    // The event carries the category id; recipients need its name
+    const category = event.categoryId ? await this.categoryRepository.findById(event.categoryId) : null;
+    const categoryName = category?.name ?? '';
 
     for (const [lang, emails] of emailRecipients) {
       const result = await sendWorkspaceEmail(this.emailService, sender, {
         to: emails,
-        subject: template.subject({ ticketName: event.ticketName, ticketUrl, reporterName: event.reporterName, priority: event.priority, category: event.categoryId, workspaceName: event.workspaceName, lang }),
-        html: template.html({ ticketName: event.ticketName, ticketUrl, reporterName: event.reporterName, priority: event.priority, category: event.categoryId, workspaceName: event.workspaceName, lang }),
+        subject: template.subject({ ticketName: event.ticketName, ticketUrl, reporterName: event.reporterName, priority: event.priority, category: categoryName, workspaceName: event.workspaceName, lang }),
+        html: template.html({ ticketName: event.ticketName, ticketUrl, reporterName: event.reporterName, priority: event.priority, category: categoryName, workspaceName: event.workspaceName, lang }),
         ...(emailDomain && { messageId: `<ticket-${event.ticketId}@${emailDomain}>` }),
         ...(mailbox && { replyTo: mailbox.address }),
       });

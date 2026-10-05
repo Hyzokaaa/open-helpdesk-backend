@@ -3,6 +3,8 @@ import { CustomFieldDefinitionRepository } from '../repositories/custom-field-de
 
 interface DeleteCustomFieldDefinitionProps {
   id: string;
+  /** The workspace of the caller; an item of any other workspace is not found. */
+  workspaceId: string;
 }
 
 export class DeleteCustomFieldDefinition {
@@ -10,7 +12,7 @@ export class DeleteCustomFieldDefinition {
 
   async execute(props: DeleteCustomFieldDefinitionProps): Promise<void> {
     const definition = await this.repository.findById(props.id);
-    if (!definition) {
+    if (!definition || definition.workspaceId !== props.workspaceId) {
       throw new EntityNotFoundError('Custom field definition not found');
     }
 

@@ -16,6 +16,82 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.25.0',
+    date: '2026-10-04',
+    categories: [
+      {
+        title: { en: 'Important Changes — Read Before Updating', es: 'Cambios Importantes — Léelos Antes de Actualizar' },
+        features: [
+          { en: 'Sign-in with Microsoft has been removed. Users who signed in that way can use "Forgot password" to set a password', es: 'Se elimina el inicio de sesión con Microsoft. Quien entraba así puede usar "¿Olvidaste tu contraseña?" para crear una' },
+          { en: 'API keys now work only on the public API (/api/v1), and stop working when the person who created them is deactivated', es: 'Las claves de API solo funcionan en la API pública (/api/v1), y dejan de funcionar si se desactiva a quien las creó' },
+          { en: 'API keys are not included when a workspace is migrated: create new keys in the destination and update your integrations', es: 'Las claves de API no se incluyen al migrar un workspace: crea claves nuevas en el destino y actualiza tus integraciones' },
+          { en: 'New passwords must have between 8 and 128 characters. Existing passwords keep working', es: 'Las contraseñas nuevas deben tener entre 8 y 128 caracteres. Las contraseñas actuales siguen funcionando' },
+          { en: 'Workspace admins who are not system admins must verify custom domains through DNS', es: 'Los administradores de workspace que no son administradores del sistema deben verificar los dominios propios por DNS' },
+          { en: 'Accounts created by an import no longer get a shared default password: they receive an email to set their own', es: 'Las cuentas creadas por una importación ya no reciben una contraseña común por defecto: reciben un email para crear la suya' },
+          { en: 'Workspace exports are now encrypted .ohd files protected by a password. Older JSON exports can still be imported', es: 'Las exportaciones de workspace son ahora archivos .ohd cifrados con contraseña. Las exportaciones JSON anteriores se siguen pudiendo importar' },
+          { en: 'New settings: ATTACHMENT_MAX_SIZE_MB (default 25), WORKSPACE_IMPORT_MAX_MB (2048), WORKSPACE_IMPORT_MAX_FILE_MB (512) and WORKSPACE_IMPORT_URL_TIMEOUT_SECONDS (600). With filesystem storage and the API on its own domain, set API_URL so file links point at it', es: 'Nuevos ajustes: ATTACHMENT_MAX_SIZE_MB (25 por defecto), WORKSPACE_IMPORT_MAX_MB (2048), WORKSPACE_IMPORT_MAX_FILE_MB (512) y WORKSPACE_IMPORT_URL_TIMEOUT_SECONDS (600). Con almacenamiento en disco y la API en su propio dominio, define API_URL para que los enlaces de archivos apunten a ella' },
+        ],
+      },
+      {
+        title: { en: 'Security', es: 'Seguridad' },
+        features: [
+          { en: 'Workspace isolation reviewed end to end: tickets, comments, attachments, mailboxes, transfers, followers and reports only reach data of your own workspace', es: 'Revisión completa del aislamiento entre workspaces: tickets, comentarios, adjuntos, buzones, transferencias, seguidores e informes solo llegan a datos de tu propio workspace' },
+          { en: 'Permissions are enforced on every ticket action, including followers, pickup, transfers, edit history and creating tickets on behalf of someone', es: 'Los permisos se aplican en todas las acciones de ticket, incluidos seguidores, tomar tickets, transferencias, historial de ediciones y crear tickets en nombre de otra persona' },
+          { en: 'Supervisors can no longer invite admins, and the instance-wide user list is visible only to system admins', es: 'Los supervisores ya no pueden invitar administradores, y la lista de usuarios de la instancia solo la ven los administradores del sistema' },
+          { en: 'Sign-in links, OAuth codes and password reset links work only once, and OAuth sign-in is bound to the browser that started it', es: 'Los enlaces de acceso, los códigos OAuth y los enlaces de restablecimiento sirven una sola vez, y el inicio con OAuth queda ligado al navegador que lo empezó' },
+          { en: 'Stored content, names and emails can no longer carry scripts or disguised links', es: 'El contenido guardado, los nombres y los emails ya no pueden llevar scripts ni enlaces disfrazados' },
+          { en: 'The public portal can no longer be used to act as an existing account', es: 'El portal público ya no se puede usar para actuar como una cuenta existente' },
+          { en: 'Uploads are size-limited while they arrive, and served files can no longer run in the browser', es: 'Las subidas se limitan en tamaño mientras llegan, y los archivos servidos ya no pueden ejecutarse en el navegador' },
+          { en: 'The AI assistant can only be used by members of the workspace it belongs to', es: 'El asistente de IA solo lo pueden usar los miembros de su workspace' },
+        ],
+      },
+      {
+        title: { en: 'Workspace Migration', es: 'Migración de Workspaces' },
+        features: [
+          { en: 'Exports include everything: tickets with their department, project, organization and source, comments, edit history, attachments, organizations, departments, projects, knowledge base, custom fields, mailboxes, email rules, webhooks and settings', es: 'Las exportaciones lo incluyen todo: tickets con su departamento, proyecto, organización y origen, comentarios, historial de ediciones, adjuntos, organizaciones, departamentos, proyectos, base de conocimiento, campos personalizados, buzones, reglas de email, webhooks y ajustes' },
+          { en: 'Attachments and logos travel inside the encrypted file and are copied as new files on import', es: 'Los adjuntos y logos viajan dentro del archivo cifrado y se copian como archivos nuevos al importar' },
+          { en: 'Optionally include credentials (mailbox and email sender passwords, webhook secrets) when exporting', es: 'Opcionalmente, incluye las credenciales (contraseñas de buzones y del remitente, secretos de webhooks) al exportar' },
+          { en: 'Before importing, see what the file brings and choose which settings to overwrite: palette, SLA, description, branding, name, email sender and custom domain', es: 'Antes de importar, ve qué trae el archivo y elige qué ajustes sobrescribir: paleta, SLA, descripción, marca, nombre, remitente de email y dominio propio' },
+          { en: 'Mailboxes arrive paused and webhooks disabled, so two installations never read the same inbox or fire the same webhook', es: 'Los buzones llegan pausados y los webhooks desactivados, para que dos instalaciones nunca lean el mismo buzón ni disparen el mismo webhook' },
+          { en: 'Importing the same file again never duplicates anything, even after renames, and can complete tickets that already exist without changing what they have', es: 'Importar el mismo archivo otra vez no duplica nada, aunque se hayan renombrado cosas, y puede completar tickets que ya existen sin cambiar lo que tienen' },
+          { en: 'Deactivated users stay deactivated after an import', es: 'Los usuarios desactivados siguen desactivados tras una importación' },
+          { en: 'Import by link accepts only Open Helpdesk export links', es: 'La importación por enlace solo acepta enlaces de exportación de Open Helpdesk' },
+          { en: 'Clear messages for wrong passwords, damaged files and invalid content, and a summary of what was imported, skipped or completed', es: 'Mensajes claros ante contraseñas incorrectas, archivos dañados o contenido no válido, y un resumen de lo importado, omitido o completado' },
+          { en: 'Exports, export links and imports — including failed ones — are recorded in the audit log', es: 'Las exportaciones, los enlaces de exportación y las importaciones, también las fallidas, quedan en el registro de auditoría' },
+        ],
+      },
+      {
+        title: { en: 'Tickets & Portal', es: 'Tickets y Portal' },
+        features: [
+          { en: 'Customers see the names of the people handling their ticket', es: 'Los clientes ven el nombre de quienes atienden su ticket' },
+          { en: 'Users can choose the category of a new ticket', es: 'Los usuarios pueden elegir la categoría de un ticket nuevo' },
+          { en: 'The project picked when creating a ticket is saved', es: 'Se guarda el proyecto elegido al crear un ticket' },
+          { en: 'The team is notified when a customer replies from the portal tracking page', es: 'Se avisa al equipo cuando un cliente responde desde la página de seguimiento del portal' },
+          { en: 'The portal tracking page correctly shows who opened the ticket and their own comments', es: 'La página de seguimiento del portal muestra bien el nombre de quien abrió el ticket y sus propios comentarios' },
+          { en: 'New permissions to manage followers and to create tickets on behalf of someone', es: 'Nuevos permisos para gestionar seguidores y crear tickets en nombre de otra persona' },
+        ],
+      },
+      {
+        title: { en: 'Fixes', es: 'Correcciones' },
+        features: [
+          { en: 'Editing a mailbox no longer switches off its post-processing', es: 'Editar un buzón ya no desactiva su post-procesado' },
+          { en: 'New-ticket emails show the category name', es: 'Los emails de ticket nuevo muestran el nombre de la categoría' },
+          { en: 'Report date ranges follow your time zone', es: 'Los rangos de fechas de los informes siguen tu zona horaria' },
+          { en: 'Invitation emails are checked before sending, so one wrong address no longer fails the whole batch', es: 'Los emails de invitación se comprueban antes de enviar, así una dirección errónea ya no hace fallar todo el lote' },
+          { en: 'Filesystem storage works with the Docker image', es: 'El almacenamiento en disco funciona con la imagen Docker' },
+        ],
+      },
+      {
+        title: { en: 'Performance & Operations', es: 'Rendimiento y Operaciones' },
+        features: [
+          { en: 'Faster workspace listings in large installations', es: 'Listados por workspace más rápidos en instalaciones grandes' },
+          { en: 'Pages load on demand, so the app starts faster', es: 'Las páginas se cargan bajo demanda, así la app arranca más rápido' },
+          { en: 'Release images are built only after typecheck and tests pass', es: 'Las imágenes de release se construyen solo si pasan el typecheck y los tests' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.24.1',
     date: '2026-10-02',
     categories: [

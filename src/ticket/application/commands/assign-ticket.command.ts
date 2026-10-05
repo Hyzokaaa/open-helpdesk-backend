@@ -3,6 +3,7 @@ import { Command } from '../../../shared/domain/command';
 import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { TicketRepository } from '../../domain/repositories/ticket.repository';
 import { AssignTicket } from '../../domain/services/ticket-assign';
+import { EnsureTicketAssignee } from '../../domain/services/ticket-ensure-assignee';
 import { EnsureWorkspacePermission } from '../../../workspace/domain/services/workspace-ensure-permission';
 import { PERMISSIONS } from '../../../workspace/domain/permissions';
 import { TicketAssignedEvent } from '../../../email/domain/events';
@@ -35,6 +36,7 @@ export class AssignTicketCommand implements Command<Props, AssignTicketResponse>
     private readonly ensurePermission: EnsureWorkspacePermission,
     private readonly eventPublisher: EventPublisher,
     private readonly createAuditLog: CreateAuditLogEntry,
+    private readonly ensureAssignee?: EnsureTicketAssignee,
   ) {}
 
   async execute(props: Props): Promise<AssignTicketResponse> {
@@ -47,6 +49,10 @@ export class AssignTicketCommand implements Command<Props, AssignTicketResponse>
 
     const ticket = await this.ticketRepository.findById(props.ticketId);
     if (!ticket || ticket.workspaceId !== props.workspaceId) throw new EntityNotFoundError('Ticket not found');
+
+    if (props.assigneeId && this.ensureAssignee) {
+      await this.ensureAssignee.execute({ workspaceId: props.workspaceId, userId: props.assigneeId });
+    }
 
     const previousAssigneeId = ticket.assigneeId;
 

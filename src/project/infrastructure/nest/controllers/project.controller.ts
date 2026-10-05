@@ -189,10 +189,7 @@ export class ProjectController {
     const workspaceId = await this.resolveWorkspaceId(slug);
     await this.ensurePermission(workspaceId, user, PERMISSIONS.PROJECT_MANAGE);
 
-    const project = await this.projectRepository.findById(projectId);
-    if (!project || project.workspaceId !== workspaceId) {
-      throw new EntityNotFoundError('Project not found');
-    }
+    await this.ensureProjectAndCategory(projectId, body.categoryId, workspaceId);
 
     await this.categoryRepository.addToProject(projectId, body.categoryId);
     return { projectId, categoryId: body.categoryId };
@@ -207,6 +204,7 @@ export class ProjectController {
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
     await this.ensurePermission(workspaceId, user, PERMISSIONS.PROJECT_MANAGE);
+    await this.ensureProjectAndCategory(projectId, categoryId, workspaceId);
 
     await this.categoryRepository.removeFromProject(projectId, categoryId);
   }
@@ -227,6 +225,18 @@ export class ProjectController {
       slug: c.slug,
       color: c.color,
     }));
+  }
+
+  /** Both ends of the link must be of the caller's workspace. */
+  private async ensureProjectAndCategory(projectId: string, categoryId: string, workspaceId: string): Promise<void> {
+    const project = await this.projectRepository.findById(projectId);
+    if (!project || project.workspaceId !== workspaceId) {
+      throw new EntityNotFoundError('Project not found');
+    }
+    const category = await this.categoryRepository.findById(categoryId);
+    if (!category || category.workspaceId !== workspaceId) {
+      throw new EntityNotFoundError('Category not found');
+    }
   }
 
   private async resolveWorkspaceId(slug: string): Promise<string> {

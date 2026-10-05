@@ -338,7 +338,7 @@ export function t(key: string, lang: string, vars?: Record<string, string>): str
 
   if (vars) {
     for (const [k, v] of Object.entries(vars)) {
-      text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), v);
+      text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), () => v); // literal: a "$&" in the value must not expand
     }
   }
 

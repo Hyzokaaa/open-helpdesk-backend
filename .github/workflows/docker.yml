@@ -3,13 +3,37 @@ name: Build and Push Docker Image
 on:
   push:
     branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main, dev]
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx tsc --noEmit -p tsconfig.json
+
+      - run: npx jest --ci
+
   build:
+    needs: test
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -29,8 +53,10 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=latest
+            type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
 
       - uses: docker/build-push-action@v6
         with:
@@ -41,6 +67,7 @@ jobs:
 
   deploy-cloud:
     needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - run: |

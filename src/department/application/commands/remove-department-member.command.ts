@@ -28,6 +28,7 @@ export class RemoveDepartmentMemberCommand implements Command<Props, void> {
     await this.removeMember.execute({
       departmentId: props.departmentId,
       userId: props.userId,
+      workspaceId: props.workspaceId,
     });
   }
 }

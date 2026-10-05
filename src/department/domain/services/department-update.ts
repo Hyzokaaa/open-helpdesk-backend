@@ -4,6 +4,8 @@ import { Department } from '../entities/department';
 
 interface UpdateDepartmentProps {
   id: string;
+  /** The workspace of the caller; an item of any other workspace is not found. */
+  workspaceId: string;
   name?: string;
   description?: string | null;
 }
@@ -13,7 +15,7 @@ export class UpdateDepartment {
 
   async execute(props: UpdateDepartmentProps): Promise<Department> {
     const department = await this.repository.findById(props.id);
-    if (!department) {
+    if (!department || department.workspaceId !== props.workspaceId) {
       throw new EntityNotFoundError('Department not found');
     }
 

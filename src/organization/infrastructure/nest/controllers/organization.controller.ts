@@ -38,6 +38,7 @@ import { PERMISSIONS } from '../../../../workspace/domain/permissions';
 import { TypeOrmUserRepository } from '../../../../user/infrastructure/typeorm/repositories/typeorm-user.repository';
 import { CreateOrganizationRequest } from '../dto/create-organization.request';
 import { UpdateOrganizationRequest } from '../dto/update-organization.request';
+import { imageUploadOptions, LOGO_IMAGE_MIMES } from '../../../../shared/infrastructure/nest/image-upload-options';
 
 const MIME_TO_EXT: Record<string, string> = {
   'image/png': '.png',
@@ -204,7 +205,7 @@ export class OrganizationController {
   }
 
   @Post(':id/logo')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', imageUploadOptions(1024 * 1024, LOGO_IMAGE_MIMES)))
   async uploadLogo(
     @Param('slug') slug: string,
     @Param('id') id: string,

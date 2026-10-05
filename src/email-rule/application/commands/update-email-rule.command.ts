@@ -4,6 +4,7 @@ import { RuleCondition, RuleAction } from '../../domain/entities/email-rule';
 
 interface Props {
   id: string;
+  workspaceId: string;
   name?: string;
   isActive?: boolean;
   mailboxIds?: string[];

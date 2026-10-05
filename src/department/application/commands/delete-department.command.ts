@@ -24,6 +24,6 @@ export class DeleteDepartmentCommand implements Command<Props, void> {
       isSystemAdmin: props.isSystemAdmin,
     });
 
-    await this.deleteDepartment.execute({ id: props.id });
+    await this.deleteDepartment.execute({ id: props.id, workspaceId: props.workspaceId });
   }
 }

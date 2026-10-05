@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   ManyToOne,
   PrimaryColumn,
   UpdateDateColumn,
@@ -10,6 +11,7 @@ import { WorkspaceModel } from '../../../../workspace/infrastructure/typeorm/mod
 import { RuleCondition, RuleAction } from '../../../domain/entities/email-rule';
 
 @Entity('email_rules')
+@Index('IDX_email_rules_workspace', ['workspaceId'])
 export class EmailRuleModel {
   @PrimaryColumn()
   id!: string;

@@ -1,5 +1,6 @@
 import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { User } from '../entities/user';
+import { normalizeUserName } from '../user-name';
 import { UserRepository } from '../repositories/user.repository';
 
 interface UpdateProfileProps {
@@ -19,8 +20,8 @@ export class UpdateUserProfile {
     const user = await this.repository.findById(props.userId);
     if (!user) throw new EntityNotFoundError('User not found');
 
-    if (props.firstName !== undefined) user.firstName = props.firstName;
-    if (props.lastName !== undefined) user.lastName = props.lastName;
+    if (props.firstName !== undefined) user.firstName = normalizeUserName(props.firstName);
+    if (props.lastName !== undefined) user.lastName = normalizeUserName(props.lastName);
     if (props.language !== undefined) user.language = props.language;
     if (props.theme !== undefined) user.theme = props.theme;
     if (props.dateFormat !== undefined) user.dateFormat = props.dateFormat;

@@ -4,22 +4,36 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Inject,
+  Logger,
   Param,
   Patch,
   Post,
   Query,
+  Req,
   Res,
   UploadedFile,
   UseInterceptors,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
-import { Response } from "express";
+import { Request, Response } from "express";
+import { diskStorage } from "multer";
+import { randomBytes } from "node:crypto";
+import { createReadStream } from "node:fs";
+import { unlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { DataSource } from "typeorm";
+import { JwtTokenService } from "../../../../shared/infrastructure/jwt-token-service";
+import { WorkspaceFrontendResolver } from "../../../../shared/infrastructure/workspace-frontend-resolver";
+import { EmailService } from "../../../../email/domain/email.service";
+import { EMAIL_SERVICE } from "../../../../email/email.constants";
+import { sendImportWelcomeEmails } from "../import-welcome-emails";
 import { CurrentUser } from "../../../../shared/nest/decorators/current-user.decorator";
 import { AuthUser } from "../../../../shared/nest/strategies/jwt.strategy";
 import { UlidGenerator } from "../../../../shared/infrastructure/ulid-generator";
-import { EntityNotFoundError } from "../../../../shared/domain/errors";
+import { DomainValidationError, EntityNotFoundError } from "../../../../shared/domain/errors";
 import { slugify } from "../../../../shared/domain/slugify";
 import { CreateWorkspace } from "../../../domain/services/workspace-create";
 import { AddWorkspaceMember } from "../../../domain/services/workspace-add-member";
@@ -72,20 +86,83 @@ import { AddMemberRequest } from "../dto/add-member.request";
 import { SortDto } from "../../../../shared/nest/dto/sort.dto";
 import { ConfigService } from "@nestjs/config";
 import { ExportWorkspace } from "../../../domain/services/workspace-export";
-import { ImportWorkspace } from "../../../domain/services/workspace-import";
+import {
+  buildImportPreview,
+  ImportArchiveFiles,
+  ImportPreview,
+  ImportWorkspace,
+  withCustomDomainConflict,
+} from "../../../domain/services/workspace-import";
+import { CURRENT_VERSION } from "../../../domain/services/workspace-export-transforms";
+import {
+  ExportSummary,
+  exportSummaryOf,
+  importFailureReason,
+  importSourceOf,
+  WorkspaceTransferAudit,
+} from "../../../application/workspace-transfer-audit";
+import { WorkspaceExportData } from "../../../domain/workspace-export";
 import {
   createExportToken,
   validateExportToken,
 } from "../../../domain/services/workspace-export-token";
 import { Public } from "../../../../shared/nest/decorators/public.decorator";
+import { ExportWorkspaceRequest } from "../dto/export-workspace.request";
+import {
+  downloadExportLink,
+  exportLinkTimeoutFromEnv,
+  forgetExportDownload,
+  recallExportDownload,
+  rememberExportDownload,
+} from "../../export-link-download";
+import {
+  assertExportPassword,
+  deriveExportKey,
+  ExportKeyContext,
+} from "../../export-file-codec";
+import {
+  createDecodeDirectory,
+  decodeExportStream,
+  DecodedExport,
+  importLimitsFromEnv,
+  removeDirectory,
+  writeExportArchive,
+} from "../../export-archive";
 import { TypeOrmWorkspaceEmailSenderRepository } from "../../typeorm/repositories/typeorm-workspace-email-sender.repository";
 import { WorkspaceEmailSender } from "../../../domain/entities/workspace-email-sender";
 import * as nodemailer from "nodemailer";
 import { TypeOrmTicketCategoryRepository } from "../../../../project/infrastructure/typeorm/repositories/typeorm-ticket-category.repository";
 import { SeedDefaultCategories } from "../../../../project/domain/services/ticket-category-seed";
+import { EnsureCanCreateWorkspace } from "../../../domain/services/workspace-ensure-can-create";
+import { TypeOrmWorkspaceCreationSettingsRepository } from "../../typeorm/repositories/typeorm-workspace-creation-settings.repository";
+import { workspaceCreationPolicy } from "../workspace-creation-policy";
+import { imageUploadOptions, LOGO_IMAGE_MIMES } from "../../../../shared/infrastructure/nest/image-upload-options";
+
+const IMPORT_LIMITS = importLimitsFromEnv();
+
+/**
+ * Import uploads stream to a temp file (never whole into memory), capped at WORKSPACE_IMPORT_MAX_MB
+ * while they arrive (413 past it). The handler always deletes the file.
+ */
+const IMPORT_UPLOAD_OPTIONS = {
+  storage: diskStorage({
+    destination: tmpdir(),
+    filename: (_req, _file, callback) => callback(null, `ohd-upload-${randomBytes(12).toString("hex")}`),
+  }),
+  limits: { fileSize: IMPORT_LIMITS.maxTotalBytes, files: 1 },
+};
+
+/** A decoded import: the export JSON, plus the archive files written to a temp directory. */
+interface ImportSource {
+  data: WorkspaceExportData;
+  source: "file" | "url" | "direct";
+  decoded: DecodedExport | null;
+}
 
 @Controller("workspaces")
 export class WorkspaceController {
+  private readonly logger = new Logger(WorkspaceController.name);
+
   constructor(
     @Inject() private readonly workspaceRepository: TypeOrmWorkspaceRepository,
     @Inject()
@@ -101,6 +178,10 @@ export class WorkspaceController {
     @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
     private readonly dataSource: DataSource,
     @Inject() private readonly ticketCategoryRepository: TypeOrmTicketCategoryRepository,
+    @Inject() private readonly creationSettingsRepository: TypeOrmWorkspaceCreationSettingsRepository,
+    @Inject() private readonly tokenService: JwtTokenService,
+    @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
+    @Inject() private readonly frontendResolver: WorkspaceFrontendResolver,
   ) {}
 
   @Post()
@@ -132,8 +213,12 @@ export class WorkspaceController {
       this.idGenerator,
       this.ticketCategoryRepository,
     );
+    const ensureCanCreate = new EnsureCanCreateWorkspace(
+      workspaceCreationPolicy(this.creationSettingsRepository, this.config),
+    );
     const command = new CreateWorkspaceCommand(
       createService,
+      ensureCanCreate,
       addMemberService,
       auditLog,
       seedCategories,
@@ -143,6 +228,7 @@ export class WorkspaceController {
       name: body.name,
       description: body.description,
       creatorUserId: user.userId,
+      creatorIsSystemAdmin: user.isSystemAdmin,
       accountId: account?.getId(),
       supportEmailDomain,
     });
@@ -190,12 +276,17 @@ export class WorkspaceController {
   }
 
   @Get(":slug")
-  async get(@Param("slug") slug: string) {
+  async get(@Param("slug") slug: string, @CurrentUser() user: AuthUser) {
     const query = new GetWorkspaceQuery(
       this.workspaceRepository,
+      new EnsureWorkspacePermission(this.memberRepository),
       this.mailboxRepository,
     );
-    const result = await query.execute({ slug });
+    const result = await query.execute({
+      slug,
+      userId: user.userId,
+      isSystemAdmin: user.isSystemAdmin,
+    });
     return {
       ...result,
       logo: result.logo
@@ -622,9 +713,11 @@ export class WorkspaceController {
     return { systemMailboxEnabled: workspace.systemMailboxEnabled };
   }
 
-  @Get(":slug/export")
+  @Post(":slug/export")
+  @HttpCode(200)
   async exportWorkspace(
     @Param("slug") slug: string,
+    @Body() body: ExportWorkspaceRequest,
     @CurrentUser() user: AuthUser,
     @Res() res: Response,
   ) {
@@ -638,21 +731,110 @@ export class WorkspaceController {
       permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
       isSystemAdmin: user.isSystemAdmin,
     });
-    const service = new ExportWorkspace(this.dataSource);
-    const data = await service.execute(workspaceId);
-    res.setHeader("Content-Type", "application/json");
+    assertExportPassword(body.password);
+    const { summary, completed } = await this.streamExportFile(res, slug, workspaceId, await deriveExportKey(body.password), body.includeCredentials === true);
+    await this.transferAudit().exported({ workspaceId, userId: user.userId, summary, completed });
+  }
+
+  private transferAudit(): WorkspaceTransferAudit {
+    return new WorkspaceTransferAudit(new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository));
+  }
+
+  /**
+   * Streams the .ohd file (format 2, with attachments and logos) as a download named after the
+   * workspace and the day. Errors before the first byte go through the usual exception filter;
+   * after it, the response can only be cut short, which the client sees as a failed download.
+   * Returns what the file carried, and whether it was written to the end.
+   */
+  private async streamExportFile(
+    res: Response,
+    slug: string,
+    workspaceId: string,
+    context: ExportKeyContext,
+    includeCredentials: boolean,
+  ): Promise<{ summary: ExportSummary; completed: boolean }> {
+    const bundle = await new ExportWorkspace(this.dataSource, this.storage).prepare(workspaceId, { includeCredentials });
+    const summary = exportSummaryOf(bundle, includeCredentials);
+    const files = bundle.files.map((file) => ({
+      path: file.path,
+      size: file.size,
+      open: () => this.storage.getStream(file.storageKey),
+    }));
+    const day = new Date().toISOString().slice(0, 10);
+    res.setHeader("Content-Type", "application/octet-stream");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${slug}-export.json"`,
+      `attachment; filename="${slug}-${day}.ohd"`,
     );
-    res.send(JSON.stringify(data, null, 2));
+    try {
+      await writeExportArchive(res, bundle.data, files, context);
+      return { summary, completed: true };
+    } catch (error) {
+      this.logger.error(`Export of workspace ${workspaceId} failed midway: ${(error as Error)?.message}`);
+      res.destroy();
+      return { summary, completed: false };
+    }
+  }
+
+  @Post(":slug/import/preview")
+  @HttpCode(200)
+  @UseInterceptors(FileInterceptor("file", IMPORT_UPLOAD_OPTIONS))
+  async previewImport(
+    @Param("slug") slug: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body() body: any,
+    @CurrentUser() user: AuthUser,
+    @Req() req: Request,
+  ): Promise<ImportPreview> {
+    try {
+      const workspaceId = await this.resolveWorkspaceId(slug);
+      const ensurePermission = new EnsureWorkspacePermission(
+        this.memberRepository,
+      );
+      await ensurePermission.execute({
+        workspaceId,
+        userId: user.userId,
+        permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+        isSystemAdmin: user.isSystemAdmin,
+      });
+      // The whole file is decoded (and so verified) to count its files; the temp copy is dropped
+      const preview = await this.withImportSource(req, file, body, `${workspaceId}:${user.userId}`, async ({ data, decoded }) =>
+        buildImportPreview(data, { files: decoded?.files.size ?? 0, bytes: decoded?.filesBytes ?? 0 }),
+      );
+      return await withCustomDomainConflict(this.dataSource, preview, workspaceId);
+    } finally {
+      await this.discardUpload(file);
+    }
   }
 
   @Post(":slug/import")
+  @UseInterceptors(FileInterceptor("file", IMPORT_UPLOAD_OPTIONS))
   async importWorkspace(
     @Param("slug") slug: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
     @Body() body: any,
     @CurrentUser() user: AuthUser,
+    @Req() req: Request,
+    // Comma list of target settings to overwrite: palette, sla, description, branding, name, emailSender, customDomain
+    @Query("overwrite") overwrite?: string | string[],
+    // "true" completes tickets the workspace already has, adding only what they lack
+    @Query("completeExisting") completeExisting?: string,
+  ) {
+    try {
+      return await this.runImport(slug, file, body, user, req, overwrite, completeExisting === "true");
+    } finally {
+      await this.discardUpload(file);
+    }
+  }
+
+  private async runImport(
+    slug: string,
+    file: Express.Multer.File | undefined,
+    body: any,
+    user: AuthUser,
+    req: Request,
+    overwrite?: string | string[],
+    completeExisting = false,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
     const ensurePermission = new EnsureWorkspacePermission(
@@ -665,40 +847,111 @@ export class WorkspaceController {
       isSystemAdmin: user.isSystemAdmin,
     });
 
-    // Support URL-based import: { url: "https://..." }
-    let data = body;
-    if (body.url && typeof body.url === "string") {
-      const response = await fetch(body.url);
-      if (!response.ok)
-        throw new Error(`Failed to fetch export from URL: ${response.status}`);
-      data = await response.json();
-    }
-
-    const service = new ImportWorkspace(this.dataSource);
-    const result = await service.execute(workspaceId, data);
-
-    const auditLog = new CreateAuditLogEntry(
-      this.idGenerator,
-      this.auditLogRepository,
+    // From here on every outcome is audited: completed, or failed with the reason the user is shown
+    const startedAt = Date.now();
+    const sourceInfo = importSourceOf(
+      file?.originalname,
+      body && typeof body === "object" && typeof body.url === "string" ? body.url.trim() : null,
     );
-    await auditLog.execute({
-      action: AuditAction.WORKSPACE_IMPORT_STARTED,
-      entityType: "workspace",
-      entityId: workspaceId,
-      userId: user.userId,
+    let outcome: Awaited<ReturnType<WorkspaceController["executeImport"]>>;
+    try {
+      outcome = await this.executeImport(workspaceId, file, body, user, req, overwrite, completeExisting);
+    } catch (error) {
+      try {
+        await this.transferAudit().importFailed({
+          workspaceId,
+          userId: user.userId,
+          source: sourceInfo,
+          reason: importFailureReason(error),
+          durationMs: Date.now() - startedAt,
+        });
+      } catch (auditError) {
+        this.logger.error(`Could not audit a failed import of workspace ${workspaceId}: ${(auditError as Error)?.message}`);
+      }
+      throw error;
+    }
+    const durationMs = Date.now() - startedAt;
+    const { formatVersion, result, newMembers, overwriteKeys } = outcome;
+
+    // The import is committed: what follows cannot make it a failed one
+    const workspace = await this.workspaceRepository.findById(workspaceId);
+    await sendImportWelcomeEmails(
+      { tokenService: this.tokenService, emailService: this.emailService },
+      newMembers,
+      { name: workspace?.name ?? slug, frontendUrl: await this.frontendResolver.resolve(workspaceId) },
+    );
+
+    await this.transferAudit().importCompleted({
       workspaceId,
-      metadata: { source: body.url ? "url" : "direct", imported: result },
-      category: AuditCategory.WORKSPACE,
-      level: AuditLevel.INFO,
-      source: "ui",
+      userId: user.userId,
+      source: sourceInfo,
+      formatVersion,
+      completeExisting,
+      overwrite: overwriteKeys,
+      result,
+      durationMs,
     });
 
     return result;
   }
 
+  /** Decodes the export and imports it in one transaction; nothing after the commit happens here. */
+  private async executeImport(
+    workspaceId: string,
+    file: Express.Multer.File | undefined,
+    body: any,
+    user: AuthUser,
+    req: Request,
+    overwrite: string | string[] | undefined,
+    completeExisting: boolean,
+  ) {
+    const downloadKey = `${workspaceId}:${user.userId}`;
+    const overwriteKeys = [overwrite ?? []].flat()
+      .flatMap((value) => String(value).split(","))
+      .map((key) => key.trim())
+      .filter(Boolean);
+    // A custom domain carried by the file may not be the platform's own hostname, as when set by hand
+    let primaryHost = "";
+    try {
+      primaryHost = new URL(this.config.get<string>("FRONTEND_URL", "")).hostname;
+    } catch {}
+    const service = new ImportWorkspace(this.dataSource, this.storage, (key, error) =>
+      this.logger.warn(`Could not delete storage object ${key} after a workspace import: ${(error as Error)?.message}`),
+    );
+    // Nothing is written until the whole file has been decoded and verified into the temp directory
+    const { formatVersion, result, newMembers } = await this.withImportSource(req, file, body, downloadKey, async ({ data, decoded }) => {
+      // Read before the import upgrades the data to the current version
+      const rawVersion = data && typeof data === "object" ? (data as { version?: unknown }).version : undefined;
+      const formatVersion = typeof rawVersion === "string" ? rawVersion : null;
+      const files: ImportArchiveFiles | undefined = decoded
+        ? {
+          size: (path) => decoded.files.get(path)?.size ?? null,
+          open: (path) => {
+            const entry = decoded.files.get(path);
+            if (!entry) throw new Error(`Not in the archive: ${path}`);
+            return createReadStream(entry.diskPath);
+          },
+        }
+        : undefined;
+      return {
+        formatVersion,
+        ...(await service.execute(workspaceId, data, {
+          overwrite: overwriteKeys,
+          files,
+          completeExisting,
+          primaryHost,
+          importer: { userId: user.userId, isSystemAdmin: user.isSystemAdmin === true },
+        })),
+      };
+    });
+    forgetExportDownload(downloadKey);
+    return { formatVersion, result, newMembers, overwriteKeys };
+  }
+
   @Post(":slug/export/token")
   async createExportTokenEndpoint(
     @Param("slug") slug: string,
+    @Body() body: ExportWorkspaceRequest,
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
@@ -711,23 +964,22 @@ export class WorkspaceController {
       permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
       isSystemAdmin: user.isSystemAdmin,
     });
-    const { token, expiresAt } = createExportToken(workspaceId);
+    assertExportPassword(body.password);
+    // Keep the derived key, not the password: the file is built and encrypted when it is downloaded
+    const includeCredentials = body.includeCredentials === true;
+    const { token, expiresAt } = createExportToken(
+      workspaceId,
+      await deriveExportKey(body.password),
+      includeCredentials,
+    );
     const baseUrl = process.env.API_URL || process.env.BACKEND_URL || "";
 
-    const auditLog = new CreateAuditLogEntry(
-      this.idGenerator,
-      this.auditLogRepository,
-    );
-    await auditLog.execute({
-      action: AuditAction.WORKSPACE_EXPORT_CREATED,
-      entityType: "workspace",
-      entityId: workspaceId,
-      userId: user.userId,
+    await this.transferAudit().exportLinkCreated({
       workspaceId,
-      metadata: {},
-      category: AuditCategory.WORKSPACE,
-      level: AuditLevel.INFO,
-      source: "ui",
+      userId: user.userId,
+      formatVersion: CURRENT_VERSION,
+      includeCredentials,
+      expiresAt,
     });
 
     return {
@@ -741,22 +993,27 @@ export class WorkspaceController {
   async exportByToken(
     @Param("slug") slug: string,
     @Param("token") token: string,
+    @Req() req: Request,
     @Res() res: Response,
   ) {
-    const workspaceId = validateExportToken(token);
-    if (!workspaceId) {
+    const entry = validateExportToken(token);
+    if (!entry) {
       res.status(401).json({ message: "Invalid or expired export token" });
       return;
     }
     const workspace = await this.workspaceRepository.findBySlug(slug);
-    if (!workspace || workspace.getId() !== workspaceId) {
+    if (!workspace || workspace.getId() !== entry.workspaceId) {
       res.status(404).json({ message: "Workspace not found" });
       return;
     }
-    const service = new ExportWorkspace(this.dataSource);
-    const data = await service.execute(workspaceId);
-    res.setHeader("Content-Type", "application/json");
-    res.send(JSON.stringify(data));
+    const { summary, completed } = await this.streamExportFile(res, slug, entry.workspaceId, entry.encryption, entry.includeCredentials);
+    await this.transferAudit().exportLinkDownloaded({
+      workspaceId: entry.workspaceId,
+      summary,
+      completed,
+      expiresAt: entry.expiresAt,
+      ip: req.ip ?? null,
+    });
   }
 
   @Get(":slug/email-sender")
@@ -1104,6 +1361,7 @@ export class WorkspaceController {
       workspaceId,
       domain: body.domain,
       autoVerify: body.autoVerify,
+      isSystemAdmin: user.isSystemAdmin,
     });
 
     const auditLog = new CreateAuditLogEntry(
@@ -1218,7 +1476,7 @@ export class WorkspaceController {
   }
 
   @Post(":slug/branding/logo")
-  @UseInterceptors(FileInterceptor("file"))
+  @UseInterceptors(FileInterceptor("file", imageUploadOptions(1024 * 1024, LOGO_IMAGE_MIMES)))
   async uploadLogo(
     @Param("slug") slug: string,
     @UploadedFile() file: Express.Multer.File,
@@ -1293,7 +1551,7 @@ export class WorkspaceController {
   }
 
   @Post(":slug/branding/icon")
-  @UseInterceptors(FileInterceptor("file"))
+  @UseInterceptors(FileInterceptor("file", imageUploadOptions(512 * 1024, LOGO_IMAGE_MIMES)))
   async uploadIcon(
     @Param("slug") slug: string,
     @UploadedFile() file: Express.Multer.File,
@@ -1365,6 +1623,57 @@ export class WorkspaceController {
     }
 
     return { icon: null };
+  }
+
+  /**
+   * The export an import or preview reads: a multipart `file` or `url` (exactly one, with an
+   * optional `password`), or, for JSON requests, the export object itself or `{ url, password? }`.
+   * The file is decoded into a fresh temp directory, which is removed once `use` settles.
+   */
+  private async withImportSource<T>(
+    req: Request,
+    file: Express.Multer.File | undefined,
+    body: any,
+    cacheKey: string,
+    use: (source: ImportSource) => Promise<T>,
+  ): Promise<T> {
+    const fields = body && typeof body === "object" ? body : {};
+    const password = typeof fields.password === "string" ? fields.password : undefined;
+    const url = typeof fields.url === "string" && fields.url.trim() ? fields.url.trim() : undefined;
+    const multipart = req.is("multipart/form-data") === "multipart/form-data";
+
+    if (multipart) {
+      if (file && url) throw new DomainValidationError("Send either a file or a URL, not both");
+      if (!file && !url) throw new DomainValidationError("Send an export file or a URL");
+    }
+    if (!file && !url) return use({ data: fields as WorkspaceExportData, source: "direct", decoded: null });
+
+    const path = file ? file.path : await this.fetchExportFile(url!, cacheKey);
+    const dir = await createDecodeDirectory();
+    try {
+      const decoded = await decodeExportStream(createReadStream(path), password, dir, IMPORT_LIMITS);
+      return await use({ data: decoded.data as WorkspaceExportData, source: file ? "file" : "url", decoded });
+    } finally {
+      await removeDirectory(dir);
+    }
+  }
+
+  /** Multer wrote the upload to a temp file; it is never kept past the request. */
+  private async discardUpload(file: Express.Multer.File | undefined) {
+    if (file?.path) await unlink(file.path).catch(() => undefined);
+  }
+
+  /** An export link downloaded to a temp file, reusing the one a preview already fetched (links are single use). */
+  private async fetchExportFile(url: string, cacheKey: string): Promise<string> {
+    const remembered = recallExportDownload(cacheKey, url);
+    if (remembered) return remembered;
+    const filePath = join(tmpdir(), `ohd-download-${randomBytes(12).toString("hex")}`);
+    await downloadExportLink(url, filePath, {
+      maxBytes: IMPORT_LIMITS.maxTotalBytes,
+      timeoutMs: exportLinkTimeoutFromEnv(),
+    });
+    rememberExportDownload(cacheKey, url, filePath);
+    return filePath;
   }
 
   private async resolveWorkspaceId(slug: string): Promise<string> {

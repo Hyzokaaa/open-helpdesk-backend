@@ -16,9 +16,11 @@ import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum'
 import { CreateImapMailbox } from '../../../domain/services/mailbox-create-imap';
 import { UpdateMailbox } from '../../../domain/services/mailbox-update';
 import { DeleteMailbox } from '../../../domain/services/mailbox-delete';
-import { MailboxType } from '../../../domain/enums/mailbox-type.enum';
 import { Mailbox } from '../../../domain/entities/mailbox';
 import { NestEventPublisher } from '../../../../shared/infrastructure/nest-event-publisher';
+import { CreateMailboxRequest } from '../dto/create-mailbox.request';
+import { UpdateMailboxRequest } from '../dto/update-mailbox.request';
+import { TestMailboxConnectionRequest } from '../dto/test-mailbox-connection.request';
 
 @Controller('workspaces/:slug/mailboxes')
 export class MailboxController {
@@ -56,26 +58,15 @@ export class MailboxController {
       addressMode: m.addressMode,
       acceptedAddresses: m.acceptedAddresses,
       autoReply: m.autoReply,
+      postProcessAction: m.postProcessAction,
+      postProcessFolder: m.postProcessFolder,
     }));
   }
 
   @Post()
   async create(
     @Param('slug') slug: string,
-    @Body() body: {
-      address: string;
-      imapHost: string;
-      imapPort: number;
-      imapUser: string;
-      imapPass: string;
-      imapTls?: boolean;
-      encryption?: string;
-      imapFolder?: string;
-      pollInterval?: number;
-      addressMode?: string;
-      acceptedAddresses?: string[];
-      autoReply?: boolean;
-    },
+    @Body() body: CreateMailboxRequest,
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
@@ -96,6 +87,8 @@ export class MailboxController {
       addressMode: body.addressMode,
       acceptedAddresses: body.acceptedAddresses,
       autoReply: body.autoReply,
+      postProcessAction: body.postProcessAction,
+      postProcessFolder: body.postProcessFolder,
     });
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
@@ -131,23 +124,7 @@ export class MailboxController {
   async update(
     @Param('slug') slug: string,
     @Param('mailboxId') mailboxId: string,
-    @Body() body: {
-      address?: string;
-      isActive?: boolean;
-      imapHost?: string | null;
-      imapPort?: number | null;
-      imapUser?: string | null;
-      imapPass?: string | null;
-      imapTls?: boolean | null;
-      encryption?: string;
-      imapFolder?: string | null;
-      pollInterval?: number | null;
-      addressMode?: string;
-      acceptedAddresses?: string[];
-      autoReply?: boolean;
-      postProcessAction?: string;
-      postProcessFolder?: string | null;
-    },
+    @Body() body: UpdateMailboxRequest,
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
@@ -163,7 +140,25 @@ export class MailboxController {
     }
 
     const service = new UpdateMailbox(this.mailboxRepository);
-    const mailbox = await service.execute({ id: mailboxId, ...body });
+    const mailbox = await service.execute({
+      id: mailboxId,
+      workspaceId,
+      address: body.address,
+      isActive: body.isActive,
+      imapHost: body.imapHost,
+      imapPort: body.imapPort,
+      imapUser: body.imapUser,
+      imapPass: body.imapPass,
+      imapTls: body.imapTls,
+      encryption: body.encryption,
+      imapFolder: body.imapFolder,
+      pollInterval: body.pollInterval,
+      addressMode: body.addressMode,
+      acceptedAddresses: body.acceptedAddresses,
+      autoReply: body.autoReply,
+      postProcessAction: body.postProcessAction,
+      postProcessFolder: body.postProcessFolder,
+    });
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({
@@ -207,15 +202,7 @@ export class MailboxController {
   @Post('test-connection')
   async testConnection(
     @Param('slug') slug: string,
-    @Body() body: {
-      imapHost: string;
-      imapPort: number;
-      imapUser: string;
-      imapPass: string;
-      imapTls?: boolean;
-      encryption?: string;
-      mailboxId?: string;
-    },
+    @Body() body: TestMailboxConnectionRequest,
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);

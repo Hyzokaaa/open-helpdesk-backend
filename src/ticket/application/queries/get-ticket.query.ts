@@ -3,6 +3,7 @@ import { Query } from '../../../shared/domain/query';
 import { TicketRepository } from '../../domain/repositories/ticket.repository';
 import { EnsureTicketAccess, TicketAccessLevel } from '../../domain/services/ticket-ensure-access';
 import { formatTicketNumber } from '../../domain/ticket-number';
+import { SummarizeUsers, UserSummary } from '../../../user/domain/services/user-summarize';
 
 interface Props {
   ticketId: string;
@@ -40,12 +41,17 @@ export interface TicketDetailResponse {
   accessLevel: TicketAccessLevel;
   aiCache: Record<string, { source: string; result: string }>;
   descriptionEditedAt: Date | null;
+  reporter?: UserSummary | null;
+  assignee?: UserSummary | null;
+  registeredBy?: UserSummary | null;
+  resolvedBy?: UserSummary | null;
 }
 
 export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
   constructor(
     private readonly repository: TicketRepository,
     private readonly ensureTicketAccess: EnsureTicketAccess,
+    private readonly summarizeUsers?: SummarizeUsers,
   ) {}
 
   async execute(props: Props): Promise<TicketDetailResponse> {
@@ -55,6 +61,11 @@ export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
     if (!ticket || ticket.workspaceId !== props.workspaceId) {
       throw new EntityNotFoundError('Ticket not found');
     }
+
+    const people = this.summarizeUsers
+      ? await this.summarizeUsers.execute([ticket.reporterId, ticket.assigneeId, ticket.registeredById, ticket.resolvedById])
+      : null;
+    const person = (id: string | null) => (id ? people?.get(id) ?? null : null);
 
     return {
       id: ticket.getId(),
@@ -85,6 +96,12 @@ export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
       accessLevel,
       aiCache: ticket.aiCache ?? {},
       descriptionEditedAt: ticket.descriptionEditedAt,
+      ...(people && {
+        reporter: person(ticket.reporterId),
+        assignee: person(ticket.assigneeId),
+        registeredBy: person(ticket.registeredById),
+        resolvedBy: person(ticket.resolvedById),
+      }),
     };
   }
 }

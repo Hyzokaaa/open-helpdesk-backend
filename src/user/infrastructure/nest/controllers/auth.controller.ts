@@ -25,8 +25,8 @@ import { ResendVerificationCommand } from '../../../application/commands/resend-
 import { TypeOrmUserRepository } from '../../typeorm/repositories/typeorm-user.repository';
 import { LoginUserRequest } from '../dto/login-user.request';
 import { SignupUserRequest } from '../dto/signup-user.request';
+import { ResetPasswordRequest } from '../dto/reset-password.request';
 import { GoogleAuthGuard } from '../../../../shared/nest/guards/google-auth.guard';
-import { MicrosoftAuthGuard } from '../../../../shared/nest/guards/microsoft-auth.guard';
 import { CreateUser } from '../../../domain/services/user-create';
 import { CreateAccountForUser } from '../../../../account/domain/services/account-create-for-user';
 import { AcceptInvitation } from '../../../../workspace/domain/services/invitation-accept';
@@ -42,6 +42,10 @@ import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/
 import { TypeOrmWorkspaceRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository';
 import { resolveFrontendUrl } from '../../../../shared/infrastructure/resolve-frontend-url';
 import { TypeOrmUserSessionRepository } from '../../typeorm/repositories/typeorm-user-session.repository';
+import { TypeOrmUsedTokenRepository } from '../../typeorm/repositories/typeorm-used-token.repository';
+import { ConsumeOneTimeToken } from '../../../domain/services/user-token-consume';
+import { VerifyOAuthState } from '../../../domain/services/user-oauth-state';
+import { OAUTH_NONCE_COOKIE, readOAuthNonce } from '../../../../shared/nest/guards/oauth-state';
 import { SessionPolicy, StartUserSession } from '../../../domain/services/user-session-start';
 import { SignAccessToken } from '../../../domain/services/user-session-sign-access-token';
 import { RefreshUserSession } from '../../../domain/services/user-session-refresh';
@@ -58,7 +62,6 @@ import { sessionPolicyFromConfig } from '../session-policy';
 export class AuthController {
   private readonly frontendUrl: string;
   private readonly googleEnabled: boolean;
-  private readonly microsoftEnabled: boolean;
   private readonly sessionPolicy: SessionPolicy;
 
   constructor(
@@ -73,11 +76,11 @@ export class AuthController {
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
     @Inject() private readonly workspaceRepository: TypeOrmWorkspaceRepository,
     @Inject() private readonly sessionRepository: TypeOrmUserSessionRepository,
+    @Inject() private readonly usedTokenRepository: TypeOrmUsedTokenRepository,
     private readonly config: ConfigService,
   ) {
     this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
     this.googleEnabled = !!config.get('GOOGLE_CLIENT_ID');
-    this.microsoftEnabled = !!config.get('MICROSOFT_CLIENT_ID');
     this.sessionPolicy = sessionPolicyFromConfig(config);
   }
 
@@ -99,7 +102,6 @@ export class AuthController {
   getProviders() {
     return {
       google: this.googleEnabled,
-      microsoft: this.microsoftEnabled,
     };
   }
 
@@ -159,7 +161,8 @@ export class AuthController {
   @Throttle({ default: { ttl: 60000, limit: 10 } })
   @Post('oauth/exchange')
   exchangeOAuthCode(@Body() body: ExchangeOAuthCodeRequest) {
-    const command = new ExchangeOAuthCodeCommand(this.tokenService, this.userRepository, this.createStartSession());
+    const consumeToken = new ConsumeOneTimeToken(this.tokenService, this.usedTokenRepository);
+    const command = new ExchangeOAuthCodeCommand(consumeToken, this.userRepository, this.createStartSession());
     return command.execute({ code: body.code, rememberMe: body.rememberMe ?? false });
   }
 
@@ -212,9 +215,10 @@ export class AuthController {
 
   @Public()
   @Post('reset-password')
-  async resetPassword(@Body() body: { token: string; newPassword: string }) {
+  async resetPassword(@Body() body: ResetPasswordRequest) {
     const service = new ResetPassword(this.userRepository, this.passwordHasher);
-    const command = new ResetPasswordCommand(service, this.tokenService, new RevokeUserSessions(this.sessionRepository));
+    const consumeToken = new ConsumeOneTimeToken(this.tokenService, this.usedTokenRepository);
+    const command = new ResetPasswordCommand(service, consumeToken, new RevokeUserSessions(this.sessionRepository));
     await command.execute({ token: body.token, newPassword: body.newPassword });
 
     let userId: string | null = null;
@@ -314,23 +318,18 @@ export class AuthController {
     return this.handleOAuthCallback(req, res);
   }
 
-  @Public()
-  @Get('microsoft')
-  @UseGuards(MicrosoftAuthGuard)
-  microsoftLogin() {
-    // Guard redirects to Microsoft
-  }
-
-  @Public()
-  @Get('microsoft/callback')
-  @UseGuards(MicrosoftAuthGuard)
-  async microsoftCallback(@Req() req: Request, @Res() res: Response) {
-    return this.handleOAuthCallback(req, res);
-  }
-
   private async handleOAuthCallback(req: Request, res: Response) {
-    const oauthUser = req.user as { email: string; firstName: string; lastName: string; authProvider: string };
-    const redirectUrl = await this.resolveRedirectUrl(req.query?.state as string);
+    const oauthUser = req.user as { email: string; firstName: string; lastName: string; authProvider: string; emailVerified: boolean };
+    // The state must be the one this browser was given when it started the sign-in
+    const verifyState = new VerifyOAuthState(new ConsumeOneTimeToken(this.tokenService, this.usedTokenRepository));
+    const verified = await verifyState.execute({
+      state: typeof req.query?.state === 'string' ? req.query.state : null,
+      browserNonce: readOAuthNonce(req),
+    });
+    res.clearCookie(OAUTH_NONCE_COOKIE, { path: '/' });
+    if (!verified) return res.redirect(`${this.frontendUrl}/login?error=oauth_failed`);
+
+    const redirectUrl = await this.resolveRedirectUrl(verified.redirect ?? undefined);
 
     try {
       const service = new AuthenticateOAuth(this.idGenerator, this.userRepository, this.passwordHasher);
@@ -340,6 +339,7 @@ export class AuthController {
         firstName: oauthUser.firstName,
         lastName: oauthUser.lastName,
         authProvider: oauthUser.authProvider,
+        emailVerified: oauthUser.emailVerified,
       });
 
       const user = await this.userRepository.findByEmail(oauthUser.email);
@@ -356,6 +356,12 @@ export class AuthController {
           level: AuditLevel.INFO,
           source: 'ui',
         });
+
+        // An address the provider did not vouch for must be confirmed before the account is usable
+        if (!user.isEmailVerified) {
+          const verification = new ResendVerificationCommand(this.userRepository, this.tokenService, this.emailService);
+          await verification.execute({ userId: user.getId(), frontendUrl: redirectUrl }).catch(() => undefined);
+        }
       }
 
       return res.redirect(`${redirectUrl}/auth/callback?code=${encodeURIComponent(result.code)}`);
@@ -364,11 +370,11 @@ export class AuthController {
     }
   }
 
-  private async resolveRedirectUrl(state?: string): Promise<string> {
-    if (!state || state === this.frontendUrl) return this.frontendUrl;
+  private async resolveRedirectUrl(redirect?: string): Promise<string> {
+    if (!redirect || redirect === this.frontendUrl) return this.frontendUrl;
     try {
-      const hostname = new URL(state).hostname;
-      if (await this.isVerifiedDomain(hostname)) return state;
+      const hostname = new URL(redirect).hostname;
+      if (await this.isVerifiedDomain(hostname)) return redirect;
     } catch {}
     return this.frontendUrl;
   }

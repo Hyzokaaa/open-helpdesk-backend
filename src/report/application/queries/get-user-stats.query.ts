@@ -77,6 +77,11 @@ export class GetUserStatsQuery {
       props.workspaceId,
       props.targetUserId,
     );
+    // Only members of this workspace have stats here; otherwise REPORT_VIEW in one workspace
+    // would read the name and email of any account on the instance.
+    if (!targetMember && !isSelf) {
+      throw new EntityNotFoundError('User not found');
+    }
     const isReporter = targetMember?.role === WorkspaceRole.USER;
 
     if (isReporter) {

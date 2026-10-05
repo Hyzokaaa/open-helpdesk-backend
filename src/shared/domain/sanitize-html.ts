@@ -1,3 +1,5 @@
+import { INVISIBLE_CHARS_AND_SPACE } from './sanitize-plain-text';
+
 const ALLOWED_TAGS = new Set([
   'p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'del',
   'code', 'pre', 'blockquote',
@@ -11,6 +13,21 @@ const ALLOWED_ATTRS: Record<string, Set<string>> = {
 };
 
 const SELF_CLOSING = new Set(['br']);
+
+/** Attributes whose value is a URL and must pass the scheme check. */
+const URL_ATTRS = new Set(['href', 'src']);
+
+/** Schemes a link may point to. Anything else (javascript:, data:, vbscript:, ...) is dropped. */
+const LINK_SCHEMES = new Set(['http', 'https', 'mailto', 'tel']);
+
+/** Schemes an image may load from. `data:` is allowed only for raster image payloads. */
+const IMAGE_SCHEMES = new Set(['http', 'https']);
+const DATA_IMAGE_URL = /^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+/=]*$/i;
+
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'",
+  colon: ':', sol: '/', tab: '\t', newline: '\n', nbsp: String.fromCharCode(0xa0),
+};
 
 interface SanitizeOptions {
   extraTags?: string[];
@@ -82,16 +99,71 @@ function extractAllowedAttrs(tagContent: string, tagName: string, attrsMap: Reco
   let match;
 
   while ((match = attrRegex.exec(tagContent)) !== null) {
-    const [, name, value] = match;
-    if (allowed.has(name.toLowerCase())) {
-      attrs.push(` ${name.toLowerCase()}="${escapeAttr(value)}"`);
+    const [, rawName, rawValue] = match;
+    const name = rawName.toLowerCase();
+    if (!allowed.has(name)) continue;
+
+    if (URL_ATTRS.has(name)) {
+      const url = sanitizeUrl(rawValue, name === 'src' ? 'image' : 'link');
+      if (url === null) continue; // unsafe scheme: drop the attribute, keep the tag
+      attrs.push(` ${name}="${escapeAttr(url)}"`);
+    } else {
+      attrs.push(` ${name}="${escapeAttr(rawValue)}"`);
     }
   }
 
   return attrs.join('');
 }
 
-function escapeHtml(input: string): string {
+/**
+ * Returns the URL a browser would actually resolve, or null when its scheme is not allowed.
+ * Entities are decoded and control characters removed first, because browsers do the same before
+ * reading the scheme: `java&#x73;cript:` and `java\tscript:` both run as `javascript:`.
+ */
+export function sanitizeUrl(value: string, kind: 'link' | 'image'): string | null {
+  // Browsers ignore whitespace, control and zero-width characters while reading a URL, so they
+  // must not be allowed to hide a scheme.
+  const decoded = decodeEntities(value).replace(INVISIBLE_CHARS_AND_SPACE, '');
+
+  if (decoded === '') return null;
+
+  const schemeMatch = /^([a-z][a-z0-9+.-]*):/i.exec(decoded);
+  if (!schemeMatch) {
+    // Relative URL (/path, #anchor, ./x, ?query, plain path): resolves against our own origin
+    return decoded;
+  }
+
+  const scheme = schemeMatch[1].toLowerCase();
+  if (kind === 'link') {
+    return LINK_SCHEMES.has(scheme) ? decoded : null;
+  }
+  if (IMAGE_SCHEMES.has(scheme)) return decoded;
+  if (scheme === 'data' && DATA_IMAGE_URL.test(decoded)) return decoded;
+  return null;
+}
+
+/** Decodes named and numeric HTML entities (repeatedly, as a browser effectively would). */
+export function decodeEntities(input: string): string {
+  // Decode repeatedly: `&amp;#106;` becomes `&#106;` and then `j`, which is what a browser ends up with
+  let current = input;
+  for (let pass = 0; pass < 3; pass++) {
+    const next = current.replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z]+);?/gi, (whole, body: string) => {
+      if (body[0] === '#') {
+        const codePoint = body[1].toLowerCase() === 'x' ? parseInt(body.slice(2), 16) : parseInt(body.slice(1), 10);
+        if (!Number.isFinite(codePoint) || codePoint > 0x10ffff) return '';
+        return String.fromCodePoint(codePoint);
+      }
+      const named = NAMED_ENTITIES[body.toLowerCase()];
+      return named ?? whole;
+    });
+    if (next === current) break;
+    current = next;
+  }
+  return current;
+}
+
+/** Escapes text for an HTML text node or a quoted attribute (& < > " '). */
+export function escapeHtml(input: string): string {
   return input
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -100,7 +172,8 @@ function escapeHtml(input: string): string {
     .replace(/'/g, '&#x27;');
 }
 
-function escapeAttr(input: string): string {
+/** Escapes a value for a double-quoted HTML attribute. */
+export function escapeAttr(input: string): string {
   return input
     .replace(/&/g, '&amp;')
     .replace(/"/g, '&quot;')

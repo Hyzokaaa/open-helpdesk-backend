@@ -37,6 +37,7 @@ export class UpdateOrganizationCommand implements Command<Props, UpdateOrganizat
 
     const org = await this.updateOrganization.execute({
       id: props.id,
+      workspaceId: props.workspaceId,
       name: props.name,
       description: props.description,
       notes: props.notes,

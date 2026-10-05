@@ -1,16 +1,18 @@
 import { TokenService } from '../../../shared/domain/token-service';
 import { Command } from '../../../shared/domain/command';
 import { AuthenticateOAuth } from '../../domain/services/user-authenticate-oauth';
+import { newTokenId } from '../../domain/services/user-token-consume';
 
 interface Props {
   email: string;
   firstName: string;
   lastName: string;
   authProvider: string;
+  emailVerified: boolean;
 }
 
 export interface OAuthLoginResponse {
-  /** One-minute code the client trades for a session; it travels in the redirect URL. */
+  /** One-minute, single-use code the client trades for a session; it travels in the redirect URL. */
   code: string;
 }
 
@@ -28,11 +30,12 @@ export class OAuthLoginCommand implements Command<Props, OAuthLoginResponse> {
       firstName: props.firstName,
       lastName: props.lastName,
       authProvider: props.authProvider,
+      emailVerified: props.emailVerified,
     });
 
     // The redirect URL ends up in browser history and logs, so it carries a short-lived code
     // instead of the session tokens themselves.
-    const code = this.tokenService.sign({ sub: user.getId(), type: OAUTH_CODE_TYPE }, { expiresIn: '60s' });
+    const code = this.tokenService.sign({ sub: user.getId(), type: OAUTH_CODE_TYPE, jti: newTokenId() }, { expiresIn: '60s' });
     return { code };
   }
 }

@@ -25,20 +25,21 @@ export class MockAttachmentRepository implements AttachmentRepository {
   }
 
   async findByTokens(tokens: string[]): Promise<Attachment[]> {
-    return this.attachments.filter((a) => tokens.includes((a as any).stagingToken));
+    return this.attachments.filter((a) => a.token !== null && tokens.includes(a.token));
   }
 
-  async claimStagedAttachments(tokens: string[], ticketId: string): Promise<void> {
+  async claimStagedAttachments(tokens: string[], ticketId: string, uploadedById: string): Promise<void> {
     for (const a of this.attachments) {
-      if (tokens.includes((a as any).stagingToken)) {
-        (a as any).ticketId = ticketId;
-        (a as any).stagingToken = null;
+      if (a.token !== null && tokens.includes(a.token) && a.uploadedById === uploadedById) {
+        a.ticketId = ticketId;
+        a.token = null;
+        a.stagedAt = null;
       }
     }
   }
 
   async findExpiredStaged(before: Date): Promise<Attachment[]> {
-    return this.attachments.filter((a) => (a as any).stagingToken && (a as any).createdAt < before);
+    return this.attachments.filter((a) => a.stagedAt !== null && a.stagedAt < before);
   }
 
   async deleteMany(ids: string[]): Promise<void> {

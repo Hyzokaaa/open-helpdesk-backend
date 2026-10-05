@@ -24,6 +24,6 @@ export class DeleteOrganizationCommand implements Command<Props, void> {
       isSystemAdmin: props.isSystemAdmin,
     });
 
-    await this.deleteOrganization.execute({ id: props.id });
+    await this.deleteOrganization.execute({ id: props.id, workspaceId: props.workspaceId });
   }
 }

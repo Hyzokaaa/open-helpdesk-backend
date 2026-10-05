@@ -3,12 +3,13 @@ import { DeleteEmailRule } from '../../domain/services/email-rule-delete';
 
 interface Props {
   id: string;
+  workspaceId: string;
 }
 
 export class DeleteEmailRuleCommand implements Command<Props, void> {
   constructor(private readonly deleteEmailRule: DeleteEmailRule) {}
 
   async execute(props: Props): Promise<void> {
-    await this.deleteEmailRule.execute(props.id);
+    await this.deleteEmailRule.execute(props.id, props.workspaceId);
   }
 }

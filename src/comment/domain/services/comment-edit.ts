@@ -8,9 +8,10 @@ import { CommentEditRepository } from '../repositories/comment-edit.repository';
 
 interface EditCommentProps {
   commentId: string;
+  /** The ticket the caller has access to; a comment of any other ticket is not found. */
+  ticketId: string;
   content: string;
   userId: string;
-  isAdmin: boolean;
 }
 
 export class EditComment {
@@ -22,11 +23,12 @@ export class EditComment {
 
   async execute(props: EditCommentProps): Promise<Comment> {
     const comment = await this.commentRepository.findById(props.commentId);
-    if (!comment) {
+    if (!comment || comment.ticketId !== props.ticketId) {
       throw new EntityNotFoundError('Comment not found');
     }
 
-    if (comment.authorId !== props.userId && !props.isAdmin) {
+    // Nobody else, system admins included, may put words in the author's mouth.
+    if (comment.authorId !== props.userId) {
       throw new AccessDeniedError('You can only edit your own comments');
     }
 

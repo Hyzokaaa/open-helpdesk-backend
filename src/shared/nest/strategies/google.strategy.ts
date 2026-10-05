@@ -19,7 +19,11 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   validate(
     _accessToken: string,
     _refreshToken: string,
-    profile: { emails?: { value: string }[]; name?: { givenName?: string; familyName?: string } },
+    profile: {
+      emails?: { value: string; verified?: boolean }[];
+      name?: { givenName?: string; familyName?: string };
+      _json?: { email_verified?: boolean };
+    },
     done: VerifyCallback,
   ): void {
     const email = profile.emails?.[0]?.value;
@@ -33,6 +37,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       firstName: profile.name?.givenName || '',
       lastName: profile.name?.familyName || '',
       authProvider: 'google',
+      emailVerified: profile.emails?.[0]?.verified === true || profile._json?.email_verified === true,
     };
     done(null, user);
   }

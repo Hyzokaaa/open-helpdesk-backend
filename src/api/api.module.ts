@@ -1,3 +1,5 @@
+import { ProjectModule } from '../project/project.module';
+import { TagModule } from '../tag/tag.module';
 import { Module } from '@nestjs/common';
 import { SharedModule } from '../shared/shared.module';
 import { WorkspaceModule } from '../workspace/workspace.module';
@@ -17,6 +19,8 @@ import { ApiController } from './infrastructure/nest/controllers/api.controller'
     UserModule,
     AuditLogModule,
     CustomFieldModule,
+    ProjectModule,
+    TagModule,
   ],
   controllers: [ApiController],
 })

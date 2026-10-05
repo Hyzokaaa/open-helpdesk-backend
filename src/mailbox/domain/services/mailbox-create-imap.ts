@@ -1,4 +1,3 @@
-import { DomainValidationError } from '../../../shared/domain/errors';
 import { IdGenerator } from '../../../shared/domain/id-generator';
 import { Mailbox } from '../entities/mailbox';
 import { MailboxRepository } from '../repositories/mailbox.repository';
@@ -18,6 +17,8 @@ interface CreateImapMailboxProps {
   addressMode?: string;
   acceptedAddresses?: string[];
   autoReply?: boolean;
+  postProcessAction?: string;
+  postProcessFolder?: string | null;
 }
 
 export class CreateImapMailbox {
@@ -44,6 +45,8 @@ export class CreateImapMailbox {
       addressMode: props.addressMode ?? 'all',
       acceptedAddresses: props.acceptedAddresses ?? [],
       autoReply: props.autoReply,
+      postProcessAction: props.postProcessAction,
+      postProcessFolder: props.postProcessFolder,
     });
 
     await this.repository.create(mailbox);

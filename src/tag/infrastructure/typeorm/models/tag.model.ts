@@ -2,12 +2,14 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   ManyToOne,
   PrimaryColumn,
 } from 'typeorm';
 import { WorkspaceModel } from '../../../../workspace/infrastructure/typeorm/models/workspace.model';
 
 @Entity('tags')
+@Index('IDX_tags_workspace', ['workspaceId'])
 export class TagModel {
   @PrimaryColumn()
   id!: string;
