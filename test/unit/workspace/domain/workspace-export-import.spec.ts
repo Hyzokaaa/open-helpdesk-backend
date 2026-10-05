@@ -1435,15 +1435,16 @@ describe('buildImportPreview', () => {
     expect(preview.counts).toEqual({
       tickets: 2, comments: 0, users: 1, categories: 0, organizations: 0, departments: 0,
       projects: 0, kbArticles: 0, customFields: 0, cannedResponses: 0,
-      attachments: 0, files: 0, filesBytes: 0,
+      attachments: 0, files: 0, filesBytes: 0, mailboxes: 0, emailRules: 0, webhooks: 0,
     });
+    expect(preview.credentialsIncluded).toBe(false);
   });
 
   it('reports a setting as absent when the file has no value for it', () => {
     const preview = buildImportPreview(emptyExport({
       workspace: { name: 'Acme', description: '', slaPolicy: null, metadata: { palette: '' }, appName: null, appSubtitle: '' },
     }));
-    expect(preview.settings).toEqual({ palette: null, sla: false, description: null, branding: null });
+    expect(preview.settings).toEqual({ palette: null, sla: false, description: null, branding: null, name: 'Acme', emailSender: null, customDomain: null });
   });
 
   it('reports the settings the file carries', () => {
@@ -1456,7 +1457,30 @@ describe('buildImportPreview', () => {
     expect(preview.settings).toEqual({
       palette: 'ocean', sla: true, description: 'Support desk',
       branding: { appName: 'Acme Help', appSubtitle: null, logo: false, icon: false },
+      name: 'Acme', emailSender: null, customDomain: null,
     });
+  });
+
+  it('reports the configuration the file carries and whether it includes credentials', () => {
+    const sender = { smtpHost: 'smtp.acme.com', smtpPort: 587, smtpUser: 'mailer', smtpFrom: 'no-reply@acme.com', encryption: 'tls', fromName: null, fromEmail: null };
+    const mailbox = {
+      originId: 'mb', address: 'a@acme.com', type: 'imap', imapHost: null, imapPort: null, imapUser: null, encryption: 'tls',
+      imapFolder: null, pollInterval: null, addressMode: 'all', acceptedAddresses: [], autoReply: true, postProcessAction: 'none', postProcessFolder: null,
+    };
+    const preview = buildImportPreview(emptyExport({
+      credentialsIncluded: true,
+      customDomain: 'help.acme.com',
+      emailSender: { ...sender, fromEmail: 'help@acme.com', smtpPass: 'p' },
+      mailboxes: [mailbox],
+      emailRules: [{ originId: 'r', name: 'R', position: 0, isActive: true, conditions: [], actions: [], mailboxOriginIds: [] }],
+      webhooks: [{ originId: 'w1', url: 'https://a.example', events: [] }, { originId: 'w2', url: 'https://b.example', events: [] }],
+    }));
+    expect(preview.counts).toMatchObject({ mailboxes: 1, emailRules: 1, webhooks: 2 });
+    expect(preview.settings).toMatchObject({ customDomain: 'help.acme.com', emailSender: { fromAddress: 'help@acme.com', hasCredentials: true } });
+    expect(preview.credentialsIncluded).toBe(true);
+
+    const withoutPassword = buildImportPreview(emptyExport({ emailSender: sender }));
+    expect(withoutPassword.settings.emailSender).toEqual({ fromAddress: 'no-reply@acme.com', hasCredentials: false });
   });
 
   it('rejects a file the import would reject', () => {

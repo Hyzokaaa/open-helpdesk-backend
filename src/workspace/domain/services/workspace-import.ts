@@ -605,6 +605,9 @@ export interface ImportPreview {
     attachments: number;
     files: number;
     filesBytes: number;
+    mailboxes: number;
+    emailRules: number;
+    webhooks: number;
   };
   /** The workspace settings the file carries a value for; null or false when it has none. */
   settings: {
@@ -612,7 +615,13 @@ export interface ImportPreview {
     sla: boolean;
     description: string | null;
     branding: { appName: string | null; appSubtitle: string | null; logo: boolean; icon: boolean } | null;
+    name: string | null;
+    /** The sender's from address; hasCredentials says whether its password travels (needed to apply it). */
+    emailSender: { fromAddress: string | null; hasCredentials: boolean } | null;
+    customDomain: string | null;
   };
+  /** Whether the file carries passwords and secrets. */
+  credentialsIncluded: boolean;
 }
 
 /** What the decoded archive holds besides the JSON. */
@@ -648,6 +657,9 @@ export function buildImportPreview(
       attachments: data.attachments.filter((a) => present(a.file)).length,
       files: archive.files,
       filesBytes: archive.bytes,
+      mailboxes: count(data.mailboxes),
+      emailRules: count(data.emailRules),
+      webhooks: count(data.webhooks),
     },
     settings: {
       palette: present(palette) ? String(palette) : null,
@@ -661,7 +673,16 @@ export function buildImportPreview(
           icon: present(ws.iconFile?.file),
         }
         : null,
+      name: text(ws.name),
+      emailSender: data.emailSender
+        ? {
+          fromAddress: text(data.emailSender.fromEmail) ?? text(data.emailSender.smtpFrom),
+          hasCredentials: present(data.emailSender.smtpPass),
+        }
+        : null,
+      customDomain: text(data.customDomain),
     },
+    credentialsIncluded: data.credentialsIncluded === true,
   };
 }
 
