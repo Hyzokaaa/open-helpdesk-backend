@@ -137,6 +137,8 @@ import { EnsureCanCreateWorkspace } from "../../../domain/services/workspace-ens
 import { TypeOrmWorkspaceCreationSettingsRepository } from "../../typeorm/repositories/typeorm-workspace-creation-settings.repository";
 import { workspaceCreationPolicy } from "../workspace-creation-policy";
 import { imageUploadOptions, LOGO_IMAGE_MIMES } from "../../../../shared/infrastructure/nest/image-upload-options";
+import { TypeOrmOrganizationRepository } from "../../../../organization/infrastructure/typeorm/repositories/typeorm-organization.repository";
+import { OrganizationModel } from "../../../../organization/infrastructure/typeorm/models/organization.model";
 
 const IMPORT_LIMITS = importLimitsFromEnv();
 
@@ -533,7 +535,19 @@ export class WorkspaceController {
     );
     if (!member) throw new EntityNotFoundError("Member not found");
 
-    member.organizationId = body.organizationId;
+    if (body.organizationId) {
+      // OrganizationModule imports WorkspaceModule, so the repository is built here instead of injected.
+      const organizationRepository = new TypeOrmOrganizationRepository(
+        this.dataSource.getRepository(OrganizationModel),
+      );
+      const organization = await organizationRepository.findById(
+        body.organizationId,
+      );
+      if (!organization || organization.workspaceId !== workspaceId)
+        throw new EntityNotFoundError("Organization not found");
+    }
+
+    member.organizationId = body.organizationId ?? null;
     await this.memberRepository.update(member);
 
     return { organizationId: member.organizationId };
