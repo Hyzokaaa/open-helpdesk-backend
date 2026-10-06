@@ -16,6 +16,19 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.25.3',
+    date: '2026-10-05',
+    categories: [
+      {
+        title: { en: 'Security', es: 'Seguridad' },
+        features: [
+          { en: 'A member can only be assigned an organization of the same workspace', es: 'A un miembro solo se le puede asignar una organización del mismo workspace' },
+          { en: 'A contact can only be renamed from a workspace it belongs to, and not when it also belongs to another workspace', es: 'Un contacto solo se puede renombrar desde un workspace al que pertenece, y no si también pertenece a otro workspace' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.25.2',
     date: '2026-10-05',
     categories: [
