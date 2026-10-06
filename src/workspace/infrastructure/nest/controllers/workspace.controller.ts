@@ -838,7 +838,7 @@ export class WorkspaceController {
     @Body() body: any,
     @CurrentUser() user: AuthUser,
     @Req() req: Request,
-    // Comma list of target settings to overwrite: palette, sla, description, branding, name, emailSender, customDomain
+    // Comma list of target settings to overwrite: palette, sla, description, branding, name, emailSender, customDomain, analytics
     @Query("overwrite") overwrite?: string | string[],
     // "true" completes tickets the workspace already has, adding only what they lack
     @Query("completeExisting") completeExisting?: string,

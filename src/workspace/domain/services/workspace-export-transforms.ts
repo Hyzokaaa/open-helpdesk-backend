@@ -100,9 +100,23 @@ const TRANSFORMS: Record<string, Transform> = {
     data.version = '1.18.0';
     return data;
   },
-  // A 1.18 file written by hand may leave out the configuration sections: they count as empty
-  '1.18.0': (data) => withConfigurationSections(data),
+  '1.18.0': (data) => {
+    // 1.18 → 1.19: the workspace's analytics settings travel too. An older file carries none, and
+    // a 1.18 file written by hand may leave out the configuration sections: they count as empty.
+    withConfigurationSections(data);
+    withAnalytics(data);
+    data.version = '1.19.0';
+    return data;
+  },
+  // A 1.19 file written by hand may leave out the analytics section: it counts as absent
+  '1.19.0': (data) => withAnalytics(withConfigurationSections(data)),
 };
+
+/** A file without the 1.19 analytics section carries no analytics settings. */
+function withAnalytics(data: WorkspaceExportData): WorkspaceExportData {
+  if (data.analytics === undefined) data.analytics = null;
+  return data;
+}
 
 /** Fills the 1.18 configuration sections a file lacks, leaving the ones it carries. */
 function withConfigurationSections(data: WorkspaceExportData): WorkspaceExportData {
@@ -115,8 +129,8 @@ function withConfigurationSections(data: WorkspaceExportData): WorkspaceExportDa
   return data;
 }
 
-const VERSION_ORDER = ['1.11.0', '1.12.0', '1.13.0', '1.14.0', '1.15.0', '1.16.0', '1.17.0', '1.18.0'];
-const CURRENT_VERSION = '1.18.0';
+const VERSION_ORDER = ['1.11.0', '1.12.0', '1.13.0', '1.14.0', '1.15.0', '1.16.0', '1.17.0', '1.18.0', '1.19.0'];
+const CURRENT_VERSION = '1.19.0';
 const MIN_VERSION = '1.11.0';
 
 /** Sections every supported version has; the transforms walk some of them. */
