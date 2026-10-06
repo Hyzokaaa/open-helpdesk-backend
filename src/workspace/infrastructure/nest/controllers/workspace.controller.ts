@@ -473,10 +473,19 @@ export class WorkspaceController {
       isSystemAdmin: user.isSystemAdmin,
     });
 
+    // A contact is a global user: renaming it here renames it in every workspace it belongs to.
+    const memberships = await this.memberRepository.findByUserId(userId);
+    if (!memberships.some((m) => m.workspaceId === workspaceId))
+      throw new EntityNotFoundError("User not found");
+
     const targetUser = await this.userRepository.findById(userId);
     if (!targetUser) throw new EntityNotFoundError("User not found");
     if (!targetUser.autoCreated)
       throw new BadRequestException("Only auto-created contacts can be edited");
+    if (memberships.length > 1)
+      throw new BadRequestException(
+        "This contact also belongs to another workspace and cannot be renamed from here",
+      );
 
     const before = {
       firstName: targetUser.firstName,
