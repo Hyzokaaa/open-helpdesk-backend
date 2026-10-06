@@ -3,8 +3,7 @@ import { IdGenerator } from '../../../shared/domain/id-generator';
 import { SystemAnalyticsSettings } from '../entities/system-analytics-settings';
 import { AnalyticsProvider } from '../enums/analytics-provider.enum';
 import { SystemAnalyticsSettingsRepository } from '../repositories/system-analytics-settings.repository';
-
-const SITE_ID_REGEX = /^[1-9][0-9]{0,9}$/;
+import { normalizeMatomoServerUrl, normalizeMatomoSiteId } from './matomo-settings-validation';
 
 interface Props {
   provider?: AnalyticsProvider | null;
@@ -38,35 +37,6 @@ function snapshot(settings: SystemAnalyticsSettings): SystemAnalyticsSettingsSna
   };
 }
 
-function normalizeServerUrl(value: string | null): string {
-  const trimmed = value?.trim() ?? '';
-  if (trimmed === '') throw new DomainValidationError('Server URL is required for Matomo');
-
-  let url: URL;
-  try {
-    url = new URL(trimmed);
-  } catch {
-    throw new DomainValidationError('Server URL is not a valid URL');
-  }
-
-  if (url.protocol !== 'https:') throw new DomainValidationError('Server URL must use https');
-  if (url.username || url.password) throw new DomainValidationError('Server URL must not contain credentials');
-  if (url.search) throw new DomainValidationError('Server URL must not contain a query string');
-  if (url.hash) throw new DomainValidationError('Server URL must not contain a fragment');
-
-  const path = url.pathname.endsWith('/') ? url.pathname : `${url.pathname}/`;
-  return `${url.origin}${path}`;
-}
-
-function normalizeSiteId(value: string | null): string {
-  const trimmed = value?.trim() ?? '';
-  if (trimmed === '') throw new DomainValidationError('Site ID is required for Matomo');
-  if (!SITE_ID_REGEX.test(trimmed)) {
-    throw new DomainValidationError('Site ID must be a positive integer of at most 10 digits');
-  }
-  return trimmed;
-}
-
 export class UpdateSystemAnalyticsSettings {
   constructor(
     private readonly repository: SystemAnalyticsSettingsRepository,
@@ -93,8 +63,8 @@ export class UpdateSystemAnalyticsSettings {
       settings.trackEvents = true;
     } else if (provider === AnalyticsProvider.MATOMO) {
       settings.provider = provider;
-      settings.serverUrl = normalizeServerUrl(props.serverUrl !== undefined ? props.serverUrl : settings.serverUrl);
-      settings.siteId = normalizeSiteId(props.siteId !== undefined ? props.siteId : settings.siteId);
+      settings.serverUrl = normalizeMatomoServerUrl(props.serverUrl !== undefined ? props.serverUrl : settings.serverUrl);
+      settings.siteId = normalizeMatomoSiteId(props.siteId !== undefined ? props.siteId : settings.siteId);
       if (props.useCookies !== undefined) settings.useCookies = props.useCookies;
       if (props.trackEvents !== undefined) settings.trackEvents = props.trackEvents;
     } else {

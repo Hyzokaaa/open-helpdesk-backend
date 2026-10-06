@@ -9,11 +9,14 @@ export interface PublicAnalyticsConfig {
   trackEvents: boolean;
 }
 
+/** The fields the browser config is built from, shared by the installation and the workspace settings. */
+export type AnalyticsSettingsLike = Pick<SystemAnalyticsSettings, 'provider' | 'serverUrl' | 'siteId' | 'useCookies' | 'trackEvents'>;
+
 /**
  * The analytics settings the browser needs to load the tracker, or null when
  * analytics is off or the stored settings are incomplete.
  */
-export function toPublicAnalyticsConfig(settings: SystemAnalyticsSettings | null): PublicAnalyticsConfig | null {
+export function toPublicAnalyticsConfig(settings: AnalyticsSettingsLike | null): PublicAnalyticsConfig | null {
   if (!settings) return null;
   if (settings.provider !== AnalyticsProvider.MATOMO) return null;
   if (!settings.serverUrl || !settings.siteId) return null;
