@@ -162,6 +162,7 @@ export enum AuditAction {
   SYSTEM_MAILBOX_CONFIGURED = 'system-mailbox-configured',
   SYSTEM_MAILBOX_DELETED = 'system-mailbox-deleted',
   SYSTEM_MAILBOX_TEST_CONNECTION = 'system-mailbox-test-connection',
+  SYSTEM_ANALYTICS_UPDATED = 'system-analytics-updated',
 
   // Notifications
   NOTIFICATION_PREFERENCES_UPDATED = 'notification-preferences-updated',
