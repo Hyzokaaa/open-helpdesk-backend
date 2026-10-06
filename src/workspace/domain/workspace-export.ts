@@ -328,6 +328,17 @@ export interface WorkspaceExportWebhook {
   secret?: string;
 }
 
+/** The workspace's own web analytics and whether it shares usage with the installation. Since 1.19. */
+export interface WorkspaceExportAnalytics {
+  /** 'matomo', or null when the workspace has no analytics of its own. */
+  provider: string | null;
+  serverUrl: string | null;
+  siteId: string | null;
+  useCookies: boolean;
+  trackEvents: boolean;
+  shareWithInstallation: boolean;
+}
+
 export interface WorkspaceExportData {
   version: string;
   exportedAt: string;
@@ -367,6 +378,8 @@ export interface WorkspaceExportData {
   emailSender: WorkspaceExportEmailSender | null;
   webhooks: WorkspaceExportWebhook[];
   customDomain: string | null;
+  /** Null when the workspace never configured analytics (defaults apply). Since 1.19. */
+  analytics: WorkspaceExportAnalytics | null;
   /** True when the export carries passwords and secrets (mailboxes, email sender, webhooks). Since 1.18. */
   credentialsIncluded: boolean;
   /** Files the source storage no longer had when this export was made. Since 1.16. */

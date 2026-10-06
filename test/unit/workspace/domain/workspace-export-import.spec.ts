@@ -79,6 +79,7 @@ function emptyExport(overrides: Partial<WorkspaceExportData> = {}): WorkspaceExp
     emailSender: null,
     webhooks: [],
     customDomain: null,
+    analytics: null,
     credentialsIncluded: false,
     ...overrides,
   };
@@ -1313,7 +1314,7 @@ describe('ImportWorkspace settings overwrite', () => {
   it('rejects an unknown overwrite key before touching the database', async () => {
     const qr = new FakeQueryRunner(answer);
     await expect(new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', source(), { overwrite: ['palette', 'logo'] }))
-      .rejects.toThrow(new DomainValidationError('Unknown overwrite setting: logo. Allowed: palette, sla, description, branding, name, emailSender, customDomain'));
+      .rejects.toThrow(new DomainValidationError('Unknown overwrite setting: logo. Allowed: palette, sla, description, branding, name, emailSender, customDomain, analytics'));
     expect(qr.queries).toHaveLength(0);
   });
 
@@ -1447,7 +1448,7 @@ describe('buildImportPreview', () => {
     const preview = buildImportPreview(emptyExport({
       workspace: { name: 'Acme', description: '', slaPolicy: null, metadata: { palette: '' }, appName: null, appSubtitle: '' },
     }));
-    expect(preview.settings).toEqual({ palette: null, sla: false, description: null, branding: null, name: 'Acme', emailSender: null, customDomain: null, customDomainConflict: false });
+    expect(preview.settings).toEqual({ palette: null, sla: false, description: null, branding: null, name: 'Acme', emailSender: null, customDomain: null, customDomainConflict: false, analytics: null });
   });
 
   it('reports the settings the file carries', () => {
@@ -1460,7 +1461,7 @@ describe('buildImportPreview', () => {
     expect(preview.settings).toEqual({
       palette: 'ocean', sla: true, description: 'Support desk',
       branding: { appName: 'Acme Help', appSubtitle: null, logo: false, icon: false },
-      name: 'Acme', emailSender: null, customDomain: null, customDomainConflict: false,
+      name: 'Acme', emailSender: null, customDomain: null, customDomainConflict: false, analytics: null,
     });
   });
 
@@ -2659,5 +2660,90 @@ describe('ImportWorkspace configuration', () => {
       ticketsImported: 1, mailboxesImported: 0, emailRulesImported: 0, webhooksImported: 0,
       customDomainSkipped: null, credentialsIncluded: false, settingsApplied: ['name'],
     });
+  });
+});
+
+describe('workspace analytics in exports', () => {
+  const stored = {
+    provider: 'matomo', serverUrl: 'https://stats.acme.com/', siteId: '4', useCookies: true, trackEvents: false, shareWithInstallation: false,
+  };
+  const run = async (data: WorkspaceExportData, overwrite: string[] = []) => {
+    const qr = new FakeQueryRunner(answerFrom({}));
+    const { result } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data, { overwrite });
+    return { qr, result };
+  };
+
+  it('exports the workspace analytics scoped to the workspace, and null when it has none', async () => {
+    const qr = new FakeQueryRunner((sql) => {
+      if (/FROM workspaces WHERE id/.test(sql)) return [{ name: 'Acme', description: '', slaPolicy: null, metadata: null }];
+      if (/FROM workspace_analytics_settings WHERE/.test(sql)) return [stored];
+      return [];
+    });
+    const result = await new ExportWorkspace(dataSourceOf(qr)).execute('ws-1');
+
+    const [query] = qr.find(/FROM workspace_analytics_settings WHERE/);
+    expect(query.sql).toMatch(/"workspaceId" = \$1/);
+    expect(query.params).toEqual(['ws-1']);
+    expect(result.version).toBe('1.19.0');
+    expect(result.analytics).toEqual(stored);
+
+    const none = await new ExportWorkspace(dataSourceOf(new FakeQueryRunner((sql) => (
+      /FROM workspaces WHERE id/.test(sql) ? [{ name: 'Acme', description: '', slaPolicy: null, metadata: null }] : []
+    )))).execute('ws-1');
+    expect(none.analytics).toBeNull();
+  });
+
+  it('upgrades a 1.18 file, which carries no analytics, to 1.19 with none', () => {
+    const legacy = emptyExport({ version: '1.18.0' }) as Partial<WorkspaceExportData>;
+    delete legacy.analytics;
+    const upgraded = applyTransforms(legacy as WorkspaceExportData);
+    expect(upgraded.version).toBe(CURRENT_VERSION);
+    expect(CURRENT_VERSION).toBe('1.19.0');
+    expect(upgraded.analytics).toBeNull();
+  });
+
+  it('previews the analytics the file carries', () => {
+    expect(buildImportPreview(emptyExport({ analytics: stored })).settings.analytics).toEqual({
+      provider: 'matomo', serverUrl: 'https://stats.acme.com/', siteId: '4', shareWithInstallation: false,
+    });
+    const off = { ...stored, provider: null, serverUrl: null, siteId: null };
+    expect(buildImportPreview(emptyExport({ analytics: off })).settings.analytics).toEqual({
+      provider: null, serverUrl: null, siteId: null, shareWithInstallation: false,
+    });
+  });
+
+  it('leaves the target analytics alone unless overwritten, or when the file has none', async () => {
+    const { qr, result } = await run(emptyExport({ analytics: stored }));
+    expect(qr.find(/workspace_analytics_settings/)).toHaveLength(0);
+    expect(result.settingsApplied).toEqual([]);
+
+    const empty = await run(emptyExport(), ['analytics']);
+    expect(empty.qr.find(/workspace_analytics_settings/)).toHaveLength(0);
+    expect(empty.result.settingsApplied).toEqual([]);
+  });
+
+  it('replaces the target analytics when overwritten, normalised and keyed by workspace', async () => {
+    const { qr, result } = await run(emptyExport({ analytics: { ...stored, serverUrl: 'https://Stats.Acme.com/m', siteId: ' 4 ' } }), ['analytics']);
+
+    const [upsert] = qr.find(/INSERT INTO workspace_analytics_settings/);
+    expect(upsert.sql).toMatch(/ON CONFLICT \("workspaceId"\) DO UPDATE SET/);
+    expect(upsert.params.slice(1)).toEqual(['ws-target', 'matomo', 'https://stats.acme.com/m/', '4', true, false, false]);
+    expect(result.settingsApplied).toEqual(['analytics']);
+  });
+
+  it('applies a file whose source had no Matomo as off, keeping its share flag', async () => {
+    const { qr } = await run(emptyExport({ analytics: { ...stored, provider: null } }), ['analytics']);
+    const [upsert] = qr.find(/INSERT INTO workspace_analytics_settings/);
+    expect(upsert.params.slice(1)).toEqual(['ws-target', null, null, null, false, true, false]);
+  });
+
+  it.each([
+    [{ provider: 'ga' }, 'analytics.provider'],
+    [{ serverUrl: 'http://stats.acme.com/' }, 'analytics.serverUrl'],
+    [{ siteId: 'x' }, 'analytics.siteId'],
+    [{ shareWithInstallation: 'yes' }, 'analytics.shareWithInstallation'],
+  ])('rejects analytics %p before touching the database', async (patch, field) => {
+    const data = emptyExport({ analytics: { ...stored, ...patch } as WorkspaceExportData['analytics'] });
+    await expect(run(data, ['analytics'])).rejects.toThrow(field);
   });
 });

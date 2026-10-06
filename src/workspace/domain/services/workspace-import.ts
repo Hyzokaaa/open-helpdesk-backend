@@ -27,6 +27,8 @@ import { EmailRuleConditionField } from '../../../email-rule/domain/enums/email-
 import { EmailRuleOperator } from '../../../email-rule/domain/enums/email-rule-operator.enum';
 import { EmailRuleActionType } from '../../../email-rule/domain/enums/email-rule-action-type.enum';
 import { DOMAIN_REGEX } from './workspace-set-custom-domain';
+import { AnalyticsProvider } from '../../../config/domain/enums/analytics-provider.enum';
+import { normalizeMatomoServerUrl, normalizeMatomoSiteId } from '../../../config/domain/services/matomo-settings-validation';
 
 export interface ImportResult {
   usersCreated: number;
@@ -84,9 +86,10 @@ export interface ImportResult {
  * description → description, branding → appName, appSubtitle, logo and icon (each when the file
  * carries it), name → name, emailSender → the workspace SMTP sender (only when the file carries
  * its password: without one it could not send), customDomain → customDomain, unverified and with a
- * new verification token (skipped when another workspace uses it).
+ * new verification token (skipped when another workspace uses it), analytics → the workspace's own
+ * web analytics and whether it shares usage with the installation.
  */
-export const IMPORT_SETTINGS = ['palette', 'sla', 'description', 'branding', 'name', 'emailSender', 'customDomain'] as const;
+export const IMPORT_SETTINGS = ['palette', 'sla', 'description', 'branding', 'name', 'emailSender', 'customDomain', 'analytics'] as const;
 export type ImportSetting = typeof IMPORT_SETTINGS[number];
 
 /** The files of a decoded .ohd archive, by archive path. */
@@ -587,6 +590,23 @@ function validateExportData(data: WorkspaceExportData): void {
     optionalText(w, p, 'secret');
   });
   if (data.customDomain != null && typeof data.customDomain !== 'string') fail('"customDomain"', 'must be text or null');
+  // Workspace analytics (1.19), checked as the settings page checks it
+  const analytics: any = data.analytics;
+  if (analytics != null) {
+    if (typeof analytics !== 'object' || Array.isArray(analytics)) fail('"analytics"', 'must be an object or null');
+    member(analytics, 'analytics', 'provider', oneOf(AnalyticsProvider), true);
+    for (const field of ['useCookies', 'trackEvents', 'shareWithInstallation']) optionalBoolean(analytics, 'analytics', field);
+    if (analytics.provider === AnalyticsProvider.MATOMO) {
+      for (const [field, normalize] of [['serverUrl', normalizeMatomoServerUrl], ['siteId', normalizeMatomoSiteId]] as const) {
+        if (analytics[field] != null && typeof analytics[field] !== 'string') fail(`analytics.${field}`, 'must be text');
+        try {
+          normalize(analytics[field]);
+        } catch (error) {
+          fail(`analytics.${field}`, `is not valid: ${(error as Error).message}`);
+        }
+      }
+    }
+  }
   if (typeof data.credentialsIncluded !== 'boolean') fail('"credentialsIncluded"', 'must be true or false');
 
   const identified = [
@@ -667,6 +687,11 @@ export interface ImportPreview {
      * which case the import skips it. Always false from buildImportPreview: see withCustomDomainConflict.
      */
     customDomainConflict: boolean;
+    /**
+     * The workspace analytics the file carries (since 1.19), null when it has none. provider null
+     * means the source had no analytics of its own; shareWithInstallation still applies.
+     */
+    analytics: { provider: string | null; serverUrl: string | null; siteId: string | null; shareWithInstallation: boolean } | null;
   };
   /** Whether the file carries passwords and secrets. */
   credentialsIncluded: boolean;
@@ -730,6 +755,14 @@ export function buildImportPreview(
         : null,
       customDomain: text(data.customDomain),
       customDomainConflict: false,
+      analytics: data.analytics
+        ? {
+          provider: text(data.analytics.provider),
+          serverUrl: present(data.analytics.provider) ? text(data.analytics.serverUrl) : null,
+          siteId: present(data.analytics.provider) ? text(data.analytics.siteId) : null,
+          shareWithInstallation: data.analytics.shareWithInstallation !== false,
+        }
+        : null,
     },
     credentialsIncluded: data.credentialsIncluded === true,
   };
@@ -837,6 +870,31 @@ export class ImportWorkspace {
             `, [
               ulid(), targetWorkspaceId, sender.smtpHost, sender.smtpPort, sender.smtpUser, sender.smtpPass, sender.smtpFrom,
               sender.encryption || 'tls', sender.fromName ?? null, sender.fromEmail ?? null,
+            ]);
+            result.settingsApplied.push(key);
+            continue;
+          }
+          if (key === 'analytics') {
+            // The whole settings row, as the source had it: a file without the section leaves the
+            // target's analytics alone. Values were checked by validateExportData; stored normalised.
+            const analytics = data.analytics;
+            if (!analytics) continue;
+            const matomo = analytics.provider === AnalyticsProvider.MATOMO;
+            await qr.query(`
+              INSERT INTO workspace_analytics_settings (id, "workspaceId", provider, "serverUrl", "siteId", "useCookies", "trackEvents", "shareWithInstallation")
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+              ON CONFLICT ("workspaceId") DO UPDATE SET
+                provider = EXCLUDED.provider, "serverUrl" = EXCLUDED."serverUrl", "siteId" = EXCLUDED."siteId",
+                "useCookies" = EXCLUDED."useCookies", "trackEvents" = EXCLUDED."trackEvents",
+                "shareWithInstallation" = EXCLUDED."shareWithInstallation", "updatedAt" = now()
+            `, [
+              ulid(), targetWorkspaceId,
+              matomo ? AnalyticsProvider.MATOMO : null,
+              matomo ? normalizeMatomoServerUrl(analytics.serverUrl) : null,
+              matomo ? normalizeMatomoSiteId(analytics.siteId) : null,
+              matomo ? analytics.useCookies === true : false,
+              matomo ? analytics.trackEvents !== false : true,
+              analytics.shareWithInstallation !== false,
             ]);
             result.settingsApplied.push(key);
             continue;

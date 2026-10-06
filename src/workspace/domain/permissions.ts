@@ -7,6 +7,8 @@ export const PERMISSIONS = {
   WORKSPACE_INVITATIONS_MANAGE: 'workspace.invitations.manage',
   WORKSPACE_MEMBERS_VIEW: 'workspace.members.view',
   WORKSPACE_SETTINGS_MANAGE: 'workspace.settings.manage',
+  /** Configure the workspace's own web analytics and whether it shares usage with the installation. Admins only. */
+  WORKSPACE_ANALYTICS_MANAGE: 'workspace.analytics.manage',
 
   // Tags
   TAG_CREATE: 'tag.create',

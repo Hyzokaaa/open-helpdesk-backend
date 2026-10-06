@@ -269,6 +269,10 @@ export class ExportWorkspace {
         SELECT id, url, events, ${includeCredentials ? 'secret, ' : ''}"createdAt"
         FROM webhooks WHERE "workspaceId" = $1 ORDER BY "createdAt", id
       `, [workspaceId]);
+      const analytics = await qr.query(`
+        SELECT provider, "serverUrl", "siteId", "useCookies", "trackEvents", "shareWithInstallation"
+        FROM workspace_analytics_settings WHERE "workspaceId" = $1
+      `, [workspaceId]);
 
       // An entity this workspace got from an import keeps the identity it had in the file, so the
       // next import elsewhere (or back where it came from) recognises it; anything else is its own
@@ -564,6 +568,16 @@ export class ExportWorkspace {
           ...(includeCredentials ? { secret: w.secret } : {}),
         })),
         customDomain: ws.customDomain ?? null,
+        analytics: analytics.length
+          ? {
+            provider: analytics[0].provider ?? null,
+            serverUrl: analytics[0].serverUrl ?? null,
+            siteId: analytics[0].siteId ?? null,
+            useCookies: analytics[0].useCookies === true,
+            trackEvents: analytics[0].trackEvents !== false,
+            shareWithInstallation: analytics[0].shareWithInstallation !== false,
+          }
+          : null,
         credentialsIncluded: includeCredentials,
       };
     } finally {

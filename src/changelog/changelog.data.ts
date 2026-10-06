@@ -16,6 +16,35 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.27.0',
+    date: '2026-10-06',
+    categories: [
+      {
+        title: { en: 'Web Analytics for Workspaces', es: 'Analítica Web por Workspace' },
+        features: [
+          { en: 'Each workspace can send its analytics to its own Matomo, set up by its admins in Settings → Analytics', es: 'Cada workspace puede enviar su analítica a su propio Matomo, configurado por sus administradores en Ajustes → Analítica' },
+          { en: 'The workspace receives only its own pages and events: portal, knowledge base and its dashboard, never anything outside it', es: 'El workspace recibe solo sus propias páginas y eventos: portal, base de conocimiento y su panel, nunca nada ajeno' },
+          { en: 'On a custom domain every page counts for its workspace, login and legal pages included', es: 'En un dominio propio todas las páginas cuentan para su workspace, incluidos el acceso y las páginas legales' },
+          { en: 'New workspace option Share usage with Open Helpdesk, on by default. Turned off, the installation analytics is absent from that workspace and from its whole custom domain', es: 'Nueva opción del workspace Compartir uso con Open Helpdesk, activada por defecto. Si se desactiva, la analítica de la instalación desaparece de ese workspace y de todo su dominio propio' },
+          { en: 'The cookie banner and the privacy policy say who measures each page: the installation, the workspace or both', es: 'El aviso de cookies y la política de privacidad indican quién mide cada página: la instalación, el workspace o ambos' },
+          { en: 'Workspace exports carry the analytics settings, and an import can overwrite them', es: 'Las exportaciones de workspace incluyen los ajustes de analítica, y una importación puede sobrescribirlos' },
+        ],
+      },
+      {
+        title: { en: 'Security', es: 'Seguridad' },
+        features: [
+          { en: 'The Matomo tracker is served by the installation itself: no script is ever loaded from an analytics server', es: 'El script de Matomo lo sirve la propia instalación: nunca se carga código desde un servidor de analítica' },
+        ],
+      },
+      {
+        title: { en: 'Fixes', es: 'Correcciones' },
+        features: [
+          { en: 'The analytics settings pages show why a value was rejected', es: 'Las páginas de ajustes de analítica muestran por qué se rechazó un valor' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.26.0',
     date: '2026-10-06',
     categories: [
