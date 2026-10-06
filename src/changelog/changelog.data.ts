@@ -16,6 +16,18 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.27.1',
+    date: '2026-10-06',
+    categories: [
+      {
+        title: { en: 'Improvements', es: 'Mejoras' },
+        features: [
+          { en: 'Products built on Open Helpdesk can show their own versions on the Updates page, with the core presented as their base', es: 'Los productos construidos sobre Open Helpdesk pueden mostrar sus propias versiones en la página de Actualizaciones, con el core presentado como su base' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.27.0',
     date: '2026-10-06',
     categories: [
