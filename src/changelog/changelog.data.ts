@@ -16,6 +16,35 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.26.0',
+    date: '2026-10-06',
+    categories: [
+      {
+        title: { en: 'Important Changes — Read Before Updating', es: 'Cambios Importantes — Léelos Antes de Actualizar' },
+        features: [
+          { en: 'Web analytics is now configured in Administration → Analytics. The VITE_UMAMI_URL and VITE_UMAMI_WEBSITE_ID build variables are no longer read', es: 'La analítica web se configura ahora en Administración → Analítica. Las variables de compilación VITE_UMAMI_URL y VITE_UMAMI_WEBSITE_ID dejan de leerse' },
+        ],
+      },
+      {
+        title: { en: 'Web Analytics', es: 'Analítica Web' },
+        features: [
+          { en: 'Measure how your installation is used with your own Matomo server, set up from Administration → Analytics without rebuilding anything', es: 'Mide cómo se usa tu instalación con tu propio servidor Matomo, configurado desde Administración → Analítica sin recompilar nada' },
+          { en: 'Every page change is measured, reported only as a route pattern: never real addresses, identifiers or access tokens', es: 'Se mide cada cambio de página, enviado solo como patrón de ruta: nunca direcciones reales, identificadores ni tokens de acceso' },
+          { en: 'Optional cookies with a consent banner. Until visitors accept, or if they reject, measurement continues without cookies', es: 'Cookies opcionales con aviso de consentimiento. Hasta que el visitante acepta, o si las rechaza, la medición sigue sin cookies' },
+          { en: 'The privacy policy describes the active analytics configuration automatically', es: 'La política de privacidad describe automáticamente la configuración de analítica activa' },
+          { en: 'Optional product events such as ticket created or workspace created, with short technical labels only', es: 'Eventos de producto opcionales, como ticket creado o workspace creado, solo con etiquetas técnicas breves' },
+          { en: 'Analytics settings changes are recorded in the system log', es: 'Los cambios en los ajustes de analítica quedan en el registro del sistema' },
+        ],
+      },
+      {
+        title: { en: 'Fixes', es: 'Correcciones' },
+        features: [
+          { en: 'Editing a contact explains when its name cannot be changed because it also belongs to another workspace', es: 'Al editar un contacto se explica cuándo no se puede cambiar su nombre porque también pertenece a otro workspace' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.25.3',
     date: '2026-10-05',
     categories: [
