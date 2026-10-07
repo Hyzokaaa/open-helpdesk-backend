@@ -39,11 +39,8 @@ export class AdminAuditLogController {
     });
 
     const userIds = [...new Set(result.items.map((i) => i.userId).filter(Boolean))] as string[];
-    const userMap = new Map<string, string>();
-    for (const uid of userIds) {
-      const u = await this.userRepository.findById(uid);
-      if (u) userMap.set(uid, `${u.firstName} ${u.lastName}`.trim() || u.email);
-    }
+    const users = userIds.length > 0 ? await this.userRepository.findByIds(userIds) : [];
+    const userMap = new Map(users.map((u) => [u.getId(), `${u.firstName} ${u.lastName}`.trim() || u.email]));
 
     return {
       ...result,
