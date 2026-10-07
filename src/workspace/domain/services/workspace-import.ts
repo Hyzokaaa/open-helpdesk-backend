@@ -28,7 +28,14 @@ import { EmailRuleOperator } from '../../../email-rule/domain/enums/email-rule-o
 import { EmailRuleActionType } from '../../../email-rule/domain/enums/email-rule-action-type.enum';
 import { DOMAIN_REGEX } from './workspace-set-custom-domain';
 import { AnalyticsProvider } from '../../../config/domain/enums/analytics-provider.enum';
-import { TicketReferenceStyle, normalizeTicketReferencePrefix } from '../../../ticket/domain/ticket-reference';
+import {
+  TicketReferenceFormat,
+  TicketReferenceStyle,
+  formatTicketReference,
+  normalizeTicketReferencePrefix,
+  ticketReferenceFormatOf,
+} from '../../../ticket/domain/ticket-reference';
+import { WorkspaceTicketReference } from '../entities/workspace-ticket-reference';
 import { normalizeMatomoServerUrl, normalizeMatomoSiteId } from '../../../config/domain/services/matomo-settings-validation';
 
 export interface ImportResult {
@@ -1426,6 +1433,30 @@ export class ImportWorkspace {
         );
         let ticketNumber = Number(maxNumResult[0].max);
 
+        // Each ticket keeps the reference it showed in the source, so emails and notes that quote it
+        // still lead to it. One the target already uses (soft-deleted tickets included) is not taken
+        // twice: that ticket gets a new one in the target's format, as a ticket created here would.
+        const takenReferences = new Set<string>(
+          data.tickets.length
+            ? (await qr.query(
+              `SELECT reference FROM tickets WHERE "workspaceId" = $1 AND reference IS NOT NULL`, [targetWorkspaceId],
+            )).map((r: any) => r.reference)
+            : [],
+        );
+        // Read once, and only if a reference has to be made: the format as it stands after the settings above
+        let targetReferenceFormat: TicketReferenceFormat | undefined;
+        const referenceFormat = async (): Promise<TicketReferenceFormat> => {
+          if (!targetReferenceFormat) {
+            const [settings] = await qr.query(
+              `SELECT style, prefix, secret FROM workspace_ticket_references WHERE "workspaceId" = $1`, [targetWorkspaceId],
+            );
+            targetReferenceFormat = ticketReferenceFormatOf(
+              settings ? new WorkspaceTicketReference({ workspaceId: targetWorkspaceId, ...settings }) : null,
+            );
+          }
+          return targetReferenceFormat;
+        };
+
         // Tickets the workspace already has (by identity, else same name, reporter and second)
         const existingTickets = await qr.query(EXISTING_TICKETS_SQL, [targetWorkspaceId]);
         const ticketMatches = matchTickets(data.tickets, existingTickets, identity, userIdFor);
@@ -1446,6 +1477,12 @@ export class ImportWorkspace {
 
           const newId = ulid();
           ticketNumber++;
+          let reference = importedTicketReference(t.reference);
+          if (!reference || takenReferences.has(reference)) {
+            const format = await referenceFormat();
+            while (takenReferences.has(reference = formatTicketReference(ticketNumber, format))) ticketNumber++;
+          }
+          takenReferences.add(reference);
           await qr.query(`
             INSERT INTO tickets (
               id, name, description, priority, status, "categoryId",
@@ -1454,8 +1491,8 @@ export class ImportWorkspace {
               "firstResponseAt", "resolvedAt", "resolvedById",
               "firstResponseBreached", "resolutionBreached", "createdAt", "updatedAt",
               "organizationId", "departmentId", "projectId",
-              source, "registeredById", "originDate", "descriptionEditedAt", "mailboxId"
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)
+              source, "registeredById", "originDate", "descriptionEditedAt", "mailboxId", reference
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29)
           `, [
             newId, t.name, sanitizeHtml(t.description ?? ''), t.priority, t.status, categoryIdFor(t.category),
             targetWorkspaceId, userIdFor(t.reporterEmail), userIdFor(t.assigneeEmail), ticketNumber,
@@ -1464,7 +1501,7 @@ export class ImportWorkspace {
             t.firstResponseBreached, t.resolutionBreached, t.createdAt, t.updatedAt,
             organizationIdFor(t.organizationId), departmentIdFor(t.departmentId), projectIdFor(t.projectId),
             t.source ?? TicketSource.UI, userIdFor(t.registeredByEmail ?? null), t.originDate ?? null, t.descriptionEditedAt ?? null,
-            mailboxIdFor(t.mailboxOriginId),
+            mailboxIdFor(t.mailboxOriginId), reference,
           ]);
           ticketIdMap.set(t.id, newId);
           links.record(LINK.ticket, originOf(t), newId);
@@ -2074,4 +2111,11 @@ export class ImportWorkspace {
       }
     }
   }
+}
+
+/** A reference from the file as stored: trimmed, upper case, at most 40 characters. Null when unusable. */
+function importedTicketReference(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const reference = value.trim().toUpperCase();
+  return reference && reference.length <= 40 ? reference : null;
 }

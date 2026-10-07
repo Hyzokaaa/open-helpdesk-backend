@@ -103,6 +103,7 @@ function ticket(id: string, category: string | null): WorkspaceExportData['ticke
     reporterEmail: 'alice@example.com',
     assigneeEmail: null,
     ticketNumber: 1,
+    reference: `REF-${id}`.toUpperCase(),
     customFields: {},
     discardReason: null,
     portalToken: null,
@@ -1117,7 +1118,7 @@ describe('ImportWorkspace ticket fields', () => {
 
     const [insert] = qr.find(/INSERT INTO tickets/);
     expect(insert.sql).toMatch(/source, "registeredById", "originDate", "descriptionEditedAt"/);
-    expect(insert.params.slice(23)).toEqual(['portal', 'u-1', '2025-12-31T00:00:00.000Z', '2026-01-02T00:00:00.000Z', null]);
+    expect(insert.params.slice(23, 28)).toEqual(['portal', 'u-1', '2025-12-31T00:00:00.000Z', '2026-01-02T00:00:00.000Z', null]);
   });
 
   it('imports a ticket from an older file as created from the UI with no registrar', async () => {
@@ -1130,7 +1131,7 @@ describe('ImportWorkspace ticket fields', () => {
 
     await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
 
-    expect(qr.find(/INSERT INTO tickets/)[0].params.slice(23)).toEqual(['ui', null, null, null, null]);
+    expect(qr.find(/INSERT INTO tickets/)[0].params.slice(23, 28)).toEqual(['ui', null, null, null, null]);
   });
 
   it('rejects an unknown ticket source', async () => {
@@ -2429,7 +2430,7 @@ describe('ImportWorkspace configuration', () => {
         emptyExport({ users: [alice], mailboxes: [mailbox()], tickets: [{ ...ticket('t-1', null), mailboxOriginId: 'mb-origin' }] }),
       );
       const [ticketInsert] = created.qr.find(/INSERT INTO tickets/);
-      expect(ticketInsert.sql).toMatch(/"mailboxId"\n/);
+      expect(ticketInsert.sql).toMatch(/"mailboxId", reference\n/);
       expect(ticketInsert.params[27]).toBe('mb-here');
 
       const here = {
@@ -2694,7 +2695,7 @@ describe('workspace analytics in exports', () => {
     const [query] = qr.find(/FROM workspace_analytics_settings WHERE/);
     expect(query.sql).toMatch(/"workspaceId" = \$1/);
     expect(query.params).toEqual(['ws-1']);
-    expect(result.version).toBe('1.20.0');
+    expect(result.version).toBe(CURRENT_VERSION);
     expect(result.analytics).toEqual(stored);
 
     const none = await new ExportWorkspace(dataSourceOf(new FakeQueryRunner((sql) => (
@@ -2708,7 +2709,7 @@ describe('workspace analytics in exports', () => {
     delete legacy.analytics;
     const upgraded = applyTransforms(legacy as WorkspaceExportData);
     expect(upgraded.version).toBe(CURRENT_VERSION);
-    expect(CURRENT_VERSION).toBe('1.20.0');
+    expect(CURRENT_VERSION).toBe('1.21.0');
     expect(upgraded.analytics).toBeNull();
   });
 
@@ -2778,12 +2779,73 @@ describe('ticket reference format in exports', () => {
     expect(query.params).toEqual(['ws-1']);
   });
 
-  it('upgrades a 1.19 file, which carries none, to 1.20 with the default format', () => {
+  it('upgrades a 1.19 file, which carries none, with the default format', () => {
     const legacy = emptyExport({ version: '1.19.0' }) as Partial<WorkspaceExportData>;
     delete legacy.ticketReference;
     const upgraded = applyTransforms(legacy as WorkspaceExportData);
-    expect(upgraded.version).toBe('1.20.0');
+    expect(upgraded.version).toBe('1.21.0');
     expect(upgraded.ticketReference).toBeNull();
+  });
+
+  it('upgrades a 1.20 file giving each ticket the reference its number had in the file format', () => {
+    const plain = { ...ticket('t-1', null), ticketNumber: 42 } as Partial<WorkspaceExportData['tickets'][number]>;
+    delete plain.reference;
+    const legacy = emptyExport({ version: '1.20.0', ticketReference: { style: 'sequential', prefix: 'SUP', secret: null }, tickets: [plain as WorkspaceExportData['tickets'][number]] });
+    const upgraded = applyTransforms(legacy);
+    expect(upgraded.version).toBe('1.21.0');
+    expect(upgraded.tickets[0].reference).toBe('SUP-000042');
+
+    const fresh = { ...ticket('t-1', null), ticketNumber: 42 } as Partial<WorkspaceExportData['tickets'][number]>;
+    delete fresh.reference;
+    const older = emptyExport({ version: '1.19.0', tickets: [fresh as WorkspaceExportData['tickets'][number]] }) as Partial<WorkspaceExportData>;
+    delete older.ticketReference;
+    expect(applyTransforms(older as WorkspaceExportData).tickets[0].reference).toBe('TK-000042');
+  });
+
+  it('exports the reference each ticket keeps, or the one the format gives a ticket stored without it', async () => {
+    const qr = new FakeQueryRunner((sql) => {
+      if (/FROM workspaces WHERE id/.test(sql)) return [{ name: 'Acme', description: '', slaPolicy: null, metadata: null }];
+      if (/FROM workspace_ticket_references WHERE/.test(sql)) return [{ style: 'sequential', prefix: 'SUP', secret: null }];
+      if (/FROM tickets t/.test(sql)) {
+        return [
+          { id: 't-1', ticketNumber: 1, reference: 'TK-000001', tagIds: [], createdAt: new Date(), updatedAt: new Date() },
+          { id: 't-2', ticketNumber: 2, reference: null, tagIds: [], createdAt: new Date(), updatedAt: new Date() },
+        ];
+      }
+      return [];
+    });
+    const result = await new ExportWorkspace(dataSourceOf(qr)).execute('ws-1');
+    expect(result.tickets.map((t) => t.reference)).toEqual(['TK-000001', 'SUP-000002']);
+  });
+
+  it('keeps the source references and gives a new one, in the target format, to a reference already taken', async () => {
+    const qr = new FakeQueryRunner((sql, params) => {
+      if (/FROM users WHERE email = ANY/.test(sql)) return [{ id: 'u-1', email: 'alice@example.com' }];
+      if (/MAX\("ticketNumber"\)/.test(sql)) return [{ max: 10 }];
+      // The target already has ACME-000011 (a kept reference) and ACME-000012 (its own)
+      if (/SELECT reference FROM tickets/.test(sql)) return [{ reference: 'ACME-000011' }, { reference: 'ACME-000012' }, { reference: 'OLD-7' }];
+      if (/FROM workspace_ticket_references WHERE/.test(sql)) return [{ style: 'sequential', prefix: 'ACME', secret: null }];
+      return answerFrom({})(sql, params);
+    });
+    const data = emptyExport({
+      users: [{ email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' }],
+      tickets: [
+        { ...ticket('t-1', null), ticketNumber: 1, reference: 'old-5' },
+        { ...ticket('t-2', null), ticketNumber: 2, reference: 'OLD-7' },
+        { ...ticket('t-3', null), ticketNumber: 3, reference: 'OLD-5' },
+      ],
+    });
+
+    await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    const inserts = qr.find(/INSERT INTO tickets/);
+    // [name, number, reference]: t-1 keeps its reference (upper case); t-2's is taken in the target,
+    // so it gets the next free one in the target format, skipping 11 and 12; t-3's duplicates t-1's
+    expect(inserts.map((q) => [q.params[1], q.params[9], q.params[28]])).toEqual([
+      ['Ticket t-1', 11, 'OLD-5'],
+      ['Ticket t-2', 13, 'ACME-000013'],
+      ['Ticket t-3', 14, 'ACME-000014'],
+    ]);
   });
 
   it('previews the format without its key', () => {

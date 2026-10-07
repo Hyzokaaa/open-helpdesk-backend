@@ -4,7 +4,10 @@ import {
   formatTicketReference,
   normalizeTicketReferencePrefix,
   parseTicketReference,
+  ticketReferenceOf,
 } from '../../../../src/ticket/domain/ticket-reference';
+import { TicketReferenceFormats } from '../../../../src/ticket/domain/services/ticket-reference-formats';
+import { WorkspaceTicketReference } from '../../../../src/workspace/domain/entities/workspace-ticket-reference';
 
 const random = (secret: string, prefix = 'TK'): TicketReferenceFormat => ({ style: TicketReferenceStyle.RANDOM, prefix, secret });
 const sequential = (prefix = 'TK'): TicketReferenceFormat => ({ style: TicketReferenceStyle.SEQUENTIAL, prefix, secret: null });
@@ -103,5 +106,23 @@ describe('Ticket references', () => {
       expect(normalizeTicketReferencePrefix('TOO-LONG-PREFIX')).toBeNull();
       expect(normalizeTicketReferencePrefix('A-B')).toBeNull();
     });
+  });
+});
+
+describe('Stored ticket references', () => {
+  it('shows the reference the ticket was created with, whatever the format is now', () => {
+    expect(ticketReferenceOf({ reference: 'OLD-000042', ticketNumber: 42 })).toBe('OLD-000042');
+    expect(ticketReferenceOf({ reference: null, ticketNumber: 42 })).toBe('TK-000042');
+  });
+
+  it('searches a term as typed and with the workspace prefix', async () => {
+    const formats = new TicketReferenceFormats({
+      findByWorkspaceId: async () => new WorkspaceTicketReference({ workspaceId: 'ws-1', style: 'random', prefix: 'ACME', secret: 'k' }),
+      save: async () => undefined,
+    });
+    expect(await formats.candidates('ws-1', ' 7qx4m2k ')).toEqual(['7QX4M2K', 'ACME-7QX4M2K']);
+    expect(await formats.candidates('ws-1', 'acme-7qx4m2k')).toEqual(['ACME-7QX4M2K']);
+    expect(await formats.candidates('ws-1', 'tk-000042')).toEqual(['TK-000042', 'ACME-TK-000042']);
+    expect(await formats.candidates('ws-1', '  ')).toEqual([]);
   });
 });

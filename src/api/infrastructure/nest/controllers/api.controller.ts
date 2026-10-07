@@ -194,7 +194,7 @@ export class ApiController {
     const workspaceId = this.resolveWorkspaceId(user);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const ensureAccess = new EnsureTicketAccess(this.ticketRepository, ensurePermission, this.participantRepository);
-    const query = new GetTicketQuery(this.ticketRepository, ensureAccess, undefined, new TicketReferenceFormats(this.ticketReferenceRepository));
+    const query = new GetTicketQuery(this.ticketRepository, ensureAccess, undefined);
     return query.execute({
       ticketId: id,
       workspaceId,
@@ -316,7 +316,7 @@ export class ApiController {
       const updateService = new UpdateTicket(this.ticketRepository);
       const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
       const validateCustomFields = new ValidateCustomFieldValues(this.customFieldDefinitionRepository);
-      const updateCommand = new UpdateTicketCommand(updateService, this.ticketRepository, ensurePermission, auditLog, validateCustomFields, this.createEnsureReferences(), this.createResolveLabels(), this.eventPublisher, new TicketReferenceFormats(this.ticketReferenceRepository));
+      const updateCommand = new UpdateTicketCommand(updateService, this.ticketRepository, ensurePermission, auditLog, validateCustomFields, this.createEnsureReferences(), this.createResolveLabels(), this.eventPublisher);
       return updateCommand.execute({
         ticketId: id,
         workspaceId: workspace.getId(),
@@ -358,7 +358,7 @@ export class ApiController {
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new DeleteTicket(this.ticketRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-    const command = new DeleteTicketCommand(service, ensurePermission, this.ticketRepository, auditLog, this.eventPublisher, new TicketReferenceFormats(this.ticketReferenceRepository));
+    const command = new DeleteTicketCommand(service, ensurePermission, this.ticketRepository, auditLog, this.eventPublisher);
     return command.execute({
       ticketId: id,
       workspaceId,
@@ -428,8 +428,6 @@ export class ApiController {
       this.userRepository,
       this.eventPublisher,
       auditLog,
-      undefined,
-      new TicketReferenceFormats(this.ticketReferenceRepository),
     );
     return command.execute({
       content: body.content,

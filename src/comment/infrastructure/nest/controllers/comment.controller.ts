@@ -34,8 +34,6 @@ import { AddTicketParticipant } from "../../../../ticket/domain/services/ticket-
 import { EnsureTicketAccess } from "../../../../ticket/domain/services/ticket-ensure-access";
 import { TypeOrmTicketParticipantRepository } from "../../../../ticket/infrastructure/typeorm/repositories/typeorm-ticket-participant.repository";
 import { CreateCommentRequest } from "../dto/create-comment.request";
-import { TypeOrmWorkspaceTicketReferenceRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-ticket-reference.repository';
-import { TicketReferenceFormats } from '../../../../ticket/domain/services/ticket-reference-formats';
 
 @Controller("workspaces/:slug/tickets/:ticketId/comments")
 export class CommentController {
@@ -43,7 +41,6 @@ export class CommentController {
     @Inject() private readonly commentRepository: TypeOrmCommentRepository,
     @Inject() private readonly ticketRepository: TypeOrmTicketRepository,
     @Inject() private readonly workspaceRepository: TypeOrmWorkspaceRepository,
-    @Inject() private readonly ticketReferenceRepository: TypeOrmWorkspaceTicketReferenceRepository,
     @Inject() private readonly userRepository: TypeOrmUserRepository,
     @Inject() private readonly idGenerator: UlidGenerator,
     @Inject() private readonly eventPublisher: NestEventPublisher,
@@ -72,7 +69,6 @@ export class CommentController {
       this.eventPublisher,
       auditLog,
       addParticipant,
-      new TicketReferenceFormats(this.ticketReferenceRepository),
     );
     return command.execute({
       content: body.content,

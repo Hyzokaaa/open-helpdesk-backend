@@ -7,7 +7,7 @@ import {
   TicketFilters,
   TicketRepository,
 } from '../../domain/repositories/ticket.repository';
-import { formatTicketReference } from '../../domain/ticket-reference';
+import { ticketReferenceOf } from '../../domain/ticket-reference';
 import { TicketReferenceFormats } from '../../domain/services/ticket-reference-formats';
 
 interface Props {
@@ -56,10 +56,11 @@ export class ListTicketsQuery
     });
 
     const filters = { ...props.filters };
-    const format = this.referenceFormats ? await this.referenceFormats.forWorkspace(props.workspaceId) : undefined;
-    // A search term is read as a reference of this workspace's own format
+    // A search term is matched against stored references (as typed and with the workspace prefix)
+    // and read as a reference of the workspace's current format
     if (filters.search && this.referenceFormats) {
       filters.ticketNumber = await this.referenceFormats.parse(props.workspaceId, filters.search);
+      filters.referenceCandidates = await this.referenceFormats.candidates(props.workspaceId, filters.search);
     }
     if (!hasPermission(ctx.role, PERMISSIONS.TICKET_VIEW)) {
       if (hasPermission(ctx.role, PERMISSIONS.TICKET_CREATE) && ctx.role !== WorkspaceRole.USER) {
@@ -86,7 +87,7 @@ export class ListTicketsQuery
         projectId: ticket.projectId,
         reporterId: ticket.reporterId,
         assigneeId: ticket.assigneeId,
-        ticketNumber: formatTicketReference(ticket.ticketNumber, format),
+        ticketNumber: ticketReferenceOf(ticket),
         createdAt: ticket.createdAt,
         tagIds: ticket.tagIds,
         customFields: ticket.customFields,

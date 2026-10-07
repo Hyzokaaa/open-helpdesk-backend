@@ -8,6 +8,8 @@ import { TicketDiscardReason } from '../../../domain/enums/ticket-discard-reason
 import { TicketSource } from '../../../domain/enums/ticket-source.enum';
 import { TicketStatus } from '../../../domain/enums/ticket-status.enum';
 import { parseTicketNumber } from '../../../domain/ticket-number';
+import { formatTicketReference, ticketReferenceFormatOf } from '../../../domain/ticket-reference';
+import { WorkspaceTicketReference } from '../../../../workspace/domain/entities/workspace-ticket-reference';
 import {
   TicketFilters,
   TicketRepository,
@@ -32,7 +34,29 @@ export class TypeOrmTicketRepository implements TicketRepository {
         `SELECT COALESCE(MAX("ticketNumber"), 0) as max FROM tickets WHERE "workspaceId" = $1`,
         [ticket.workspaceId],
       );
-      ticket.ticketNumber = Number(max) + 1;
+
+      // The reference is fixed now, in the workspace's current format. A number whose reference an
+      // imported ticket already holds is skipped: the number is internal, the reference is what
+      // people see, and it must stay unique.
+      const [settings] = await manager.query(
+        `SELECT style, prefix, secret FROM workspace_ticket_references WHERE "workspaceId" = $1`,
+        [ticket.workspaceId],
+      );
+      const format = ticketReferenceFormatOf(settings ? new WorkspaceTicketReference({ workspaceId: ticket.workspaceId, ...settings }) : null);
+      let next = Number(max) + 1;
+      for (;;) {
+        const reference = formatTicketReference(next, format);
+        const [taken] = await manager.query(
+          `SELECT 1 FROM tickets WHERE "workspaceId" = $1 AND reference = $2 LIMIT 1`,
+          [ticket.workspaceId, reference],
+        );
+        if (!taken) {
+          ticket.ticketNumber = next;
+          ticket.reference = reference;
+          break;
+        }
+        next++;
+      }
 
       const model = this.toModel(ticket);
       model.tags = ticket.tagIds.map((id) => {
@@ -65,20 +89,15 @@ export class TypeOrmTicketRepository implements TicketRepository {
 
     if (filters.search) {
       const search = filters.search.trim();
-      // A term that reads as a ticket reference resolves by equality on the
-      // indexed counter; other terms only hit the text columns.
+      // A ticket is found by its stored reference (whatever format it was created with), by the
+      // internal counter a reference reads as, or by text. References are stored in upper case.
+      const references = filters.referenceCandidates?.length ? filters.referenceCandidates : [search.toUpperCase()];
       const ticketNumber = filters.ticketNumber !== undefined ? filters.ticketNumber : parseTicketNumber(search);
-      if (ticketNumber !== null) {
-        qb.andWhere(
-          '(ticket.ticketNumber = :ticketNumber OR ticket.name ILIKE :search OR ticket.description ILIKE :search)',
-          { ticketNumber, search: `%${search}%` },
-        );
-      } else {
-        qb.andWhere(
-          '(ticket.name ILIKE :search OR ticket.description ILIKE :search)',
-          { search: `%${search}%` },
-        );
-      }
+      qb.andWhere(
+        `(ticket.reference IN (:...references)${ticketNumber !== null ? ' OR ticket.ticketNumber = :ticketNumber' : ''}`
+          + ' OR ticket.name ILIKE :search OR ticket.description ILIKE :search)',
+        { references, ticketNumber, search: `%${search}%` },
+      );
     }
     if (filters.status) {
       qb.andWhere('ticket.status = :status', { status: filters.status });
@@ -227,6 +246,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
       createdAt: model.createdAt,
       deletedAt: model.deletedAt,
       ticketNumber: model.ticketNumber,
+      reference: model.reference ?? null,
       tagIds: model.tags ? model.tags.map((t) => t.id) : [],
       customFields: model.customFields ?? {},
       discardReason: model.discardReason as TicketDiscardReason | null,
@@ -260,6 +280,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
     model.resolvedAt = ticket.resolvedAt;
     model.resolvedById = ticket.resolvedById;
     model.ticketNumber = ticket.ticketNumber;
+    model.reference = ticket.reference;
     model.customFields = ticket.customFields;
     model.discardReason = ticket.discardReason;
     model.portalToken = ticket.portalToken;

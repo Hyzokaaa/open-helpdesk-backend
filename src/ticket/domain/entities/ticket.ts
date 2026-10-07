@@ -20,6 +20,7 @@ interface Props {
   createdAt: Date | null;
   deletedAt: Date | null;
   ticketNumber?: number;
+  reference?: string | null;
   tagIds: string[];
   customFields: Record<string, unknown>;
   discardReason: TicketDiscardReason | null;
@@ -53,6 +54,8 @@ export class Ticket {
   createdAt: Date | null;
   deletedAt: Date | null;
   ticketNumber: number;
+  /** The reference people see, fixed at creation; null only for tickets not yet stored. */
+  reference: string | null;
   tagIds: string[];
   customFields: Record<string, unknown>;
   discardReason: TicketDiscardReason | null;
@@ -85,6 +88,7 @@ export class Ticket {
     this.createdAt = props.createdAt;
     this.deletedAt = props.deletedAt;
     this.ticketNumber = props.ticketNumber ?? 0;
+    this.reference = props.reference ?? null;
     this.tagIds = props.tagIds;
     this.customFields = props.customFields ?? {};
     this.discardReason = props.discardReason ?? null;
