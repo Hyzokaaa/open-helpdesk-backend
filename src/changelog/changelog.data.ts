@@ -16,6 +16,21 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.30.1',
+    date: '2026-10-07',
+    categories: [
+      {
+        title: { en: 'Settings', es: 'Ajustes' },
+        features: [
+          { en: 'The ticket reference preview updates as you change the format or the prefix', es: 'La vista previa de la referencia de ticket se actualiza al cambiar el formato o el prefijo' },
+          { en: 'Audit retention fields show each category minimum and correct a value below it as you type, without waiting for Save', es: 'Los campos de retención de auditoría muestran el mínimo de cada categoría y corrigen un valor inferior al escribirlo, sin esperar a Guardar' },
+          { en: 'Automatic deletion of audit entries is now a simple switch, and shows the time it runs in your own time zone', es: 'El borrado automático de la auditoría es ahora un interruptor simple, y muestra la hora a la que se ejecuta en tu zona horaria' },
+          { en: 'Clearer layout for converting existing tickets and for workspace creation when it is set by the server', es: 'Presentación más clara para convertir los tickets existentes y para la creación de espacios cuando la fija el servidor' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.30.0',
     date: '2026-10-07',
     categories: [
