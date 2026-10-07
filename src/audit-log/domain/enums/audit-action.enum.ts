@@ -211,6 +211,11 @@ export enum AuditAction {
   SYSTEM_MAILBOX_DELETED = 'system-mailbox-deleted',
   SYSTEM_MAILBOX_TEST_CONNECTION = 'system-mailbox-test-connection',
   SYSTEM_ANALYTICS_UPDATED = 'system-analytics-updated',
+  /** Retention turned on or off, or its days changed. */
+  AUDIT_RETENTION_UPDATED = 'audit-retention-updated',
+  WORKSPACE_AUDIT_RETENTION_UPDATED = 'workspace-audit-retention-updated',
+  /** The daily retention run deleted entries, with how many per category. */
+  AUDIT_LOG_PRUNED = 'audit-log-pruned',
   /** A system admin sent an arbitrary email through the installation's own sender. */
   SYSTEM_ADMIN_EMAIL_SENT = 'system-admin-email-sent',
   SYSTEM_NOTIFICATION_SETTINGS_UPDATED = 'system-notification-settings-updated',

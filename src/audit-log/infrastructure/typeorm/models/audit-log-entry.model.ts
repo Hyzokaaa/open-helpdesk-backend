@@ -14,6 +14,8 @@ import { UserModel } from '../../../../user/infrastructure/typeorm/models/user.m
 @Index(['entityType', 'entityId'])
 @Index(['category'])
 @Index(['level'])
+// Retention deletes by category and age
+@Index('IDX_audit_log_category_created', ['category', 'createdAt'])
 export class AuditLogEntryModel {
   @PrimaryColumn()
   id!: string;
