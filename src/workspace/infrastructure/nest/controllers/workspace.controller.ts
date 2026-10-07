@@ -1391,6 +1391,7 @@ export class WorkspaceController {
     try {
       primaryHost = new URL(frontendUrl).hostname;
     } catch {}
+    const previousDomain = (await this.workspaceRepository.findById(workspaceId))?.customDomain ?? null;
     const service = new SetCustomDomain(this.workspaceRepository, primaryHost);
     const workspace = await service.execute({
       workspaceId,
@@ -1412,9 +1413,14 @@ export class WorkspaceController {
       entityId: workspaceId,
       userId: user.userId,
       workspaceId,
-      metadata: { domain: body.domain },
+      // The domain it replaced or removed, and whether a system admin skipped the DNS check
+      metadata: {
+        domain: body.domain,
+        previousDomain,
+        ...(!isRemoval && workspace.customDomainVerified ? { verifiedWithoutDns: true } : {}),
+      },
       category: AuditCategory.WORKSPACE,
-      level: AuditLevel.INFO,
+      level: !isRemoval && workspace.customDomainVerified ? AuditLevel.WARNING : AuditLevel.INFO,
       source: "ui",
     });
 
@@ -1454,6 +1460,24 @@ export class WorkspaceController {
       cnameTarget,
     );
     const result = await service.execute({ workspaceId });
+
+    if (!result.verified) {
+      await new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository).execute({
+        action: AuditAction.WORKSPACE_CUSTOM_DOMAIN_VERIFICATION_FAILED,
+        entityType: "workspace",
+        entityId: workspaceId,
+        userId: user.userId,
+        workspaceId,
+        metadata: {
+          domain: (await this.workspaceRepository.findById(workspaceId))?.customDomain ?? null,
+          dnsValid: result.dnsValid,
+          txtValid: result.txtValid,
+        },
+        category: AuditCategory.WORKSPACE,
+        level: AuditLevel.INFO,
+        source: "ui",
+      });
+    }
 
     if (result.verified) {
       const auditLog = new CreateAuditLogEntry(

@@ -100,6 +100,7 @@ export class WebhookController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspace = await this.resolveWorkspace(slug);
+    const previous = await this.webhookRepository.findById(id);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new UpdateWebhook(this.webhookRepository);
     const command = new UpdateWebhookCommand(service, ensurePermission);
@@ -120,9 +121,17 @@ export class WebhookController {
       entityId: id,
       userId: user.userId,
       workspaceId: workspace.getId(),
-      metadata: body.url !== undefined ? { host: webhookUrlHost(body.url) } : {},
+      // Redirecting a webhook is a way to leak data, so its destination is recorded before and after
+      metadata: {
+        before: previous ? { host: webhookUrlHost(previous.url), events: previous.events, isActive: previous.isActive } : null,
+        after: {
+          host: webhookUrlHost(body.url ?? previous?.url),
+          events: body.events ?? previous?.events,
+          isActive: body.isActive ?? previous?.isActive,
+        },
+      },
       category: AuditCategory.CONFIG,
-      level: AuditLevel.INFO,
+      level: body.url !== undefined && webhookUrlHost(body.url) !== webhookUrlHost(previous?.url) ? AuditLevel.WARNING : AuditLevel.INFO,
       source: 'ui',
     });
 

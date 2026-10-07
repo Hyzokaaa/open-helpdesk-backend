@@ -329,9 +329,10 @@ export class UserController {
       entityId: result.id,
       userId: user.userId,
       workspaceId: null,
-      metadata: { email: body.email },
+      metadata: { email: body.email, isSystemAdmin: !!body.isSystemAdmin, isEmailVerified: !!body.isEmailVerified },
       category: AuditCategory.USER,
-      level: AuditLevel.INFO,
+      // Creating another system administrator is the most powerful thing an admin can do
+      level: body.isSystemAdmin ? AuditLevel.WARNING : AuditLevel.INFO,
       source: 'ui',
     });
 

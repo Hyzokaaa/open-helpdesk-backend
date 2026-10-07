@@ -141,9 +141,17 @@ export class WorkspaceImportController {
       entityId: workspace.getId(),
       userId: user.userId,
       workspaceId: workspace.getId(),
-      metadata: { count: result.created + result.added },
+      // Who was brought in and with which role, not just how many; skipping verification is a choice worth keeping
+      metadata: {
+        count: result.created + result.added,
+        created: result.created,
+        added: result.added,
+        skipped: result.skipped,
+        skipVerification: body.skipVerification ?? false,
+        rows: body.rows.slice(0, 500).map((r) => ({ email: r.email, role: r.role })),
+      },
       category: AuditCategory.WORKSPACE,
-      level: AuditLevel.INFO,
+      level: body.rows.some((r) => r.role === 'admin') ? AuditLevel.WARNING : AuditLevel.INFO,
       source: 'ui',
     });
 

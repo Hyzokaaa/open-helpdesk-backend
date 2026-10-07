@@ -37,6 +37,8 @@ export enum AuditAction {
   WORKSPACE_SYSTEM_MAILBOX_TOGGLED = 'workspace-system-mailbox-toggled',
   WORKSPACE_CUSTOM_DOMAIN_SET = 'workspace-custom-domain-set',
   WORKSPACE_CUSTOM_DOMAIN_VERIFIED = 'workspace-custom-domain-verified',
+  /** A DNS check that did not pass; says which record was missing. */
+  WORKSPACE_CUSTOM_DOMAIN_VERIFICATION_FAILED = 'workspace-custom-domain-verification-failed',
   WORKSPACE_CUSTOM_DOMAIN_REMOVED = 'workspace-custom-domain-removed',
   WORKSPACE_BRANDING_UPDATED = 'workspace-branding-updated',
   WORKSPACE_ANALYTICS_UPDATED = 'workspace-analytics-updated',
@@ -176,6 +178,10 @@ export enum AuditAction {
   SYSTEM_MAILBOX_DELETED = 'system-mailbox-deleted',
   SYSTEM_MAILBOX_TEST_CONNECTION = 'system-mailbox-test-connection',
   SYSTEM_ANALYTICS_UPDATED = 'system-analytics-updated',
+  /** A system admin sent an arbitrary email through the installation's own sender. */
+  SYSTEM_ADMIN_EMAIL_SENT = 'system-admin-email-sent',
+  SYSTEM_NOTIFICATION_SETTINGS_UPDATED = 'system-notification-settings-updated',
+  WORKSPACE_CREATION_POLICY_UPDATED = 'workspace-creation-policy-updated',
 
   // Notifications
   NOTIFICATION_PREFERENCES_UPDATED = 'notification-preferences-updated',
