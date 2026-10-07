@@ -23,6 +23,7 @@ import { TicketCategoryModel } from '../../../../project/infrastructure/typeorm/
   unique: true,
 })
 @Index('IDX_tickets_workspace_created_at', ['workspaceId', 'createdAt'])
+@Index('IDX_tickets_workspace_reference', ['workspaceId', 'reference'], { unique: true })
 export class TicketModel {
   @PrimaryColumn()
   id!: string;
@@ -74,6 +75,14 @@ export class TicketModel {
 
   @Column({ default: 0 })
   ticketNumber!: number;
+
+  /**
+   * The reference people see (TK-000042, ACME-7QX4M2K), fixed when the ticket is created: a later
+   * change of the workspace format applies to new tickets only, unless the workspace converts the
+   * old ones on purpose. Unique within the workspace.
+   */
+  @Column({ type: 'varchar', length: 40, nullable: true })
+  reference!: string | null;
 
   @Column({ type: 'jsonb', default: {} })
   customFields!: Record<string, unknown>;

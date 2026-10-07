@@ -9,8 +9,9 @@ import { WorkspaceTicketReference } from '../../workspace/domain/entities/worksp
  * - random: TK-7QX4M2K, the counter run through a keyed permutation, so references reveal
  *   neither how many tickets there are nor their order, and one cannot be guessed from another.
  *
- * Both are reversible, which is what lets a reference typed in a search find its ticket without
- * storing anything per ticket.
+ * Each ticket stores the reference it was created with (tickets.reference), so a later change of
+ * format or prefix applies to new tickets only. Both formats are also reversible, which lets a
+ * reference typed in a search find its ticket through the counter as well.
  */
 export enum TicketReferenceStyle {
   SEQUENTIAL = 'sequential',
@@ -123,6 +124,14 @@ function checkCharacter(code: string): string {
     sum += addend;
   }
   return ALPHABET[(BASE - (sum % BASE)) % BASE];
+}
+
+/**
+ * The reference a stored ticket shows: the one fixed when it was created. Every ticket has one;
+ * the fallback only covers an object built without it.
+ */
+export function ticketReferenceOf(ticket: { reference: string | null; ticketNumber: number }): string {
+  return ticket.reference ?? formatTicketReference(ticket.ticketNumber, DEFAULT_TICKET_REFERENCE_FORMAT);
 }
 
 // ── Formatting and reading ──

@@ -101,6 +101,8 @@ export interface WorkspaceExportTicket {
   reporterEmail: string;
   assigneeEmail: string | null;
   ticketNumber: number;
+  /** The reference the ticket shows in the source (1.21+); kept on import unless the target already uses it. */
+  reference: string;
   customFields: Record<string, unknown>;
   discardReason: string | null;
   portalToken: string | null;

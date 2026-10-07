@@ -10,6 +10,8 @@ export interface TicketFilters {
    * it points to, or null when it is not a reference. Left out, the default format reads it.
    */
   ticketNumber?: number | null;
+  /** Spellings of the term as a stored reference (with and without the workspace prefix). */
+  referenceCandidates?: string[];
   status?: TicketStatus;
   excludeStatus?: string;
   priority?: TicketPriority;

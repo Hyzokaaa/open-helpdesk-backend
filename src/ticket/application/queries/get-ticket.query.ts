@@ -2,8 +2,7 @@ import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { Query } from '../../../shared/domain/query';
 import { TicketRepository } from '../../domain/repositories/ticket.repository';
 import { EnsureTicketAccess, TicketAccessLevel } from '../../domain/services/ticket-ensure-access';
-import { formatTicketNumber } from '../../domain/ticket-number';
-import { TicketReferenceFormats } from '../../domain/services/ticket-reference-formats';
+import { ticketReferenceOf } from '../../domain/ticket-reference';
 import { SummarizeUsers, UserSummary } from '../../../user/domain/services/user-summarize';
 
 interface Props {
@@ -53,7 +52,6 @@ export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
     private readonly repository: TicketRepository,
     private readonly ensureTicketAccess: EnsureTicketAccess,
     private readonly summarizeUsers?: SummarizeUsers,
-    private readonly referenceFormats?: TicketReferenceFormats,
   ) {}
 
   async execute(props: Props): Promise<TicketDetailResponse> {
@@ -85,9 +83,7 @@ export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
       firstResponseAt: ticket.firstResponseAt,
       resolvedAt: ticket.resolvedAt,
       resolvedById: ticket.resolvedById,
-      ticketNumber: this.referenceFormats
-        ? await this.referenceFormats.format(ticket.workspaceId, ticket.ticketNumber)
-        : formatTicketNumber(ticket.ticketNumber),
+      ticketNumber: ticketReferenceOf(ticket),
       createdAt: ticket.createdAt,
       originDate: ticket.originDate,
       tagIds: ticket.tagIds,

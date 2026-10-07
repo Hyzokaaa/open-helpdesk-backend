@@ -74,6 +74,8 @@ import { EnsureWorkspaceOwner } from "../../../domain/services/workspace-ensure-
 import { UpdateTicketReferenceFormat } from "../../../domain/services/workspace-ticket-reference-update";
 import { formatTicketReference, ticketReferenceFormatOf } from "../../../../ticket/domain/ticket-reference";
 import { SqlWorkspaceFileKeys } from "../../typeorm/workspace-file-keys.sql";
+import { SqlTicketReferenceRewriter } from "../../typeorm/ticket-reference-rewriter.sql";
+import { ConvertTicketReferences } from "../../../domain/services/workspace-ticket-reference-convert";
 import { Workspace } from "../../../domain/entities/workspace";
 import { NestEventPublisher } from "../../../../shared/infrastructure/nest-event-publisher";
 import { GetWorkspaceQuery } from "../../../application/queries/get-workspace.query";
@@ -854,6 +856,45 @@ export class WorkspaceController {
       prefix: settings.prefix,
       example: formatTicketReference(42, ticketReferenceFormatOf(settings)),
     };
+  }
+
+  /**
+   * Gives every existing ticket a reference in the current format. A format change otherwise
+   * only applies to new tickets; this one is on purpose, confirmed with the workspace's name,
+   * since the old references stop finding their tickets.
+   */
+  @Post(":slug/ticket-reference/convert")
+  async convertTicketReferences(
+    @Param("slug") slug: string,
+    @Body() body: { confirmName?: string },
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    await new EnsureWorkspacePermission(this.memberRepository).execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+    const { converted, format } = await new ConvertTicketReferences(
+      this.workspaceRepository,
+      this.ticketReferenceRepository,
+      new SqlTicketReferenceRewriter(this.dataSource),
+    ).execute({ workspaceId, confirmName: body?.confirmName ?? "" });
+
+    await new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository).execute({
+      action: AuditAction.WORKSPACE_TICKET_REFERENCES_CONVERTED,
+      entityType: "workspace",
+      entityId: workspaceId,
+      userId: user.userId,
+      workspaceId,
+      metadata: { converted, style: format.style, prefix: format.prefix },
+      category: AuditCategory.CONFIG,
+      level: AuditLevel.WARNING,
+      source: "ui",
+    });
+
+    return { converted };
   }
 
   @Patch(":slug/sla")

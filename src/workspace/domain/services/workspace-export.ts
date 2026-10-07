@@ -2,6 +2,8 @@ import { DataSource } from 'typeorm';
 import { ulid } from 'ulid';
 import { WorkspaceExportData, WorkspaceExportFile, WorkspaceExportMissingFile } from '../workspace-export';
 import { CURRENT_VERSION } from './workspace-export-transforms';
+import { formatTicketReference, ticketReferenceFormatOf } from '../../../ticket/domain/ticket-reference';
+import { WorkspaceTicketReference } from '../entities/workspace-ticket-reference';
 import { ExtractMentions } from '../../../comment/domain/services/comment-extract-mentions';
 import { StorageService } from '../../../shared/domain/storage-service';
 import { IMPORT_LINK_TYPES as LINK, ImportLinkType } from '../workspace-import-link';
@@ -172,7 +174,7 @@ export class ExportWorkspace {
       // slug so older files and newer ones describe the category the same way.
       const tickets = await qr.query(`
         SELECT t.id, t.name, t.description, t.priority, t.status, tc.slug AS category,
-          t."reporterId", t."assigneeId", t."ticketNumber", t."customFields",
+          t."reporterId", t."assigneeId", t."ticketNumber", t.reference, t."customFields",
           t."discardReason", t."portalToken", t."firstResponseAt", t."resolvedAt",
           t."resolvedById", t."firstResponseBreached", t."resolutionBreached",
           t."organizationId", t."departmentId", t."projectId", t.source, t."registeredById", t."mailboxId",
@@ -271,6 +273,10 @@ export class ExportWorkspace {
       `, [workspaceId]);
       const ticketReference = await qr.query(
         `SELECT style, prefix, secret FROM workspace_ticket_references WHERE "workspaceId" = $1`, [workspaceId],
+      );
+      // For a ticket stored without its reference, the one the workspace showed for it
+      const referenceFormat = ticketReferenceFormatOf(
+        ticketReference.length ? new WorkspaceTicketReference({ workspaceId, ...ticketReference[0] }) : null,
       );
       const analytics = await qr.query(`
         SELECT provider, "serverUrl", "siteId", "useCookies", "trackEvents", "shareWithInstallation"
@@ -394,6 +400,7 @@ export class ExportWorkspace {
           reporterEmail: emailFor(t.reporterId)!,
           assigneeEmail: emailFor(t.assigneeId),
           ticketNumber: t.ticketNumber,
+          reference: t.reference ?? formatTicketReference(t.ticketNumber, referenceFormat),
           customFields: t.customFields ?? {},
           discardReason: t.discardReason,
           portalToken: t.portalToken,

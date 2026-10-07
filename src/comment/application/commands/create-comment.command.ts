@@ -14,8 +14,7 @@ import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.en
 import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
 import { AddTicketParticipant } from '../../../ticket/domain/services/ticket-add-participant';
 import { ParticipantRole } from '../../../ticket/domain/enums/participant-role.enum';
-import { formatTicketNumber } from '../../../ticket/domain/ticket-number';
-import { TicketReferenceFormats } from '../../../ticket/domain/services/ticket-reference-formats';
+import { ticketReferenceOf } from '../../../ticket/domain/ticket-reference';
 import { commentPreview } from '../../domain/comment-preview';
 
 interface Props {
@@ -45,7 +44,6 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
     private readonly eventPublisher: EventPublisher,
     private readonly createAuditLog: CreateAuditLogEntry,
     private readonly addParticipant?: AddTicketParticipant,
-    private readonly referenceFormats?: TicketReferenceFormats,
   ) {}
 
   async execute(props: Props): Promise<CreateCommentResponse> {
@@ -83,9 +81,7 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
       const event: NewCommentEvent = {
         ticketId: props.ticketId,
         ticketName: ticket.name,
-        ticketNumber: this.referenceFormats
-          ? await this.referenceFormats.format(ticket.workspaceId, ticket.ticketNumber)
-          : formatTicketNumber(ticket.ticketNumber),
+        ticketNumber: ticketReferenceOf(ticket),
         commentId: comment.getId(),
         authorId: props.authorId,
         authorName: `${author.firstName} ${author.lastName}`,

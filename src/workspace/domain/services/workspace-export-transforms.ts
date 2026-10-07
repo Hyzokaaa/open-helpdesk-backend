@@ -1,5 +1,7 @@
 import { WorkspaceExportData } from '../workspace-export';
 import { DomainValidationError } from '../../../shared/domain/errors';
+import { formatTicketReference, ticketReferenceFormatOf } from '../../../ticket/domain/ticket-reference';
+import { WorkspaceTicketReference } from '../entities/workspace-ticket-reference';
 
 type Transform = (data: WorkspaceExportData) => WorkspaceExportData;
 
@@ -115,9 +117,27 @@ const TRANSFORMS: Record<string, Transform> = {
     data.version = '1.20.0';
     return data;
   },
-  // A 1.20 file written by hand may leave out its newer sections: they count as absent
-  '1.20.0': (data) => withTicketReference(withAnalytics(withConfigurationSections(data))),
+  '1.20.0': (data) => {
+    // 1.20 → 1.21: each ticket carries the reference it shows. An older file did not store it:
+    // it is the one the file's format gives the ticket's number, which is what the source showed.
+    withTicketReferences(withTicketReference(withAnalytics(withConfigurationSections(data))));
+    data.version = '1.21.0';
+    return data;
+  },
+  // A 1.21 file written by hand may leave out its newer sections: they count as absent
+  '1.21.0': (data) => withTicketReferences(withTicketReference(withAnalytics(withConfigurationSections(data)))),
 };
+
+/** Tickets without a stored reference show the one their number has in the file's format. */
+function withTicketReferences(data: WorkspaceExportData): WorkspaceExportData {
+  const format = ticketReferenceFormatOf(data.ticketReference ? new WorkspaceTicketReference({ workspaceId: '', ...data.ticketReference }) : null);
+  for (const ticket of data.tickets ?? []) {
+    if (typeof ticket.reference !== 'string' || !ticket.reference.trim()) {
+      ticket.reference = formatTicketReference(Number(ticket.ticketNumber) || 0, format);
+    }
+  }
+  return data;
+}
 
 /** A file without the 1.20 section shows its references in the default format. */
 function withTicketReference(data: WorkspaceExportData): WorkspaceExportData {
@@ -142,8 +162,8 @@ function withConfigurationSections(data: WorkspaceExportData): WorkspaceExportDa
   return data;
 }
 
-const VERSION_ORDER = ['1.11.0', '1.12.0', '1.13.0', '1.14.0', '1.15.0', '1.16.0', '1.17.0', '1.18.0', '1.19.0', '1.20.0'];
-const CURRENT_VERSION = '1.20.0';
+const VERSION_ORDER = ['1.11.0', '1.12.0', '1.13.0', '1.14.0', '1.15.0', '1.16.0', '1.17.0', '1.18.0', '1.19.0', '1.20.0', '1.21.0'];
+const CURRENT_VERSION = '1.21.0';
 const MIN_VERSION = '1.11.0';
 
 /** Sections every supported version has; the transforms walk some of them. */

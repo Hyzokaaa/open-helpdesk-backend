@@ -2,14 +2,14 @@ import { WorkspaceTicketReferenceRepository } from '../../../workspace/domain/re
 import {
   DEFAULT_TICKET_REFERENCE_FORMAT,
   TicketReferenceFormat,
-  formatTicketReference,
   parseTicketReference,
   ticketReferenceFormatOf,
 } from '../ticket-reference';
 
 /**
- * Formats and reads ticket references with each workspace's own format, looking the format up
- * once per workspace for the life of the instance (one request, one command).
+ * Reads search terms as ticket references of each workspace's own format, looking the format up
+ * once per workspace for the life of the instance (one request, one command). Shown references
+ * are not computed here: each ticket keeps the one it was created with.
  */
 export class TicketReferenceFormats {
   private readonly cache = new Map<string, Promise<TicketReferenceFormat>>();
@@ -28,8 +28,12 @@ export class TicketReferenceFormats {
     return format;
   }
 
-  async format(workspaceId: string, ticketNumber: number): Promise<string> {
-    return formatTicketReference(ticketNumber, await this.forWorkspace(workspaceId));
+  /** The ways a term can be spelled as a stored reference: as typed, and with the workspace prefix. */
+  async candidates(workspaceId: string, term: string): Promise<string[]> {
+    const typed = term.trim().toUpperCase();
+    if (!typed) return [];
+    const { prefix } = await this.forWorkspace(workspaceId);
+    return typed.startsWith(`${prefix}-`) ? [typed] : [typed, `${prefix}-${typed}`];
   }
 
   async parse(workspaceId: string, term: string): Promise<number | null> {
