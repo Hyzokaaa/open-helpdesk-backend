@@ -98,6 +98,11 @@ describe('Audit log, batch 1', () => {
       expect(IMPORTED_AUDIT_SOURCE).toBe('import');
     });
 
+    it('replaces a forged import date, which the audit retention would otherwise trip on', () => {
+      const forged = markImported({ imported: { at: 'not-a-date', fromWorkspace: 'X' } }, 'import', '2026-10-07T10:00:00.000Z', 'Y');
+      expect(forged.imported).toEqual({ at: '2026-10-07T10:00:00.000Z', fromWorkspace: 'X' });
+    });
+
     it('keeps the mark of the first import when a row travels again', () => {
       const first = markImported(null, 'api', '2026-01-01T00:00:00.000Z', 'Origin');
       const again = markImported(first, IMPORTED_AUDIT_SOURCE, '2026-10-07T10:00:00.000Z', 'Middle');
