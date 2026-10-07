@@ -129,7 +129,9 @@ describe('export file codec', () => {
     const error = await rejection(decodeExport(bytes, PASSWORD));
     expect(error).toBeInstanceOf(DomainValidationError);
     expect(error.message).toBe('The export is too large');
-  });
+    // It builds and inflates a 200 MB payload: alone it takes about a second, but beside the
+    // rest of the suite it can outlast Jest's default 5 seconds
+  }, 30_000);
 
   it('enforces the export password length', async () => {
     await expect(encodeExport(DATA, 'short', FAST)).rejects.toThrow(/at least 12/);
