@@ -11,6 +11,8 @@ interface Props {
   description?: string;
   isSystemAdmin: boolean;
   userId: string;
+  /** The values before the change, read by the caller. */
+  previous?: { name: string; description: string };
 }
 
 export interface UpdateWorkspaceResponse {
@@ -35,7 +37,11 @@ export class UpdateWorkspaceCommand implements Command<Props, UpdateWorkspaceRes
       entityId: workspace.getId(),
       userId: props.userId,
       workspaceId: workspace.getId(),
-      metadata: { name: props.name, description: props.description },
+      metadata: {
+        name: workspace.name,
+        ...(props.previous ? { before: props.previous } : {}),
+        after: { name: workspace.name, description: workspace.description },
+      },
       category: AuditCategory.WORKSPACE,
       level: AuditLevel.INFO,
       source: 'ui',

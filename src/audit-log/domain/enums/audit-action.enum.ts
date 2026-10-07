@@ -41,8 +41,13 @@ export enum AuditAction {
   WORKSPACE_CUSTOM_DOMAIN_VERIFICATION_FAILED = 'workspace-custom-domain-verification-failed',
   WORKSPACE_CUSTOM_DOMAIN_REMOVED = 'workspace-custom-domain-removed',
   WORKSPACE_BRANDING_UPDATED = 'workspace-branding-updated',
+  WORKSPACE_LOGO_UPDATED = 'workspace-logo-updated',
+  WORKSPACE_LOGO_REMOVED = 'workspace-logo-removed',
   WORKSPACE_ANALYTICS_UPDATED = 'workspace-analytics-updated',
   SYSTEM_BRANDING_UPDATED = 'system-branding-updated',
+  /** The installation's logo or icon; an SVG is accepted, so a change is worth knowing about. */
+  SYSTEM_LOGO_UPDATED = 'system-logo-updated',
+  SYSTEM_LOGO_REMOVED = 'system-logo-removed',
 
   // Members
   MEMBER_ADDED = 'member-added',
@@ -101,9 +106,14 @@ export enum AuditAction {
   MAILBOX_TEST_CONNECTION = 'mailbox-test-connection',
 
   // Email system
+  /** No longer emitted: two entries per poll buried everything else. */
   IMAP_POLL_STARTED = 'imap-poll-started',
+  /** Only for a poll that brought mail, or the first one to succeed after failures. */
   IMAP_POLL_COMPLETED = 'imap-poll-completed',
+  /** Only when a mailbox starts failing or its error changes, not on every retry. */
   IMAP_POLL_FAILED = 'imap-poll-failed',
+  /** A fetched message that could not be routed; it is not retried. */
+  EMAIL_PROCESSING_FAILED = 'email-processing-failed',
   EMAIL_RECEIVED = 'email-received',
   EMAIL_SENT = 'email-sent',
   EMAIL_SEND_FAILED = 'email-send-failed',
@@ -135,16 +145,30 @@ export enum AuditAction {
   ORGANIZATION_CREATED = 'organization-created',
   ORGANIZATION_UPDATED = 'organization-updated',
   ORGANIZATION_DELETED = 'organization-deleted',
+  ORGANIZATION_MEMBER_ADDED = 'organization-member-added',
+  ORGANIZATION_MEMBER_REMOVED = 'organization-member-removed',
+  /** A member moved to another organization (or out of one) from the member list. */
+  MEMBER_ORGANIZATION_CHANGED = 'member-organization-changed',
+  ORGANIZATION_LOGO_UPDATED = 'organization-logo-updated',
+  ORGANIZATION_LOGO_REMOVED = 'organization-logo-removed',
 
   // Projects
   PROJECT_CREATED = 'project-created',
   PROJECT_UPDATED = 'project-updated',
   PROJECT_DELETED = 'project-deleted',
+  PROJECT_CATEGORY_LINKED = 'project-category-linked',
+  PROJECT_CATEGORY_UNLINKED = 'project-category-unlinked',
 
   // Ticket Categories
   TICKET_CATEGORY_CREATED = 'ticket-category-created',
   TICKET_CATEGORY_UPDATED = 'ticket-category-updated',
   TICKET_CATEGORY_DELETED = 'ticket-category-deleted',
+
+  // Email rules
+  EMAIL_RULE_CREATED = 'email-rule-created',
+  EMAIL_RULE_UPDATED = 'email-rule-updated',
+  EMAIL_RULE_DELETED = 'email-rule-deleted',
+  EMAIL_RULE_REORDERED = 'email-rule-reordered',
 
   // Canned responses
   CANNED_RESPONSE_CREATED = 'canned-response-created',

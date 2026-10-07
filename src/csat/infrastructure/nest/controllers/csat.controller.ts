@@ -81,8 +81,9 @@ export class CsatController {
       entityType: 'csat',
       entityId: csatResponse.getId(),
       userId: null,
-      workspaceId: null,
-      metadata: { rating, token },
+      // In the workspace's own log, tied to the ticket; the survey token is a credential and is not kept
+      workspaceId: csatResponse.workspaceId,
+      metadata: { rating, ticketId: csatResponse.ticketId },
       category: AuditCategory.TICKET,
       level: AuditLevel.INFO,
       source: 'portal',

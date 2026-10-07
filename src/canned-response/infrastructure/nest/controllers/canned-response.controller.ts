@@ -95,6 +95,7 @@ export class CannedResponseController {
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    const previous = await this.cannedResponseRepository.findById(id);
     const service = new UpdateCannedResponse(this.cannedResponseRepository);
     const command = new UpdateCannedResponseCommand(service, ensurePermission);
     const result = await command.execute({
@@ -113,7 +114,13 @@ export class CannedResponseController {
       entityId: id,
       userId: user.userId,
       workspaceId,
-      metadata: { title: body.title },
+      // The text itself is not copied into the log; only whether it changed
+      metadata: {
+        title: body.title ?? previous?.title ?? null,
+        before: { title: previous?.title ?? null },
+        after: { title: body.title ?? previous?.title ?? null },
+        contentChanged: body.content !== undefined && body.content !== previous?.content,
+      },
       category: AuditCategory.CONFIG,
       level: AuditLevel.INFO,
       source: 'ui',

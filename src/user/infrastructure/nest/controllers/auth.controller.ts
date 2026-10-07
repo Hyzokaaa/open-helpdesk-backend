@@ -246,7 +246,8 @@ export class AuthController {
         action: AuditAction.USER_FORGOT_PASSWORD,
         entityType: 'user',
         entityId: user.getId(),
-        userId: user.getId(),
+        // Anyone can ask for a reset link for any address: the account is the subject, not the actor
+        userId: null,
         workspaceId: null,
         metadata: { email: body.email, client: clientInfo(req) },
         category: AuditCategory.USER,

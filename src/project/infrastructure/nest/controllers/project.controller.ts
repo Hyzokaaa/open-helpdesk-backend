@@ -127,6 +127,7 @@ export class ProjectController {
       throw new EntityNotFoundError('Project not found');
     }
 
+    const before = { name: existing.name, description: existing.description };
     const service = new UpdateProject(this.projectRepository);
     const project = await service.execute({ id, ...body });
 
@@ -137,7 +138,11 @@ export class ProjectController {
       entityId: project.getId(),
       userId: user.userId,
       workspaceId,
-      metadata: { name: project.name },
+      metadata: {
+        name: project.name,
+        before: { name: before.name, description: before.description },
+        after: { name: project.name, description: project.description },
+      },
       category: AuditCategory.CONFIG,
       level: AuditLevel.INFO,
       source: 'ui',
@@ -189,9 +194,10 @@ export class ProjectController {
     const workspaceId = await this.resolveWorkspaceId(slug);
     await this.ensurePermission(workspaceId, user, PERMISSIONS.PROJECT_MANAGE);
 
-    await this.ensureProjectAndCategory(projectId, body.categoryId, workspaceId);
+    const names = await this.ensureProjectAndCategory(projectId, body.categoryId, workspaceId);
 
     await this.categoryRepository.addToProject(projectId, body.categoryId);
+    await this.auditCategoryLink(AuditAction.PROJECT_CATEGORY_LINKED, projectId, body.categoryId, names, workspaceId, user);
     return { projectId, categoryId: body.categoryId };
   }
 
@@ -204,9 +210,31 @@ export class ProjectController {
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
     await this.ensurePermission(workspaceId, user, PERMISSIONS.PROJECT_MANAGE);
-    await this.ensureProjectAndCategory(projectId, categoryId, workspaceId);
+    const names = await this.ensureProjectAndCategory(projectId, categoryId, workspaceId);
 
     await this.categoryRepository.removeFromProject(projectId, categoryId);
+    await this.auditCategoryLink(AuditAction.PROJECT_CATEGORY_UNLINKED, projectId, categoryId, names, workspaceId, user);
+  }
+
+  private async auditCategoryLink(
+    action: AuditAction,
+    projectId: string,
+    categoryId: string,
+    names: { project: string; category: string },
+    workspaceId: string,
+    user: AuthUser,
+  ): Promise<void> {
+    await new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository).execute({
+      action,
+      entityType: 'project',
+      entityId: projectId,
+      userId: user.userId,
+      workspaceId,
+      metadata: { name: names.project, category: names.category, categoryId },
+      category: AuditCategory.CONFIG,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
   }
 
   @Get(':id/categories')
@@ -228,7 +256,7 @@ export class ProjectController {
   }
 
   /** Both ends of the link must be of the caller's workspace. */
-  private async ensureProjectAndCategory(projectId: string, categoryId: string, workspaceId: string): Promise<void> {
+  private async ensureProjectAndCategory(projectId: string, categoryId: string, workspaceId: string): Promise<{ project: string; category: string }> {
     const project = await this.projectRepository.findById(projectId);
     if (!project || project.workspaceId !== workspaceId) {
       throw new EntityNotFoundError('Project not found');
@@ -237,6 +265,7 @@ export class ProjectController {
     if (!category || category.workspaceId !== workspaceId) {
       throw new EntityNotFoundError('Category not found');
     }
+    return { project: project.name, category: category.name };
   }
 
   private async resolveWorkspaceId(slug: string): Promise<string> {

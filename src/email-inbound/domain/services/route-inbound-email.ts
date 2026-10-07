@@ -26,6 +26,10 @@ export interface RouteInboundEmailResult {
   action: 'ticket-created' | 'comment-added' | 'rejected';
   ticketId?: string;
   reason?: string;
+  /** Who the message was filed as, when it reached a ticket. */
+  authorId?: string;
+  /** The email rule that rejected the message, if one did. */
+  rule?: { id: string | null; name: string | null };
 }
 
 export class RouteInboundEmail {
@@ -114,7 +118,11 @@ export class RouteInboundEmail {
       );
       if (ruleResult.action === 'reject') {
         this.logger.log(`Email rejected by rule "${ruleResult.matchedRuleName}": ${parsed.fromAddress} — ${parsed.subject}`);
-        return { action: 'rejected', reason: 'rule-rejected' };
+        return {
+          action: 'rejected',
+          reason: 'rule-rejected',
+          rule: { id: ruleResult.matchedRuleId ?? null, name: ruleResult.matchedRuleName ?? null },
+        };
       }
     }
 
@@ -189,7 +197,7 @@ export class RouteInboundEmail {
         }
 
         await this.uploadAttachments(parsed, ticket.getId(), comment.getId(), user.getId());
-        return { action: 'comment-added', ticketId: ticket.getId() };
+        return { action: 'comment-added', ticketId: ticket.getId(), authorId: user.getId() };
       }
     }
 
@@ -253,7 +261,7 @@ export class RouteInboundEmail {
 
     await this.uploadAttachments(parsed, ticket.getId(), null, user.getId());
 
-    return { action: 'ticket-created', ticketId: ticket.getId() };
+    return { action: 'ticket-created', ticketId: ticket.getId(), authorId: user.getId() };
   }
 
   private extractNameFromEmail(

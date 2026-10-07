@@ -20,6 +20,7 @@ export interface EmailRuleResult {
   tagIds?: string[];
   assigneeId?: string;
   matchedRuleName?: string;
+  matchedRuleId?: string;
 }
 
 export class EvaluateEmailRules {
@@ -85,6 +86,7 @@ export class EvaluateEmailRules {
     const result: EmailRuleResult = {
       action: 'proceed',
       matchedRuleName: rule.name,
+      matchedRuleId: rule.getId(),
     };
 
     for (const action of rule.actions) {

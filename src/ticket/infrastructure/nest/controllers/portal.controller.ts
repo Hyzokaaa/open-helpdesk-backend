@@ -313,11 +313,12 @@ export class PortalController {
       category: AuditCategory.TICKET,
       level: AuditLevel.INFO,
       source: 'portal',
-      entityType: 'comment',
-      entityId: comment.getId(),
+      // On the ticket, like any other comment, so the reply shows in the ticket's activity
+      entityType: 'ticket',
+      entityId: ticket.getId(),
       userId: ticket.reporterId,
       workspaceId: ticket.workspaceId,
-      metadata: { ticketId: ticket.getId(), ticketName: ticket.name, content: commentPreview(comment.content) },
+      metadata: { ticketId: ticket.getId(), commentId: comment.getId(), ticketName: ticket.name, content: commentPreview(comment.content) },
     });
 
     // Tell the team, like any other reply: email to stakeholders, in-app notification and live update

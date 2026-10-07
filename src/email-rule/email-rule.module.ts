@@ -5,12 +5,14 @@ import { TypeOrmEmailRuleRepository } from './infrastructure/typeorm/repositorie
 import { EmailRuleController } from './infrastructure/nest/controllers/email-rule.controller';
 import { SharedModule } from '../shared/shared.module';
 import { WorkspaceModule } from '../workspace/workspace.module';
+import { AuditLogModule } from '../audit-log/audit-log.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([EmailRuleModel]),
     SharedModule,
     WorkspaceModule,
+    AuditLogModule,
   ],
   controllers: [EmailRuleController],
   providers: [TypeOrmEmailRuleRepository],

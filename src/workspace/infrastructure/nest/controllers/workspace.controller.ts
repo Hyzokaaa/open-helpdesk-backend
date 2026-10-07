@@ -311,6 +311,7 @@ export class WorkspaceController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
+    const current = await this.workspaceRepository.findById(workspaceId);
     const service = new UpdateWorkspace(this.workspaceRepository);
     const auditLog = new CreateAuditLogEntry(
       this.idGenerator,
@@ -323,6 +324,7 @@ export class WorkspaceController {
       description: body.description,
       isSystemAdmin: user.isSystemAdmin,
       userId: user.userId,
+      previous: current ? { name: current.name, description: current.description } : undefined,
     });
   }
 
@@ -340,6 +342,21 @@ export class WorkspaceController {
       isSystemAdmin: user.isSystemAdmin,
       userId: user.userId,
       stats: user.isSystemAdmin ? await this.workspaceStats(workspaceId) : undefined,
+    });
+  }
+
+  /** The logo and icon are shown to customers on the portal and in emails. */
+  private async auditBrandingImage(action: AuditAction, workspaceId: string, user: AuthUser, metadata: Record<string, unknown>): Promise<void> {
+    await new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository).execute({
+      action,
+      entityType: "workspace",
+      entityId: workspaceId,
+      userId: user.userId,
+      workspaceId,
+      metadata,
+      category: AuditCategory.WORKSPACE,
+      level: AuditLevel.INFO,
+      source: "ui",
     });
   }
 
@@ -556,20 +573,47 @@ export class WorkspaceController {
     );
     if (!member) throw new EntityNotFoundError("Member not found");
 
+    // OrganizationModule imports WorkspaceModule, so the repository is built here instead of injected.
+    const organizationRepository = new TypeOrmOrganizationRepository(
+      this.dataSource.getRepository(OrganizationModel),
+    );
+    let organizationName: string | null = null;
     if (body.organizationId) {
-      // OrganizationModule imports WorkspaceModule, so the repository is built here instead of injected.
-      const organizationRepository = new TypeOrmOrganizationRepository(
-        this.dataSource.getRepository(OrganizationModel),
-      );
       const organization = await organizationRepository.findById(
         body.organizationId,
       );
       if (!organization || organization.workspaceId !== workspaceId)
         throw new EntityNotFoundError("Organization not found");
+      organizationName = organization.name;
     }
 
+    const previousOrganizationId = member.organizationId;
     member.organizationId = body.organizationId ?? null;
     await this.memberRepository.update(member);
+
+    if (previousOrganizationId !== member.organizationId) {
+      const previous = previousOrganizationId
+        ? await organizationRepository.findById(previousOrganizationId)
+        : null;
+      const target = await this.userRepository.findById(userId);
+      await new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository).execute({
+        action: AuditAction.MEMBER_ORGANIZATION_CHANGED,
+        entityType: "workspace-member",
+        entityId: member.getId(),
+        userId: user.userId,
+        workspaceId,
+        metadata: {
+          target: target?.email ?? userId,
+          before: { organizationId: previousOrganizationId },
+          after: { organizationId: member.organizationId },
+          beforeLabels: { organizationId: previous?.name ?? null },
+          afterLabels: { organizationId: organizationName },
+        },
+        category: AuditCategory.WORKSPACE,
+        level: AuditLevel.INFO,
+        source: "ui",
+      });
+    }
 
     return { organizationId: member.organizationId };
   }
@@ -680,6 +724,7 @@ export class WorkspaceController {
       permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
       isSystemAdmin: user.isSystemAdmin,
     });
+    const previousPolicy = (await this.workspaceRepository.findById(workspaceId))?.slaPolicy ?? null;
     const service = new UpdateWorkspaceSlaPolicy(this.workspaceRepository);
     const command = new UpdateSlaPolicyCommand(service);
     const result = await command.execute({
@@ -697,7 +742,11 @@ export class WorkspaceController {
       entityId: workspaceId,
       userId: user.userId,
       workspaceId,
-      metadata: { slaPolicy: body.slaPolicy },
+      // What was stored, not the raw request body
+      metadata: {
+        before: { slaPolicy: previousPolicy },
+        after: { slaPolicy: (await this.workspaceRepository.findById(workspaceId))?.slaPolicy ?? null },
+      },
       category: AuditCategory.WORKSPACE,
       level: AuditLevel.INFO,
       source: "ui",
@@ -1112,6 +1161,10 @@ export class WorkspaceController {
     let resultId: string;
     const existing =
       await this.emailSenderRepository.findByWorkspaceId(workspaceId);
+    // Where the workspace's mail goes out from, before the change; the password is never kept
+    const senderBefore = existing
+      ? { smtpHost: existing.smtpHost, smtpPort: existing.smtpPort, smtpUser: existing.smtpUser, smtpFrom: existing.smtpFrom, encryption: existing.encryption, fromName: existing.fromName, fromEmail: existing.fromEmail }
+      : null;
     if (existing) {
       existing.smtpHost = body.smtpHost;
       existing.smtpPort = body.smtpPort;
@@ -1152,7 +1205,13 @@ export class WorkspaceController {
       entityId: workspaceId,
       userId: user.userId,
       workspaceId,
-      metadata: { smtpHost: body.smtpHost, smtpFrom: body.smtpFrom },
+      metadata: {
+        smtpHost: body.smtpHost,
+        smtpFrom: body.smtpFrom,
+        before: senderBefore,
+        after: { smtpHost: body.smtpHost, smtpPort: body.smtpPort, smtpUser: body.smtpUser, smtpFrom: body.smtpFrom, encryption: body.encryption ?? senderBefore?.encryption ?? null, fromName: body.fromName ?? senderBefore?.fromName ?? null, fromEmail: body.fromEmail ?? senderBefore?.fromEmail ?? null },
+        passwordChanged: !!body.smtpPass,
+      },
       category: AuditCategory.CONFIG,
       level: AuditLevel.INFO,
       source: "ui",
@@ -1579,6 +1638,7 @@ export class WorkspaceController {
     await this.storage.upload(file.buffer, key, file.mimetype);
     workspace.logo = key;
     await this.workspaceRepository.update(workspace);
+    await this.auditBrandingImage(AuditAction.WORKSPACE_LOGO_UPDATED, workspace.getId(), user, { kind: "logo", mimeType: file.mimetype, size: file.size });
 
     const logoUrl = await this.storage.getPresignedUrl(key);
     return { logo: logoUrl };
@@ -1604,6 +1664,7 @@ export class WorkspaceController {
       await this.storage.delete(workspace.logo);
       workspace.logo = null;
       await this.workspaceRepository.update(workspace);
+      await this.auditBrandingImage(AuditAction.WORKSPACE_LOGO_REMOVED, workspace.getId(), user, { kind: "logo" });
     }
 
     return { logo: null };
@@ -1654,6 +1715,7 @@ export class WorkspaceController {
     await this.storage.upload(file.buffer, key, file.mimetype);
     workspace.icon = key;
     await this.workspaceRepository.update(workspace);
+    await this.auditBrandingImage(AuditAction.WORKSPACE_LOGO_UPDATED, workspace.getId(), user, { kind: "icon", mimeType: file.mimetype, size: file.size });
 
     const iconUrl = await this.storage.getPresignedUrl(key);
     return { icon: iconUrl };
@@ -1679,6 +1741,7 @@ export class WorkspaceController {
       await this.storage.delete(workspace.icon);
       workspace.icon = null;
       await this.workspaceRepository.update(workspace);
+      await this.auditBrandingImage(AuditAction.WORKSPACE_LOGO_REMOVED, workspace.getId(), user, { kind: "icon" });
     }
 
     return { icon: null };

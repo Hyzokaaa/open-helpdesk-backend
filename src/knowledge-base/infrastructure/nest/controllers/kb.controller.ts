@@ -78,6 +78,7 @@ export class KbController {
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
     await this.ensurePermission(workspaceId, user, PERMISSIONS.KB_CATEGORY_MANAGE);
+    const previous = await this.categoryRepository.findById(id);
     const service = new UpdateKbCategory(this.categoryRepository);
     const category = await service.execute({ id, workspaceId, name: body.name, icon: body.icon });
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
@@ -87,7 +88,11 @@ export class KbController {
       entityId: id,
       userId: user.userId,
       workspaceId,
-      metadata: { name: body.name, icon: body.icon },
+      metadata: {
+        name: category.name,
+        before: previous ? { name: previous.name, icon: previous.icon } : null,
+        after: { name: category.name, icon: category.icon },
+      },
       category: AuditCategory.KNOWLEDGE_BASE,
       level: AuditLevel.INFO,
       source: 'ui',
@@ -226,6 +231,9 @@ export class KbController {
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
     await this.ensurePermission(workspaceId, user, PERMISSIONS.KB_ARTICLE_EDIT);
+    const previous = await this.articleRepository.findById(id);
+    const previousContent = previous?.content;
+    const before = previous ? { title: previous.title, status: previous.status, categoryId: previous.categoryId } : null;
     const service = new UpdateKbArticle(this.articleRepository, this.categoryRepository);
     const article = await service.execute({ id, workspaceId, title: body.title, content: body.content, status: body.status as any, categoryId: body.categoryId });
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
@@ -235,7 +243,13 @@ export class KbController {
       entityId: id,
       userId: user.userId,
       workspaceId,
-      metadata: { title: body.title, status: body.status },
+      // The article body is not copied into the log; only whether it changed
+      metadata: {
+        title: article.title,
+        before,
+        after: { title: article.title, status: article.status, categoryId: article.categoryId },
+        contentChanged: previousContent !== undefined && previousContent !== article.content,
+      },
       category: AuditCategory.KNOWLEDGE_BASE,
       level: AuditLevel.INFO,
       source: 'ui',

@@ -183,8 +183,6 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     const pollStart = Date.now();
 
     try {
-      this.emitAudit(AuditAction.IMAP_POLL_STARTED, mailbox.getId(), mailbox.workspaceId, { address: mailbox.address }).catch(() => {});
-
       const fetched = await this.fetchMessages({
         host: mailbox.imapHost!,
         port: mailbox.imapPort!,
@@ -220,12 +218,21 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       }
 
       // Mark success
+      const recoveredFrom = mailbox.lastError;
       mailbox.lastSyncAt = new Date();
       mailbox.lastSyncDuration = Date.now() - pollStart;
       mailbox.lastError = null;
       await this.mailboxRepository.update(mailbox);
 
-      this.emitAudit(AuditAction.IMAP_POLL_COMPLETED, mailbox.getId(), mailbox.workspaceId, { address: mailbox.address, fetched: fetched.length, duration: Date.now() - pollStart }).catch(() => {});
+      // A poll every few seconds per mailbox: only the ones that brought mail, or ended a failure, are worth an entry
+      if (fetched.length > 0 || recoveredFrom) {
+        this.emitAudit(AuditAction.IMAP_POLL_COMPLETED, mailbox.getId(), mailbox.workspaceId, {
+          address: mailbox.address,
+          fetched: fetched.length,
+          duration: Date.now() - pollStart,
+          ...(recoveredFrom ? { recoveredFrom } : {}),
+        }).catch(() => {});
+      }
 
       state.backoff = 1000;
       if (this.pollers.has(mailbox.getId())) {
@@ -235,7 +242,10 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       const errMsg = err instanceof Error ? err.message : 'Unknown error';
       this.logger.error(`IMAP [${mailbox.address}] poll failed: ${errMsg}`);
 
-      this.emitAudit(AuditAction.IMAP_POLL_FAILED, mailbox.getId(), mailbox.workspaceId, { address: mailbox.address, error: errMsg }, AuditLevel.ERROR).catch(() => {});
+      // Retries back off but keep failing the same way: recorded when the mailbox starts failing or the error changes
+      if (mailbox.lastError !== errMsg) {
+        this.emitAudit(AuditAction.IMAP_POLL_FAILED, mailbox.getId(), mailbox.workspaceId, { address: mailbox.address, error: errMsg }, AuditLevel.ERROR).catch(() => {});
+      }
 
       // Mark error
       mailbox.lastError = errMsg;
@@ -353,13 +363,45 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       }
 
       if (mailboxId) {
-        this.emitAudit(AuditAction.EMAIL_RECEIVED, mailboxId, workspaceId ?? null, { from: parsed.fromAddress, subject: parsed.subject, action: result.action, ticketId: result.ticketId ?? null }).catch(() => {});
+        // A rejected message says why, and which rule rejected it
+        this.emitAudit(AuditAction.EMAIL_RECEIVED, mailboxId, workspaceId ?? null, {
+          from: parsed.fromAddress,
+          subject: parsed.subject,
+          action: result.action,
+          ticketId: result.ticketId ?? null,
+          ...(result.reason ? { reason: result.reason } : {}),
+          ...(result.rule ? { rule: result.rule.name, ruleId: result.rule.id } : {}),
+        }, result.action === 'rejected' ? AuditLevel.WARNING : undefined).catch(() => {});
+      }
+
+      // The ticket's own activity shows mail like any other ticket or reply
+      if (result.ticketId && workspaceId && result.action !== 'rejected') {
+        new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository).execute({
+          action: result.action === 'ticket-created' ? AuditAction.TICKET_CREATED : AuditAction.COMMENT_CREATED,
+          entityType: 'ticket',
+          entityId: result.ticketId,
+          userId: result.authorId ?? null,
+          workspaceId,
+          metadata: { from: parsed.fromAddress, subject: parsed.subject, ...(mailboxId ? { mailboxId } : {}) },
+          category: AuditCategory.TICKET,
+          level: AuditLevel.INFO,
+          source: 'email',
+        }).catch(() => {});
       }
 
       return result.action === 'rejected' ? 'rejected' : 'created';
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : 'Unknown error';
       this.logger.error(`IMAP: failed to process message UID ${msg.uid}: ${errMsg}`);
+      // Lost mail would otherwise leave no trace outside the server log
+      if (mailboxId) {
+        this.emitAudit(AuditAction.EMAIL_PROCESSING_FAILED, mailboxId, workspaceId ?? null, {
+          from: msg.envelope.from ?? null,
+          subject: msg.envelope.subject ?? null,
+          uid: msg.uid,
+          error: errMsg,
+        }, AuditLevel.ERROR).catch(() => {});
+      }
       return 'skipped';
     }
   }
