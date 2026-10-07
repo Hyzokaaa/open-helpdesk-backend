@@ -271,7 +271,7 @@ export class UserController {
           userId: authUser.userId,
           workspaceId: null,
           metadata: { reason: 'wrong-current-password' },
-          category: AuditCategory.USER,
+          category: AuditCategory.SECURITY,
           level: AuditLevel.WARNING,
           source: 'ui',
         }).catch(() => undefined);

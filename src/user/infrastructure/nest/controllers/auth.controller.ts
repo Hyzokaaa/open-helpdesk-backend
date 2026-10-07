@@ -136,7 +136,7 @@ export class AuthController {
         userId: user.getId(),
         workspaceId: null,
         metadata: { email: user.email, client: clientInfo(req) },
-        category: AuditCategory.USER,
+        category: AuditCategory.SECURITY,
         level: AuditLevel.INFO,
         source: 'ui',
       });
@@ -160,7 +160,7 @@ export class AuthController {
       userId: null,
       workspaceId: null,
       metadata: { email: typed, reason, client: clientInfo(req) },
-      category: AuditCategory.USER,
+      category: AuditCategory.SECURITY,
       level: AuditLevel.WARNING,
       source: 'ui',
     }).catch(() => undefined);
@@ -175,7 +175,7 @@ export class AuthController {
       userId: null,
       workspaceId: null,
       metadata: { provider, email, reason, client: clientInfo(req) },
-      category: AuditCategory.USER,
+      category: AuditCategory.SECURITY,
       level: AuditLevel.WARNING,
       source: 'ui',
     }).catch(() => undefined);
@@ -250,7 +250,7 @@ export class AuthController {
         userId: null,
         workspaceId: null,
         metadata: { email: body.email, client: clientInfo(req) },
-        category: AuditCategory.USER,
+        category: AuditCategory.SECURITY,
         level: AuditLevel.INFO,
         source: 'ui',
       });
@@ -281,7 +281,7 @@ export class AuthController {
           userId: null,
           workspaceId: null,
           metadata: { reason: 'invalid-token', client: clientInfo(req) },
-          category: AuditCategory.USER,
+          category: AuditCategory.SECURITY,
           level: AuditLevel.WARNING,
           source: 'ui',
         }).catch(() => undefined);
@@ -304,7 +304,7 @@ export class AuthController {
         userId,
         workspaceId: null,
         metadata: { userId, client: clientInfo(req) },
-        category: AuditCategory.USER,
+        category: AuditCategory.SECURITY,
         level: AuditLevel.INFO,
         source: 'ui',
       });
@@ -441,7 +441,7 @@ export class AuthController {
             ...(before && !before.isEmailVerified && user.isEmailVerified ? { emailVerifiedByProvider: true } : {}),
             client: clientInfo(req),
           },
-          category: AuditCategory.USER,
+          category: AuditCategory.SECURITY,
           level: AuditLevel.INFO,
           source: 'ui',
         });

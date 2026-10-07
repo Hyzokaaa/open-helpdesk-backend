@@ -7,4 +7,6 @@ export enum AuditCategory {
   KNOWLEDGE_BASE = 'knowledge-base',
   SYSTEM = 'system',
   BILLING = 'billing',
+  /** Sign-ins and their failures, password resets, refused requests, API sessions: kept apart for retention. */
+  SECURITY = 'security',
 }

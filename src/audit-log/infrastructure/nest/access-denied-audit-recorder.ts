@@ -47,7 +47,7 @@ export class AccessDeniedAuditRecorder implements AccessDeniedRecorder {
         ...(user?.apiKeyId ? { apiKeyId: user.apiKeyId } : {}),
         client: clientInfo(request),
       },
-      category: AuditCategory.SYSTEM,
+      category: AuditCategory.SECURITY,
       level: AuditLevel.WARNING,
       source: user?.apiKeyId ? 'api' : 'ui',
     });

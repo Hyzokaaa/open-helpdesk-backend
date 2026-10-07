@@ -71,7 +71,7 @@ export class ExchangeTokenCommand implements Command<Props, ExchangeTokenRespons
         ...(created ? { role: props.role } : {}),
         ...(props.apiKeyId ? { apiKeyId: props.apiKeyId } : {}),
       },
-      category: AuditCategory.USER,
+      category: AuditCategory.SECURITY,
       level: created && props.role !== WorkspaceRole.AGENT && props.role !== WorkspaceRole.USER
         ? AuditLevel.WARNING
         : AuditLevel.INFO,
