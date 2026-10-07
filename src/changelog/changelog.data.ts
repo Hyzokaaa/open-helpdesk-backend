@@ -16,6 +16,29 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.29.0',
+    date: '2026-10-07',
+    categories: [
+      {
+        title: { en: 'Ticket References', es: 'Referencias de Ticket' },
+        features: [
+          { en: 'Each workspace chooses how its ticket references look, in Settings → Ticket references. Sequential (TK-000042) stays the default', es: 'Cada workspace elige cómo se ven sus referencias de ticket, en Ajustes → Referencias de ticket. La secuencial (TK-000042) sigue siendo la opción por defecto' },
+          { en: 'New random references such as TK-7QX4M2K, which reveal neither how many tickets there are nor their order, and cannot be guessed from one another', es: 'Nuevas referencias aleatorias como TK-7QX4M2K, que no revelan cuántos tickets hay ni su orden, y no se pueden adivinar unas a partir de otras' },
+          { en: 'Random references end with a check character, so a mistyped reference does not lead to another ticket', es: 'Las referencias aleatorias terminan con un carácter de control, para que una referencia mal escrita no lleve a otro ticket' },
+          { en: 'Each workspace can set its own prefix, such as SUP or ACME, instead of TK', es: 'Cada workspace puede usar su propio prefijo, como SUP o ACME, en lugar de TK' },
+          { en: 'Search still finds a ticket by its earlier reference, so emails sent before a change keep working', es: 'La búsqueda sigue encontrando un ticket por su referencia anterior, así que los emails enviados antes de un cambio siguen sirviendo' },
+          { en: 'The format travels with workspace exports, and an import can apply it', es: 'El formato viaja con las exportaciones del workspace, y una importación puede aplicarlo' },
+        ],
+      },
+      {
+        title: { en: 'API', es: 'API' },
+        features: [
+          { en: 'The ticketNumber field is now documented as an opaque reference in the workspace format: show it and search with it, but do not parse it', es: 'El campo ticketNumber queda documentado como una referencia opaca en el formato del workspace: muéstrala y busca con ella, pero no la interpretes' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.28.0',
     date: '2026-10-07',
     categories: [
