@@ -15,6 +15,7 @@ import { Throttle } from '@nestjs/throttler';
 import { Public } from '../../../../shared/nest/decorators/public.decorator';
 import { EntityNotFoundError } from '../../../../shared/domain/errors';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
+import { RecordAutoCreated } from '../../../../audit-log/domain/services/audit-log-record-auto-created';
 import { BcryptPasswordHasher } from '../../../../shared/infrastructure/bcrypt-password-hasher';
 import { StorageService } from '../../../../shared/domain/storage-service';
 import { STORAGE_SERVICE } from '../../../../shared/shared.module';
@@ -139,6 +140,7 @@ export class PortalController {
       this.memberRepository,
       new CreateUser(this.idGenerator, this.userRepository, this.passwordHasher),
       new AddWorkspaceMember(this.idGenerator, this.memberRepository),
+      new RecordAutoCreated(new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository)),
     );
     const reporter = await resolveReporter.execute({
       workspaceId: workspace.getId(),

@@ -22,6 +22,8 @@ interface Props {
   workspaceSlug: string;
   userId: string;
   isSystemAdmin: boolean;
+  /** Set when the action came through the public API, with the key that made it. */
+  apiKeyId?: string;
 }
 
 export interface AssignTicketResponse {
@@ -76,12 +78,12 @@ export class AssignTicketCommand implements Command<Props, AssignTicketResponse>
       action: AuditAction.TICKET_ASSIGNED,
       category: AuditCategory.TICKET,
       level: AuditLevel.INFO,
-      source: 'ui',
+      source: props.apiKeyId ? 'api' : 'ui',
       entityType: 'ticket',
       entityId: props.ticketId,
       userId: props.userId,
       workspaceId: props.workspaceId,
-      metadata: { ticketName: ticket.name, before: { assignee: props.previousAssigneeLabel }, after: { assignee: props.assigneeLabel } },
+      metadata: { ...(props.apiKeyId ? { apiKeyId: props.apiKeyId } : {}), ticketName: ticket.name, before: { assignee: props.previousAssigneeLabel }, after: { assignee: props.assigneeLabel } },
     });
 
     return {

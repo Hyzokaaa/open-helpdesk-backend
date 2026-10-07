@@ -14,8 +14,11 @@ describe('DeleteWorkspace', () => {
   });
 
   it('should delete workspace when system admin', async () => {
-    await service.execute({ workspaceId: 'ws-1', isSystemAdmin: true });
+    const deleted = await service.execute({ workspaceId: 'ws-1', isSystemAdmin: true });
     expect(await repository.findById('ws-1')).toBeNull();
+    // Returned so the audit entry can keep its name and slug once it is gone
+    expect(deleted.name).toBe('Test');
+    expect(deleted.slug).toBe('test');
   });
 
   it('should throw AccessDeniedError when not system admin', async () => {

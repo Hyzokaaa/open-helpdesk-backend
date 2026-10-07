@@ -339,7 +339,17 @@ export class WorkspaceController {
       workspaceId,
       isSystemAdmin: user.isSystemAdmin,
       userId: user.userId,
+      stats: user.isSystemAdmin ? await this.workspaceStats(workspaceId) : undefined,
     });
+  }
+
+  private async workspaceStats(workspaceId: string): Promise<{ memberCount: number; ticketCount: number }> {
+    const [row] = await this.dataSource.query(
+      `SELECT (SELECT COUNT(*) FROM workspace_members WHERE "workspaceId" = $1)::int AS "memberCount",
+              (SELECT COUNT(*) FROM tickets WHERE "workspaceId" = $1 AND "deletedAt" IS NULL)::int AS "ticketCount"`,
+      [workspaceId],
+    );
+    return { memberCount: row?.memberCount ?? 0, ticketCount: row?.ticketCount ?? 0 };
   }
 
   @Post(":slug/members")
@@ -429,6 +439,7 @@ export class WorkspaceController {
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
     const targetUser = await this.userRepository.findById(userId);
+    const targetMember = await this.memberRepository.findByWorkspaceAndUser(workspaceId, userId);
     const service = new ChangeWorkspaceMemberRole(this.memberRepository);
     const auditLog = new CreateAuditLogEntry(
       this.idGenerator,
@@ -444,6 +455,7 @@ export class WorkspaceController {
       targetLabel: targetUser
         ? `${targetUser.firstName} ${targetUser.lastName} (${targetUser.email})`
         : userId,
+      previousRole: targetMember?.role,
     });
 
     if (targetUser?.autoCreated && body.role !== "user") {

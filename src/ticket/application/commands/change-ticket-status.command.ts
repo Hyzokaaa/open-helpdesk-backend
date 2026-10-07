@@ -23,6 +23,8 @@ interface Props {
   workspaceSlug: string;
   userId: string;
   isSystemAdmin: boolean;
+  /** Set when the action came through the public API, with the key that made it. */
+  apiKeyId?: string;
 }
 
 export interface ChangeStatusResponse {
@@ -93,12 +95,13 @@ export class ChangeTicketStatusCommand implements Command<Props, ChangeStatusRes
       action: AuditAction.TICKET_STATUS_CHANGED,
       category: AuditCategory.TICKET,
       level: AuditLevel.INFO,
-      source: 'ui',
+      source: props.apiKeyId ? 'api' : 'ui',
       entityType: 'ticket',
       entityId: props.ticketId,
       userId: props.userId,
       workspaceId: props.workspaceId,
       metadata: {
+        ...(props.apiKeyId ? { apiKeyId: props.apiKeyId } : {}),
         ticketName: ticket.name,
         before: { status: oldStatus },
         after: { status: props.status },

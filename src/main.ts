@@ -3,7 +3,9 @@ import { ValidationPipe } from "@nestjs/common";
 import { json } from "body-parser";
 import { AppModule } from "./app.module";
 import { ensureDatabase } from "./shared/infrastructure/ensure-database";
+import { DataSource } from "typeorm";
 import { DomainExceptionFilter } from "./shared/nest/filters/domain-exception.filter";
+import { AccessDeniedAuditRecorder } from "./audit-log/infrastructure/nest/access-denied-audit-recorder";
 import { setupApiDocs } from "./api/infrastructure/nest/openapi/api-docs";
 import { resolveBackendVersion } from "./config/infrastructure/nest/resolve-backend-version";
 
@@ -23,7 +25,7 @@ async function bootstrap() {
     }),
   );
 
-  app.useGlobalFilters(new DomainExceptionFilter());
+  app.useGlobalFilters(new DomainExceptionFilter(new AccessDeniedAuditRecorder(app.get(DataSource))));
 
   const corsOrigins = process.env.CORS_ORIGINS || process.env.FRONTEND_URL;
   const allowedOrigins = corsOrigins

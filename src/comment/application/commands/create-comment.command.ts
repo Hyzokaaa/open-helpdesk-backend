@@ -23,6 +23,8 @@ interface Props {
   authorId: string;
   workspaceSlug: string;
   isSystemAdmin: boolean;
+  /** Set when the action came through the public API, with the key that made it. */
+  apiKeyId?: string;
 }
 
 export interface CreateCommentResponse {
@@ -108,12 +110,12 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
       action: AuditAction.COMMENT_CREATED,
       category: AuditCategory.TICKET,
       level: AuditLevel.INFO,
-      source: 'ui',
+      source: props.apiKeyId ? 'api' : 'ui',
       entityType: 'ticket',
       entityId: props.ticketId,
       userId: props.authorId,
       workspaceId: workspace.getId(),
-      metadata: { ticketName: ticket.name, commentId: comment.getId(), content: commentPreview(props.content) },
+      metadata: { ...(props.apiKeyId ? { apiKeyId: props.apiKeyId } : {}), ticketName: ticket.name, commentId: comment.getId(), content: commentPreview(props.content) },
     });
 
     return {

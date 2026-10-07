@@ -58,6 +58,7 @@ import { TypeOrmUserRepository } from '../../../../user/infrastructure/typeorm/r
 import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
 import { EnsureWorkspacePermission } from '../../../../workspace/domain/services/workspace-ensure-permission';
 import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit-log-create';
+import { RecordAutoCreated } from '../../../../audit-log/domain/services/audit-log-record-auto-created';
 import { TypeOrmCustomFieldDefinitionRepository } from '../../../../custom-field/infrastructure/typeorm/repositories/typeorm-custom-field-definition.repository';
 import { ValidateCustomFieldValues } from '../../../../custom-field/domain/services/custom-field-validate-values';
 import { BulkChangeStatusCommand } from '../../../application/commands/bulk-change-status.command';
@@ -134,6 +135,7 @@ export class TicketController {
         this.memberRepository,
         new CreateUser(this.idGenerator, this.userRepository, new BcryptPasswordHasher()),
         new AddWorkspaceMember(this.idGenerator, this.memberRepository),
+        new RecordAutoCreated(auditLog),
       );
       const resolved = await resolveOnBehalfOf.execute({
         email: body.onBehalfOf,

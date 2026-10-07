@@ -11,6 +11,7 @@ import { TypeOrmTicketRepository } from '../../../ticket/infrastructure/typeorm/
 import { TypeOrmCommentRepository } from '../../../comment/infrastructure/typeorm/repositories/typeorm-comment.repository';
 import { TypeOrmAuditLogRepository } from '../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
 import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
+import { RecordAutoCreated } from '../../../audit-log/domain/services/audit-log-record-auto-created';
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
 import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
@@ -463,6 +464,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       evaluateRules,
       this.organizationRepository,
       this.ticketCategoryRepository,
+      new RecordAutoCreated(new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository)),
     );
   }
 

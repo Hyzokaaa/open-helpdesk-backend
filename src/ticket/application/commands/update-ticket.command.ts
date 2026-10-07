@@ -35,6 +35,8 @@ interface Props {
   workspaceSlug: string;
   userId: string;
   isSystemAdmin: boolean;
+  /** Set when the action came through the public API, with the key that made it. */
+  apiKeyId?: string;
   name?: string;
   description?: string;
   priority?: TicketPriority;
@@ -166,12 +168,12 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
       action: AuditAction.TICKET_UPDATED,
       category: AuditCategory.TICKET,
       level: AuditLevel.INFO,
-      source: 'ui',
+      source: props.apiKeyId ? 'api' : 'ui',
       entityType: 'ticket',
       entityId: updated.getId(),
       userId: props.userId,
       workspaceId: props.workspaceId,
-      metadata: { ticketName: updated.name, before, after, ...labels },
+      metadata: { ...(props.apiKeyId ? { apiKeyId: props.apiKeyId } : {}), ticketName: updated.name, before, after, ...labels },
     });
 
     if (this.eventPublisher) {

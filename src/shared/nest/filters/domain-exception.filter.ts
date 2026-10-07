@@ -1,5 +1,5 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpStatus } from '@nestjs/common';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import {
   AccessDeniedError,
   ConflictError,
@@ -17,12 +17,23 @@ const STATUS_MAP: Record<string, HttpStatus> = {
   InvalidCredentialsError: HttpStatus.UNAUTHORIZED,
 };
 
+/** Told about every refused request, to audit it. Failing to record never changes the response. */
+export interface AccessDeniedRecorder {
+  record(error: AccessDeniedError, request: Request): Promise<void>;
+}
+
 @Catch(DomainError)
 export class DomainExceptionFilter implements ExceptionFilter {
+  constructor(private readonly accessDeniedRecorder?: AccessDeniedRecorder) {}
+
   catch(exception: DomainError, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const status = STATUS_MAP[exception.name] ?? HttpStatus.INTERNAL_SERVER_ERROR;
+
+    if (exception instanceof AccessDeniedError && this.accessDeniedRecorder) {
+      this.accessDeniedRecorder.record(exception, ctx.getRequest<Request>()).catch(() => undefined);
+    }
 
     response.status(status).json({
       statusCode: status,

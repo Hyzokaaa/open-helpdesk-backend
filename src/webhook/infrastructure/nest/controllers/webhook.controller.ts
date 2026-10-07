@@ -30,6 +30,7 @@ import { TypeOrmWorkspaceMemberRepository } from '../../../../workspace/infrastr
 import { EnsureWorkspacePermission } from '../../../../workspace/domain/services/workspace-ensure-permission';
 import { CreateWebhookRequest } from '../dto/create-webhook.request';
 import { UpdateWebhookRequest } from '../dto/update-webhook.request';
+import { webhookUrlHost } from '../../../domain/webhook-url-host';
 
 @Controller('workspaces/:slug/webhooks')
 export class WebhookController {
@@ -67,7 +68,7 @@ export class WebhookController {
       entityId: result.id,
       userId: user.userId,
       workspaceId: workspace.getId(),
-      metadata: { url: body.url, events: body.events },
+      metadata: { host: webhookUrlHost(body.url), events: body.events },
       category: AuditCategory.CONFIG,
       level: AuditLevel.INFO,
       source: 'ui',
@@ -119,7 +120,7 @@ export class WebhookController {
       entityId: id,
       userId: user.userId,
       workspaceId: workspace.getId(),
-      metadata: { url: body.url },
+      metadata: body.url !== undefined ? { host: webhookUrlHost(body.url) } : {},
       category: AuditCategory.CONFIG,
       level: AuditLevel.INFO,
       source: 'ui',
@@ -153,7 +154,7 @@ export class WebhookController {
       entityId: id,
       userId: user.userId,
       workspaceId: workspace.getId(),
-      metadata: { url: existing?.url },
+      metadata: { host: webhookUrlHost(existing?.url) },
       category: AuditCategory.CONFIG,
       level: AuditLevel.INFO,
       source: 'ui',

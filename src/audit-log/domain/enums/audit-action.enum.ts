@@ -67,13 +67,25 @@ export enum AuditAction {
   USER_DATE_FORMAT_CHANGED = 'user-date-format-changed',
   USER_TIMEZONE_CHANGED = 'user-timezone-changed',
   USER_PASSWORD_CHANGED = 'user-password-changed',
+  /** The current password given was wrong. */
+  USER_PASSWORD_CHANGE_FAILED = 'user-password-change-failed',
+  /** A system admin changed someone's email address. */
+  USER_EMAIL_CHANGED = 'user-email-changed',
 
   // Auth
   USER_LOGGED_IN = 'user-logged-in',
+  /** Any failed sign-in, for an existing account or not; the reason is kept only here. */
+  USER_LOGIN_FAILED = 'user-login-failed',
   USER_FORGOT_PASSWORD = 'user-forgot-password',
   USER_RESET_PASSWORD = 'user-reset-password',
+  USER_PASSWORD_RESET_FAILED = 'user-password-reset-failed',
   USER_EMAIL_VERIFIED = 'user-email-verified',
   USER_OAUTH_LOGIN = 'user-oauth-login',
+  USER_OAUTH_LOGIN_FAILED = 'user-oauth-login-failed',
+  /** An API key exchanged an email for a session (POST /api/v1/auth/exchange). */
+  API_SESSION_EXCHANGED = 'api-session-exchanged',
+  /** A request refused for lack of permission, recorded by the exception filter. */
+  PERMISSION_DENIED = 'permission-denied',
   USER_RESEND_VERIFICATION = 'user-resend-verification',
 
   // Mailbox

@@ -5,6 +5,7 @@ import { CreateUser } from '../../../user/domain/services/user-create';
 import { WorkspaceMemberRepository } from '../../../workspace/domain/repositories/workspace-member.repository';
 import { AddWorkspaceMember } from '../../../workspace/domain/services/workspace-add-member';
 import { WorkspaceRole } from '../../../workspace/domain/enums/workspace-role.enum';
+import { RecordAutoCreated } from '../../../audit-log/domain/services/audit-log-record-auto-created';
 
 interface Props {
   workspaceId: string;
@@ -36,6 +37,7 @@ export class ResolvePortalReporter {
     private readonly memberRepository: WorkspaceMemberRepository,
     private readonly createUser: CreateUser,
     private readonly addMember: AddWorkspaceMember,
+    private readonly recordAutoCreated?: RecordAutoCreated,
   ) {}
 
   async execute(props: Props): Promise<PortalReporter> {
@@ -46,7 +48,8 @@ export class ResolvePortalReporter {
       // The anonymous submitter still never gets the portal link: that goes only to the inbox.
       const member = await this.memberRepository.findByWorkspaceAndUser(props.workspaceId, existing.getId());
       if (!member) {
-        await this.addMember.execute({ workspaceId: props.workspaceId, userId: existing.getId(), role: WorkspaceRole.USER });
+        const added = await this.addMember.execute({ workspaceId: props.workspaceId, userId: existing.getId(), role: WorkspaceRole.USER });
+        await this.record(existing, false, added.getId(), props.workspaceId);
       }
       return { user: existing, isMember: true, mayRevealPortalLink: false };
     }
@@ -59,7 +62,20 @@ export class ResolvePortalReporter {
       isEmailVerified: false,
       autoCreated: true,
     });
-    await this.addMember.execute({ workspaceId: props.workspaceId, userId: user.getId(), role: WorkspaceRole.USER });
+    const added = await this.addMember.execute({ workspaceId: props.workspaceId, userId: user.getId(), role: WorkspaceRole.USER });
+    await this.record(user, true, added.getId(), props.workspaceId);
     return { user, isMember: true, mayRevealPortalLink: true };
+  }
+
+  private async record(user: User, userCreated: boolean, memberId: string, workspaceId: string): Promise<void> {
+    await this.recordAutoCreated?.execute({
+      via: 'portal',
+      user: { id: user.getId(), email: user.email },
+      userCreated,
+      member: { id: memberId, role: WorkspaceRole.USER },
+      workspaceId,
+      actorUserId: null,
+      source: 'portal',
+    });
   }
 }

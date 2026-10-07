@@ -19,6 +19,8 @@ interface Props {
   workspaceSlug: string;
   userId: string;
   isSystemAdmin: boolean;
+  /** Set when the action came through the public API, with the key that made it. */
+  apiKeyId?: string;
 }
 
 export class DeleteTicketCommand implements Command<Props, void> {
@@ -46,12 +48,12 @@ export class DeleteTicketCommand implements Command<Props, void> {
       action: AuditAction.TICKET_DELETED,
       category: AuditCategory.TICKET,
       level: AuditLevel.INFO,
-      source: 'ui',
+      source: props.apiKeyId ? 'api' : 'ui',
       entityType: 'ticket',
       entityId: props.ticketId,
       userId: props.userId,
       workspaceId: props.workspaceId,
-      metadata: { name: ticket?.name ?? null },
+      metadata: { ...(props.apiKeyId ? { apiKeyId: props.apiKeyId } : {}), name: ticket?.name ?? null },
     });
 
     const event: TicketDeletedEvent = {

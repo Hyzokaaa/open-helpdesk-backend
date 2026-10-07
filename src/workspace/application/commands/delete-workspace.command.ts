@@ -9,6 +9,8 @@ interface Props {
   workspaceId: string;
   isSystemAdmin: boolean;
   userId: string;
+  /** What the workspace held when it was deleted, for the record. */
+  stats?: { memberCount: number; ticketCount: number };
 }
 
 export class DeleteWorkspaceCommand implements Command<Props, void> {
@@ -18,18 +20,25 @@ export class DeleteWorkspaceCommand implements Command<Props, void> {
   ) {}
 
   async execute(props: Props): Promise<void> {
+    // Recorded only once it happened: a refused attempt must not read as a deletion
+    const workspace = await this.deleteWorkspace.execute(props);
+
+    // The entry cannot point at the deleted workspace, so it carries what identifies it
     await this.createAuditLog.execute({
       action: AuditAction.WORKSPACE_DELETED,
       entityType: 'workspace',
       entityId: props.workspaceId,
       userId: props.userId,
       workspaceId: null,
-      metadata: null,
+      metadata: {
+        workspaceId: props.workspaceId,
+        name: workspace.name,
+        slug: workspace.slug,
+        ...(props.stats ?? {}),
+      },
       category: AuditCategory.WORKSPACE,
-      level: AuditLevel.INFO,
+      level: AuditLevel.WARNING,
       source: 'ui',
     });
-
-    await this.deleteWorkspace.execute(props);
   }
 }

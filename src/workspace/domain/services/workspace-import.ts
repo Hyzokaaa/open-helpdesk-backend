@@ -779,6 +779,21 @@ export async function withCustomDomainConflict(
   return { ...preview, settings: { ...preview.settings, customDomainConflict: conflict } };
 }
 
+/** The source of every audit row that came in an import file. */
+export const IMPORTED_AUDIT_SOURCE = 'import';
+
+/** Marks an imported audit row: when, from which workspace, and the source it claimed. */
+export function markImported(
+  metadata: Record<string, unknown> | null,
+  originalSource: string | null,
+  importedAt: string,
+  fromWorkspace: string | null,
+): Record<string, unknown> {
+  const base = metadata && typeof metadata === 'object' ? metadata : {};
+  if (base.imported && typeof base.imported === 'object') return base;
+  return { ...base, imported: { at: importedAt, fromWorkspace, originalSource } };
+}
+
 export class ImportWorkspace {
   /**
    * Without storage no file is imported. `onCleanupFailure` hears about objects this import
@@ -1868,6 +1883,10 @@ export class ImportWorkspace {
           return remapped;
         };
 
+        // Imported history is kept but never passes for activity of this installation: the file
+        // can be edited by whoever exported it, so every row says it came from an import. A row
+        // already imported elsewhere keeps the mark of its first import.
+        const importedAt = new Date().toISOString();
         for (const a of data.auditLog) {
           const key = auditKey(a.action, a.entityType, userIdFor(a.userEmail), a.createdAt);
           if (existingAuditKeys.has(key)) continue;
@@ -1877,8 +1896,8 @@ export class ImportWorkspace {
             INSERT INTO audit_log_entries (id, action, "entityType", "entityId", "userId", "workspaceId", metadata, category, level, source, "createdAt")
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
           `, [
-            ulid(), a.action, a.entityType, entityId, userIdFor(a.userEmail), targetWorkspaceId, JSON.stringify(remapMetadata(a.metadata)),
-            a.category ?? 'ticket', a.level ?? 'info', a.source ?? null, a.createdAt,
+            ulid(), a.action, a.entityType, entityId, userIdFor(a.userEmail), targetWorkspaceId, JSON.stringify(markImported(remapMetadata(a.metadata), a.source ?? null, importedAt, data.workspace?.name ?? null)),
+            a.category ?? 'ticket', a.level ?? 'info', IMPORTED_AUDIT_SOURCE, a.createdAt,
           ]);
           result.auditLogImported++;
         }
