@@ -49,9 +49,10 @@ import { CreatePortalCommentRequest } from '../dto/create-portal-comment.request
 import { TypeOrmOrganizationRepository } from '../../../../organization/infrastructure/typeorm/repositories/typeorm-organization.repository';
 import { TypeOrmTicketCategoryRepository } from '../../../../project/infrastructure/typeorm/repositories/typeorm-ticket-category.repository';
 import { AutoEnrollOrganization } from '../../../../organization/domain/services/organization-auto-enroll';
-import { formatTicketNumber } from '../../../domain/ticket-number';
 import { ResolvePortalReporter } from '../../../domain/services/ticket-portal-resolve-reporter';
 import { commentPreview } from '../../../../comment/domain/comment-preview';
+import { TypeOrmWorkspaceTicketReferenceRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-ticket-reference.repository';
+import { TicketReferenceFormats } from '../../../domain/services/ticket-reference-formats';
 
 /** Portal visitors have no account; their staged uploads are claimed only by portal tickets. */
 const PORTAL_UPLOADER = 'portal-anonymous';
@@ -61,6 +62,7 @@ const PORTAL_UPLOADER = 'portal-anonymous';
 export class PortalController {
   constructor(
     @Inject() private readonly workspaceRepository: TypeOrmWorkspaceRepository,
+    @Inject() private readonly ticketReferenceRepository: TypeOrmWorkspaceTicketReferenceRepository,
     @Inject() private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
     @Inject() private readonly userRepository: TypeOrmUserRepository,
     @Inject() private readonly ticketRepository: TypeOrmTicketRepository,
@@ -216,7 +218,7 @@ export class PortalController {
       userId: user.getId(),
       workspaceId: workspace.getId(),
       metadata: {
-        ticketNumber: formatTicketNumber(ticket.ticketNumber),
+        ticketNumber: await new TicketReferenceFormats(this.ticketReferenceRepository).format(ticket.workspaceId, ticket.ticketNumber),
         email: body.email,
         existingAccount: !reporter.mayRevealPortalLink,
       },
@@ -226,7 +228,7 @@ export class PortalController {
     });
 
     return {
-      ticketNumber: formatTicketNumber(ticket.ticketNumber),
+      ticketNumber: await new TicketReferenceFormats(this.ticketReferenceRepository).format(ticket.workspaceId, ticket.ticketNumber),
       // null for an existing account: the link was emailed to its owner instead
       portalToken: reporter.mayRevealPortalLink ? ticket.portalToken : null,
       message: 'Ticket created',
@@ -271,7 +273,7 @@ export class PortalController {
       : null;
 
     return {
-      ticketNumber: formatTicketNumber(ticket.ticketNumber),
+      ticketNumber: await new TicketReferenceFormats(this.ticketReferenceRepository).format(ticket.workspaceId, ticket.ticketNumber),
       name: ticket.name,
       description: ticket.description,
       status: ticket.status,
@@ -333,7 +335,7 @@ export class PortalController {
       const event: NewCommentEvent = {
         ticketId: ticket.getId(),
         ticketName: ticket.name,
-        ticketNumber: formatTicketNumber(ticket.ticketNumber),
+        ticketNumber: await new TicketReferenceFormats(this.ticketReferenceRepository).format(ticket.workspaceId, ticket.ticketNumber),
         commentId: comment.getId(),
         authorId: ticket.reporterId,
         authorName: `${reporter.firstName} ${reporter.lastName}`.trim(),

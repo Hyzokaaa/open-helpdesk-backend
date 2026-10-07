@@ -39,7 +39,7 @@ export class ApiTicketListItem {
   @ApiProperty({ type: String, nullable: true })
   assigneeId!: string | null;
 
-  @ApiProperty({ example: 'TK-000042', description: 'Formatted ticket number, unique per workspace.' })
+  @ApiProperty({ example: 'TK-000042', description: 'Ticket reference, unique per workspace, in its format (sequential like TK-000042 or random like TK-7QX4M2K). Opaque: show it, do not parse it.' })
   ticketNumber!: string;
 
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
@@ -133,7 +133,7 @@ export class ApiTicketDetail {
   @ApiProperty({ type: String, nullable: true })
   resolvedById!: string | null;
 
-  @ApiProperty({ example: 'TK-000042' })
+  @ApiProperty({ example: 'TK-000042', description: 'Ticket reference in the workspace format. Opaque: show it, do not parse it.' })
   ticketNumber!: string;
 
   @ApiProperty({ type: String, format: 'date-time', nullable: true })

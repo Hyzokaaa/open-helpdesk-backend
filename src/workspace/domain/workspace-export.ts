@@ -339,6 +339,16 @@ export interface WorkspaceExportAnalytics {
   shareWithInstallation: boolean;
 }
 
+/**
+ * How the workspace shows its ticket references, with the key of the random ones, so a workspace
+ * moved to another installation keeps showing the same references. Since 1.20.
+ */
+export interface WorkspaceExportTicketReference {
+  style: string;
+  prefix: string;
+  secret: string | null;
+}
+
 export interface WorkspaceExportData {
   version: string;
   exportedAt: string;
@@ -380,6 +390,8 @@ export interface WorkspaceExportData {
   customDomain: string | null;
   /** Null when the workspace never configured analytics (defaults apply). Since 1.19. */
   analytics: WorkspaceExportAnalytics | null;
+  /** Null when the file predates 1.20 (the default format applies). */
+  ticketReference: WorkspaceExportTicketReference | null;
   /** True when the export carries passwords and secrets (mailboxes, email sender, webhooks). Since 1.18. */
   credentialsIncluded: boolean;
   /** Files the source storage no longer had when this export was made. Since 1.16. */

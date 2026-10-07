@@ -28,6 +28,7 @@ import { EmailRuleOperator } from '../../../email-rule/domain/enums/email-rule-o
 import { EmailRuleActionType } from '../../../email-rule/domain/enums/email-rule-action-type.enum';
 import { DOMAIN_REGEX } from './workspace-set-custom-domain';
 import { AnalyticsProvider } from '../../../config/domain/enums/analytics-provider.enum';
+import { TicketReferenceStyle, normalizeTicketReferencePrefix } from '../../../ticket/domain/ticket-reference';
 import { normalizeMatomoServerUrl, normalizeMatomoSiteId } from '../../../config/domain/services/matomo-settings-validation';
 
 export interface ImportResult {
@@ -87,9 +88,10 @@ export interface ImportResult {
  * carries it), name → name, emailSender → the workspace SMTP sender (only when the file carries
  * its password: without one it could not send), customDomain → customDomain, unverified and with a
  * new verification token (skipped when another workspace uses it), analytics → the workspace's own
- * web analytics and whether it shares usage with the installation.
+ * web analytics and whether it shares usage with the installation, ticketReference → how ticket
+ * references are shown, with the key of the random ones.
  */
-export const IMPORT_SETTINGS = ['palette', 'sla', 'description', 'branding', 'name', 'emailSender', 'customDomain', 'analytics'] as const;
+export const IMPORT_SETTINGS = ['palette', 'sla', 'description', 'branding', 'name', 'emailSender', 'customDomain', 'analytics', 'ticketReference'] as const;
 export type ImportSetting = typeof IMPORT_SETTINGS[number];
 
 /** The files of a decoded .ohd archive, by archive path. */
@@ -607,6 +609,19 @@ function validateExportData(data: WorkspaceExportData): void {
       }
     }
   }
+  // Ticket reference format (1.20)
+  const reference: any = data.ticketReference;
+  if (reference != null) {
+    if (typeof reference !== 'object' || Array.isArray(reference)) fail('"ticketReference"', 'must be an object or null');
+    if (!Object.values(TicketReferenceStyle).includes(reference.style)) fail('ticketReference.style', 'must be sequential or random');
+    if (!normalizeTicketReferencePrefix(reference.prefix)) fail('ticketReference.prefix', 'must be 1 to 10 letters or digits');
+    if (reference.secret != null && !(typeof reference.secret === 'string' && /^[0-9a-f]{64}$/.test(reference.secret))) {
+      fail('ticketReference.secret', 'must be 64 hexadecimal characters or null');
+    }
+    if (reference.style === TicketReferenceStyle.RANDOM && reference.secret == null) {
+      fail('ticketReference.secret', 'is required for random references');
+    }
+  }
   if (typeof data.credentialsIncluded !== 'boolean') fail('"credentialsIncluded"', 'must be true or false');
 
   const identified = [
@@ -692,6 +707,8 @@ export interface ImportPreview {
      * means the source had no analytics of its own; shareWithInstallation still applies.
      */
     analytics: { provider: string | null; serverUrl: string | null; siteId: string | null; shareWithInstallation: boolean } | null;
+    /** How the source showed its ticket references (since 1.20), null when the file does not say. */
+    ticketReference: { style: string; prefix: string } | null;
   };
   /** Whether the file carries passwords and secrets. */
   credentialsIncluded: boolean;
@@ -762,6 +779,9 @@ export function buildImportPreview(
           siteId: present(data.analytics.provider) ? text(data.analytics.siteId) : null,
           shareWithInstallation: data.analytics.shareWithInstallation !== false,
         }
+        : null,
+      ticketReference: data.ticketReference
+        ? { style: data.ticketReference.style, prefix: data.ticketReference.prefix }
         : null,
     },
     credentialsIncluded: data.credentialsIncluded === true,
@@ -917,6 +937,21 @@ export class ImportWorkspace {
               matomo ? analytics.trackEvents !== false : true,
               analytics.shareWithInstallation !== false,
             ]);
+            result.settingsApplied.push(key);
+            continue;
+          }
+          if (key === 'ticketReference') {
+            // Format, prefix and key together: the references the source showed are the ones the
+            // target shows, for the tickets the import brings with their numbers
+            const reference = data.ticketReference;
+            if (!reference) continue;
+            await qr.query(`
+              INSERT INTO workspace_ticket_references ("workspaceId", style, prefix, secret)
+              VALUES ($1, $2, $3, $4)
+              ON CONFLICT ("workspaceId") DO UPDATE SET
+                style = EXCLUDED.style, prefix = EXCLUDED.prefix,
+                secret = COALESCE(EXCLUDED.secret, workspace_ticket_references.secret), "updatedAt" = now()
+            `, [targetWorkspaceId, reference.style, normalizeTicketReferencePrefix(reference.prefix), reference.secret ?? null]);
             result.settingsApplied.push(key);
             continue;
           }

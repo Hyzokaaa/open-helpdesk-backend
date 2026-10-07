@@ -16,6 +16,7 @@ import { ResolveTicketReferenceLabels, TicketReferenceLabels, TicketReferenceVal
 import { EventPublisher } from '../../../shared/domain/event-publisher';
 import { TicketFieldChange, TicketUpdatedEvent } from '../../../email/domain/events';
 import { formatTicketNumber } from '../../domain/ticket-number';
+import { TicketReferenceFormats } from '../../domain/services/ticket-reference-formats';
 
 const REFERENCE_FIELDS = ['categoryId', 'departmentId', 'organizationId', 'projectId'] as const;
 
@@ -65,6 +66,7 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
     private readonly ensureReferences?: EnsureTicketReferences,
     private readonly resolveLabels?: ResolveTicketReferenceLabels,
     private readonly eventPublisher?: EventPublisher,
+    private readonly referenceFormats?: TicketReferenceFormats,
   ) {}
 
   async execute(props: Props): Promise<UpdateTicketResponse> {
@@ -186,7 +188,9 @@ export class UpdateTicketCommand implements Command<Props, UpdateTicketResponse>
       if (changes.length > 0) {
         const event: TicketUpdatedEvent = {
           ticketId: updated.getId(),
-          ticketNumber: formatTicketNumber(updated.ticketNumber),
+          ticketNumber: this.referenceFormats
+            ? await this.referenceFormats.format(props.workspaceId, updated.ticketNumber)
+            : formatTicketNumber(updated.ticketNumber),
           ticketName: updated.name,
           updatedById: props.userId,
           changes,

@@ -49,6 +49,8 @@ export enum AuditAction {
   WORKSPACE_LOGO_UPDATED = 'workspace-logo-updated',
   WORKSPACE_LOGO_REMOVED = 'workspace-logo-removed',
   WORKSPACE_ANALYTICS_UPDATED = 'workspace-analytics-updated',
+  /** The ticket reference format (sequential or random) or its prefix changed. */
+  WORKSPACE_TICKET_REFERENCE_UPDATED = 'workspace-ticket-reference-updated',
   SYSTEM_BRANDING_UPDATED = 'system-branding-updated',
   /** The installation's logo or icon; an SVG is accepted, so a change is worth knowing about. */
   SYSTEM_LOGO_UPDATED = 'system-logo-updated',

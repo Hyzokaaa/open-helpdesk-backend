@@ -86,6 +86,7 @@ function emptyExport(overrides: Partial<WorkspaceExportData> = {}): WorkspaceExp
     webhooks: [],
     customDomain: null,
     analytics: null,
+    ticketReference: null,
     credentialsIncluded: false,
     ...overrides,
   };
@@ -1323,7 +1324,7 @@ describe('ImportWorkspace settings overwrite', () => {
   it('rejects an unknown overwrite key before touching the database', async () => {
     const qr = new FakeQueryRunner(answer);
     await expect(new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', source(), { overwrite: ['palette', 'logo'] }))
-      .rejects.toThrow(new DomainValidationError('Unknown overwrite setting: logo. Allowed: palette, sla, description, branding, name, emailSender, customDomain, analytics'));
+      .rejects.toThrow(new DomainValidationError('Unknown overwrite setting: logo. Allowed: palette, sla, description, branding, name, emailSender, customDomain, analytics, ticketReference'));
     expect(qr.queries).toHaveLength(0);
   });
 
@@ -1457,7 +1458,7 @@ describe('buildImportPreview', () => {
     const preview = buildImportPreview(emptyExport({
       workspace: { name: 'Acme', description: '', slaPolicy: null, metadata: { palette: '' }, appName: null, appSubtitle: '' },
     }));
-    expect(preview.settings).toEqual({ palette: null, sla: false, description: null, branding: null, name: 'Acme', emailSender: null, customDomain: null, customDomainConflict: false, analytics: null });
+    expect(preview.settings).toEqual({ palette: null, sla: false, description: null, branding: null, name: 'Acme', emailSender: null, customDomain: null, customDomainConflict: false, analytics: null, ticketReference: null });
   });
 
   it('reports the settings the file carries', () => {
@@ -1470,7 +1471,7 @@ describe('buildImportPreview', () => {
     expect(preview.settings).toEqual({
       palette: 'ocean', sla: true, description: 'Support desk',
       branding: { appName: 'Acme Help', appSubtitle: null, logo: false, icon: false },
-      name: 'Acme', emailSender: null, customDomain: null, customDomainConflict: false, analytics: null,
+      name: 'Acme', emailSender: null, customDomain: null, customDomainConflict: false, analytics: null, ticketReference: null,
     });
   });
 
@@ -2693,7 +2694,7 @@ describe('workspace analytics in exports', () => {
     const [query] = qr.find(/FROM workspace_analytics_settings WHERE/);
     expect(query.sql).toMatch(/"workspaceId" = \$1/);
     expect(query.params).toEqual(['ws-1']);
-    expect(result.version).toBe('1.19.0');
+    expect(result.version).toBe('1.20.0');
     expect(result.analytics).toEqual(stored);
 
     const none = await new ExportWorkspace(dataSourceOf(new FakeQueryRunner((sql) => (
@@ -2707,7 +2708,7 @@ describe('workspace analytics in exports', () => {
     delete legacy.analytics;
     const upgraded = applyTransforms(legacy as WorkspaceExportData);
     expect(upgraded.version).toBe(CURRENT_VERSION);
-    expect(CURRENT_VERSION).toBe('1.19.0');
+    expect(CURRENT_VERSION).toBe('1.20.0');
     expect(upgraded.analytics).toBeNull();
   });
 
@@ -2754,5 +2755,63 @@ describe('workspace analytics in exports', () => {
   ])('rejects analytics %p before touching the database', async (patch, field) => {
     const data = emptyExport({ analytics: { ...stored, ...patch } as WorkspaceExportData['analytics'] });
     await expect(run(data, ['analytics'])).rejects.toThrow(field);
+  });
+});
+
+describe('ticket reference format in exports', () => {
+  const secret = 'a'.repeat(64);
+  const run = async (data: WorkspaceExportData, overwrite: string[] = []) => {
+    const qr = new FakeQueryRunner(answerFrom({}));
+    const { result } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data, { overwrite });
+    return { qr, result };
+  };
+
+  it('exports the format with its key, so a moved workspace shows the same references', async () => {
+    const qr = new FakeQueryRunner((sql) => {
+      if (/FROM workspaces WHERE id/.test(sql)) return [{ name: 'Acme', description: '', slaPolicy: null, metadata: null }];
+      if (/FROM workspace_ticket_references WHERE/.test(sql)) return [{ style: 'random', prefix: 'ACME', secret }];
+      return [];
+    });
+    const result = await new ExportWorkspace(dataSourceOf(qr)).execute('ws-1');
+    expect(result.ticketReference).toEqual({ style: 'random', prefix: 'ACME', secret });
+    const [query] = qr.find(/FROM workspace_ticket_references WHERE/);
+    expect(query.params).toEqual(['ws-1']);
+  });
+
+  it('upgrades a 1.19 file, which carries none, to 1.20 with the default format', () => {
+    const legacy = emptyExport({ version: '1.19.0' }) as Partial<WorkspaceExportData>;
+    delete legacy.ticketReference;
+    const upgraded = applyTransforms(legacy as WorkspaceExportData);
+    expect(upgraded.version).toBe('1.20.0');
+    expect(upgraded.ticketReference).toBeNull();
+  });
+
+  it('previews the format without its key', () => {
+    expect(buildImportPreview(emptyExport({ ticketReference: { style: 'random', prefix: 'ACME', secret } })).settings.ticketReference)
+      .toEqual({ style: 'random', prefix: 'ACME' });
+  });
+
+  it('leaves the target format alone unless overwritten', async () => {
+    const { qr, result } = await run(emptyExport({ ticketReference: { style: 'random', prefix: 'ACME', secret } }));
+    expect(qr.find(/workspace_ticket_references/)).toHaveLength(0);
+    expect(result.settingsApplied).toEqual([]);
+  });
+
+  it('applies format, prefix and key when overwritten', async () => {
+    const { qr, result } = await run(emptyExport({ ticketReference: { style: 'random', prefix: 'acme', secret } }), ['ticketReference']);
+    const [upsert] = qr.find(/INSERT INTO workspace_ticket_references/);
+    expect(upsert.sql).toMatch(/ON CONFLICT \("workspaceId"\) DO UPDATE SET/);
+    expect(upsert.params).toEqual(['ws-target', 'random', 'ACME', secret]);
+    expect(result.settingsApplied).toEqual(['ticketReference']);
+  });
+
+  it.each([
+    [{ style: 'emoji' }, 'ticketReference.style'],
+    [{ prefix: 'NOT VALID' }, 'ticketReference.prefix'],
+    [{ secret: 'short' }, 'ticketReference.secret'],
+    [{ secret: null }, 'ticketReference.secret'],
+  ])('rejects a reference format %p before touching the database', async (patch, field) => {
+    const data = emptyExport({ ticketReference: { style: 'random', prefix: 'ACME', secret, ...patch } as WorkspaceExportData['ticketReference'] });
+    await expect(run(data, ['ticketReference'])).rejects.toThrow(field);
   });
 });
