@@ -22,6 +22,7 @@ import {
   RETENTION_CATEGORIES,
   effectiveRetention,
 } from '../../../domain/audit-retention';
+import { nextAuditRetentionRun } from '../audit-retention.scheduler';
 import { TypeOrmAuditRetentionSettingsRepository } from '../../typeorm/repositories/typeorm-audit-retention-settings.repository';
 import { TypeOrmWorkspaceAuditRetentionRepository } from '../../typeorm/repositories/typeorm-workspace-audit-retention.repository';
 import { TypeOrmAuditLogRepository } from '../../typeorm/repositories/typeorm-audit-log.repository';
@@ -46,7 +47,13 @@ export class AuditRetentionController {
   }
 
   private limits() {
-    return { categories: RETENTION_CATEGORIES, defaults: DEFAULT_RETENTION_DAYS, minDays: MIN_RETENTION_DAYS, maxDays: MAX_RETENTION_DAYS };
+    return {
+      categories: RETENTION_CATEGORIES,
+      defaults: DEFAULT_RETENTION_DAYS,
+      minDays: MIN_RETENTION_DAYS,
+      maxDays: MAX_RETENTION_DAYS,
+      nextRunAt: nextAuditRetentionRun().toISOString(),
+    };
   }
 
   @Get('admin/audit-retention')

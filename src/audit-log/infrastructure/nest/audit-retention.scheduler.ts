@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import { DataSource } from 'typeorm';
 import { UlidGenerator } from '../../../shared/infrastructure/ulid-generator';
 import { PruneAuditLog } from '../../domain/services/audit-log-prune';
@@ -10,6 +10,17 @@ import { AuditLevel } from '../../domain/enums/audit-level.enum';
 import { SqlAuditLogPruner } from '../typeorm/audit-log-pruner.sql';
 import { TypeOrmAuditRetentionSettingsRepository } from '../typeorm/repositories/typeorm-audit-retention-settings.repository';
 import { TypeOrmAuditLogRepository } from '../typeorm/repositories/typeorm-audit-log.repository';
+
+/** The hour of the day, in the server's time zone, at which expired audit entries are deleted. */
+export const AUDIT_RETENTION_HOUR = 2;
+
+/** When the next deletion runs, so the admin panel can show it in the viewer's own time. */
+export function nextAuditRetentionRun(now: Date = new Date()): Date {
+  const next = new Date(now);
+  next.setHours(AUDIT_RETENTION_HOUR, 0, 0, 0);
+  if (next <= now) next.setDate(next.getDate() + 1);
+  return next;
+}
 
 /**
  * Once a day, deletes the audit entries that outlived their retention (nothing while retention is
@@ -26,7 +37,7 @@ export class AuditRetentionScheduler {
     private readonly dataSource: DataSource,
   ) {}
 
-  @Cron(CronExpression.EVERY_DAY_AT_2AM)
+  @Cron(`0 0 ${AUDIT_RETENTION_HOUR} * * *`)
   async run(now: Date = new Date()): Promise<void> {
     try {
       const deleted = await new PruneAuditLog(this.settingsRepository, new SqlAuditLogPruner(this.dataSource)).execute(now);
