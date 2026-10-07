@@ -16,6 +16,67 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.28.0',
+    date: '2026-10-07',
+    categories: [
+      {
+        title: { en: 'Important Changes — Read Before Updating', es: 'Cambios Importantes — Léelos Antes de Actualizar' },
+        features: [
+          { en: 'Deleting a workspace no longer erases it at once: it is turned off and can be restored for 30 days, then it is erased for good together with its files. After that, its data only survives in your backups', es: 'Eliminar un workspace ya no lo borra al momento: se desactiva y se puede restaurar durante 30 días; después se borra definitivamente junto con sus archivos. A partir de ahí sus datos solo quedan en tus copias de seguridad' },
+          { en: 'Audit log retention is off after updating: nothing is deleted until a system administrator turns it on in Administration → Settings', es: 'La retención del registro de auditoría está desactivada tras actualizar: no se borra nada hasta que un administrador del sistema la activa en Administración → Ajustes' },
+          { en: 'Sign-ins, password resets, refused requests and API sessions are now filed under a new Security category. Older entries keep their previous category', es: 'Los inicios de sesión, restablecimientos de contraseña, peticiones rechazadas y sesiones por API pasan a una nueva categoría Seguridad. Las entradas anteriores conservan su categoría' },
+        ],
+      },
+      {
+        title: { en: 'Recoverable Workspace Deletion', es: 'Eliminación de Workspaces Recuperable' },
+        features: [
+          { en: 'The owner of a workspace can now delete it, not only system administrators. Admins of the workspace who are not its owner cannot', es: 'El dueño de un workspace puede eliminarlo, no solo los administradores del sistema. Los administradores del workspace que no son su dueño no pueden' },
+          { en: 'Deleting asks you to type the name of the workspace to confirm', es: 'Eliminar pide escribir el nombre del workspace para confirmar' },
+          { en: 'While deleted, the workspace is off everywhere: no access, no portal or custom domain, its mailboxes are not read and its API keys stop working. Its address stays reserved', es: 'Mientras está eliminado, el workspace está desactivado en todas partes: sin acceso, sin portal ni dominio propio, sus buzones no se leen y sus claves de API dejan de funcionar. Su dirección queda reservada' },
+          { en: 'New Deleted workspaces page in your settings to restore yours, and a section in Administration → Workspaces to restore, export or erase any of them', es: 'Nueva página Workspaces eliminados en tus ajustes para restaurar los tuyos, y una sección en Administración → Workspaces para restaurar, exportar o borrar cualquiera' },
+          { en: 'The owner and admins are told by email when a workspace is deleted or restored, and the owner gets a reminder three days before it is erased', es: 'El dueño y los administradores reciben un email cuando se elimina o se restaura un workspace, y el dueño un recordatorio tres días antes del borrado definitivo' },
+        ],
+      },
+      {
+        title: { en: 'Audit Log Retention', es: 'Retención del Registro de Auditoría' },
+        features: [
+          { en: 'Choose how long audit entries are kept per category, from 7 days to 10 years or forever. Defaults: email 30 days, security 90 days, everything else one year', es: 'Elige cuánto se conservan las entradas del registro por categoría, de 7 días a 10 años o siempre. Por defecto: email 30 días, seguridad 90 días y el resto un año' },
+          { en: 'Retention is by age only, never by number of entries, so nobody can push entries out by generating more', es: 'La retención es solo por antigüedad, nunca por número de entradas, para que nadie pueda desplazar entradas generando más' },
+          { en: 'Each workspace can keep its own history longer than the installation, never shorter', es: 'Cada workspace puede conservar su historial más tiempo que la instalación, nunca menos' },
+          { en: 'Imported history counts from the day it was imported', es: 'El historial importado cuenta desde el día en que se importó' },
+        ],
+      },
+      {
+        title: { en: 'Audit Log', es: 'Registro de Auditoría' },
+        features: [
+          { en: 'Failed sign-ins are recorded, also for unknown addresses, with the connection IP, the IP reported by the proxy and the browser', es: 'Se registran los inicios de sesión fallidos, también con direcciones desconocidas, con la IP de la conexión, la IP indicada por el proxy y el navegador' },
+          { en: 'Every request refused for lack of permission is recorded', es: 'Se registra cada petición rechazada por falta de permisos' },
+          { en: 'Actions made with an API key show which key, and delegated sign-ins through the API are recorded', es: 'Las acciones hechas con una clave de API indican qué clave, y se registran los inicios de sesión delegados por la API' },
+          { en: 'Many more actions are recorded, with their previous values: email rules, organizations and their members, logos, project categories, workspace settings, SLA, email sender, knowledge base, canned responses and custom fields', es: 'Se registran muchas más acciones, con sus valores anteriores: reglas de email, organizaciones y sus miembros, logos, categorías de proyecto, ajustes del workspace, SLA, remitente de email, base de conocimiento, respuestas predefinidas y campos personalizados' },
+          { en: 'Accounts and memberships created automatically (by email, portal, on behalf of someone or first Google sign-in) are recorded with how they came to be', es: 'Las cuentas y membresías creadas automáticamente (por email, portal, en nombre de otro o primer acceso con Google) se registran indicando su origen' },
+          { en: 'Mailbox checks only leave an entry when they bring mail or something fails, instead of two entries every few seconds', es: 'Las consultas de buzón solo dejan una entrada cuando traen correo o algo falla, en vez de dos entradas cada pocos segundos' },
+          { en: 'Ticket activity now shows portal replies, attachments and tickets and replies that arrived by email', es: 'La actividad del ticket muestra ahora las respuestas del portal, los adjuntos y los tickets y respuestas llegados por email' },
+          { en: 'Imported history is marked as imported and can no longer pass for activity of this installation', es: 'El historial importado queda marcado como importado y ya no puede pasar por actividad de esta instalación' },
+          { en: 'Clearer log: complete filters, readable names for actions, entity types, roles and changed fields, and former members shown by name', es: 'Registro más claro: filtros completos, nombres legibles de acciones, tipos de entidad, roles y campos cambiados, y los exmiembros aparecen con su nombre' },
+        ],
+      },
+      {
+        title: { en: 'Security', es: 'Seguridad' },
+        features: [
+          { en: 'Webhook addresses are recorded by their host only, since some carry their secret in the path', es: 'Las direcciones de webhook se registran solo por su dominio, porque algunas llevan su secreto en la ruta' },
+          { en: 'Survey and upload tokens are no longer stored in the audit log', es: 'Los tokens de encuestas y de subidas ya no se guardan en el registro' },
+        ],
+      },
+      {
+        title: { en: 'Fixes', es: 'Correcciones' },
+        features: [
+          { en: 'A malformed SLA policy is rejected with a clear message instead of an error, and only the known priorities are stored', es: 'Una política de SLA mal formada se rechaza con un mensaje claro en lugar de un error, y solo se guardan las prioridades conocidas' },
+          { en: 'Mailbox imports are recorded when they finish, with how many messages they handled', es: 'Las importaciones de buzón se registran al terminar, con cuántos mensajes trataron' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.27.1',
     date: '2026-10-06',
     categories: [
