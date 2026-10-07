@@ -7,7 +7,8 @@ import {
   TicketFilters,
   TicketRepository,
 } from '../../domain/repositories/ticket.repository';
-import { formatTicketNumber } from '../../domain/ticket-number';
+import { formatTicketReference } from '../../domain/ticket-reference';
+import { TicketReferenceFormats } from '../../domain/services/ticket-reference-formats';
 
 interface Props {
   workspaceId: string;
@@ -43,6 +44,7 @@ export class ListTicketsQuery
   constructor(
     private readonly repository: TicketRepository,
     private readonly ensurePermission: EnsureWorkspacePermission,
+    private readonly referenceFormats?: TicketReferenceFormats,
   ) {}
 
   async execute(props: Props): Promise<PaginatedResult<TicketListItem>> {
@@ -54,6 +56,11 @@ export class ListTicketsQuery
     });
 
     const filters = { ...props.filters };
+    const format = this.referenceFormats ? await this.referenceFormats.forWorkspace(props.workspaceId) : undefined;
+    // A search term is read as a reference of this workspace's own format
+    if (filters.search && this.referenceFormats) {
+      filters.ticketNumber = await this.referenceFormats.parse(props.workspaceId, filters.search);
+    }
     if (!hasPermission(ctx.role, PERMISSIONS.TICKET_VIEW)) {
       if (hasPermission(ctx.role, PERMISSIONS.TICKET_CREATE) && ctx.role !== WorkspaceRole.USER) {
         filters.agentUserId = props.userId;
@@ -79,7 +86,7 @@ export class ListTicketsQuery
         projectId: ticket.projectId,
         reporterId: ticket.reporterId,
         assigneeId: ticket.assigneeId,
-        ticketNumber: formatTicketNumber(ticket.ticketNumber),
+        ticketNumber: formatTicketReference(ticket.ticketNumber, format),
         createdAt: ticket.createdAt,
         tagIds: ticket.tagIds,
         customFields: ticket.customFields,

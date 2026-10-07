@@ -29,6 +29,8 @@ import { TypeOrmWorkspaceAnalyticsSettingsRepository } from './infrastructure/ty
 import { WorkspaceAnalyticsController } from './infrastructure/nest/controllers/workspace-analytics.controller';
 import { WorkspaceFrontendResolver } from '../shared/infrastructure/workspace-frontend-resolver';
 import { WorkspacePurgeScheduler } from './infrastructure/nest/services/workspace-purge.scheduler';
+import { WorkspaceTicketReferenceModel } from './infrastructure/typeorm/models/workspace-ticket-reference.model';
+import { TypeOrmWorkspaceTicketReferenceRepository } from './infrastructure/typeorm/repositories/typeorm-workspace-ticket-reference.repository';
 
 @Module({
   imports: [
@@ -38,10 +40,10 @@ import { WorkspacePurgeScheduler } from './infrastructure/nest/services/workspac
     AuditLogModule,
     MailboxModule,
     forwardRef(() => ProjectModule),
-    TypeOrmModule.forFeature([WorkspaceModel, WorkspaceMemberModel, WorkspaceInvitationModel, WorkspaceEmailSenderModel, WorkspaceCreationSettingsModel, WorkspaceImportLinkModel, WorkspaceAnalyticsSettingsModel]),
+    TypeOrmModule.forFeature([WorkspaceModel, WorkspaceMemberModel, WorkspaceInvitationModel, WorkspaceEmailSenderModel, WorkspaceCreationSettingsModel, WorkspaceImportLinkModel, WorkspaceAnalyticsSettingsModel, WorkspaceTicketReferenceModel]),
   ],
   controllers: [WorkspaceController, WorkspaceInvitationController, WorkspaceImportController, InvitationPublicController, DomainCheckController, WorkspaceCreationSettingsController, WorkspaceAnalyticsController],
-  providers: [TypeOrmWorkspaceRepository, TypeOrmWorkspaceMemberRepository, TypeOrmWorkspaceInvitationRepository, TypeOrmWorkspaceEmailSenderRepository, TypeOrmWorkspaceCreationSettingsRepository, TypeOrmWorkspaceAnalyticsSettingsRepository, WorkspaceFrontendResolver, WorkspacePurgeScheduler],
-  exports: [TypeOrmWorkspaceRepository, TypeOrmWorkspaceMemberRepository, TypeOrmWorkspaceInvitationRepository, TypeOrmWorkspaceEmailSenderRepository, TypeOrmWorkspaceCreationSettingsRepository, TypeOrmWorkspaceAnalyticsSettingsRepository, WorkspaceFrontendResolver],
+  providers: [TypeOrmWorkspaceRepository, TypeOrmWorkspaceMemberRepository, TypeOrmWorkspaceInvitationRepository, TypeOrmWorkspaceEmailSenderRepository, TypeOrmWorkspaceCreationSettingsRepository, TypeOrmWorkspaceAnalyticsSettingsRepository, WorkspaceFrontendResolver, WorkspacePurgeScheduler, TypeOrmWorkspaceTicketReferenceRepository],
+  exports: [TypeOrmWorkspaceRepository, TypeOrmWorkspaceMemberRepository, TypeOrmWorkspaceInvitationRepository, TypeOrmWorkspaceEmailSenderRepository, TypeOrmWorkspaceCreationSettingsRepository, TypeOrmWorkspaceAnalyticsSettingsRepository, WorkspaceFrontendResolver, TypeOrmWorkspaceTicketReferenceRepository],
 })
 export class WorkspaceModule {}

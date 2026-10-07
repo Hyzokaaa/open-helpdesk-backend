@@ -106,7 +106,7 @@ export class WebhookCommentCreatedData extends WebhookWorkspaceFields {
   @ApiProperty({ example: 'Cannot log in to the portal', description: 'Ticket title.' })
   ticketName!: string;
 
-  @ApiPropertyOptional({ example: 'TK-000042', description: 'Formatted ticket number. Absent on comments that arrive as email replies.' })
+  @ApiPropertyOptional({ example: 'TK-000042', description: 'Ticket reference in the workspace format (sequential like TK-000042 or random like TK-7QX4M2K). Opaque: show it, do not parse it. Absent on comments that arrive as email replies.' })
   ticketNumber?: string;
 
   @ApiProperty({ example: ULID })
@@ -165,7 +165,7 @@ export class WebhookTicketUpdatedData extends WebhookWorkspaceFields {
   @ApiProperty({ example: ULID })
   ticketId!: string;
 
-  @ApiProperty({ example: 'TK-000042', description: 'Formatted ticket number.' })
+  @ApiProperty({ example: 'TK-000042', description: 'Ticket reference in the workspace format (sequential like TK-000042 or random like TK-7QX4M2K). Opaque: show it, do not parse it.' })
   ticketNumber!: string;
 
   @ApiProperty({ example: 'Cannot log in to the portal', description: 'Ticket title after the edit.' })
@@ -183,7 +183,7 @@ export class WebhookTicketDeletedData extends WebhookWorkspaceFields {
   @ApiProperty({ example: ULID })
   ticketId!: string;
 
-  @ApiProperty({ example: 'TK-000042', description: 'Formatted ticket number.' })
+  @ApiProperty({ example: 'TK-000042', description: 'Ticket reference in the workspace format (sequential like TK-000042 or random like TK-7QX4M2K). Opaque: show it, do not parse it.' })
   ticketNumber!: string;
 
   @ApiProperty({ example: 'Cannot log in to the portal', description: 'Ticket title.' })

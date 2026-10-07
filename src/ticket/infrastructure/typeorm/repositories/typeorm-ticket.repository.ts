@@ -67,7 +67,7 @@ export class TypeOrmTicketRepository implements TicketRepository {
       const search = filters.search.trim();
       // A term that reads as a ticket reference resolves by equality on the
       // indexed counter; other terms only hit the text columns.
-      const ticketNumber = parseTicketNumber(search);
+      const ticketNumber = filters.ticketNumber !== undefined ? filters.ticketNumber : parseTicketNumber(search);
       if (ticketNumber !== null) {
         qb.andWhere(
           '(ticket.ticketNumber = :ticketNumber OR ticket.name ILIKE :search OR ticket.description ILIKE :search)',

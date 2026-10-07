@@ -269,6 +269,9 @@ export class ExportWorkspace {
         SELECT id, url, events, ${includeCredentials ? 'secret, ' : ''}"createdAt"
         FROM webhooks WHERE "workspaceId" = $1 ORDER BY "createdAt", id
       `, [workspaceId]);
+      const ticketReference = await qr.query(
+        `SELECT style, prefix, secret FROM workspace_ticket_references WHERE "workspaceId" = $1`, [workspaceId],
+      );
       const analytics = await qr.query(`
         SELECT provider, "serverUrl", "siteId", "useCookies", "trackEvents", "shareWithInstallation"
         FROM workspace_analytics_settings WHERE "workspaceId" = $1
@@ -577,6 +580,11 @@ export class ExportWorkspace {
             trackEvents: analytics[0].trackEvents !== false,
             shareWithInstallation: analytics[0].shareWithInstallation !== false,
           }
+          : null,
+        // The key is not a credential: it only orders the references, and without it a workspace
+        // moved elsewhere would show different ones
+        ticketReference: ticketReference.length
+          ? { style: ticketReference[0].style, prefix: ticketReference[0].prefix, secret: ticketReference[0].secret ?? null }
           : null,
         credentialsIncluded: includeCredentials,
       };

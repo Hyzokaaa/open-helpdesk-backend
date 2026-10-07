@@ -5,6 +5,11 @@ import { TicketStatus } from '../enums/ticket-status.enum';
 
 export interface TicketFilters {
   search?: string;
+  /**
+   * The search term already read as a ticket reference with the workspace's format: the counter
+   * it points to, or null when it is not a reference. Left out, the default format reads it.
+   */
+  ticketNumber?: number | null;
   status?: TicketStatus;
   excludeStatus?: string;
   priority?: TicketPriority;

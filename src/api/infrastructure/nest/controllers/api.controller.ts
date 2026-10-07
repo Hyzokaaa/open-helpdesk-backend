@@ -90,6 +90,8 @@ import { ResolveTicketReferenceLabels } from '../../../../ticket/domain/services
 import { EnsureTicketAssignee } from '../../../../ticket/domain/services/ticket-ensure-assignee';
 import { TypeOrmTicketCategoryRepository } from '../../../../project/infrastructure/typeorm/repositories/typeorm-ticket-category.repository';
 import { TypeOrmTagRepository } from '../../../../tag/infrastructure/typeorm/repositories/typeorm-tag.repository';
+import { TicketReferenceFormats } from '../../../../ticket/domain/services/ticket-reference-formats';
+import { TypeOrmWorkspaceTicketReferenceRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-ticket-reference.repository';
 
 const TICKET_ID_PARAM = ApiParam({ name: 'id', description: 'Ticket id (ULID), not the TK- number.', example: '01JABCDEF0123456789ABCDEFG' });
 const PAGE_QUERY = ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number, from 1.', example: 1 });
@@ -107,6 +109,7 @@ export class ApiController {
     @Inject() private readonly ticketRepository: TypeOrmTicketRepository,
     @Inject() private readonly commentRepository: TypeOrmCommentRepository,
     @Inject() private readonly workspaceRepository: TypeOrmWorkspaceRepository,
+    @Inject() private readonly ticketReferenceRepository: TypeOrmWorkspaceTicketReferenceRepository,
     @Inject() private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
     @Inject() private readonly userRepository: TypeOrmUserRepository,
     @Inject() private readonly idGenerator: UlidGenerator,
@@ -157,7 +160,7 @@ export class ApiController {
     this.requireScope(user, ApiKeyScope.TICKETS_READ);
     const workspaceId = this.resolveWorkspaceId(user);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
-    const query = new ListTicketsQuery(this.ticketRepository, ensurePermission);
+    const query = new ListTicketsQuery(this.ticketRepository, ensurePermission, new TicketReferenceFormats(this.ticketReferenceRepository));
     return query.execute({
       workspaceId,
       userId: user.userId,
@@ -191,7 +194,7 @@ export class ApiController {
     const workspaceId = this.resolveWorkspaceId(user);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const ensureAccess = new EnsureTicketAccess(this.ticketRepository, ensurePermission, this.participantRepository);
-    const query = new GetTicketQuery(this.ticketRepository, ensureAccess);
+    const query = new GetTicketQuery(this.ticketRepository, ensureAccess, undefined, new TicketReferenceFormats(this.ticketReferenceRepository));
     return query.execute({
       ticketId: id,
       workspaceId,
@@ -313,7 +316,7 @@ export class ApiController {
       const updateService = new UpdateTicket(this.ticketRepository);
       const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
       const validateCustomFields = new ValidateCustomFieldValues(this.customFieldDefinitionRepository);
-      const updateCommand = new UpdateTicketCommand(updateService, this.ticketRepository, ensurePermission, auditLog, validateCustomFields, this.createEnsureReferences(), this.createResolveLabels(), this.eventPublisher);
+      const updateCommand = new UpdateTicketCommand(updateService, this.ticketRepository, ensurePermission, auditLog, validateCustomFields, this.createEnsureReferences(), this.createResolveLabels(), this.eventPublisher, new TicketReferenceFormats(this.ticketReferenceRepository));
       return updateCommand.execute({
         ticketId: id,
         workspaceId: workspace.getId(),
@@ -355,7 +358,7 @@ export class ApiController {
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new DeleteTicket(this.ticketRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-    const command = new DeleteTicketCommand(service, ensurePermission, this.ticketRepository, auditLog, this.eventPublisher);
+    const command = new DeleteTicketCommand(service, ensurePermission, this.ticketRepository, auditLog, this.eventPublisher, new TicketReferenceFormats(this.ticketReferenceRepository));
     return command.execute({
       ticketId: id,
       workspaceId,
@@ -425,6 +428,8 @@ export class ApiController {
       this.userRepository,
       this.eventPublisher,
       auditLog,
+      undefined,
+      new TicketReferenceFormats(this.ticketReferenceRepository),
     );
     return command.execute({
       content: body.content,

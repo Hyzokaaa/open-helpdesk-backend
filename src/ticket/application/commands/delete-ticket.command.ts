@@ -11,6 +11,7 @@ import { TicketRepository } from '../../domain/repositories/ticket.repository';
 import { EventPublisher } from '../../../shared/domain/event-publisher';
 import { TicketDeletedEvent } from '../../../email/domain/events';
 import { formatTicketNumber } from '../../domain/ticket-number';
+import { TicketReferenceFormats } from '../../domain/services/ticket-reference-formats';
 
 interface Props {
   ticketId: string;
@@ -30,6 +31,7 @@ export class DeleteTicketCommand implements Command<Props, void> {
     private readonly ticketRepository: TicketRepository,
     private readonly createAuditLog: CreateAuditLogEntry,
     private readonly eventPublisher?: EventPublisher,
+    private readonly referenceFormats?: TicketReferenceFormats,
   ) {}
 
   async execute(props: Props): Promise<void> {
@@ -58,7 +60,9 @@ export class DeleteTicketCommand implements Command<Props, void> {
 
     const event: TicketDeletedEvent = {
       ticketId: props.ticketId,
-      ticketNumber: formatTicketNumber(ticket.ticketNumber),
+      ticketNumber: this.referenceFormats
+        ? await this.referenceFormats.format(props.workspaceId, ticket.ticketNumber)
+        : formatTicketNumber(ticket.ticketNumber),
       ticketName: ticket.name,
       deletedById: props.userId,
       workspaceId: props.workspaceId,

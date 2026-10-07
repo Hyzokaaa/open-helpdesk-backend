@@ -71,6 +71,8 @@ import { RestoreWorkspaceCommand } from "../../../application/commands/restore-w
 import { PurgeWorkspace } from "../../../domain/services/workspace-purge";
 import { PurgeWorkspaceCommand } from "../../../application/commands/purge-workspace.command";
 import { EnsureWorkspaceOwner } from "../../../domain/services/workspace-ensure-owner";
+import { UpdateTicketReferenceFormat } from "../../../domain/services/workspace-ticket-reference-update";
+import { formatTicketReference, ticketReferenceFormatOf } from "../../../../ticket/domain/ticket-reference";
 import { SqlWorkspaceFileKeys } from "../../typeorm/workspace-file-keys.sql";
 import { Workspace } from "../../../domain/entities/workspace";
 import { NestEventPublisher } from "../../../../shared/infrastructure/nest-event-publisher";
@@ -147,6 +149,7 @@ import { workspaceCreationPolicy } from "../workspace-creation-policy";
 import { imageUploadOptions, LOGO_IMAGE_MIMES } from "../../../../shared/infrastructure/nest/image-upload-options";
 import { TypeOrmOrganizationRepository } from "../../../../organization/infrastructure/typeorm/repositories/typeorm-organization.repository";
 import { OrganizationModel } from "../../../../organization/infrastructure/typeorm/models/organization.model";
+import { TypeOrmWorkspaceTicketReferenceRepository } from "../../typeorm/repositories/typeorm-workspace-ticket-reference.repository";
 
 const IMPORT_LIMITS = importLimitsFromEnv();
 
@@ -193,6 +196,7 @@ export class WorkspaceController {
     @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
     @Inject() private readonly frontendResolver: WorkspaceFrontendResolver,
     @Inject() private readonly eventPublisher: NestEventPublisher,
+    @Inject() private readonly ticketReferenceRepository: TypeOrmWorkspaceTicketReferenceRepository,
   ) {}
 
   @Post()
@@ -360,6 +364,7 @@ export class WorkspaceController {
       new EnsureWorkspacePermission(this.memberRepository),
       this.mailboxRepository,
       this.accountRepository,
+      this.ticketReferenceRepository,
     );
     const result = await query.execute({
       slug,
@@ -792,6 +797,63 @@ export class WorkspaceController {
     });
     const workspace = await this.workspaceRepository.findById(workspaceId);
     return { slaPolicy: workspace?.slaPolicy ?? null };
+  }
+
+  /**
+   * How the workspace shows its ticket references: sequential (TK-000042) or random
+   * (TK-7QX4M2K), and with which prefix. The response carries a sample so the change can be
+   * seen before anyone looks for a ticket.
+   */
+  @Get(":slug/ticket-reference")
+  async getTicketReference(@Param("slug") slug: string, @CurrentUser() user: AuthUser) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    await new EnsureWorkspacePermission(this.memberRepository).execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+    const settings = await this.ticketReferenceRepository.findByWorkspaceId(workspaceId);
+    return {
+      style: settings?.style ?? "sequential",
+      prefix: settings?.prefix ?? "TK",
+      example: formatTicketReference(42, ticketReferenceFormatOf(settings)),
+    };
+  }
+
+  @Patch(":slug/ticket-reference")
+  async updateTicketReference(
+    @Param("slug") slug: string,
+    @Body() body: { style?: string; prefix?: string },
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    await new EnsureWorkspacePermission(this.memberRepository).execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+    const { settings, before, after } = await new UpdateTicketReferenceFormat(this.ticketReferenceRepository)
+      .execute({ workspaceId, style: body?.style, prefix: body?.prefix });
+
+    await new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository).execute({
+      action: AuditAction.WORKSPACE_TICKET_REFERENCE_UPDATED,
+      entityType: "workspace",
+      entityId: workspaceId,
+      userId: user.userId,
+      workspaceId,
+      metadata: { before, after },
+      category: AuditCategory.CONFIG,
+      level: AuditLevel.INFO,
+      source: "ui",
+    });
+
+    return {
+      style: settings.style,
+      prefix: settings.prefix,
+      example: formatTicketReference(42, ticketReferenceFormatOf(settings)),
+    };
   }
 
   @Patch(":slug/sla")
