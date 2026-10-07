@@ -16,6 +16,21 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.30.0',
+    date: '2026-10-07',
+    categories: [
+      {
+        title: { en: 'Ticket References', es: 'Referencias de Ticket' },
+        features: [
+          { en: 'Each ticket keeps the reference it was created with: changing the format or the prefix applies to new tickets only', es: 'Cada ticket conserva la referencia con la que se creó: cambiar el formato o el prefijo se aplica solo a los tickets nuevos' },
+          { en: 'Existing tickets keep the reference they show today, so nothing already sent changes', es: 'Los tickets existentes conservan la referencia que muestran hoy, así que nada de lo ya enviado cambia' },
+          { en: 'New option to convert existing tickets to the current format, confirmed with the workspace name and recorded in the audit log', es: 'Nueva opción para convertir los tickets existentes al formato actual, confirmada con el nombre del workspace y registrada en la auditoría' },
+          { en: 'Imported tickets keep their original reference unless the workspace already uses it, and new tickets never repeat one', es: 'Los tickets importados conservan su referencia original salvo que el workspace ya la use, y los tickets nuevos nunca repiten una' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.29.0',
     date: '2026-10-07',
     categories: [
