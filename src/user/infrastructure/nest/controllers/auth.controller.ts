@@ -31,6 +31,7 @@ import { CreateUser } from '../../../domain/services/user-create';
 import { CreateAccountForUser } from '../../../../account/domain/services/account-create-for-user';
 import { AcceptInvitation } from '../../../../workspace/domain/services/invitation-accept';
 import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit-log-create';
+import { RecordAutoCreated } from '../../../../audit-log/domain/services/audit-log-record-auto-created';
 import { AuditAction } from '../../../../audit-log/domain/enums/audit-action.enum';
 import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
@@ -57,6 +58,8 @@ import { LogoutCommand } from '../../../application/commands/logout.command';
 import { ExchangeOAuthCodeRequest } from '../dto/exchange-oauth-code.request';
 import { RefreshSessionRequest } from '../dto/refresh-session.request';
 import { sessionPolicyFromConfig } from '../session-policy';
+import { DomainError, InvalidCredentialsError } from '../../../../shared/domain/errors';
+import { clientInfo } from '../../../../shared/nest/client-info';
 
 @Controller('auth')
 export class AuthController {
@@ -108,14 +111,20 @@ export class AuthController {
   @Public()
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @Post('login')
-  async login(@Body() body: LoginUserRequest) {
+  async login(@Body() body: LoginUserRequest, @Req() req: Request) {
     const service = new AuthenticateUser(this.userRepository, this.passwordHasher);
     const command = new LoginUserCommand(service, this.createStartSession());
-    const result = await command.execute({
-      email: body.email,
-      password: body.password,
-      rememberMe: body.rememberMe ?? false,
-    });
+    let result: Awaited<ReturnType<LoginUserCommand['execute']>>;
+    try {
+      result = await command.execute({
+        email: body.email,
+        password: body.password,
+        rememberMe: body.rememberMe ?? false,
+      });
+    } catch (error) {
+      if (error instanceof InvalidCredentialsError) await this.auditLoginFailed(body.email, error.reason ?? null, req);
+      throw error;
+    }
 
     const user = await this.userRepository.findByEmail(body.email);
     if (user) {
@@ -126,14 +135,50 @@ export class AuthController {
         entityId: user.getId(),
         userId: user.getId(),
         workspaceId: null,
-        metadata: { email: user.email },
-        category: AuditCategory.USER,
+        metadata: { email: user.email, client: clientInfo(req) },
+        category: AuditCategory.SECURITY,
         level: AuditLevel.INFO,
         source: 'ui',
       });
     }
 
     return result;
+  }
+
+  /**
+   * Every failed sign-in is kept, also for addresses with no account: a run of them is what an
+   * attack looks like. Nobody is the actor (the attempt proves nothing about who made it); the
+   * account, when there is one, is the entity.
+   */
+  private async auditLoginFailed(email: string, reason: string | null, req: Request): Promise<void> {
+    const typed = String(email ?? '').trim().toLowerCase().slice(0, 254);
+    const user = typed ? await this.userRepository.findByEmail(typed) : null;
+    await new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository).execute({
+      action: AuditAction.USER_LOGIN_FAILED,
+      entityType: 'user',
+      entityId: user?.getId() ?? typed,
+      userId: null,
+      workspaceId: null,
+      metadata: { email: typed, reason, client: clientInfo(req) },
+      category: AuditCategory.SECURITY,
+      level: AuditLevel.WARNING,
+      source: 'ui',
+    }).catch(() => undefined);
+  }
+
+  private async auditOAuthLoginFailed(provider: string | null, email: string | null, reason: string, req: Request): Promise<void> {
+    const user = email ? await this.userRepository.findByEmail(email) : null;
+    await new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository).execute({
+      action: AuditAction.USER_OAUTH_LOGIN_FAILED,
+      entityType: 'user',
+      entityId: user?.getId() ?? email ?? 'unknown',
+      userId: null,
+      workspaceId: null,
+      metadata: { provider, email, reason, client: clientInfo(req) },
+      category: AuditCategory.SECURITY,
+      level: AuditLevel.WARNING,
+      source: 'ui',
+    }).catch(() => undefined);
   }
 
   @Public()
@@ -201,10 +246,11 @@ export class AuthController {
         action: AuditAction.USER_FORGOT_PASSWORD,
         entityType: 'user',
         entityId: user.getId(),
-        userId: user.getId(),
+        // Anyone can ask for a reset link for any address: the account is the subject, not the actor
+        userId: null,
         workspaceId: null,
-        metadata: { email: body.email },
-        category: AuditCategory.USER,
+        metadata: { email: body.email, client: clientInfo(req) },
+        category: AuditCategory.SECURITY,
         level: AuditLevel.INFO,
         source: 'ui',
       });
@@ -215,11 +261,33 @@ export class AuthController {
 
   @Public()
   @Post('reset-password')
-  async resetPassword(@Body() body: ResetPasswordRequest) {
+  async resetPassword(@Body() body: ResetPasswordRequest, @Req() req: Request) {
     const service = new ResetPassword(this.userRepository, this.passwordHasher);
     const consumeToken = new ConsumeOneTimeToken(this.tokenService, this.usedTokenRepository);
     const command = new ResetPasswordCommand(service, consumeToken, new RevokeUserSessions(this.sessionRepository));
-    await command.execute({ token: body.token, newPassword: body.newPassword });
+    try {
+      await command.execute({ token: body.token, newPassword: body.newPassword });
+    } catch (error) {
+      if (error instanceof InvalidCredentialsError) {
+        // The link was invalid, expired or already used; whose it was is known only if it still verifies
+        let targetId: string | null = null;
+        try {
+          targetId = this.tokenService.verify<{ sub: string }>(body.token).sub ?? null;
+        } catch { /* expired or forged */ }
+        await new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository).execute({
+          action: AuditAction.USER_PASSWORD_RESET_FAILED,
+          entityType: 'user',
+          entityId: targetId ?? 'unknown',
+          userId: null,
+          workspaceId: null,
+          metadata: { reason: 'invalid-token', client: clientInfo(req) },
+          category: AuditCategory.SECURITY,
+          level: AuditLevel.WARNING,
+          source: 'ui',
+        }).catch(() => undefined);
+      }
+      throw error;
+    }
 
     let userId: string | null = null;
     try {
@@ -235,8 +303,8 @@ export class AuthController {
         entityId: userId,
         userId,
         workspaceId: null,
-        metadata: { userId },
-        category: AuditCategory.USER,
+        metadata: { userId, client: clientInfo(req) },
+        category: AuditCategory.SECURITY,
         level: AuditLevel.INFO,
         source: 'ui',
       });
@@ -327,11 +395,16 @@ export class AuthController {
       browserNonce: readOAuthNonce(req),
     });
     res.clearCookie(OAUTH_NONCE_COOKIE, { path: '/' });
-    if (!verified) return res.redirect(`${this.frontendUrl}/login?error=oauth_failed`);
+    if (!verified) {
+      await this.auditOAuthLoginFailed(oauthUser?.authProvider ?? null, oauthUser?.email ?? null, 'invalid-state', req);
+      return res.redirect(`${this.frontendUrl}/login?error=oauth_failed`);
+    }
 
     const redirectUrl = await this.resolveRedirectUrl(verified.redirect ?? undefined);
 
     try {
+      // Read before signing in: whether this sign-in created the account or verified its address
+      const before = await this.userRepository.findByEmail(oauthUser.email);
       const service = new AuthenticateOAuth(this.idGenerator, this.userRepository, this.passwordHasher);
       const command = new OAuthLoginCommand(service, this.tokenService);
       const result = await command.execute({
@@ -345,14 +418,30 @@ export class AuthController {
       const user = await this.userRepository.findByEmail(oauthUser.email);
       if (user) {
         const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+        if (!before) {
+          await new RecordAutoCreated(auditLog).execute({
+            via: 'oauth',
+            user: { id: user.getId(), email: user.email },
+            userCreated: true,
+            workspaceId: null,
+            actorUserId: null,
+            source: 'ui',
+          });
+        }
         await auditLog.execute({
           action: AuditAction.USER_OAUTH_LOGIN,
           entityType: 'user',
           entityId: user.getId(),
           userId: user.getId(),
           workspaceId: null,
-          metadata: { provider: oauthUser.authProvider, email: oauthUser.email },
-          category: AuditCategory.USER,
+          metadata: {
+            provider: oauthUser.authProvider,
+            email: oauthUser.email,
+            // The provider vouched for an address the account had never confirmed
+            ...(before && !before.isEmailVerified && user.isEmailVerified ? { emailVerifiedByProvider: true } : {}),
+            client: clientInfo(req),
+          },
+          category: AuditCategory.SECURITY,
           level: AuditLevel.INFO,
           source: 'ui',
         });
@@ -365,7 +454,9 @@ export class AuthController {
       }
 
       return res.redirect(`${redirectUrl}/auth/callback?code=${encodeURIComponent(result.code)}`);
-    } catch {
+    } catch (error) {
+      const reason = error instanceof DomainError ? error.message : 'error';
+      await this.auditOAuthLoginFailed(oauthUser.authProvider, oauthUser.email, reason, req);
       return res.redirect(`${redirectUrl}/login?error=oauth_failed`);
     }
   }

@@ -76,11 +76,13 @@ export class UploadAttachmentCommand implements Command<Props, UploadAttachmentR
       category: AuditCategory.TICKET,
       level: AuditLevel.INFO,
       source: 'ui',
-      entityType: 'attachment',
-      entityId: attachment.getId(),
+      // On the ticket the file belongs to, so it shows in the ticket's activity
+      entityType: 'ticket',
+      entityId: props.ticketId,
       userId: props.userId,
       workspaceId: props.workspaceId,
       metadata: {
+        attachmentId: attachment.getId(),
         ticketId: props.ticketId,
         commentId: props.commentId,
         originalName: attachment.originalName,

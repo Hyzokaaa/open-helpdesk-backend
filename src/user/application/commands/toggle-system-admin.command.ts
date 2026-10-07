@@ -38,7 +38,8 @@ export class ToggleSystemAdminCommand implements Command<Props, ToggleSystemAdmi
     await this.createAuditLog.execute({
       action: AuditAction.USER_ADMIN_TOGGLED,
       category: AuditCategory.USER,
-      level: AuditLevel.INFO,
+      // Granting or removing system administration is always worth a look
+      level: AuditLevel.WARNING,
       source: 'ui',
       entityType: 'user',
       entityId: props.targetUserId,

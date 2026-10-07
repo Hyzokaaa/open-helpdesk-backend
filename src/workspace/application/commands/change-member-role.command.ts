@@ -13,6 +13,8 @@ interface Props {
   requestingUserId: string;
   isSystemAdmin: boolean;
   targetLabel: string;
+  /** The role before the change, read by the caller. */
+  previousRole?: WorkspaceRole;
 }
 
 export interface ChangeMemberRoleResponse {
@@ -35,9 +37,16 @@ export class ChangeMemberRoleCommand implements Command<Props, ChangeMemberRoleR
       entityId: props.targetUserId,
       userId: props.requestingUserId,
       workspaceId: props.workspaceId,
-      metadata: { target: props.targetLabel, after: { role: props.newRole } },
+      metadata: {
+        target: props.targetLabel,
+        ...(props.previousRole ? { before: { role: props.previousRole } } : {}),
+        after: { role: props.newRole },
+      },
       category: AuditCategory.WORKSPACE,
-      level: AuditLevel.INFO,
+      // Gaining or losing admin is what matters most in a role change
+      level: props.previousRole === WorkspaceRole.ADMIN || props.newRole === WorkspaceRole.ADMIN
+        ? AuditLevel.WARNING
+        : AuditLevel.INFO,
       source: 'ui',
     });
 

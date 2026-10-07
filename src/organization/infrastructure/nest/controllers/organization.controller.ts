@@ -242,6 +242,7 @@ export class OrganizationController {
     await this.storage.upload(file.buffer, key, file.mimetype);
     org.logo = key;
     await this.organizationRepository.update(org);
+    await this.audit(AuditAction.ORGANIZATION_LOGO_UPDATED, id, workspaceId, user, { name: org.name, mimeType: file.mimetype, size: file.size });
 
     return { logo: await this.storage.getPresignedUrl(key) };
   }
@@ -268,6 +269,7 @@ export class OrganizationController {
       await this.storage.delete(org.logo);
       org.logo = null;
       await this.organizationRepository.update(org);
+      await this.audit(AuditAction.ORGANIZATION_LOGO_REMOVED, id, workspaceId, user, { name: org.name });
     }
 
     return { logo: null };
@@ -325,8 +327,19 @@ export class OrganizationController {
     const member = await this.memberRepository.findByWorkspaceAndUser(workspaceId, body.userId);
     if (!member) throw new EntityNotFoundError('Member not found in workspace');
 
+    const previousOrganizationId = member.organizationId;
     member.organizationId = id;
     await this.memberRepository.update(member);
+
+    if (previousOrganizationId !== id) {
+      const target = await this.userRepository.findById(body.userId);
+      await this.audit(AuditAction.ORGANIZATION_MEMBER_ADDED, id, workspaceId, user, {
+        name: org.name,
+        target: target?.email ?? body.userId,
+        targetUserId: body.userId,
+        ...(previousOrganizationId ? { previousOrganizationId } : {}),
+      });
+    }
 
     return { success: true };
   }
@@ -353,9 +366,29 @@ export class OrganizationController {
     if (member.organizationId === id) {
       member.organizationId = null;
       await this.memberRepository.update(member);
+      const [org, target] = await Promise.all([this.organizationRepository.findById(id), this.userRepository.findById(userId)]);
+      await this.audit(AuditAction.ORGANIZATION_MEMBER_REMOVED, id, workspaceId, user, {
+        name: org?.name ?? null,
+        target: target?.email ?? userId,
+        targetUserId: userId,
+      });
     }
 
     return { success: true };
+  }
+
+  private async audit(action: AuditAction, organizationId: string, workspaceId: string, user: AuthUser, metadata: Record<string, unknown>): Promise<void> {
+    await new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository).execute({
+      action,
+      entityType: 'organization',
+      entityId: organizationId,
+      userId: user.userId,
+      workspaceId,
+      metadata,
+      category: AuditCategory.CONFIG,
+      level: AuditLevel.INFO,
+      source: 'ui',
+    });
   }
 
   private async resolveWorkspaceId(slug: string): Promise<string> {

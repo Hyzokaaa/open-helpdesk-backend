@@ -34,6 +34,8 @@ interface Props {
   source?: TicketSource;
   registeredById?: string | null;
   isSystemAdmin: boolean;
+  /** Set when the action came through the public API, with the key that made it. */
+  apiKeyId?: string;
 }
 
 export interface CreateTicketResponse {
@@ -128,7 +130,14 @@ export class CreateTicketCommand implements Command<Props, CreateTicketResponse>
       entityId: ticket.getId(),
       userId: props.userId,
       workspaceId: props.workspaceId,
-      metadata: { name: props.name, priority: props.priority, categoryId: props.categoryId },
+      metadata: {
+        ...(props.apiKeyId ? { apiKeyId: props.apiKeyId } : {}),
+        name: props.name,
+        priority: props.priority,
+        categoryId: props.categoryId,
+        // Files uploaded before the ticket existed, claimed by it now
+        ...(props.uploadTokens?.length ? { attachmentsClaimed: props.uploadTokens.length } : {}),
+      },
     });
 
     return {

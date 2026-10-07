@@ -7,6 +7,7 @@ import { AddWorkspaceMember } from '../../../workspace/domain/services/workspace
 import { EnsureWorkspacePermission } from '../../../workspace/domain/services/workspace-ensure-permission';
 import { WorkspaceRole } from '../../../workspace/domain/enums/workspace-role.enum';
 import { PERMISSIONS } from '../../../workspace/domain/permissions';
+import { RecordAutoCreated } from '../../../audit-log/domain/services/audit-log-record-auto-created';
 
 interface Props {
   email: string;
@@ -33,6 +34,7 @@ export class ResolveOnBehalfOfCommand implements Command<Props, ResolveOnBehalfO
     private readonly memberRepository: WorkspaceMemberRepository,
     private readonly createUser: CreateUser,
     private readonly addMember: AddWorkspaceMember,
+    private readonly recordAutoCreated?: RecordAutoCreated,
   ) {}
 
   async execute(props: Props): Promise<ResolveOnBehalfOfResponse> {
@@ -45,6 +47,7 @@ export class ResolveOnBehalfOfCommand implements Command<Props, ResolveOnBehalfO
 
     const email = props.email.trim().toLowerCase();
     let targetUser = await this.userRepository.findByEmail(email);
+    const userCreated = !targetUser;
 
     if (!targetUser) {
       targetUser = await this.createUser.execute({
@@ -58,13 +61,23 @@ export class ResolveOnBehalfOfCommand implements Command<Props, ResolveOnBehalfO
     }
 
     const existingMember = await this.memberRepository.findByWorkspaceAndUser(props.workspaceId, targetUser.getId());
-    if (!existingMember) {
-      await this.addMember.execute({
-        workspaceId: props.workspaceId,
-        userId: targetUser.getId(),
-        role: WorkspaceRole.USER,
-      });
-    }
+    const member = existingMember
+      ? null
+      : await this.addMember.execute({
+          workspaceId: props.workspaceId,
+          userId: targetUser.getId(),
+          role: WorkspaceRole.USER,
+        });
+
+    await this.recordAutoCreated?.execute({
+      via: 'on-behalf',
+      user: { id: targetUser.getId(), email: targetUser.email },
+      userCreated,
+      member: member ? { id: member.getId(), role: member.role } : null,
+      workspaceId: props.workspaceId,
+      actorUserId: props.userId,
+      source: 'ui',
+    });
 
     return { userId: targetUser.getId(), email: targetUser.email };
   }

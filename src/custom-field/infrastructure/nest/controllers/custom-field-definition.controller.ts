@@ -133,6 +133,7 @@ export class CustomFieldDefinitionController {
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    const previous = await this.definitionRepository.findById(id);
     const service = new UpdateCustomFieldDefinition(this.definitionRepository);
     const command = new UpdateCustomFieldDefinitionCommand(service, ensurePermission);
     const result = await command.execute({
@@ -152,7 +153,15 @@ export class CustomFieldDefinitionController {
       entityId: id,
       userId: user.userId,
       workspaceId: workspaceId,
-      metadata: { name: body.name },
+      metadata: {
+        name: body.name ?? previous?.name ?? null,
+        before: previous ? { name: previous.name, options: previous.options, required: previous.required } : null,
+        after: {
+          name: body.name ?? previous?.name ?? null,
+          options: body.options ?? previous?.options ?? null,
+          required: body.required ?? previous?.required ?? null,
+        },
+      },
       category: AuditCategory.CONFIG,
       level: AuditLevel.INFO,
       source: 'ui',

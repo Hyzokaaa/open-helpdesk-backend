@@ -67,4 +67,33 @@ describe('AuthenticateUser', () => {
       service.execute({ email: 'inactive@example.com', password: 'correct-password' }),
     ).rejects.toThrow(InvalidCredentialsError);
   });
+
+  it('should give every failure the same message and keep the reason apart', async () => {
+    repository.seed(
+      new User({
+        id: 'user-3',
+        email: 'off@example.com',
+        password: 'hashed:correct-password',
+        firstName: 'Off',
+        lastName: 'Line',
+        isActive: false,
+        isSystemAdmin: false,
+        isEmailVerified: true,
+        language: 'en',
+        theme: 'system',
+      }),
+    );
+    const attempts = [
+      { email: 'nobody@example.com', password: 'x', reason: 'unknown-email' },
+      { email: 'john@example.com', password: 'wrong-password', reason: 'wrong-password' },
+      { email: 'off@example.com', password: 'correct-password', reason: 'inactive' },
+    ];
+
+    for (const attempt of attempts) {
+      const error = await service.execute(attempt).catch((e) => e);
+      expect(error).toBeInstanceOf(InvalidCredentialsError);
+      expect(error.message).toBe('Invalid credentials');
+      expect(error.reason).toBe(attempt.reason);
+    }
+  });
 });

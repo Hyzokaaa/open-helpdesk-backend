@@ -106,3 +106,17 @@ export interface TicketDeletedEvent {
   workspaceName: string;
   workspaceSlug: string;
 }
+
+/**
+ * A workspace was deleted, restored, or is about to be purged. Consumed by email only: its owner
+ * and admins are told what happened and until when it can be undone.
+ */
+export interface WorkspaceLifecycleEvent {
+  workspaceId: string;
+  workspaceName: string;
+  workspaceSlug: string;
+  accountId: string | null;
+  /** When it will be (or would have been) erased; null after a restore. */
+  purgeAt: string | null;
+  actorUserId: string | null;
+}

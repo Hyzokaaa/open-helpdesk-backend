@@ -34,7 +34,7 @@ export class SlaBreachCheckerService implements OnModuleInit, OnModuleDestroy {
   async check(): Promise<void> {
     try {
       const workspaces = await this.dataSource.query(
-        `SELECT id, "slaPolicy" FROM workspaces WHERE "slaPolicy" IS NOT NULL`,
+        `SELECT id, "slaPolicy" FROM workspaces WHERE "slaPolicy" IS NOT NULL AND "deletedAt" IS NULL`,
       );
 
       if (workspaces.length === 0) return;

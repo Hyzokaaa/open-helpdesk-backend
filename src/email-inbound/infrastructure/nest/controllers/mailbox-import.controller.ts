@@ -40,12 +40,12 @@ export class MailboxImportController {
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({
-      action: AuditAction.MAILBOX_IMPORT_STARTED,
+      action: AuditAction.MAILBOX_IMPORTED,
       entityType: 'mailbox',
       entityId: mailboxId,
       userId: user.userId,
       workspaceId: mailbox.workspaceId,
-      metadata: { address: mailbox.address },
+      metadata: { address: mailbox.address, since: since?.toISOString() ?? null, ...result },
       category: AuditCategory.EMAIL,
       level: AuditLevel.INFO,
       source: 'ui',

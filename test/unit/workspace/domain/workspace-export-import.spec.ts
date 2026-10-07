@@ -8,6 +8,12 @@ import { WorkspaceExportData } from '../../../../src/workspace/domain/workspace-
 import { DomainValidationError } from '../../../../src/shared/domain/errors';
 import { createExportToken, validateExportToken } from '../../../../src/workspace/domain/services/workspace-export-token';
 
+/** An imported audit row's metadata without the import mark, to compare what the file carried. */
+function withoutImportMark(param: unknown): Record<string, unknown> {
+  const { imported: _imported, ...rest } = JSON.parse(param as string);
+  return rest;
+}
+
 interface RecordedQuery {
   sql: string;
   params: unknown[];
@@ -690,7 +696,7 @@ describe('ImportWorkspace', () => {
     expect(result.customFieldsImported).toBe(0);
   });
 
-  it('carries the audit category, level and source, and falls back to the column defaults when absent', async () => {
+  it('carries the audit category and level, marks every row as imported and keeps the source it claimed', async () => {
     const qr = new FakeQueryRunner(answer);
     const createdAt = '2026-01-01T00:00:00.000Z';
     const data = emptyExport({
@@ -704,7 +710,10 @@ describe('ImportWorkspace', () => {
 
     const inserts = qr.find(/INSERT INTO audit_log_entries/);
     expect(inserts[0].sql).toMatch(/category, level, source/);
-    expect(inserts.map((q) => q.params.slice(7, 10))).toEqual([['email', 'error', 'system'], ['ticket', 'info', null]]);
+    expect(inserts.map((q) => q.params.slice(7, 10))).toEqual([['email', 'error', 'import'], ['ticket', 'info', 'import']]);
+    const imported = inserts.map((q) => JSON.parse(q.params[6] as string).imported);
+    expect(imported.map((i) => i.originalSource)).toEqual(['system', null]);
+    expect(imported.every((i) => typeof i.at === 'string')).toBe(true);
   });
 
   it('imports a 1.13.0 file, which has no audit category, level or source', async () => {
@@ -867,7 +876,7 @@ describe('ImportWorkspace', () => {
       ['workspace', 'ws-target'],
       ['department', 'src-dept'],
     ]);
-    expect(JSON.parse(audit[0].params[6] as string)).toEqual({
+    expect(withoutImportMark(audit[0].params[6])).toEqual({
       ticketId: idOf('tickets'), commentId: idOf('comments'), targetUserId: 'u-bob', departmentId: 'src-dept', name: 'n',
     });
   });
@@ -969,7 +978,7 @@ describe('ImportWorkspace organizations', () => {
 
     const [audit] = qr.find(/INSERT INTO audit_log_entries/);
     expect(audit.params[3]).toBe(initechId);
-    expect(JSON.parse(audit.params[6] as string)).toEqual({ organizationId: 'org-existing' });
+    expect(withoutImportMark(audit.params[6])).toEqual({ organizationId: 'org-existing' });
     expect(result.organizationsImported).toBe(1);
   });
 
@@ -1034,7 +1043,7 @@ describe('ImportWorkspace departments', () => {
     expect(qr.find(/INSERT INTO tickets/).map((q) => q.params[21])).toEqual([techId, null]);
     const [audit] = qr.find(/INSERT INTO audit_log_entries/);
     expect(audit.params[3]).toBe(techId);
-    expect(JSON.parse(audit.params[6] as string)).toEqual({ departmentId: 'dept-existing' });
+    expect(withoutImportMark(audit.params[6])).toEqual({ departmentId: 'dept-existing' });
     expect(result.departmentsImported).toBe(1);
   });
 
@@ -1081,7 +1090,7 @@ describe('ImportWorkspace projects', () => {
     expect(qr.find(/INSERT INTO tickets/).map((q) => q.params[22])).toEqual([appId, 'proj-existing']);
     const [audit] = qr.find(/INSERT INTO audit_log_entries/);
     expect(audit.params[3]).toBe(appId);
-    expect(JSON.parse(audit.params[6] as string)).toEqual({ projectId: 'proj-existing' });
+    expect(withoutImportMark(audit.params[6])).toEqual({ projectId: 'proj-existing' });
     expect(result.projectsImported).toBe(1);
   });
 });
@@ -2646,7 +2655,7 @@ describe('ImportWorkspace configuration', () => {
     const mailboxId = qr.find(/INSERT INTO mailboxes/)[0].params[0];
     const audits = qr.find(/INSERT INTO audit_log_entries/);
     expect(audits.map((q) => q.params[3])).toEqual([mailboxId, 'wh-here']);
-    expect(JSON.parse(audits[0].params[6] as string)).toEqual({ mailboxId });
+    expect(withoutImportMark(audits[0].params[6])).toEqual({ mailboxId });
   });
 
   it('imports a 1.17 file, which carries no configuration, as before', async () => {

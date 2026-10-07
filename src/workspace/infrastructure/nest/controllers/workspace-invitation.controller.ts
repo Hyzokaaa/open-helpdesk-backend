@@ -170,9 +170,12 @@ export class WorkspaceInvitationController {
       entityId: workspace.getId(),
       userId: user.userId,
       workspaceId: workspace.getId(),
-      metadata: { count: body.invitations.length },
+      metadata: {
+        count: body.invitations.length,
+        invitations: body.invitations.slice(0, 500).map((i, index) => ({ email: i.email, role: i.role, status: results[index]?.status ?? null })),
+      },
       category: AuditCategory.WORKSPACE,
-      level: AuditLevel.INFO,
+      level: body.invitations.some((i) => i.role === 'admin') ? AuditLevel.WARNING : AuditLevel.INFO,
       source: 'ui',
     });
 

@@ -17,7 +17,7 @@ export class AuthenticateUser {
   async execute(props: AuthenticateUserProps): Promise<User> {
     const user = await this.repository.findByEmail(props.email);
     if (!user) {
-      throw new InvalidCredentialsError('Invalid credentials');
+      throw new InvalidCredentialsError('Invalid credentials', 'unknown-email');
     }
 
     const isValid = await this.passwordHasher.compare(
@@ -25,11 +25,11 @@ export class AuthenticateUser {
       user.password,
     );
     if (!isValid) {
-      throw new InvalidCredentialsError('Invalid credentials');
+      throw new InvalidCredentialsError('Invalid credentials', 'wrong-password');
     }
 
     if (!user.isActive) {
-      throw new InvalidCredentialsError('Invalid credentials');
+      throw new InvalidCredentialsError('Invalid credentials', 'inactive');
     }
 
     return user;

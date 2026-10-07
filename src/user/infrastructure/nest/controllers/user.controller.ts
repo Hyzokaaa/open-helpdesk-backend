@@ -16,6 +16,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { InvalidCredentialsError } from '../../../../shared/domain/errors';
 import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { SkipEmailVerification } from '../../../../shared/nest/decorators/skip-email-verification.decorator';
@@ -252,12 +253,31 @@ export class UserController {
   ) {
     const service = new ChangePassword(this.userRepository, this.passwordHasher);
     const command = new ChangePasswordCommand(service, new RevokeUserSessions(this.sessionRepository));
-    const result = await command.execute({
-      userId: authUser.userId,
-      currentPassword: body.currentPassword,
-      newPassword: body.newPassword,
-      sessionId: authUser.sessionId,
-    });
+    let result: Awaited<ReturnType<ChangePasswordCommand['execute']>>;
+    try {
+      result = await command.execute({
+        userId: authUser.userId,
+        currentPassword: body.currentPassword,
+        newPassword: body.newPassword,
+        sessionId: authUser.sessionId,
+      });
+    } catch (error) {
+      // A wrong current password from inside a session can be someone at an unlocked computer
+      if (error instanceof InvalidCredentialsError) {
+        await new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository).execute({
+          action: AuditAction.USER_PASSWORD_CHANGE_FAILED,
+          entityType: 'user',
+          entityId: authUser.userId,
+          userId: authUser.userId,
+          workspaceId: null,
+          metadata: { reason: 'wrong-current-password' },
+          category: AuditCategory.SECURITY,
+          level: AuditLevel.WARNING,
+          source: 'ui',
+        }).catch(() => undefined);
+      }
+      throw error;
+    }
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({
@@ -309,9 +329,10 @@ export class UserController {
       entityId: result.id,
       userId: user.userId,
       workspaceId: null,
-      metadata: { email: body.email },
+      metadata: { email: body.email, isSystemAdmin: !!body.isSystemAdmin, isEmailVerified: !!body.isEmailVerified },
       category: AuditCategory.USER,
-      level: AuditLevel.INFO,
+      // Creating another system administrator is the most powerful thing an admin can do
+      level: body.isSystemAdmin ? AuditLevel.WARNING : AuditLevel.INFO,
       source: 'ui',
     });
 
@@ -355,17 +376,35 @@ export class UserController {
     await this.userRepository.update(existing);
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-    await auditLog.execute({
-      action: AuditAction.USER_NAME_UPDATED,
-      entityType: 'user',
-      entityId: id,
-      userId: authUser.userId,
-      workspaceId: null,
-      metadata: { before, after },
-      category: AuditCategory.USER,
-      level: AuditLevel.INFO,
-      source: 'ui',
-    });
+    // The email is the sign-in identity, so changing it is recorded on its own, as a warning
+    if (after.email !== undefined) {
+      await auditLog.execute({
+        action: AuditAction.USER_EMAIL_CHANGED,
+        entityType: 'user',
+        entityId: id,
+        userId: authUser.userId,
+        workspaceId: null,
+        metadata: { before: { email: before.email }, after: { email: after.email } },
+        category: AuditCategory.USER,
+        level: AuditLevel.WARNING,
+        source: 'ui',
+      });
+      delete before.email;
+      delete after.email;
+    }
+    if (Object.keys(after).length > 0) {
+      await auditLog.execute({
+        action: AuditAction.USER_NAME_UPDATED,
+        entityType: 'user',
+        entityId: id,
+        userId: authUser.userId,
+        workspaceId: null,
+        metadata: { before, after },
+        category: AuditCategory.USER,
+        level: AuditLevel.INFO,
+        source: 'ui',
+      });
+    }
 
     return { firstName: existing.firstName, lastName: existing.lastName, email: existing.email };
   }

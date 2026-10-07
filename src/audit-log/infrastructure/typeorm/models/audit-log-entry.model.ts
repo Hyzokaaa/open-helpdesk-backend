@@ -7,7 +7,6 @@ import {
   PrimaryColumn,
 } from 'typeorm';
 import { UserModel } from '../../../../user/infrastructure/typeorm/models/user.model';
-import { WorkspaceModel } from '../../../../workspace/infrastructure/typeorm/models/workspace.model';
 
 @Entity('audit_log_entries')
 @Index(['workspaceId', 'createdAt'])
@@ -15,6 +14,8 @@ import { WorkspaceModel } from '../../../../workspace/infrastructure/typeorm/mod
 @Index(['entityType', 'entityId'])
 @Index(['category'])
 @Index(['level'])
+// Retention deletes by category and age
+@Index('IDX_audit_log_category_created', ['category', 'createdAt'])
 export class AuditLogEntryModel {
   @PrimaryColumn()
   id!: string;
@@ -34,9 +35,10 @@ export class AuditLogEntryModel {
   @Column({ type: 'varchar', nullable: true })
   userId!: string | null;
 
-  @ManyToOne(() => WorkspaceModel, { nullable: true, onDelete: 'SET NULL' })
-  workspace!: WorkspaceModel | null;
-
+  /**
+   * The workspace the entry belongs to. Deliberately not a foreign key: the history of a workspace
+   * must keep pointing at it after the workspace is purged.
+   */
   @Column({ type: 'varchar', nullable: true })
   workspaceId!: string | null;
 

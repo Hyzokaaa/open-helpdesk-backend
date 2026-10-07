@@ -94,6 +94,7 @@ export class TicketCategoryController {
     const workspaceId = await this.resolveWorkspaceId(slug);
     await this.ensurePermission(workspaceId, user, PERMISSIONS.PROJECT_MANAGE);
 
+    const previous = await this.categoryRepository.findById(categoryId);
     const service = new UpdateTicketCategory(this.categoryRepository);
     const category = await service.execute({
       id: categoryId,
@@ -110,7 +111,11 @@ export class TicketCategoryController {
       entityId: categoryId,
       userId: user.userId,
       workspaceId,
-      metadata: { name: category.name },
+      metadata: {
+        name: category.name,
+        before: previous ? { name: previous.name, slug: previous.slug, color: previous.color } : null,
+        after: { name: category.name, slug: category.slug, color: category.color },
+      },
       category: AuditCat.CONFIG,
       level: AuditLevel.INFO,
       source: 'ui',

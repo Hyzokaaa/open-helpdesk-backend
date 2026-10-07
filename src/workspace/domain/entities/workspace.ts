@@ -28,6 +28,10 @@ interface Props {
   appSubtitle?: string | null;
   logo?: string | null;
   icon?: string | null;
+  deletedAt?: Date | null;
+  deletedById?: string | null;
+  purgeAt?: Date | null;
+  purgeReminderSentAt?: Date | null;
 }
 
 export class Workspace {
@@ -46,6 +50,11 @@ export class Workspace {
   appSubtitle: string | null;
   logo: string | null;
   icon: string | null;
+  /** Deleted and waiting to be purged; null while the workspace is live. */
+  deletedAt: Date | null;
+  deletedById: string | null;
+  purgeAt: Date | null;
+  purgeReminderSentAt: Date | null;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -63,6 +72,10 @@ export class Workspace {
     this.appSubtitle = props.appSubtitle ?? null;
     this.logo = props.logo ?? null;
     this.icon = props.icon ?? null;
+    this.deletedAt = props.deletedAt ?? null;
+    this.deletedById = props.deletedById ?? null;
+    this.purgeAt = props.purgeAt ?? null;
+    this.purgeReminderSentAt = props.purgeReminderSentAt ?? null;
   }
 
   getId(): string {

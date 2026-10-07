@@ -237,6 +237,7 @@ export class ApiController {
       customFields: body.customFields,
       source: TicketSource.API,
       isSystemAdmin: user.isSystemAdmin,
+      apiKeyId: user.apiKeyId,
     });
   }
 
@@ -276,6 +277,7 @@ export class ApiController {
         workspaceSlug: workspace.slug,
         userId: user.userId,
         isSystemAdmin: user.isSystemAdmin,
+        apiKeyId: user.apiKeyId,
       });
     }
 
@@ -298,6 +300,7 @@ export class ApiController {
         workspaceSlug: workspace.slug,
         userId: user.userId,
         isSystemAdmin: user.isSystemAdmin,
+        apiKeyId: user.apiKeyId,
       });
     }
 
@@ -324,6 +327,7 @@ export class ApiController {
         tagIds: body.tagIds,
         customFields: body.customFields,
         isSystemAdmin: user.isSystemAdmin,
+        apiKeyId: user.apiKeyId,
       });
     }
 
@@ -359,6 +363,7 @@ export class ApiController {
       workspaceSlug: workspace.slug,
       userId: user.userId,
       isSystemAdmin: user.isSystemAdmin,
+      apiKeyId: user.apiKeyId,
     });
   }
 
@@ -427,6 +432,7 @@ export class ApiController {
       authorId: user.userId,
       workspaceSlug: workspace.slug,
       isSystemAdmin: user.isSystemAdmin,
+      apiKeyId: user.apiKeyId,
     });
   }
 
@@ -479,7 +485,8 @@ export class ApiController {
 
     const service = new ExchangeToken(this.idGenerator, this.userRepository, this.passwordHasher, this.memberRepository);
     const addMember = new AddWorkspaceMember(this.idGenerator, this.memberRepository);
-    const command = new ExchangeTokenCommand(service, addMember, this.tokenService, this.tokenExchangeTtl);
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    const command = new ExchangeTokenCommand(service, addMember, this.tokenService, this.tokenExchangeTtl, auditLog);
 
     return command.execute({
       email: body.email,
@@ -488,6 +495,8 @@ export class ApiController {
       role: body.role ?? WorkspaceRole.AGENT,
       workspaceId,
       allowElevatedRoles: user.apiKeyScopes?.includes(ApiKeyScope.AUTH_EXCHANGE_ADMIN) ?? false,
+      apiKeyId: user.apiKeyId,
+      actorUserId: user.userId,
     });
   }
 

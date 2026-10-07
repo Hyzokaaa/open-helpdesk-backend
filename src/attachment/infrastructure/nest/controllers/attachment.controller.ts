@@ -74,11 +74,12 @@ export class AttachmentController {
       category: AuditCategory.TICKET,
       level: AuditLevel.INFO,
       source: 'ui',
-      entityType: 'attachment',
-      entityId: result.token,
+      // Staged before any ticket exists; the token claims the file, so it is never written here
+      entityType: 'staged-upload',
+      entityId: user.userId,
       userId: user?.userId ?? null,
       workspaceId: null,
-      metadata: { originalName: file.originalname, mimeType: file.mimetype, size: file.size },
+      metadata: { staged: true, originalName: file.originalname, mimeType: file.mimetype, size: file.size },
     });
 
     return result;

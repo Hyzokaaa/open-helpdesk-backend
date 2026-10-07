@@ -11,6 +11,7 @@ import { TypeOrmTicketRepository } from '../../../ticket/infrastructure/typeorm/
 import { TypeOrmCommentRepository } from '../../../comment/infrastructure/typeorm/repositories/typeorm-comment.repository';
 import { TypeOrmAuditLogRepository } from '../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
 import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
+import { RecordAutoCreated } from '../../../audit-log/domain/services/audit-log-record-auto-created';
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
 import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
@@ -136,8 +137,11 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
   private async refreshPollers() {
     if (this.stopping) return;
 
-    // Load IMAP mailboxes from DB
-    const dbMailboxes = await this.mailboxRepository.findAllByType(MailboxType.IMAP);
+    // Load IMAP mailboxes from DB; a deleted workspace's are not polled until it is restored,
+    // and its mail waits on the server (the first poll after a restore fetches it, deduplicated)
+    const deletedWorkspaceIds = new Set((await this.workspaceRepository.findDeleted()).map((w) => w.getId()));
+    const dbMailboxes = (await this.mailboxRepository.findAllByType(MailboxType.IMAP))
+      .filter((m) => !m.workspaceId || !deletedWorkspaceIds.has(m.workspaceId));
 
     // Build active set
     const activeIds = new Set<string>();
@@ -182,8 +186,6 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     const pollStart = Date.now();
 
     try {
-      this.emitAudit(AuditAction.IMAP_POLL_STARTED, mailbox.getId(), mailbox.workspaceId, { address: mailbox.address }).catch(() => {});
-
       const fetched = await this.fetchMessages({
         host: mailbox.imapHost!,
         port: mailbox.imapPort!,
@@ -219,12 +221,21 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       }
 
       // Mark success
+      const recoveredFrom = mailbox.lastError;
       mailbox.lastSyncAt = new Date();
       mailbox.lastSyncDuration = Date.now() - pollStart;
       mailbox.lastError = null;
       await this.mailboxRepository.update(mailbox);
 
-      this.emitAudit(AuditAction.IMAP_POLL_COMPLETED, mailbox.getId(), mailbox.workspaceId, { address: mailbox.address, fetched: fetched.length, duration: Date.now() - pollStart }).catch(() => {});
+      // A poll every few seconds per mailbox: only the ones that brought mail, or ended a failure, are worth an entry
+      if (fetched.length > 0 || recoveredFrom) {
+        this.emitAudit(AuditAction.IMAP_POLL_COMPLETED, mailbox.getId(), mailbox.workspaceId, {
+          address: mailbox.address,
+          fetched: fetched.length,
+          duration: Date.now() - pollStart,
+          ...(recoveredFrom ? { recoveredFrom } : {}),
+        }).catch(() => {});
+      }
 
       state.backoff = 1000;
       if (this.pollers.has(mailbox.getId())) {
@@ -234,7 +245,10 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       const errMsg = err instanceof Error ? err.message : 'Unknown error';
       this.logger.error(`IMAP [${mailbox.address}] poll failed: ${errMsg}`);
 
-      this.emitAudit(AuditAction.IMAP_POLL_FAILED, mailbox.getId(), mailbox.workspaceId, { address: mailbox.address, error: errMsg }, AuditLevel.ERROR).catch(() => {});
+      // Retries back off but keep failing the same way: recorded when the mailbox starts failing or the error changes
+      if (mailbox.lastError !== errMsg) {
+        this.emitAudit(AuditAction.IMAP_POLL_FAILED, mailbox.getId(), mailbox.workspaceId, { address: mailbox.address, error: errMsg }, AuditLevel.ERROR).catch(() => {});
+      }
 
       // Mark error
       mailbox.lastError = errMsg;
@@ -347,18 +361,53 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       const result = await router.execute(parsed);
       this.logger.log(`IMAP: routed ${result.action}${result.ticketId ? ` (ticket: ${result.ticketId})` : ''}`);
 
+      // Meant for a deleted workspace: not marked as processed, so a restore can still take it
+      if (result.reason === 'workspace-deleted') return 'skipped';
+
       if (msg.envelope.messageId) {
         await this.processedEmailRepository.markProcessed(msg.envelope.messageId);
       }
 
       if (mailboxId) {
-        this.emitAudit(AuditAction.EMAIL_RECEIVED, mailboxId, workspaceId ?? null, { from: parsed.fromAddress, subject: parsed.subject, action: result.action, ticketId: result.ticketId ?? null }).catch(() => {});
+        // A rejected message says why, and which rule rejected it
+        this.emitAudit(AuditAction.EMAIL_RECEIVED, mailboxId, workspaceId ?? null, {
+          from: parsed.fromAddress,
+          subject: parsed.subject,
+          action: result.action,
+          ticketId: result.ticketId ?? null,
+          ...(result.reason ? { reason: result.reason } : {}),
+          ...(result.rule ? { rule: result.rule.name, ruleId: result.rule.id } : {}),
+        }, result.action === 'rejected' ? AuditLevel.WARNING : undefined).catch(() => {});
+      }
+
+      // The ticket's own activity shows mail like any other ticket or reply
+      if (result.ticketId && workspaceId && result.action !== 'rejected') {
+        new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository).execute({
+          action: result.action === 'ticket-created' ? AuditAction.TICKET_CREATED : AuditAction.COMMENT_CREATED,
+          entityType: 'ticket',
+          entityId: result.ticketId,
+          userId: result.authorId ?? null,
+          workspaceId,
+          metadata: { from: parsed.fromAddress, subject: parsed.subject, ...(mailboxId ? { mailboxId } : {}) },
+          category: AuditCategory.TICKET,
+          level: AuditLevel.INFO,
+          source: 'email',
+        }).catch(() => {});
       }
 
       return result.action === 'rejected' ? 'rejected' : 'created';
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : 'Unknown error';
       this.logger.error(`IMAP: failed to process message UID ${msg.uid}: ${errMsg}`);
+      // Lost mail would otherwise leave no trace outside the server log
+      if (mailboxId) {
+        this.emitAudit(AuditAction.EMAIL_PROCESSING_FAILED, mailboxId, workspaceId ?? null, {
+          from: msg.envelope.from ?? null,
+          subject: msg.envelope.subject ?? null,
+          uid: msg.uid,
+          error: errMsg,
+        }, AuditLevel.ERROR).catch(() => {});
+      }
       return 'skipped';
     }
   }
@@ -463,6 +512,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       evaluateRules,
       this.organizationRepository,
       this.ticketCategoryRepository,
+      new RecordAutoCreated(new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository)),
     );
   }
 

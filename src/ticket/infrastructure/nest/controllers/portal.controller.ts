@@ -15,6 +15,7 @@ import { Throttle } from '@nestjs/throttler';
 import { Public } from '../../../../shared/nest/decorators/public.decorator';
 import { EntityNotFoundError } from '../../../../shared/domain/errors';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
+import { RecordAutoCreated } from '../../../../audit-log/domain/services/audit-log-record-auto-created';
 import { BcryptPasswordHasher } from '../../../../shared/infrastructure/bcrypt-password-hasher';
 import { StorageService } from '../../../../shared/domain/storage-service';
 import { STORAGE_SERVICE } from '../../../../shared/shared.module';
@@ -139,6 +140,7 @@ export class PortalController {
       this.memberRepository,
       new CreateUser(this.idGenerator, this.userRepository, this.passwordHasher),
       new AddWorkspaceMember(this.idGenerator, this.memberRepository),
+      new RecordAutoCreated(new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository)),
     );
     const reporter = await resolveReporter.execute({
       workspaceId: workspace.getId(),
@@ -237,7 +239,9 @@ export class PortalController {
     if (!ticket) throw new EntityNotFoundError('Ticket not found');
 
     const creator = await this.userRepository.findById(ticket.reporterId);
+    // A ticket of a deleted workspace is gone for its portal link too
     const workspace = await this.workspaceRepository.findById(ticket.workspaceId);
+    if (!workspace) throw new EntityNotFoundError('Ticket not found');
 
     // Fetch comments with author names and dates
     const comments = await this.commentRepository.findByTicketIdWithDates(ticket.getId());
@@ -297,6 +301,7 @@ export class PortalController {
   ) {
     const ticket = await this.ticketRepository.findByPortalToken(portalToken);
     if (!ticket) throw new EntityNotFoundError('Ticket not found');
+    if (!(await this.workspaceRepository.findById(ticket.workspaceId))) throw new EntityNotFoundError('Ticket not found');
 
     const createComment = new CreateComment(this.idGenerator, this.commentRepository);
     const comment = await createComment.execute({
@@ -311,11 +316,12 @@ export class PortalController {
       category: AuditCategory.TICKET,
       level: AuditLevel.INFO,
       source: 'portal',
-      entityType: 'comment',
-      entityId: comment.getId(),
+      // On the ticket, like any other comment, so the reply shows in the ticket's activity
+      entityType: 'ticket',
+      entityId: ticket.getId(),
       userId: ticket.reporterId,
       workspaceId: ticket.workspaceId,
-      metadata: { ticketId: ticket.getId(), ticketName: ticket.name, content: commentPreview(comment.content) },
+      metadata: { ticketId: ticket.getId(), commentId: comment.getId(), ticketName: ticket.name, content: commentPreview(comment.content) },
     });
 
     // Tell the team, like any other reply: email to stakeholders, in-app notification and live update

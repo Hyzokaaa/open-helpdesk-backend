@@ -38,7 +38,7 @@ export class ToggleUserActiveCommand implements Command<Props, ToggleUserActiveR
     await this.createAuditLog.execute({
       action: props.isActive ? AuditAction.USER_ACTIVATED : AuditAction.USER_DEACTIVATED,
       category: AuditCategory.USER,
-      level: AuditLevel.INFO,
+      level: props.isActive ? AuditLevel.INFO : AuditLevel.WARNING,
       source: 'ui',
       entityType: 'user',
       entityId: props.targetUserId,

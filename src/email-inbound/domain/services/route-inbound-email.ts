@@ -20,11 +20,16 @@ import { ParsedInboundEmail } from '../../infrastructure/imap/imap-email-parser'
 import { EvaluateEmailRules } from '../../../email-rule/domain/services/email-rule-evaluate';
 import { OrganizationRepository } from '../../../organization/domain/repositories/organization.repository';
 import { AutoEnrollOrganization } from '../../../organization/domain/services/organization-auto-enroll';
+import { RecordAutoCreated } from '../../../audit-log/domain/services/audit-log-record-auto-created';
 
 export interface RouteInboundEmailResult {
   action: 'ticket-created' | 'comment-added' | 'rejected';
   ticketId?: string;
   reason?: string;
+  /** Who the message was filed as, when it reached a ticket. */
+  authorId?: string;
+  /** The email rule that rejected the message, if one did. */
+  rule?: { id: string | null; name: string | null };
 }
 
 export class RouteInboundEmail {
@@ -45,6 +50,7 @@ export class RouteInboundEmail {
     private readonly evaluateRules?: EvaluateEmailRules,
     private readonly organizationRepository?: OrganizationRepository,
     private readonly ticketCategoryRepository?: TicketCategoryRepository,
+    private readonly recordAutoCreated?: RecordAutoCreated,
   ) {}
 
   async execute(parsed: ParsedInboundEmail): Promise<RouteInboundEmailResult> {
@@ -102,6 +108,13 @@ export class RouteInboundEmail {
 
     const workspaceId = mailbox.workspaceId;
 
+    // A deleted workspace takes no mail, not even replies to its tickets; the poller leaves the
+    // message unprocessed so it can still be picked up if the workspace is restored
+    if (!(await this.workspaceRepository.findById(workspaceId))) {
+      const deleted = await this.workspaceRepository.findDeletedById(workspaceId);
+      return { action: 'rejected', reason: deleted ? 'workspace-deleted' : 'workspace-not-found' };
+    }
+
     // 2. Evaluate email rules (before creating user/member)
     let ruleResult = { action: 'proceed' as const } as import('../../../email-rule/domain/services/email-rule-evaluate').EmailRuleResult;
     if (this.evaluateRules) {
@@ -112,12 +125,17 @@ export class RouteInboundEmail {
       );
       if (ruleResult.action === 'reject') {
         this.logger.log(`Email rejected by rule "${ruleResult.matchedRuleName}": ${parsed.fromAddress} — ${parsed.subject}`);
-        return { action: 'rejected', reason: 'rule-rejected' };
+        return {
+          action: 'rejected',
+          reason: 'rule-rejected',
+          rule: { id: ruleResult.matchedRuleId ?? null, name: ruleResult.matchedRuleName ?? null },
+        };
       }
     }
 
     // 3. Find or create user (only if not rejected)
     let user = await this.userRepository.findByEmail(parsed.fromAddress);
+    const userCreated = !user;
     if (!user) {
       const { firstName, lastName } = this.extractNameFromEmail(parsed.fromName, parsed.fromAddress);
       user = await this.createUser.execute({
@@ -136,14 +154,25 @@ export class RouteInboundEmail {
       workspaceId,
       user.getId(),
     );
+    let addedMemberId: string | null = null;
     if (!existingMember) {
-      await this.addMember.execute({
+      const added = await this.addMember.execute({
         workspaceId: workspaceId,
         userId: user.getId(),
         role: WorkspaceRole.USER,
       });
+      addedMemberId = added.getId();
       this.logger.log(`Added ${parsed.fromAddress} as USER to workspace ${workspaceId}`);
     }
+    await this.recordAutoCreated?.execute({
+      via: 'inbound-email',
+      user: { id: user.getId(), email: user.email },
+      userCreated,
+      member: addedMemberId ? { id: addedMemberId, role: WorkspaceRole.USER } : null,
+      workspaceId,
+      actorUserId: null,
+      source: 'email',
+    });
 
     // 4. Route: reply to existing ticket or create new
     if (parsed.inReplyToTicketId) {
@@ -175,7 +204,7 @@ export class RouteInboundEmail {
         }
 
         await this.uploadAttachments(parsed, ticket.getId(), comment.getId(), user.getId());
-        return { action: 'comment-added', ticketId: ticket.getId() };
+        return { action: 'comment-added', ticketId: ticket.getId(), authorId: user.getId() };
       }
     }
 
@@ -239,7 +268,7 @@ export class RouteInboundEmail {
 
     await this.uploadAttachments(parsed, ticket.getId(), null, user.getId());
 
-    return { action: 'ticket-created', ticketId: ticket.getId() };
+    return { action: 'ticket-created', ticketId: ticket.getId(), authorId: user.getId() };
   }
 
   private extractNameFromEmail(

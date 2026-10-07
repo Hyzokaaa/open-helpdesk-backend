@@ -136,6 +136,52 @@ const translations: Translations = {
     es: 'Si no creaste una cuenta, puedes ignorar este correo.',
   },
 
+  // Workspace deletion and restore
+  'workspaceLifecycle.deleted.subject': {
+    en: 'Workspace "{workspace}" was deleted',
+    es: 'Se eliminó el workspace "{workspace}"',
+  },
+  'workspaceLifecycle.deleted.title': {
+    en: '"{workspace}" was deleted',
+    es: 'Se eliminó "{workspace}"',
+  },
+  'workspaceLifecycle.deleted.body': {
+    en: 'The workspace "{workspace}" has been deleted and is no longer available. It will be erased for good, with all its tickets and files, on {date}.',
+    es: 'El workspace "{workspace}" se ha eliminado y ya no está disponible. Se borrará definitivamente, con todos sus tickets y archivos, el {date}.',
+  },
+  'workspaceLifecycle.reminder.subject': {
+    en: '"{workspace}" will be erased on {date}',
+    es: '"{workspace}" se borrará el {date}',
+  },
+  'workspaceLifecycle.reminder.title': {
+    en: 'Last days to restore "{workspace}"',
+    es: 'Últimos días para restaurar "{workspace}"',
+  },
+  'workspaceLifecycle.reminder.body': {
+    en: 'The deleted workspace "{workspace}" will be erased for good on {date}, with all its tickets and files. After that it cannot be recovered.',
+    es: 'El workspace eliminado "{workspace}" se borrará definitivamente el {date}, con todos sus tickets y archivos. Después no se podrá recuperar.',
+  },
+  'workspaceLifecycle.restored.subject': {
+    en: 'Workspace "{workspace}" was restored',
+    es: 'Se restauró el workspace "{workspace}"',
+  },
+  'workspaceLifecycle.restored.title': {
+    en: '"{workspace}" is back',
+    es: '"{workspace}" está de vuelta',
+  },
+  'workspaceLifecycle.restored.body': {
+    en: 'The workspace "{workspace}" has been restored and is available again, exactly as it was.',
+    es: 'El workspace "{workspace}" se ha restaurado y vuelve a estar disponible, tal como estaba.',
+  },
+  'workspaceLifecycle.restoreHint': {
+    en: 'You can restore it until {date} from your deleted workspaces.',
+    es: 'Puedes restaurarlo hasta el {date} desde tus workspaces eliminados.',
+  },
+  'workspaceLifecycle.restoreButton': {
+    en: 'Restore workspace',
+    es: 'Restaurar workspace',
+  },
+
   // Import welcome
   'importWelcome.subject': {
     en: 'You\'ve been added to a workspace',

@@ -5,6 +5,7 @@ export enum AuditAction {
   TICKET_STATUS_CHANGED = 'ticket-status-changed',
   TICKET_ASSIGNED = 'ticket-assigned',
   TICKET_PICKED_UP = 'ticket-picked-up',
+  /** Never emitted: transfers are recorded as transfer-request-* entries. */
   TICKET_TRANSFERRED = 'ticket-transferred',
   TICKET_DELETED = 'ticket-deleted',
 
@@ -22,7 +23,11 @@ export enum AuditAction {
   // Workspace
   WORKSPACE_CREATED = 'workspace-created',
   WORKSPACE_UPDATED = 'workspace-updated',
+  /** Deleted and recoverable until its purge date (older entries: erased at once). */
   WORKSPACE_DELETED = 'workspace-deleted',
+  WORKSPACE_RESTORED = 'workspace-restored',
+  /** Erased for good with all its data and files, by the scheduler or a system admin. */
+  WORKSPACE_PURGED = 'workspace-purged',
   WORKSPACE_PALETTE_UPDATED = 'workspace-palette-updated',
   WORKSPACE_SLA_UPDATED = 'workspace-sla-updated',
   /** No longer emitted: older entries were written after an import finished. See WORKSPACE_IMPORT_COMPLETED. */
@@ -37,10 +42,17 @@ export enum AuditAction {
   WORKSPACE_SYSTEM_MAILBOX_TOGGLED = 'workspace-system-mailbox-toggled',
   WORKSPACE_CUSTOM_DOMAIN_SET = 'workspace-custom-domain-set',
   WORKSPACE_CUSTOM_DOMAIN_VERIFIED = 'workspace-custom-domain-verified',
+  /** A DNS check that did not pass; says which record was missing. */
+  WORKSPACE_CUSTOM_DOMAIN_VERIFICATION_FAILED = 'workspace-custom-domain-verification-failed',
   WORKSPACE_CUSTOM_DOMAIN_REMOVED = 'workspace-custom-domain-removed',
   WORKSPACE_BRANDING_UPDATED = 'workspace-branding-updated',
+  WORKSPACE_LOGO_UPDATED = 'workspace-logo-updated',
+  WORKSPACE_LOGO_REMOVED = 'workspace-logo-removed',
   WORKSPACE_ANALYTICS_UPDATED = 'workspace-analytics-updated',
   SYSTEM_BRANDING_UPDATED = 'system-branding-updated',
+  /** The installation's logo or icon; an SVG is accepted, so a change is worth knowing about. */
+  SYSTEM_LOGO_UPDATED = 'system-logo-updated',
+  SYSTEM_LOGO_REMOVED = 'system-logo-removed',
 
   // Members
   MEMBER_ADDED = 'member-added',
@@ -67,13 +79,25 @@ export enum AuditAction {
   USER_DATE_FORMAT_CHANGED = 'user-date-format-changed',
   USER_TIMEZONE_CHANGED = 'user-timezone-changed',
   USER_PASSWORD_CHANGED = 'user-password-changed',
+  /** The current password given was wrong. */
+  USER_PASSWORD_CHANGE_FAILED = 'user-password-change-failed',
+  /** A system admin changed someone's email address. */
+  USER_EMAIL_CHANGED = 'user-email-changed',
 
   // Auth
   USER_LOGGED_IN = 'user-logged-in',
+  /** Any failed sign-in, for an existing account or not; the reason is kept only here. */
+  USER_LOGIN_FAILED = 'user-login-failed',
   USER_FORGOT_PASSWORD = 'user-forgot-password',
   USER_RESET_PASSWORD = 'user-reset-password',
+  USER_PASSWORD_RESET_FAILED = 'user-password-reset-failed',
   USER_EMAIL_VERIFIED = 'user-email-verified',
   USER_OAUTH_LOGIN = 'user-oauth-login',
+  USER_OAUTH_LOGIN_FAILED = 'user-oauth-login-failed',
+  /** An API key exchanged an email for a session (POST /api/v1/auth/exchange). */
+  API_SESSION_EXCHANGED = 'api-session-exchanged',
+  /** A request refused for lack of permission, recorded by the exception filter. */
+  PERMISSION_DENIED = 'permission-denied',
   USER_RESEND_VERIFICATION = 'user-resend-verification',
 
   // Mailbox
@@ -83,16 +107,25 @@ export enum AuditAction {
   MAILBOX_PAUSED = 'mailbox-paused',
   MAILBOX_RESUMED = 'mailbox-resumed',
   MAILBOX_POLL_TRIGGERED = 'mailbox-poll-triggered',
+  /** No longer emitted: older entries were written after the import finished. See MAILBOX_IMPORTED. */
   MAILBOX_IMPORT_STARTED = 'mailbox-import-started',
+  /** A manual import of past mail finished, with how many messages it handled. */
+  MAILBOX_IMPORTED = 'mailbox-imported',
   MAILBOX_TEST_CONNECTION = 'mailbox-test-connection',
 
   // Email system
+  /** No longer emitted: two entries per poll buried everything else. */
   IMAP_POLL_STARTED = 'imap-poll-started',
+  /** Only for a poll that brought mail, or the first one to succeed after failures. */
   IMAP_POLL_COMPLETED = 'imap-poll-completed',
+  /** Only when a mailbox starts failing or its error changes, not on every retry. */
   IMAP_POLL_FAILED = 'imap-poll-failed',
+  /** A fetched message that could not be routed; it is not retried. */
+  EMAIL_PROCESSING_FAILED = 'email-processing-failed',
   EMAIL_RECEIVED = 'email-received',
   EMAIL_SENT = 'email-sent',
   EMAIL_SEND_FAILED = 'email-send-failed',
+  /** Never emitted: each message is recorded as email-received on its mailbox. */
   INBOUND_EMAIL_PROCESSED = 'inbound-email-processed',
 
   // Email sender config
@@ -121,16 +154,30 @@ export enum AuditAction {
   ORGANIZATION_CREATED = 'organization-created',
   ORGANIZATION_UPDATED = 'organization-updated',
   ORGANIZATION_DELETED = 'organization-deleted',
+  ORGANIZATION_MEMBER_ADDED = 'organization-member-added',
+  ORGANIZATION_MEMBER_REMOVED = 'organization-member-removed',
+  /** A member moved to another organization (or out of one) from the member list. */
+  MEMBER_ORGANIZATION_CHANGED = 'member-organization-changed',
+  ORGANIZATION_LOGO_UPDATED = 'organization-logo-updated',
+  ORGANIZATION_LOGO_REMOVED = 'organization-logo-removed',
 
   // Projects
   PROJECT_CREATED = 'project-created',
   PROJECT_UPDATED = 'project-updated',
   PROJECT_DELETED = 'project-deleted',
+  PROJECT_CATEGORY_LINKED = 'project-category-linked',
+  PROJECT_CATEGORY_UNLINKED = 'project-category-unlinked',
 
   // Ticket Categories
   TICKET_CATEGORY_CREATED = 'ticket-category-created',
   TICKET_CATEGORY_UPDATED = 'ticket-category-updated',
   TICKET_CATEGORY_DELETED = 'ticket-category-deleted',
+
+  // Email rules
+  EMAIL_RULE_CREATED = 'email-rule-created',
+  EMAIL_RULE_UPDATED = 'email-rule-updated',
+  EMAIL_RULE_DELETED = 'email-rule-deleted',
+  EMAIL_RULE_REORDERED = 'email-rule-reordered',
 
   // Canned responses
   CANNED_RESPONSE_CREATED = 'canned-response-created',
@@ -164,6 +211,15 @@ export enum AuditAction {
   SYSTEM_MAILBOX_DELETED = 'system-mailbox-deleted',
   SYSTEM_MAILBOX_TEST_CONNECTION = 'system-mailbox-test-connection',
   SYSTEM_ANALYTICS_UPDATED = 'system-analytics-updated',
+  /** Retention turned on or off, or its days changed. */
+  AUDIT_RETENTION_UPDATED = 'audit-retention-updated',
+  WORKSPACE_AUDIT_RETENTION_UPDATED = 'workspace-audit-retention-updated',
+  /** The daily retention run deleted entries, with how many per category. */
+  AUDIT_LOG_PRUNED = 'audit-log-pruned',
+  /** A system admin sent an arbitrary email through the installation's own sender. */
+  SYSTEM_ADMIN_EMAIL_SENT = 'system-admin-email-sent',
+  SYSTEM_NOTIFICATION_SETTINGS_UPDATED = 'system-notification-settings-updated',
+  WORKSPACE_CREATION_POLICY_UPDATED = 'workspace-creation-policy-updated',
 
   // Notifications
   NOTIFICATION_PREFERENCES_UPDATED = 'notification-preferences-updated',

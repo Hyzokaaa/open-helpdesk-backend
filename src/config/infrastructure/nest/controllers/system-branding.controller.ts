@@ -143,6 +143,7 @@ export class SystemBrandingController {
     await this.storage.upload(file.buffer, key, file.mimetype);
     branding.logo = key;
     await this.repository.save(branding);
+    await this.auditBrandingImage(AuditAction.SYSTEM_LOGO_UPDATED, user, { kind: 'logo', mimeType: file.mimetype, size: file.size });
 
     return { logo: await this.storage.getPresignedUrl(key) };
   }
@@ -156,6 +157,7 @@ export class SystemBrandingController {
       await this.storage.delete(branding.logo);
       branding.logo = null;
       await this.repository.save(branding);
+      await this.auditBrandingImage(AuditAction.SYSTEM_LOGO_REMOVED, user, { kind: 'logo' });
     }
 
     return { logo: null };
@@ -191,6 +193,7 @@ export class SystemBrandingController {
     await this.storage.upload(file.buffer, key, file.mimetype);
     branding.icon = key;
     await this.repository.save(branding);
+    await this.auditBrandingImage(AuditAction.SYSTEM_LOGO_UPDATED, user, { kind: 'icon', mimeType: file.mimetype, size: file.size });
 
     return { icon: await this.storage.getPresignedUrl(key) };
   }
@@ -204,8 +207,24 @@ export class SystemBrandingController {
       await this.storage.delete(branding.icon);
       branding.icon = null;
       await this.repository.save(branding);
+      await this.auditBrandingImage(AuditAction.SYSTEM_LOGO_REMOVED, user, { kind: 'icon' });
     }
 
     return { icon: null };
+  }
+
+  /** The installation's logo and icon reach every page and email; an SVG is accepted, so a change is kept. */
+  private async auditBrandingImage(action: AuditAction, user: AuthUser, metadata: Record<string, unknown>): Promise<void> {
+    await new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository).execute({
+      action,
+      entityType: 'system',
+      entityId: 'branding',
+      userId: user.userId,
+      workspaceId: null,
+      metadata,
+      category: AuditCategory.SYSTEM,
+      level: metadata.mimeType === 'image/svg+xml' ? AuditLevel.WARNING : AuditLevel.INFO,
+      source: 'ui',
+    });
   }
 }

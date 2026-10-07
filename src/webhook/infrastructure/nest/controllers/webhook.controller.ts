@@ -30,6 +30,7 @@ import { TypeOrmWorkspaceMemberRepository } from '../../../../workspace/infrastr
 import { EnsureWorkspacePermission } from '../../../../workspace/domain/services/workspace-ensure-permission';
 import { CreateWebhookRequest } from '../dto/create-webhook.request';
 import { UpdateWebhookRequest } from '../dto/update-webhook.request';
+import { webhookUrlHost } from '../../../domain/webhook-url-host';
 
 @Controller('workspaces/:slug/webhooks')
 export class WebhookController {
@@ -67,7 +68,7 @@ export class WebhookController {
       entityId: result.id,
       userId: user.userId,
       workspaceId: workspace.getId(),
-      metadata: { url: body.url, events: body.events },
+      metadata: { host: webhookUrlHost(body.url), events: body.events },
       category: AuditCategory.CONFIG,
       level: AuditLevel.INFO,
       source: 'ui',
@@ -99,6 +100,7 @@ export class WebhookController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspace = await this.resolveWorkspace(slug);
+    const previous = await this.webhookRepository.findById(id);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new UpdateWebhook(this.webhookRepository);
     const command = new UpdateWebhookCommand(service, ensurePermission);
@@ -119,9 +121,17 @@ export class WebhookController {
       entityId: id,
       userId: user.userId,
       workspaceId: workspace.getId(),
-      metadata: { url: body.url },
+      // Redirecting a webhook is a way to leak data, so its destination is recorded before and after
+      metadata: {
+        before: previous ? { host: webhookUrlHost(previous.url), events: previous.events, isActive: previous.isActive } : null,
+        after: {
+          host: webhookUrlHost(body.url ?? previous?.url),
+          events: body.events ?? previous?.events,
+          isActive: body.isActive ?? previous?.isActive,
+        },
+      },
       category: AuditCategory.CONFIG,
-      level: AuditLevel.INFO,
+      level: body.url !== undefined && webhookUrlHost(body.url) !== webhookUrlHost(previous?.url) ? AuditLevel.WARNING : AuditLevel.INFO,
       source: 'ui',
     });
 
@@ -153,7 +163,7 @@ export class WebhookController {
       entityId: id,
       userId: user.userId,
       workspaceId: workspace.getId(),
-      metadata: { url: existing?.url },
+      metadata: { host: webhookUrlHost(existing?.url) },
       category: AuditCategory.CONFIG,
       level: AuditLevel.INFO,
       source: 'ui',

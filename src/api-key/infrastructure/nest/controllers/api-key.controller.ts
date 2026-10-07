@@ -26,6 +26,7 @@ import { TypeOrmWorkspaceRepository } from '../../../../workspace/infrastructure
 import { TypeOrmWorkspaceMemberRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
 import { EnsureWorkspacePermission } from '../../../../workspace/domain/services/workspace-ensure-permission';
 import { CreateApiKeyRequest } from '../dto/create-api-key.request';
+import { ApiKeyScope } from '../../../domain/enums/api-key-scope.enum';
 
 @Controller('workspaces/:slug/api-keys')
 export class ApiKeyController {
@@ -63,9 +64,10 @@ export class ApiKeyController {
       entityId: result.id,
       userId: user.userId,
       workspaceId: workspace.getId(),
-      metadata: { name: body.name },
+      metadata: { name: result.name, prefix: result.prefix, scopes: result.scopes, expiresAt: result.expiresAt ?? null },
       category: AuditCategory.CONFIG,
-      level: AuditLevel.INFO,
+      // A key that can sign in supervisors and admins is as strong as an admin account
+      level: result.scopes.includes(ApiKeyScope.AUTH_EXCHANGE_ADMIN) ? AuditLevel.WARNING : AuditLevel.INFO,
       source: 'ui',
     });
 
