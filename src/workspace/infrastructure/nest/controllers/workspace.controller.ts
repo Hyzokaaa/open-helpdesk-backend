@@ -33,7 +33,7 @@ import { sendImportWelcomeEmails } from "../import-welcome-emails";
 import { CurrentUser } from "../../../../shared/nest/decorators/current-user.decorator";
 import { AuthUser } from "../../../../shared/nest/strategies/jwt.strategy";
 import { UlidGenerator } from "../../../../shared/infrastructure/ulid-generator";
-import { DomainValidationError, EntityNotFoundError } from "../../../../shared/domain/errors";
+import { AccessDeniedError, DomainValidationError, EntityNotFoundError } from "../../../../shared/domain/errors";
 import { slugify } from "../../../../shared/domain/slugify";
 import { CreateWorkspace } from "../../../domain/services/workspace-create";
 import { AddWorkspaceMember } from "../../../domain/services/workspace-add-member";
@@ -66,6 +66,14 @@ import { UpdateSlaPolicyCommand } from "../../../application/commands/update-sla
 import { PERMISSIONS } from "../../../domain/permissions";
 import { DeleteWorkspace } from "../../../domain/services/workspace-delete";
 import { DeleteWorkspaceCommand } from "../../../application/commands/delete-workspace.command";
+import { RestoreWorkspace } from "../../../domain/services/workspace-restore";
+import { RestoreWorkspaceCommand } from "../../../application/commands/restore-workspace.command";
+import { PurgeWorkspace } from "../../../domain/services/workspace-purge";
+import { PurgeWorkspaceCommand } from "../../../application/commands/purge-workspace.command";
+import { EnsureWorkspaceOwner } from "../../../domain/services/workspace-ensure-owner";
+import { SqlWorkspaceFileKeys } from "../../typeorm/workspace-file-keys.sql";
+import { Workspace } from "../../../domain/entities/workspace";
+import { NestEventPublisher } from "../../../../shared/infrastructure/nest-event-publisher";
 import { GetWorkspaceQuery } from "../../../application/queries/get-workspace.query";
 import { ListWorkspacesQuery } from "../../../application/queries/list-workspaces.query";
 import { ListWorkspaceMembersQuery } from "../../../application/queries/list-workspace-members.query";
@@ -184,6 +192,7 @@ export class WorkspaceController {
     @Inject() private readonly tokenService: JwtTokenService,
     @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
     @Inject() private readonly frontendResolver: WorkspaceFrontendResolver,
+    @Inject() private readonly eventPublisher: NestEventPublisher,
   ) {}
 
   @Post()
@@ -277,12 +286,80 @@ export class WorkspaceController {
     });
   }
 
+  // ── Deleted workspaces (recoverable until purged) ──
+  // Declared before ":slug" so that "deleted" is never taken for a workspace slug.
+
+  /** The caller's own deleted workspaces; with scope=all, every one (system admins only). */
+  @Get("deleted")
+  async listDeleted(@Query("scope") scope: string | undefined, @CurrentUser() user: AuthUser) {
+    let workspaces: Workspace[];
+    if (scope === "all") {
+      if (!user.isSystemAdmin) throw new AccessDeniedError("System admin required");
+      workspaces = await this.workspaceRepository.findDeleted();
+    } else {
+      const account = await this.accountRepository.findByOwnerId(user.userId);
+      workspaces = account ? await this.workspaceRepository.findDeleted(account.getId()) : [];
+    }
+
+    const userIds = [...new Set(workspaces.map((w) => w.deletedById).filter(Boolean))] as string[];
+    const users = userIds.length > 0 ? await this.userRepository.findByIds(userIds) : [];
+    const names = new Map(users.map((u) => [u.getId(), `${u.firstName} ${u.lastName}`.trim() || u.email]));
+    return workspaces.map((w) => ({
+      id: w.getId(),
+      name: w.name,
+      slug: w.slug,
+      deletedAt: w.deletedAt,
+      purgeAt: w.purgeAt,
+      deletedBy: w.deletedById ? names.get(w.deletedById) ?? null : null,
+    }));
+  }
+
+  @Post("deleted/:id/restore")
+  async restoreDeleted(@Param("id") id: string, @CurrentUser() user: AuthUser) {
+    const command = new RestoreWorkspaceCommand(
+      new RestoreWorkspace(this.workspaceRepository, new EnsureWorkspaceOwner(this.accountRepository)),
+      new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository),
+      this.eventPublisher,
+    );
+    return command.execute({ workspaceId: id, userId: user.userId, isSystemAdmin: user.isSystemAdmin });
+  }
+
+  /** Erases a deleted workspace now instead of on its purge date (system admins only). */
+  @Delete("deleted/:id")
+  async purgeDeleted(@Param("id") id: string, @CurrentUser() user: AuthUser) {
+    if (!user.isSystemAdmin) throw new AccessDeniedError("Only system administrators can erase a workspace before its purge date");
+    const stats = await this.workspaceStats(id);
+    const command = new PurgeWorkspaceCommand(
+      new PurgeWorkspace(this.workspaceRepository, new SqlWorkspaceFileKeys(this.dataSource), this.storage),
+      new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository),
+    );
+    return command.execute({ workspaceId: id, userId: user.userId, isSystemAdmin: true, stats });
+  }
+
+  /** A copy of a deleted workspace before it is purged (system admins only). */
+  @Post("deleted/:id/export")
+  @HttpCode(200)
+  async exportDeleted(
+    @Param("id") id: string,
+    @Body() body: ExportWorkspaceRequest,
+    @CurrentUser() user: AuthUser,
+    @Res() res: Response,
+  ) {
+    if (!user.isSystemAdmin) throw new AccessDeniedError("System admin required");
+    const workspace = await this.workspaceRepository.findDeletedById(id);
+    if (!workspace) throw new EntityNotFoundError("Deleted workspace not found");
+    assertExportPassword(body.password);
+    const { summary, completed } = await this.streamExportFile(res, workspace.slug, id, await deriveExportKey(body.password), body.includeCredentials === true);
+    await this.transferAudit().exported({ workspaceId: id, userId: user.userId, summary, completed });
+  }
+
   @Get(":slug")
   async get(@Param("slug") slug: string, @CurrentUser() user: AuthUser) {
     const query = new GetWorkspaceQuery(
       this.workspaceRepository,
       new EnsureWorkspacePermission(this.memberRepository),
       this.mailboxRepository,
+      this.accountRepository,
     );
     const result = await query.execute({
       slug,
@@ -328,20 +405,29 @@ export class WorkspaceController {
     });
   }
 
+  /**
+   * Deletes the workspace, recoverably: it is off until it is restored or, after the recovery
+   * period, purged. Its owner or a system admin, typing its name to confirm.
+   */
   @Delete(":slug")
-  async remove(@Param("slug") slug: string, @CurrentUser() user: AuthUser) {
+  async remove(
+    @Param("slug") slug: string,
+    @Body() body: { confirmName?: string },
+    @CurrentUser() user: AuthUser,
+  ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
-    const service = new DeleteWorkspace(this.workspaceRepository);
+    const service = new DeleteWorkspace(this.workspaceRepository, new EnsureWorkspaceOwner(this.accountRepository));
     const auditLog = new CreateAuditLogEntry(
       this.idGenerator,
       this.auditLogRepository,
     );
-    const command = new DeleteWorkspaceCommand(service, auditLog);
+    const command = new DeleteWorkspaceCommand(service, auditLog, this.eventPublisher);
     return command.execute({
       workspaceId,
       isSystemAdmin: user.isSystemAdmin,
       userId: user.userId,
-      stats: user.isSystemAdmin ? await this.workspaceStats(workspaceId) : undefined,
+      confirmName: body?.confirmName ?? "",
+      stats: await this.workspaceStats(workspaceId),
     });
   }
 

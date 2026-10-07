@@ -7,7 +7,6 @@ import {
   PrimaryColumn,
 } from 'typeorm';
 import { UserModel } from '../../../../user/infrastructure/typeorm/models/user.model';
-import { WorkspaceModel } from '../../../../workspace/infrastructure/typeorm/models/workspace.model';
 
 @Entity('audit_log_entries')
 @Index(['workspaceId', 'createdAt'])
@@ -34,9 +33,10 @@ export class AuditLogEntryModel {
   @Column({ type: 'varchar', nullable: true })
   userId!: string | null;
 
-  @ManyToOne(() => WorkspaceModel, { nullable: true, onDelete: 'SET NULL' })
-  workspace!: WorkspaceModel | null;
-
+  /**
+   * The workspace the entry belongs to. Deliberately not a foreign key: the history of a workspace
+   * must keep pointing at it after the workspace is purged.
+   */
   @Column({ type: 'varchar', nullable: true })
   workspaceId!: string | null;
 

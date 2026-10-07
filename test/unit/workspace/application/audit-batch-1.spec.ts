@@ -1,5 +1,7 @@
 import { DeleteWorkspaceCommand } from '../../../../src/workspace/application/commands/delete-workspace.command';
 import { DeleteWorkspace } from '../../../../src/workspace/domain/services/workspace-delete';
+import { EnsureWorkspaceOwner } from '../../../../src/workspace/domain/services/workspace-ensure-owner';
+import { MockAccountRepository } from '../../../mocks/mock-account.repository';
 import { Workspace } from '../../../../src/workspace/domain/entities/workspace';
 import { CreateAuditLogEntry } from '../../../../src/audit-log/domain/services/audit-log-create';
 import { RecordAutoCreated } from '../../../../src/audit-log/domain/services/audit-log-record-auto-created';
@@ -30,23 +32,25 @@ describe('Audit log, batch 1', () => {
     });
 
     it('records nothing when the deletion is refused', async () => {
-      const command = new DeleteWorkspaceCommand(new DeleteWorkspace(workspaces), createEntry);
+      const command = new DeleteWorkspaceCommand(new DeleteWorkspace(workspaces, new EnsureWorkspaceOwner(new MockAccountRepository())), createEntry);
 
-      await expect(command.execute({ workspaceId: 'ws-1', isSystemAdmin: false, userId: 'u-1' }))
+      await expect(command.execute({ workspaceId: 'ws-1', isSystemAdmin: false, userId: 'u-1', confirmName: 'Acme' }))
         .rejects.toThrow(AccessDeniedError);
       expect(auditRepository.entries).toHaveLength(0);
     });
 
     it('keeps the name, slug and contents of the deleted workspace, as a warning', async () => {
-      const command = new DeleteWorkspaceCommand(new DeleteWorkspace(workspaces), createEntry);
+      const command = new DeleteWorkspaceCommand(new DeleteWorkspace(workspaces, new EnsureWorkspaceOwner(new MockAccountRepository())), createEntry);
 
-      await command.execute({ workspaceId: 'ws-1', isSystemAdmin: true, userId: 'u-1', stats: { memberCount: 3, ticketCount: 12 } });
+      await command.execute({ workspaceId: 'ws-1', isSystemAdmin: true, userId: 'u-1', confirmName: 'Acme', stats: { memberCount: 3, ticketCount: 12 } });
 
       const [entry] = auditRepository.entries;
       expect(entry.action).toBe(AuditAction.WORKSPACE_DELETED);
       expect(entry.level).toBe(AuditLevel.WARNING);
-      expect(entry.workspaceId).toBeNull();
-      expect(entry.metadata).toEqual({ workspaceId: 'ws-1', name: 'Acme', slug: 'acme', memberCount: 3, ticketCount: 12 });
+      // Kept on the entry: without a foreign key it survives the purge
+      expect(entry.workspaceId).toBe('ws-1');
+      expect(entry.metadata).toMatchObject({ workspaceId: 'ws-1', name: 'Acme', slug: 'acme', memberCount: 3, ticketCount: 12 });
+      expect(typeof entry.metadata?.purgeAt).toBe('string');
     });
   });
 

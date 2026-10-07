@@ -137,8 +137,11 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
   private async refreshPollers() {
     if (this.stopping) return;
 
-    // Load IMAP mailboxes from DB
-    const dbMailboxes = await this.mailboxRepository.findAllByType(MailboxType.IMAP);
+    // Load IMAP mailboxes from DB; a deleted workspace's are not polled until it is restored,
+    // and its mail waits on the server (the first poll after a restore fetches it, deduplicated)
+    const deletedWorkspaceIds = new Set((await this.workspaceRepository.findDeleted()).map((w) => w.getId()));
+    const dbMailboxes = (await this.mailboxRepository.findAllByType(MailboxType.IMAP))
+      .filter((m) => !m.workspaceId || !deletedWorkspaceIds.has(m.workspaceId));
 
     // Build active set
     const activeIds = new Set<string>();
@@ -357,6 +360,9 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
 
       const result = await router.execute(parsed);
       this.logger.log(`IMAP: routed ${result.action}${result.ticketId ? ` (ticket: ${result.ticketId})` : ''}`);
+
+      // Meant for a deleted workspace: not marked as processed, so a restore can still take it
+      if (result.reason === 'workspace-deleted') return 'skipped';
 
       if (msg.envelope.messageId) {
         await this.processedEmailRepository.markProcessed(msg.envelope.messageId);

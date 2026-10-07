@@ -108,6 +108,13 @@ export class RouteInboundEmail {
 
     const workspaceId = mailbox.workspaceId;
 
+    // A deleted workspace takes no mail, not even replies to its tickets; the poller leaves the
+    // message unprocessed so it can still be picked up if the workspace is restored
+    if (!(await this.workspaceRepository.findById(workspaceId))) {
+      const deleted = await this.workspaceRepository.findDeletedById(workspaceId);
+      return { action: 'rejected', reason: deleted ? 'workspace-deleted' : 'workspace-not-found' };
+    }
+
     // 2. Evaluate email rules (before creating user/member)
     let ruleResult = { action: 'proceed' as const } as import('../../../email-rule/domain/services/email-rule-evaluate').EmailRuleResult;
     if (this.evaluateRules) {

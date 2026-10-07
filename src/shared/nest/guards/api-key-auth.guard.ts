@@ -1,10 +1,11 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, Optional, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { createHash } from 'crypto';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { ACCEPTS_API_KEY } from '../decorators/api-key-auth.decorator';
 import { TypeOrmApiKeyRepository } from '../../../api-key/infrastructure/typeorm/repositories/typeorm-api-key.repository';
 import { TypeOrmUserRepository } from '../../../user/infrastructure/typeorm/repositories/typeorm-user.repository';
+import { TypeOrmWorkspaceRepository } from '../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository';
 
 @Injectable()
 export class ApiKeyAuthGuard implements CanActivate {
@@ -12,6 +13,7 @@ export class ApiKeyAuthGuard implements CanActivate {
     private reflector: Reflector,
     private readonly apiKeyRepository: TypeOrmApiKeyRepository,
     private readonly userRepository: TypeOrmUserRepository,
+    @Optional() private readonly workspaceRepository?: TypeOrmWorkspaceRepository,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -55,6 +57,11 @@ export class ApiKeyAuthGuard implements CanActivate {
     const creator = await this.userRepository.findById(apiKey.createdById);
     if (!creator || !creator.isActive) {
       throw new UnauthorizedException('The user who created this API key is no longer active');
+    }
+
+    // The keys of a deleted workspace stop working with it (and work again if it is restored)
+    if (this.workspaceRepository && !(await this.workspaceRepository.findById(apiKey.workspaceId))) {
+      throw new UnauthorizedException('The workspace of this API key no longer exists');
     }
 
     // Set user context similar to JWT

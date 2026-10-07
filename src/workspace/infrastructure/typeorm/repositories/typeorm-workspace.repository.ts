@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, LessThanOrEqual, Not, Repository } from 'typeorm';
 import { SortOptions } from '../../../../shared/domain/sort-options';
 import { Workspace } from '../../../domain/entities/workspace';
 import { WorkspaceRepository } from '../../../domain/repositories/workspace.repository';
@@ -68,7 +68,52 @@ export class TypeOrmWorkspaceRepository implements WorkspaceRepository {
   }
 
   async existsBySlug(slug: string): Promise<boolean> {
-    return await this.repository.existsBy({ slug });
+    // The unique index covers deleted rows too, so a deleted workspace keeps its slug until purged
+    return await this.repository.exists({ where: { slug }, withDeleted: true });
+  }
+
+  async softDelete(id: string, deletedById: string, purgeAt: Date): Promise<void> {
+    await this.repository.update({ id }, { deletedById, purgeAt, purgeReminderSentAt: null });
+    await this.repository.softDelete({ id });
+  }
+
+  async restore(id: string): Promise<void> {
+    await this.repository.restore({ id });
+    await this.repository.update({ id }, { deletedById: null, purgeAt: null, purgeReminderSentAt: null });
+  }
+
+  async findDeletedById(id: string): Promise<Workspace | null> {
+    const model = await this.repository.findOne({ where: { id, deletedAt: Not(IsNull()) }, withDeleted: true });
+    return model ? this.toDomain(model) : null;
+  }
+
+  async findDeleted(accountId?: string): Promise<Workspace[]> {
+    const models = await this.repository.find({
+      where: { deletedAt: Not(IsNull()), ...(accountId ? { accountId } : {}) },
+      withDeleted: true,
+      order: { purgeAt: 'ASC' },
+    });
+    return models.map((m) => this.toDomain(m));
+  }
+
+  async findDueForPurge(now: Date): Promise<Workspace[]> {
+    const models = await this.repository.find({
+      where: { deletedAt: Not(IsNull()), purgeAt: LessThanOrEqual(now) },
+      withDeleted: true,
+    });
+    return models.map((m) => this.toDomain(m));
+  }
+
+  async findDueForPurgeReminder(before: Date): Promise<Workspace[]> {
+    const models = await this.repository.find({
+      where: { deletedAt: Not(IsNull()), purgeAt: LessThanOrEqual(before), purgeReminderSentAt: IsNull() },
+      withDeleted: true,
+    });
+    return models.map((m) => this.toDomain(m));
+  }
+
+  async markPurgeReminderSent(id: string, at: Date): Promise<void> {
+    await this.repository.update({ id }, { purgeReminderSentAt: at });
   }
 
   async countByAccountId(accountId: string): Promise<number> {
@@ -100,6 +145,10 @@ export class TypeOrmWorkspaceRepository implements WorkspaceRepository {
       appSubtitle: model.appSubtitle ?? null,
       logo: model.logo ?? null,
       icon: model.icon ?? null,
+      deletedAt: model.deletedAt ?? null,
+      deletedById: model.deletedById ?? null,
+      purgeAt: model.purgeAt ?? null,
+      purgeReminderSentAt: model.purgeReminderSentAt ?? null,
     });
   }
 

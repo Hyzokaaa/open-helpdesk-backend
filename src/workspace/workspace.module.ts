@@ -28,6 +28,7 @@ import { WorkspaceAnalyticsSettingsModel } from './infrastructure/typeorm/models
 import { TypeOrmWorkspaceAnalyticsSettingsRepository } from './infrastructure/typeorm/repositories/typeorm-workspace-analytics-settings.repository';
 import { WorkspaceAnalyticsController } from './infrastructure/nest/controllers/workspace-analytics.controller';
 import { WorkspaceFrontendResolver } from '../shared/infrastructure/workspace-frontend-resolver';
+import { WorkspacePurgeScheduler } from './infrastructure/nest/services/workspace-purge.scheduler';
 
 @Module({
   imports: [
@@ -40,7 +41,7 @@ import { WorkspaceFrontendResolver } from '../shared/infrastructure/workspace-fr
     TypeOrmModule.forFeature([WorkspaceModel, WorkspaceMemberModel, WorkspaceInvitationModel, WorkspaceEmailSenderModel, WorkspaceCreationSettingsModel, WorkspaceImportLinkModel, WorkspaceAnalyticsSettingsModel]),
   ],
   controllers: [WorkspaceController, WorkspaceInvitationController, WorkspaceImportController, InvitationPublicController, DomainCheckController, WorkspaceCreationSettingsController, WorkspaceAnalyticsController],
-  providers: [TypeOrmWorkspaceRepository, TypeOrmWorkspaceMemberRepository, TypeOrmWorkspaceInvitationRepository, TypeOrmWorkspaceEmailSenderRepository, TypeOrmWorkspaceCreationSettingsRepository, TypeOrmWorkspaceAnalyticsSettingsRepository, WorkspaceFrontendResolver],
+  providers: [TypeOrmWorkspaceRepository, TypeOrmWorkspaceMemberRepository, TypeOrmWorkspaceInvitationRepository, TypeOrmWorkspaceEmailSenderRepository, TypeOrmWorkspaceCreationSettingsRepository, TypeOrmWorkspaceAnalyticsSettingsRepository, WorkspaceFrontendResolver, WorkspacePurgeScheduler],
   exports: [TypeOrmWorkspaceRepository, TypeOrmWorkspaceMemberRepository, TypeOrmWorkspaceInvitationRepository, TypeOrmWorkspaceEmailSenderRepository, TypeOrmWorkspaceCreationSettingsRepository, TypeOrmWorkspaceAnalyticsSettingsRepository, WorkspaceFrontendResolver],
 })
 export class WorkspaceModule {}

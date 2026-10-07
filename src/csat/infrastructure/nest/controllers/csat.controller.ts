@@ -15,6 +15,7 @@ import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit
 import { AuditAction } from '../../../../audit-log/domain/enums/audit-action.enum';
 import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
+import { DataSource } from 'typeorm';
 
 const VALID_RATINGS = Object.values(CsatRating);
 
@@ -49,6 +50,7 @@ export class CsatController {
     @Inject() private readonly csatRepository: TypeOrmCsatResponseRepository,
     @Inject() private readonly idGenerator: UlidGenerator,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
+    private readonly dataSource: DataSource,
   ) {}
 
   @Public()
@@ -63,7 +65,7 @@ export class CsatController {
     }
 
     const csatResponse = await this.csatRepository.findByToken(token);
-    if (!csatResponse) {
+    if (!csatResponse || !(await this.workspaceIsLive(csatResponse.workspaceId))) {
       return res.status(404).send('Survey not found');
     }
 
@@ -90,5 +92,11 @@ export class CsatController {
     });
 
     return res.send(thankYouHtml(false, 'en'));
+  }
+
+  /** A survey of a deleted workspace is gone with it. */
+  private async workspaceIsLive(workspaceId: string): Promise<boolean> {
+    const rows = await this.dataSource.query(`SELECT 1 FROM workspaces WHERE id = $1 AND "deletedAt" IS NULL`, [workspaceId]);
+    return rows.length > 0;
   }
 }

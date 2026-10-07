@@ -1,12 +1,15 @@
 import {
   Column,
   CreateDateColumn,
+  DeleteDateColumn,
   Entity,
+  Index,
   PrimaryColumn,
   UpdateDateColumn,
 } from 'typeorm';
 
 @Entity('workspaces')
+@Index('IDX_workspaces_purge_at', ['purgeAt'])
 export class WorkspaceModel {
   @PrimaryColumn()
   id!: string;
@@ -58,4 +61,21 @@ export class WorkspaceModel {
 
   @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt!: Date;
+
+  /**
+   * Set when the workspace is deleted. Ordinary lookups skip it from then on (TypeORM soft
+   * delete), so it is off everywhere until it is restored or purged.
+   */
+  @DeleteDateColumn({ type: 'timestamptz' })
+  deletedAt!: Date | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  deletedById!: string | null;
+
+  /** When the deleted workspace is erased for good. */
+  @Column({ type: 'timestamptz', nullable: true })
+  purgeAt!: Date | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  purgeReminderSentAt!: Date | null;
 }

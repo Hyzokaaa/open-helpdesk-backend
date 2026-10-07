@@ -20,8 +20,10 @@ import { AuditLogModule } from '../audit-log/audit-log.module';
 import { EMAIL_SERVICE } from './email.constants';
 import { AdminEmailController } from './infrastructure/nest/controllers/admin-email.controller';
 import { CoreConfigModule } from '../config/config.module';
-import { TypeOrmSystemEmailSettingsRepository } from '../config/infrastructure/typeorm/repositories/typeorm-system-email-settings.repository';
+import { TypeOrmSystemEmailSettingsRepository } from '../config/infrastructure/typeorm/repositories/typeorm-system-email-settings.repository';
+
 import { ProjectModule } from '../project/project.module';
+import { WorkspaceLifecycleHandler } from './handlers/workspace-lifecycle.handler';
 @Global()
 @Module({
   imports: [UserModule, WorkspaceModule, NotificationModule, SharedModule, CsatModule, TicketModule, MailboxModule, AuditLogModule, CoreConfigModule, ProjectModule],
@@ -47,6 +49,7 @@ import { ProjectModule } from '../project/project.module';
     StatusChangedHandler,
     CsatSurveyHandler,
     TransferRequestHandler,
+    WorkspaceLifecycleHandler,
   ],
   exports: [EMAIL_SERVICE],
 })

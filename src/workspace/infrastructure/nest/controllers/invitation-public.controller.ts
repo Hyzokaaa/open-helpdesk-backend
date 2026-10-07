@@ -18,6 +18,7 @@ import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit
 import { AuditAction } from '../../../../audit-log/domain/enums/audit-action.enum';
 import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
+import { EntityNotFoundError } from '../../../../shared/domain/errors';
 
 @Controller('invitations')
 export class InvitationPublicController {
@@ -44,6 +45,10 @@ export class InvitationPublicController {
     @CurrentUser() user: AuthUser,
   ) {
     const invitation = await this.invitationRepository.findByToken(body.token);
+    // An invitation to a deleted workspace cannot be accepted
+    if (invitation && !(await this.workspaceRepository.findById(invitation.workspaceId))) {
+      throw new EntityNotFoundError('Invitation not found');
+    }
     const service = new AcceptInvitation(this.idGenerator, this.invitationRepository, this.memberRepository);
     const command = new AcceptInvitationCommand(service);
     const result = await command.execute({ token: body.token, userId: user.userId, userEmail: user.email });

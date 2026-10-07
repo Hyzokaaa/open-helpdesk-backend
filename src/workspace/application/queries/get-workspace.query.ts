@@ -3,6 +3,7 @@ import { Query } from '../../../shared/domain/query';
 import { WorkspaceRepository } from '../../domain/repositories/workspace.repository';
 import { MailboxRepository } from '../../../mailbox/domain/repositories/mailbox.repository';
 import { EnsureWorkspacePermission } from '../../domain/services/workspace-ensure-permission';
+import { AccountRepository } from '../../../account/domain/repositories/account.repository';
 
 interface Props {
   slug: string;
@@ -25,6 +26,8 @@ export interface WorkspaceResponse {
   appSubtitle: string | null;
   logo: string | null;
   icon: string | null;
+  /** Whether the caller owns it: only the owner (or a system admin) can delete it. */
+  isOwner: boolean;
 }
 
 export class GetWorkspaceQuery implements Query<Props, WorkspaceResponse> {
@@ -32,6 +35,7 @@ export class GetWorkspaceQuery implements Query<Props, WorkspaceResponse> {
     private readonly repository: WorkspaceRepository,
     private readonly ensurePermission: EnsureWorkspacePermission,
     private readonly mailboxRepository?: MailboxRepository,
+    private readonly accountRepository?: AccountRepository,
   ) {}
 
   async execute(props: Props): Promise<WorkspaceResponse> {
@@ -51,6 +55,10 @@ export class GetWorkspaceQuery implements Query<Props, WorkspaceResponse> {
       ? await this.mailboxRepository.findByWorkspaceId(workspace.getId())
       : null;
 
+    const account = workspace.accountId && this.accountRepository
+      ? await this.accountRepository.findById(workspace.accountId)
+      : null;
+
     return {
       id: workspace.getId(),
       name: workspace.name,
@@ -66,6 +74,7 @@ export class GetWorkspaceQuery implements Query<Props, WorkspaceResponse> {
       appSubtitle: workspace.appSubtitle,
       logo: workspace.logo,
       icon: workspace.icon,
+      isOwner: !!account && account.ownerId === props.userId,
     };
   }
 }

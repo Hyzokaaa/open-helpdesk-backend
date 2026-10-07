@@ -239,7 +239,9 @@ export class PortalController {
     if (!ticket) throw new EntityNotFoundError('Ticket not found');
 
     const creator = await this.userRepository.findById(ticket.reporterId);
+    // A ticket of a deleted workspace is gone for its portal link too
     const workspace = await this.workspaceRepository.findById(ticket.workspaceId);
+    if (!workspace) throw new EntityNotFoundError('Ticket not found');
 
     // Fetch comments with author names and dates
     const comments = await this.commentRepository.findByTicketIdWithDates(ticket.getId());
@@ -299,6 +301,7 @@ export class PortalController {
   ) {
     const ticket = await this.ticketRepository.findByPortalToken(portalToken);
     if (!ticket) throw new EntityNotFoundError('Ticket not found');
+    if (!(await this.workspaceRepository.findById(ticket.workspaceId))) throw new EntityNotFoundError('Ticket not found');
 
     const createComment = new CreateComment(this.idGenerator, this.commentRepository);
     const comment = await createComment.execute({
