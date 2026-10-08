@@ -5,7 +5,7 @@ interface Props {
   days?: RetentionDays;
 }
 
-/** What a workspace keeps longer than the installation, per category (null: forever). */
+/** The days a workspace has set for itself, per category (null: forever); unset ones follow the installation. */
 export class WorkspaceAuditRetention {
   workspaceId: string;
   days: RetentionDays;

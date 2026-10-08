@@ -42,8 +42,9 @@ export function normalizeInstallationRetention(input: unknown, current: Retentio
 }
 
 /**
- * A workspace's own retention: only categories it keeps longer than the installation. A
- * workspace may never shorten it, or an admin could erase the record of what they did.
+ * The categories a workspace sets for itself. A workspace may never go below the installation, or an
+ * admin could erase the record of what they did. A value equal to the installation's is kept too: it
+ * pins the category, so lowering the installation later does not shorten this workspace's history.
  */
 export function normalizeWorkspaceRetention(input: unknown, installation: RetentionDays): RetentionDays {
   const source = input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
@@ -56,7 +57,6 @@ export function normalizeWorkspaceRetention(input: unknown, installation: Retent
     if (days !== null && days < floor) {
       throw new DomainValidationError(`A workspace can only keep ${category} entries longer than the installation (${floor} days)`);
     }
-    if (days === floor) continue; // no different from the installation
     result[category] = days;
   }
   return result;
