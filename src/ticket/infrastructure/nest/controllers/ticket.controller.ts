@@ -418,10 +418,12 @@ export class TicketController {
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new PickupTicket(this.ticketRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-    const command = new PickupTicketCommand(service, ensurePermission, auditLog);
+    const command = new PickupTicketCommand(service, ensurePermission, auditLog, this.eventPublisher);
     return command.execute({
       ticketId: id,
       workspaceId: workspace.getId(),
+      workspaceName: workspace.name,
+      workspaceSlug: workspace.slug,
       userId: user.userId,
       status: body.status,
       isSystemAdmin: user.isSystemAdmin,

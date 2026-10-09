@@ -1,3 +1,5 @@
+import { EventPublisher } from '../../../shared/domain/event-publisher';
+import { StatusChangedEvent, TicketAssignedEvent } from '../../../email/domain/events';
 import { Command } from '../../../shared/domain/command';
 import { TicketStatus } from '../../domain/enums/ticket-status.enum';
 import { PickupTicket } from '../../domain/services/ticket-pickup';
@@ -14,6 +16,8 @@ interface Props {
   userId: string;
   status?: TicketStatus;
   isSystemAdmin: boolean;
+  workspaceName?: string;
+  workspaceSlug?: string;
 }
 
 export interface PickupTicketResponse {
@@ -27,6 +31,7 @@ export class PickupTicketCommand implements Command<Props, PickupTicketResponse>
     private readonly pickupTicket: PickupTicket,
     private readonly ensurePermission: EnsureWorkspacePermission,
     private readonly createAuditLog: CreateAuditLogEntry,
+    private readonly eventPublisher?: EventPublisher,
   ) {}
 
   async execute(props: Props): Promise<PickupTicketResponse> {
@@ -43,6 +48,31 @@ export class PickupTicketCommand implements Command<Props, PickupTicketResponse>
       userId: props.userId,
       status: props.status,
     });
+
+    // A pickup is a status change and an assignment: it tells people, webhooks and open screens
+    // the same way both do on their own. Only open tickets can be picked up, unassigned.
+    const statusChanged: StatusChangedEvent = {
+      ticketId: ticket.getId(),
+      ticketName: ticket.name,
+      oldStatus: TicketStatus.OPEN,
+      newStatus: ticket.status,
+      changedById: props.userId,
+      workspaceId: props.workspaceId,
+      workspaceName: props.workspaceName ?? '',
+      workspaceSlug: props.workspaceSlug ?? '',
+    };
+    this.eventPublisher?.emit('ticket.statusChanged', statusChanged);
+    const assigned: TicketAssignedEvent = {
+      ticketId: ticket.getId(),
+      ticketName: ticket.name,
+      newAssigneeId: props.userId,
+      previousAssigneeId: null,
+      assignedById: props.userId,
+      workspaceId: props.workspaceId,
+      workspaceName: props.workspaceName ?? '',
+      workspaceSlug: props.workspaceSlug ?? '',
+    };
+    this.eventPublisher?.emit('ticket.assigned', assigned);
 
     await this.createAuditLog.execute({
       action: AuditAction.TICKET_PICKED_UP,

@@ -18,6 +18,8 @@ export interface TicketAssignedEvent {
   ticketName: string;
   newAssigneeId: string | null;
   previousAssigneeId: string | null;
+  /** Who assigned it: nobody is told about an assignment they made to themselves */
+  assignedById?: string | null;
   workspaceId: string;
   workspaceName: string;
   workspaceSlug: string;

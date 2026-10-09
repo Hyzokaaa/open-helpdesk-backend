@@ -42,6 +42,15 @@ describe('Picking up and assigning tickets', () => {
       expect(result).toEqual({ id: 'ticket-a', status: TicketStatus.PENDING, assigneeId: 'agent-a' });
       expect(w.audit.entries[0].workspaceId).toBe(WS_A);
     });
+
+    it('tells people about the pickup as a status change and an assignment made by the agent to themselves', async () => {
+      const events = new FakeEventPublisher();
+      await new PickupTicketCommand(new PickupTicket(w.tickets), w.ensurePermission(), w.auditLog(), events)
+        .execute({ ticketId: 'ticket-a', workspaceId: WS_A, workspaceName: 'A', workspaceSlug: 'a', userId: 'agent-a', isSystemAdmin: false });
+      expect(events.events.map((e) => e.event)).toEqual(['ticket.statusChanged', 'ticket.assigned']);
+      expect(events.events[0].data).toMatchObject({ oldStatus: TicketStatus.OPEN, newStatus: TicketStatus.PENDING, changedById: 'agent-a' });
+      expect(events.events[1].data).toMatchObject({ newAssigneeId: 'agent-a', previousAssigneeId: null, assignedById: 'agent-a' });
+    });
   });
 
   describe('assign', () => {
