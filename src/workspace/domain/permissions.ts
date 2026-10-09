@@ -37,6 +37,8 @@ export const PERMISSIONS = {
   /** Add or remove other people as followers of a ticket; everyone may unfollow themselves. */
   TICKET_PARTICIPANTS_MANAGE: 'ticket.participants.manage',
   TICKET_ACTIVITY_VIEW: 'ticket.activity.view',
+  /** Reading the SLA targets a ticket is measured against; changing them stays with the settings */
+  SLA_VIEW: 'sla.view',
 
   // Comments
   COMMENT_CREATE: 'comment.create',
@@ -121,6 +123,7 @@ const SUPERVISOR_PERMISSIONS: Permission[] = [
   PERMISSIONS.TICKET_EDIT_DISCARDED,
   PERMISSIONS.TICKET_PARTICIPANTS_MANAGE,
   PERMISSIONS.TICKET_ACTIVITY_VIEW,
+  PERMISSIONS.SLA_VIEW,
   PERMISSIONS.COMMENT_CREATE,
   PERMISSIONS.ATTACHMENT_UPLOAD,
   PERMISSIONS.ATTACHMENT_DELETE,
@@ -154,6 +157,7 @@ const AGENT_PERMISSIONS: Permission[] = [
   PERMISSIONS.TRANSFER_REQUEST_RESPOND,
   PERMISSIONS.TICKET_PARTICIPANTS_MANAGE,
   PERMISSIONS.TICKET_ACTIVITY_VIEW,
+  PERMISSIONS.SLA_VIEW,
   PERMISSIONS.COMMENT_CREATE,
   PERMISSIONS.ATTACHMENT_UPLOAD,
   PERMISSIONS.ATTACHMENT_DELETE,

@@ -794,10 +794,11 @@ export class WorkspaceController {
     const ensurePermission = new EnsureWorkspacePermission(
       this.memberRepository,
     );
+    // Read by whoever works tickets, so the ticket's SLA card has its targets; saving needs the settings
     await ensurePermission.execute({
       workspaceId,
       userId: user.userId,
-      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      permission: PERMISSIONS.SLA_VIEW,
       isSystemAdmin: user.isSystemAdmin,
     });
     const workspace = await this.workspaceRepository.findById(workspaceId);
