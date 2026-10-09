@@ -40,6 +40,10 @@ export class WorkspaceInvitationModel {
   @Column({ type: 'timestamptz', nullable: true })
   lastSentAt!: Date | null;
 
+  /** When the inviter was told the invitation expired */
+  @Column({ type: 'timestamptz', nullable: true })
+  expiryNotifiedAt!: Date | null;
+
   @ManyToOne(() => UserModel)
   invitedBy!: UserModel;
 

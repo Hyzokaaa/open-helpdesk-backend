@@ -67,6 +67,9 @@ export class NotificationPreferenceModel {
   @Column({ default: true })
   inAppUpgradeAvailable!: boolean;
 
+  @Column({ default: true })
+  inAppInvitationExpired!: boolean;
+
   @Column({ default: false })
   bellUnreadOnly!: boolean;
 

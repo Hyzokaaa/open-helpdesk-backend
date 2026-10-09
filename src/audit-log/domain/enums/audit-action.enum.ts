@@ -70,6 +70,8 @@ export enum AuditAction {
   INVITATION_CANCELLED = 'invitation-cancelled',
   INVITATION_ACCEPTED = 'invitation-accepted',
   INVITATION_REJECTED = 'invitation-rejected',
+  /** Noticed by the hourly check once its link stopped working; recorded with no actor */
+  INVITATION_EXPIRED = 'invitation-expired',
 
   // User
   USER_CREATED = 'user-created',

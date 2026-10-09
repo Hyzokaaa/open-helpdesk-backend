@@ -19,6 +19,7 @@ interface Props {
   inAppTransferRequest?: boolean;
   emailUpgradeAvailable?: boolean;
   inAppUpgradeAvailable?: boolean;
+  inAppInvitationExpired?: boolean;
   bellUnreadOnly?: boolean;
 }
 
@@ -39,6 +40,7 @@ export interface UpdatePreferencesResponse {
   inAppTransferRequest: boolean;
   emailUpgradeAvailable: boolean;
   inAppUpgradeAvailable: boolean;
+  inAppInvitationExpired: boolean;
   bellUnreadOnly: boolean;
 }
 
@@ -67,6 +69,7 @@ export class UpdatePreferencesCommand implements Command<Props, UpdatePreference
       inAppTransferRequest: pref.inAppTransferRequest,
       emailUpgradeAvailable: pref.emailUpgradeAvailable,
       inAppUpgradeAvailable: pref.inAppUpgradeAvailable,
+      inAppInvitationExpired: pref.inAppInvitationExpired,
       bellUnreadOnly: pref.bellUnreadOnly,
     };
   }

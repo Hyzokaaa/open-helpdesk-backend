@@ -20,6 +20,7 @@ interface UpdatePreferenceProps {
   inAppTransferRequest?: boolean;
   emailUpgradeAvailable?: boolean;
   inAppUpgradeAvailable?: boolean;
+  inAppInvitationExpired?: boolean;
   bellUnreadOnly?: boolean;
 }
 
@@ -52,6 +53,7 @@ export class UpdateNotificationPreference {
         inAppTransferRequest: true,
         emailUpgradeAvailable: true,
         inAppUpgradeAvailable: true,
+        inAppInvitationExpired: true,
         bellUnreadOnly: false,
       });
     }
@@ -72,6 +74,7 @@ export class UpdateNotificationPreference {
     if (props.inAppTransferRequest !== undefined) pref.inAppTransferRequest = props.inAppTransferRequest;
     if (props.emailUpgradeAvailable !== undefined) pref.emailUpgradeAvailable = props.emailUpgradeAvailable;
     if (props.inAppUpgradeAvailable !== undefined) pref.inAppUpgradeAvailable = props.inAppUpgradeAvailable;
+    if (props.inAppInvitationExpired !== undefined) pref.inAppInvitationExpired = props.inAppInvitationExpired;
     if (props.bellUnreadOnly !== undefined) pref.bellUnreadOnly = props.bellUnreadOnly;
 
     await this.repository.upsert(pref);

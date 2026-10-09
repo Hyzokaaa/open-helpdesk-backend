@@ -22,5 +22,6 @@ export class UpdatePreferencesRequest {
   @IsOptional() @IsBoolean() inAppTransferRequest?: boolean;
   @IsOptional() @IsBoolean() emailUpgradeAvailable?: boolean;
   @IsOptional() @IsBoolean() inAppUpgradeAvailable?: boolean;
+  @IsOptional() @IsBoolean() inAppInvitationExpired?: boolean;
   @IsOptional() @IsBoolean() bellUnreadOnly?: boolean;
 }

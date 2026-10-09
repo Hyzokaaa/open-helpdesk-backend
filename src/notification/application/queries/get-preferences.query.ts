@@ -22,6 +22,7 @@ export interface PreferencesResponse {
   inAppTransferRequest: boolean;
   emailUpgradeAvailable: boolean;
   inAppUpgradeAvailable: boolean;
+  inAppInvitationExpired: boolean;
   bellUnreadOnly: boolean;
 }
 
@@ -42,6 +43,7 @@ const DEFAULTS: PreferencesResponse = {
   inAppTransferRequest: true,
   emailUpgradeAvailable: true,
   inAppUpgradeAvailable: true,
+  inAppInvitationExpired: true,
   bellUnreadOnly: false,
 };
 
@@ -69,6 +71,7 @@ export class GetPreferencesQuery implements Query<Props, PreferencesResponse> {
       inAppTransferRequest: pref.inAppTransferRequest,
       emailUpgradeAvailable: pref.emailUpgradeAvailable,
       inAppUpgradeAvailable: pref.inAppUpgradeAvailable,
+      inAppInvitationExpired: pref.inAppInvitationExpired,
       bellUnreadOnly: pref.bellUnreadOnly,
     };
   }
