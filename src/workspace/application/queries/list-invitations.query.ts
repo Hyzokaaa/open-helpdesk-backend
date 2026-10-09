@@ -12,6 +12,7 @@ export interface InvitationListItem {
   status: string;
   expiresAt: Date;
   createdAt: Date;
+  lastSentAt: Date;
 }
 
 export class ListInvitationsQuery implements Query<Props, InvitationListItem[]> {
@@ -26,6 +27,7 @@ export class ListInvitationsQuery implements Query<Props, InvitationListItem[]> 
       status: inv.status,
       expiresAt: inv.expiresAt,
       createdAt: inv.createdAt,
+      lastSentAt: inv.lastSentAt,
     }));
   }
 }

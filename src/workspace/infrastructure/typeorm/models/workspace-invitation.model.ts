@@ -36,6 +36,10 @@ export class WorkspaceInvitationModel {
   @Column({ type: 'timestamptz' })
   expiresAt!: Date;
 
+  /** When the current link was issued: on creation and on every resend */
+  @Column({ type: 'timestamptz', nullable: true })
+  lastSentAt!: Date | null;
+
   @ManyToOne(() => UserModel)
   invitedBy!: UserModel;
 

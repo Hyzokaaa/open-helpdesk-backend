@@ -27,6 +27,7 @@ export class ResendInvitation {
 
     invitation.token = randomUUID();
     invitation.expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    invitation.lastSentAt = new Date();
 
     await this.invitationRepository.update(invitation);
     return invitation;

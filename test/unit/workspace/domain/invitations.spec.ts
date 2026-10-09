@@ -33,6 +33,22 @@ describe('Resending and cancelling an invitation stay inside its workspace', () 
     expect(invitation.token).not.toBe('old-token');
   });
 
+  it('records when the invitation was last sent, so the list shows the resend and not the creation', async () => {
+    const sentAt = (await repository.findById('inv-1'))!.lastSentAt;
+    const invitation = await new ResendInvitation(repository).execute({ invitationId: 'inv-1', workspaceId: 'ws-1' });
+    expect(invitation.lastSentAt.getTime()).toBeGreaterThanOrEqual(sentAt.getTime());
+    expect(invitation.lastSentAt).not.toBe(invitation.createdAt);
+  });
+
+  it('treats an invitation saved without a send date as sent when it was created', () => {
+    const createdAt = new Date('2026-01-01T00:00:00Z');
+    const old = new WorkspaceInvitation({
+      id: 'inv-old', workspaceId: 'ws-1', email: 'b@example.com', role: WorkspaceRole.AGENT, token: 't',
+      status: InvitationStatus.PENDING, expiresAt: new Date(), invitedById: 'user-1', createdAt, lastSentAt: null,
+    });
+    expect(old.lastSentAt).toEqual(createdAt);
+  });
+
   it('refuses to resend an invitation of another workspace and leaves it untouched', async () => {
     await expect(new ResendInvitation(repository).execute({ invitationId: 'inv-1', workspaceId: 'ws-2' }))
       .rejects.toThrow(EntityNotFoundError);
