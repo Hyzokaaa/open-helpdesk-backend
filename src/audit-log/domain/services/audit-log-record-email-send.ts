@@ -22,6 +22,9 @@ interface RecordEmailSendProps {
   subject: string;
   workspaceId: string | null;
   ticketId?: string | null;
+  /** How people know the ticket: its title and, when the caller has it, its reference (TK-000042) */
+  ticketName?: string | null;
+  ticketReference?: string | null;
   /** The record the email is about, when it is not a ticket (an invitation, a survey, an account) */
   entityType?: string;
   entityId?: string;
@@ -51,6 +54,8 @@ export class RecordEmailSend {
       to: Array.isArray(props.to) ? props.to : [props.to],
       subject: props.subject,
       ...(props.ticketId && { ticketId: props.ticketId }),
+      ...(props.ticketReference && { ticketReference: props.ticketReference }),
+      ...(props.ticketName && { ticketName: props.ticketName }),
       ...(result.via && !result.mock && { via: result.via }),
     };
     if (!sent) {

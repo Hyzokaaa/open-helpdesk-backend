@@ -123,7 +123,7 @@ export class StatusChangedHandler {
         ...(mailbox && { replyTo: mailbox.address }),
       });
       await new RecordEmailSend(this.idGenerator, this.auditLogRepository).execute({
-        result, type: 'status-change', to: emails, subject, workspaceId: event.workspaceId, ticketId: event.ticketId,
+        result, type: 'status-change', to: emails, subject, workspaceId: event.workspaceId, ticketId: event.ticketId, ticketName: event.ticketName,
       });
     }
   }

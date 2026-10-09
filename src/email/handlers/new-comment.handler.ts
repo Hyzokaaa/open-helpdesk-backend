@@ -95,7 +95,7 @@ export class NewCommentHandler {
         ...(mailbox && { replyTo: mailbox.address }),
       });
       await new RecordEmailSend(this.idGenerator, this.auditLogRepository).execute({
-        result, type: 'comment-notification', to: emails, subject, workspaceId: event.workspaceId, ticketId: event.ticketId,
+        result, type: 'comment-notification', to: emails, subject, workspaceId: event.workspaceId, ticketId: event.ticketId, ticketName: event.ticketName, ticketReference: event.ticketNumber,
       });
     }
   }

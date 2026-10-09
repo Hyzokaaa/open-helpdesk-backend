@@ -105,7 +105,7 @@ export class TicketCreatedHandler {
         ...(mailbox && { replyTo: mailbox.address }),
       });
       await new RecordEmailSend(this.idGenerator, this.auditLogRepository).execute({
-        result, type: 'ticket-notification', to: emails, subject, workspaceId: event.workspaceId, ticketId: event.ticketId,
+        result, type: 'ticket-notification', to: emails, subject, workspaceId: event.workspaceId, ticketId: event.ticketId, ticketName: event.ticketName,
       });
     }
   }
@@ -138,7 +138,7 @@ export class TicketCreatedHandler {
       ...(mailbox && { replyTo: mailbox.address }),
     });
     await new RecordEmailSend(this.idGenerator, this.auditLogRepository).execute({
-      result, type: 'confirmation', to: [creator.email], subject, workspaceId: event.workspaceId, ticketId: event.ticketId,
+      result, type: 'confirmation', to: [creator.email], subject, workspaceId: event.workspaceId, ticketId: event.ticketId, ticketName: event.ticketName,
     });
   }
 }

@@ -100,7 +100,7 @@ export class CsatSurveyHandler implements OnModuleInit {
     }
     // The survey link carries its token: only the subject is recorded, never the body
     await new RecordEmailSend(this.idGenerator, this.auditLogRepository).execute({
-      result, type: 'csat-survey', to: creator.email, subject, workspaceId: event.workspaceId, ticketId: event.ticketId,
+      result, type: 'csat-survey', to: creator.email, subject, workspaceId: event.workspaceId, ticketId: event.ticketId, ticketName: event.ticketName,
     });
   }
 }

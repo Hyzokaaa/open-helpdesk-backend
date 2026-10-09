@@ -78,7 +78,7 @@ export class TicketAssignedHandler {
             ...(mailbox && { replyTo: mailbox.address }),
           });
           await new RecordEmailSend(this.idGenerator, this.auditLogRepository).execute({
-            result, type: 'assignment', to: emails, subject, workspaceId: event.workspaceId, ticketId: event.ticketId,
+            result, type: 'assignment', to: emails, subject, workspaceId: event.workspaceId, ticketId: event.ticketId, ticketName: event.ticketName,
           });
         }
       }
@@ -116,7 +116,7 @@ export class TicketAssignedHandler {
             ...(mailbox && { replyTo: mailbox.address }),
           });
           await new RecordEmailSend(this.idGenerator, this.auditLogRepository).execute({
-            result, type: 'assignment', to: emails, subject, workspaceId: event.workspaceId, ticketId: event.ticketId,
+            result, type: 'assignment', to: emails, subject, workspaceId: event.workspaceId, ticketId: event.ticketId, ticketName: event.ticketName,
           });
         }
       }
