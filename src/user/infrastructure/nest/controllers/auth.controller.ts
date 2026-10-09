@@ -60,6 +60,7 @@ import { RefreshSessionRequest } from '../dto/refresh-session.request';
 import { sessionPolicyFromConfig } from '../session-policy';
 import { DomainError, InvalidCredentialsError } from '../../../../shared/domain/errors';
 import { clientInfo } from '../../../../shared/nest/client-info';
+import { RecordEmailSend } from '../../../../audit-log/domain/services/audit-log-record-email-send';
 
 @Controller('auth')
 export class AuthController {
@@ -236,7 +237,7 @@ export class AuthController {
   async forgotPassword(@Body() body: { email: string }, @Req() req: Request) {
     const frontendUrl = await resolveFrontendUrl(req, this.frontendUrl, (h) => this.isVerifiedDomain(h));
     const service = new RequestPasswordReset(this.userRepository);
-    const command = new RequestPasswordResetCommand(service, this.tokenService, this.emailService);
+    const command = new RequestPasswordResetCommand(service, this.tokenService, this.emailService, new RecordEmailSend(this.idGenerator, this.auditLogRepository));
     await command.execute({ email: body.email, frontendUrl });
 
     const user = await this.userRepository.findByEmail(body.email);
@@ -353,6 +354,7 @@ export class AuthController {
       this.userRepository,
       this.tokenService,
       this.emailService,
+      new RecordEmailSend(this.idGenerator, this.auditLogRepository),
     );
     await command.execute({ userId: user.userId, frontendUrl });
 
@@ -448,7 +450,7 @@ export class AuthController {
 
         // An address the provider did not vouch for must be confirmed before the account is usable
         if (!user.isEmailVerified) {
-          const verification = new ResendVerificationCommand(this.userRepository, this.tokenService, this.emailService);
+          const verification = new ResendVerificationCommand(this.userRepository, this.tokenService, this.emailService, new RecordEmailSend(this.idGenerator, this.auditLogRepository));
           await verification.execute({ userId: user.getId(), frontendUrl: redirectUrl }).catch(() => undefined);
         }
       }

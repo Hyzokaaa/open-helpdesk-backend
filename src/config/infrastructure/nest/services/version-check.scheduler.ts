@@ -9,10 +9,13 @@ import { TypeOrmNotificationRepository } from '../../../../notification/infrastr
 import { TypeOrmNotificationPreferenceRepository } from '../../../../notification/infrastructure/typeorm/repositories/typeorm-notification-preference.repository';
 import { TypeOrmSystemNotificationSettingsRepository } from '../../typeorm/repositories/typeorm-system-notification-settings.repository';
 import { SystemNotificationSettings } from '../../../domain/entities/system-notification-settings';
-import { EmailService } from '../../../../email/domain/email.service';
+import { EmailService, SendEmailResult } from '../../../../email/domain/email.service';
 import { EMAIL_SERVICE } from '../../../../email/email.constants';
 import { UpgradeAvailableTemplate } from '../../../../email/templates/upgrade-available.template';
 import { resolveBackendVersion } from '../resolve-backend-version';
+import { RecordEmailSend } from '../../../../audit-log/domain/services/audit-log-record-email-send';
+import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
+import { connectionErrorDetail } from '../../../../shared/infrastructure/connection-error-detail';
 
 const backendVersion: string = resolveBackendVersion();
 
@@ -36,6 +39,7 @@ export class VersionCheckScheduler {
     @Inject() private readonly notificationSettingsRepository: TypeOrmSystemNotificationSettingsRepository,
     @Inject() private readonly idGenerator: UlidGenerator,
     @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
+    @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
   ) {
     this.versionCheck = new VersionCheck(backendVersion);
   }
@@ -73,11 +77,18 @@ export class VersionCheckScheduler {
           const template = new UpgradeAvailableTemplate();
           for (const [lang, emails] of notifyResult.emailRecipients) {
             const data = { version: latestProduct, releaseUrl: result.latestRelease!.url, lang };
-            await this.emailService.send({
+            const subject = template.subject(data);
+            const sent: SendEmailResult = await this.emailService.send({
               to: emails,
-              subject: template.subject(data),
+              subject,
               html: template.html(data),
-            }).catch((err) => this.logger.error(`Failed to send upgrade email: ${err.message}`));
+            }).catch((err) => {
+              this.logger.error(`Failed to send upgrade email: ${err.message}`);
+              return { success: false, error: connectionErrorDetail(err) };
+            });
+            await new RecordEmailSend(this.idGenerator, this.auditLogRepository).execute({
+              result: sent, type: 'upgrade-available', to: emails, subject, workspaceId: null, entityType: 'system', entityId: 'version-check',
+            });
           }
         }
 

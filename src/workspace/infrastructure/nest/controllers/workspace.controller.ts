@@ -154,6 +154,7 @@ import { OrganizationModel } from "../../../../organization/infrastructure/typeo
 import { TypeOrmWorkspaceTicketReferenceRepository } from "../../typeorm/repositories/typeorm-workspace-ticket-reference.repository";
 import { connectionErrorDetail } from "../../../../shared/infrastructure/connection-error-detail";
 import { connectionErrorKind } from "../../../../shared/infrastructure/connection-error-kind";
+import { RecordEmailSend } from "../../../../audit-log/domain/services/audit-log-record-email-send";
 
 const IMPORT_LIMITS = importLimitsFromEnv();
 
@@ -1151,9 +1152,9 @@ export class WorkspaceController {
     // The import is committed: what follows cannot make it a failed one
     const workspace = await this.workspaceRepository.findById(workspaceId);
     await sendImportWelcomeEmails(
-      { tokenService: this.tokenService, emailService: this.emailService },
+      { tokenService: this.tokenService, emailService: this.emailService, recordEmailSend: new RecordEmailSend(this.idGenerator, this.auditLogRepository) },
       newMembers,
-      { name: workspace?.name ?? slug, frontendUrl: await this.frontendResolver.resolve(workspaceId) },
+      { name: workspace?.name ?? slug, frontendUrl: await this.frontendResolver.resolve(workspaceId), id: workspaceId },
     );
 
     await this.transferAudit().importCompleted({
