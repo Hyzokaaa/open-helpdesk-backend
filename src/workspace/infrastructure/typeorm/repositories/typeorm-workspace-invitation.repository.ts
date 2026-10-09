@@ -60,6 +60,7 @@ export class TypeOrmWorkspaceInvitationRepository implements WorkspaceInvitation
       expiresAt: model.expiresAt,
       invitedById: model.invitedById,
       createdAt: model.createdAt,
+      lastSentAt: model.lastSentAt,
     });
   }
 
@@ -73,6 +74,7 @@ export class TypeOrmWorkspaceInvitationRepository implements WorkspaceInvitation
     model.status = invitation.status;
     model.expiresAt = invitation.expiresAt;
     model.invitedById = invitation.invitedById;
+    model.lastSentAt = invitation.lastSentAt;
     return model;
   }
 }

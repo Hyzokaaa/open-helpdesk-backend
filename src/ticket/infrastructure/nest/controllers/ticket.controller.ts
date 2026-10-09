@@ -51,6 +51,7 @@ import { ListTicketsQuery } from '../../../application/queries/list-tickets.quer
 import { GetPendingTransferRequestQuery } from '../../../application/queries/get-pending-transfer-request.query';
 import { ListTicketParticipantsQuery } from '../../../application/queries/list-ticket-participants.query';
 import { GetTicketDescriptionHistoryQuery } from '../../../application/queries/get-ticket-description-history.query';
+import { ListTicketActivityQuery } from '../../../application/queries/list-ticket-activity.query';
 import { TypeOrmTicketRepository } from '../../typeorm/repositories/typeorm-ticket.repository';
 import { TypeOrmWorkspaceRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository';
 import { TypeOrmWorkspaceMemberRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
@@ -602,6 +603,18 @@ export class TicketController {
   ) {
     const workspace = await this.resolveWorkspace(slug);
     const query = new GetTicketDescriptionHistoryQuery(this.ticketDescriptionEditRepository, this.createEnsureTicketAccess());
+    return query.execute({ ticketId: id, workspaceId: workspace.getId(), userId: user.userId, isSystemAdmin: user.isSystemAdmin });
+  }
+
+  @Get(':id/activity')
+  async activity(
+    @Param('slug') slug: string,
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspace = await this.resolveWorkspace(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    const query = new ListTicketActivityQuery(this.auditLogRepository, ensurePermission, this.createEnsureTicketAccess(), this.userRepository);
     return query.execute({ ticketId: id, workspaceId: workspace.getId(), userId: user.userId, isSystemAdmin: user.isSystemAdmin });
   }
 

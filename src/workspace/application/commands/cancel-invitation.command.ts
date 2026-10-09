@@ -24,6 +24,6 @@ export class CancelInvitationCommand implements Command<Props, void> {
       isSystemAdmin: props.isSystemAdmin,
     });
 
-    return this.cancelInvitation.execute({ invitationId: props.invitationId });
+    return this.cancelInvitation.execute({ invitationId: props.invitationId, workspaceId: props.workspaceId });
   }
 }

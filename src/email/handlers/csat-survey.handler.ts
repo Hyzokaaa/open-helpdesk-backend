@@ -3,7 +3,10 @@ import { ModuleRef } from '@nestjs/core';
 import { OnEvent } from '@nestjs/event-emitter';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
-import { EmailService } from '../domain/email.service';
+import { EmailService, SendEmailResult } from '../domain/email.service';
+import { TypeOrmAuditLogRepository } from '../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
+import { RecordEmailSend } from '../../audit-log/domain/services/audit-log-record-email-send';
+import { connectionErrorDetail } from '../../shared/infrastructure/connection-error-detail';
 import { EMAIL_SERVICE } from '../email.constants';
 import { CsatSurveyTemplate } from '../templates/csat-survey.template';
 import { StatusChangedEvent } from '../domain/events';
@@ -30,6 +33,7 @@ export class CsatSurveyHandler implements OnModuleInit {
     private readonly preferenceRepository: TypeOrmNotificationPreferenceRepository,
     private readonly idGenerator: UlidGenerator,
     private readonly config: ConfigService,
+    private readonly auditLogRepository: TypeOrmAuditLogRepository,
   ) {
     this.apiUrl = config.get('API_URL', 'http://localhost:3000');
   }
@@ -82,14 +86,21 @@ export class CsatSurveyHandler implements OnModuleInit {
     const surveyBaseUrl = `${this.apiUrl}/csat/${token}`;
     const template = new CsatSurveyTemplate();
 
+    const subject = template.subject({ ticketName: event.ticketName, workspaceName: event.workspaceName, surveyBaseUrl, lang });
+    let result: SendEmailResult;
     try {
-      await this.emailService.send({
+      result = await this.emailService.send({
         to: creator.email,
-        subject: template.subject({ ticketName: event.ticketName, workspaceName: event.workspaceName, surveyBaseUrl, lang }),
+        subject,
         html: template.html({ ticketName: event.ticketName, workspaceName: event.workspaceName, surveyBaseUrl, lang }),
       });
     } catch (err) {
       this.logger.error(`Failed to send CSAT survey for ticket ${event.ticketId}: ${err}`);
+      result = { success: false, error: connectionErrorDetail(err) };
     }
+    // The survey link carries its token: only the subject is recorded, never the body
+    await new RecordEmailSend(this.idGenerator, this.auditLogRepository).execute({
+      result, type: 'csat-survey', to: creator.email, subject, workspaceId: event.workspaceId, ticketId: event.ticketId, ticketName: event.ticketName,
+    });
   }
 }

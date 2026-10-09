@@ -152,6 +152,9 @@ import { imageUploadOptions, LOGO_IMAGE_MIMES } from "../../../../shared/infrast
 import { TypeOrmOrganizationRepository } from "../../../../organization/infrastructure/typeorm/repositories/typeorm-organization.repository";
 import { OrganizationModel } from "../../../../organization/infrastructure/typeorm/models/organization.model";
 import { TypeOrmWorkspaceTicketReferenceRepository } from "../../typeorm/repositories/typeorm-workspace-ticket-reference.repository";
+import { connectionErrorDetail } from "../../../../shared/infrastructure/connection-error-detail";
+import { connectionErrorKind } from "../../../../shared/infrastructure/connection-error-kind";
+import { RecordEmailSend } from "../../../../audit-log/domain/services/audit-log-record-email-send";
 
 const IMPORT_LIMITS = importLimitsFromEnv();
 
@@ -1149,9 +1152,9 @@ export class WorkspaceController {
     // The import is committed: what follows cannot make it a failed one
     const workspace = await this.workspaceRepository.findById(workspaceId);
     await sendImportWelcomeEmails(
-      { tokenService: this.tokenService, emailService: this.emailService },
+      { tokenService: this.tokenService, emailService: this.emailService, recordEmailSend: new RecordEmailSend(this.idGenerator, this.auditLogRepository) },
       newMembers,
-      { name: workspace?.name ?? slug, frontendUrl: await this.frontendResolver.resolve(workspaceId) },
+      { name: workspace?.name ?? slug, frontendUrl: await this.frontendResolver.resolve(workspaceId), id: workspaceId },
     );
 
     await this.transferAudit().importCompleted({
@@ -1507,7 +1510,8 @@ export class WorkspaceController {
 
       return { success: true };
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Connection failed";
+      const msg = connectionErrorDetail(err);
+      const errorCode = connectionErrorKind(err);
 
       await auditLog.execute({
         action: AuditAction.EMAIL_SENDER_TEST_CONNECTION,
@@ -1515,13 +1519,13 @@ export class WorkspaceController {
         entityId: workspaceId,
         userId: user.userId,
         workspaceId,
-        metadata: { success: false, error: msg, smtpHost: body.smtpHost },
+        metadata: { success: false, error: msg, errorCode, smtpHost: body.smtpHost },
         category: AuditCategory.CONFIG,
         level: AuditLevel.WARNING,
         source: "ui",
       });
 
-      return { success: false, error: msg };
+      return { success: false, error: msg, errorCode };
     }
   }
 

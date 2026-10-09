@@ -36,6 +36,7 @@ import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category
 import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
 import { sendImportWelcomeEmails } from '../import-welcome-emails';
 import { WorkspaceFrontendResolver } from '../../../../shared/infrastructure/workspace-frontend-resolver';
+import { RecordEmailSend } from '../../../../audit-log/domain/services/audit-log-record-email-send';
 
 @Controller('workspaces')
 export class WorkspaceImportController {
@@ -129,9 +130,9 @@ export class WorkspaceImportController {
     });
 
     await sendImportWelcomeEmails(
-      { tokenService: this.tokenService, emailService: this.emailService },
+      { tokenService: this.tokenService, emailService: this.emailService, recordEmailSend: new RecordEmailSend(this.idGenerator, this.auditLogRepository) },
       result.createdUsers,
-      { name: workspace.name, frontendUrl },
+      { name: workspace.name, frontendUrl, id: workspace.getId() },
     );
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);

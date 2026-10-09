@@ -16,6 +16,56 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.31.0',
+    date: '2026-10-09',
+    categories: [
+      {
+        title: { en: 'Invitations', es: 'Invitaciones' },
+        features: [
+          { en: 'An expired invitation no longer blocks inviting the same email again: the new invitation replaces it', es: 'Una invitación caducada ya no impide volver a invitar al mismo email: la nueva la reemplaza' },
+          { en: 'When an invitation email does not leave, the notice says why, in plain words and with the mail server answer', es: 'Cuando el email de una invitación no sale, el aviso dice por qué, en palabras claras y con la respuesta del servidor de correo' },
+          { en: 'Resend is always in the invitation menu; without a mail server it renews the invitation and copies its new link', es: 'Reenviar está siempre en el menú de la invitación; sin servidor de correo renueva la invitación y copia su nuevo enlace' },
+          { en: 'Inviting an email that already has a pending invitation offers to resend it', es: 'Invitar a un email que ya tiene una invitación pendiente ofrece reenviarla' },
+          { en: 'The invite button and notices say how many invitations and to whom, and the list shows the last time each one was sent', es: 'El botón y los avisos de invitar dicen cuántas invitaciones y a quién, y la lista muestra la última vez que se envió cada una' },
+          { en: 'Invitation emails are sent in the language of whoever invites', es: 'Los emails de invitación se envían en el idioma de quien invita' },
+        ],
+      },
+      {
+        title: { en: 'Mailboxes and email senders', es: 'Buzones y remitentes' },
+        features: [
+          { en: 'The connection test explains what to change: wrong username or password, a port that does not match the encryption, a server that does not exist or does not answer', es: 'La prueba de conexión explica qué cambiar: usuario o contraseña incorrectos, un puerto que no coincide con el cifrado, un servidor que no existe o no responde' },
+          { en: 'A greyed-out save button says what is missing, and a changed field clears the previous test result', es: 'Un botón de guardar desactivado dice qué falta, y cambiar un campo borra el resultado de la prueba anterior' },
+          { en: 'A new mailbox says that it starts paused and can be activated from the same notice', es: 'Un buzón nuevo avisa de que empieza pausado y se puede activar desde el mismo aviso' },
+          { en: 'The server and port typed by hand are no longer overwritten by the automatic server detection', es: 'El servidor y el puerto escritos a mano ya no se sobrescriben con la detección automática del servidor' },
+        ],
+      },
+      {
+        title: { en: 'Audit log', es: 'Registro de auditoría' },
+        features: [
+          { en: 'Every email is recorded as sent or not sent, with recipients, subject, ticket, the server used and the reason it failed', es: 'Cada email queda registrado como enviado o no enviado, con destinatarios, asunto, ticket, el servidor usado y el motivo del fallo' },
+          { en: 'Emails that left no trace are now recorded too: invitations, satisfaction surveys, password resets, email verification and workspace notices', es: 'Ahora también quedan registrados los emails que no dejaban rastro: invitaciones, encuestas de satisfacción, restablecer contraseña, verificación de email y avisos del espacio' },
+          { en: 'A wider entry panel with a readable summary, translated fields and the technical ids folded away', es: 'Un panel de entrada más ancho, con un resumen legible, campos traducidos y los ids técnicos plegados' },
+          { en: 'Supervisors and agents see the activity of the tickets they can see', es: 'Supervisores y agentes ven la actividad de los tickets que pueden ver' },
+        ],
+      },
+      {
+        title: { en: 'Permissions and interface', es: 'Permisos e interfaz' },
+        features: [
+          { en: 'Customers no longer fill the log with permission denials: each screen only asks for what the person may see', es: 'Los clientes ya no llenan el registro de permisos denegados: cada pantalla solo pide lo que la persona puede ver' },
+          { en: 'Agents can read the tag list so they can tag tickets', es: 'Los agentes pueden leer la lista de etiquetas para etiquetar tickets' },
+          { en: 'The sidebar no longer shows the workspace slug, and hides the block on a custom domain with a single workspace', es: 'La barra lateral ya no muestra el slug del espacio, y oculta el bloque en un dominio propio con un solo espacio' },
+          { en: 'Keep me signed in shows how long it lasts', es: 'Mantener sesión iniciada muestra cuánto dura' },
+        ],
+      },
+      {
+        title: { en: 'Security', es: 'Seguridad' },
+        features: [
+          { en: 'Resending or cancelling an invitation only works on invitations of the workspace in use', es: 'Reenviar o cancelar una invitación solo funciona con invitaciones del espacio en uso' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.30.1',
     date: '2026-10-07',
     categories: [

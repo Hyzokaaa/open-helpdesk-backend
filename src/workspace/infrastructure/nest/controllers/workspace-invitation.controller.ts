@@ -37,7 +37,30 @@ import { BatchInvitationRequest } from '../dto/batch-invitation.request';
 import { BatchInvitationCommand } from '../../../application/commands/batch-invitation.command';
 import { invitationEmail } from '../../../../email/templates/workspace-invitation.template';
 import { sendWorkspaceEmail } from '../../../../email/domain/resolve-email-sender';
+import { SendEmailParams, SendEmailResult } from '../../../../email/domain/email.service';
+import { RecordEmailSend } from '../../../../audit-log/domain/services/audit-log-record-email-send';
+import { WorkspaceEmailSender } from '../../../domain/entities/workspace-email-sender';
+import { connectionErrorDetail } from '../../../../shared/infrastructure/connection-error-detail';
+import { connectionErrorKind } from '../../../../shared/infrastructure/connection-error-kind';
 import { WorkspaceFrontendResolver } from '../../../../shared/infrastructure/workspace-frontend-resolver';
+
+/** Whether the invitation email left, and if not why, for the inviter to see instead of a guess */
+interface InvitationEmailOutcome {
+  emailSent: boolean;
+  emailFailure?: {
+    reason: 'no-email-service' | 'send-failed';
+    detail?: string;
+    /** Kind of failure (`connectionErrorKind`), so the client can say it in plain words */
+    code?: string;
+    via?: 'workspace' | 'global';
+  };
+}
+
+function invitationEmailOutcome(result: SendEmailResult): InvitationEmailOutcome {
+  if (result.success && !result.mock) return { emailSent: true };
+  if (result.mock) return { emailSent: false, emailFailure: { reason: 'no-email-service' } };
+  return { emailSent: false, emailFailure: { reason: 'send-failed', detail: result.error, code: result.errorCode, via: result.via } };
+}
 
 @Controller('workspaces')
 export class WorkspaceInvitationController {
@@ -84,18 +107,15 @@ export class WorkspaceInvitationController {
     const invitationUrl = `${frontendUrl}/invite/${result.token}`;
 
     const sender = await this.emailSenderRepository.findByWorkspaceId(workspace.getId());
-    try {
-      await sendWorkspaceEmail(this.emailService, sender, invitationEmail({
-        to: body.email,
-        workspaceName: workspace.name,
-        inviterName,
-        invitationUrl,
-        workspaceUrl: frontendUrl,
-        lang: 'en',
-      }));
-    } catch {
-      // Email failure should not fail the invitation creation
-    }
+    const email = await this.sendInvitationEmail(sender, invitationEmail({
+      to: body.email,
+      workspaceName: workspace.name,
+      inviterName,
+      invitationUrl,
+      workspaceUrl: frontendUrl,
+      // The invitee has no language of their own yet: the inviter's is the best guess
+      lang: inviter?.language ?? 'en',
+    }), { workspaceId: workspace.getId(), invitationId: result.id, userId: user.userId });
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({
@@ -104,13 +124,13 @@ export class WorkspaceInvitationController {
       entityId: result.id,
       userId: user.userId,
       workspaceId: workspace.getId(),
-      metadata: { email: body.email, role: body.role },
+      metadata: { email: body.email, role: body.role, emailSent: email.emailSent },
       category: AuditCategory.WORKSPACE,
       level: AuditLevel.INFO,
       source: 'ui',
     });
 
-    return { id: result.id, email: result.email, role: result.role, status: result.status, expiresAt: result.expiresAt };
+    return { id: result.id, email: result.email, role: result.role, status: result.status, expiresAt: result.expiresAt, ...email };
   }
 
   @Post(':slug/invitations/batch')
@@ -146,19 +166,14 @@ export class WorkspaceInvitationController {
         const invitation = await this.invitationRepository.findPendingByWorkspaceAndEmail(workspace.getId(), result.email);
         if (invitation) {
           const invitationUrl = `${frontendUrl}/invite/${invitation.token}`;
-          try {
-            const emailResult = await sendWorkspaceEmail(this.emailService, sender, invitationEmail({
-              to: result.email,
-              workspaceName: workspace.name,
-              inviterName,
-              invitationUrl,
-              workspaceUrl: frontendUrl,
-              lang: 'en',
-            }));
-            (result as any).emailSent = emailResult.success && !emailResult.mock;
-          } catch {
-            (result as any).emailSent = false;
-          }
+          Object.assign(result, await this.sendInvitationEmail(sender, invitationEmail({
+            to: result.email,
+            workspaceName: workspace.name,
+            inviterName,
+            invitationUrl,
+            workspaceUrl: frontendUrl,
+            lang: inviter?.language ?? 'en',
+          }), { workspaceId: workspace.getId(), invitationId: invitation.getId(), userId: user.userId }));
         }
       }
     }
@@ -172,7 +187,7 @@ export class WorkspaceInvitationController {
       workspaceId: workspace.getId(),
       metadata: {
         count: body.invitations.length,
-        invitations: body.invitations.slice(0, 500).map((i, index) => ({ email: i.email, role: i.role, status: results[index]?.status ?? null })),
+        invitations: body.invitations.slice(0, 500).map((i, index) => ({ email: i.email, role: i.role, status: results[index]?.status ?? null, emailSent: (results[index] as Partial<InvitationEmailOutcome> | undefined)?.emailSent ?? false })),
       },
       category: AuditCategory.WORKSPACE,
       level: body.invitations.some((i) => i.role === 'admin') ? AuditLevel.WARNING : AuditLevel.INFO,
@@ -238,27 +253,22 @@ export class WorkspaceInvitationController {
     });
 
     const service = new ResendInvitation(this.invitationRepository);
-    const invitation = await service.execute({ invitationId: id });
+    const invitation = await service.execute({ invitationId: id, workspaceId: workspace.getId() });
 
     const inviter = await this.userRepository.findById(user.userId);
     const inviterName = inviter ? `${inviter.firstName} ${inviter.lastName}` : '';
     const invitationUrl = `${frontendUrl}/invite/${invitation.token}`;
 
     const sender = await this.emailSenderRepository.findByWorkspaceId(workspace.getId());
-    let emailSent = false;
-    try {
-      const emailResult = await sendWorkspaceEmail(this.emailService, sender, invitationEmail({
-        to: invitation.email,
-        workspaceName: workspace.name,
-        inviterName,
-        invitationUrl,
-        workspaceUrl: frontendUrl,
-        lang: 'en',
-      }));
-      emailSent = emailResult.success && !emailResult.mock;
-    } catch {
-      // Email failure should not fail the resend
-    }
+    const email = await this.sendInvitationEmail(sender, invitationEmail({
+      to: invitation.email,
+      workspaceName: workspace.name,
+      inviterName,
+      invitationUrl,
+      workspaceUrl: frontendUrl,
+      lang: inviter?.language ?? 'en',
+    }), { workspaceId: workspace.getId(), invitationId: invitation.getId(), userId: user.userId });
+    const emailSent = email.emailSent;
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({
@@ -273,7 +283,7 @@ export class WorkspaceInvitationController {
       source: 'ui',
     });
 
-    return { id: invitation.getId(), email: invitation.email, expiresAt: invitation.expiresAt, emailSent };
+    return { id: invitation.getId(), email: invitation.email, expiresAt: invitation.expiresAt, ...email };
   }
 
   @Delete(':slug/invitations/:id')
@@ -308,6 +318,35 @@ export class WorkspaceInvitationController {
     });
 
     return { message: 'Invitation cancelled' };
+  }
+
+  /**
+   * Sends one invitation email and records it, sent or not, in the audit log. A failure never fails
+   * the invitation: it is reported back for the inviter to see.
+   */
+  private async sendInvitationEmail(
+    sender: WorkspaceEmailSender | null,
+    params: SendEmailParams,
+    ctx: { workspaceId: string; invitationId: string; userId: string },
+  ): Promise<InvitationEmailOutcome> {
+    let result: SendEmailResult;
+    try {
+      result = await sendWorkspaceEmail(this.emailService, sender, params);
+    } catch (err) {
+      result = { success: false, error: connectionErrorDetail(err), errorCode: connectionErrorKind(err) };
+    }
+    await new RecordEmailSend(this.idGenerator, this.auditLogRepository).execute({
+      result,
+      type: 'invitation',
+      to: params.to,
+      subject: params.subject,
+      workspaceId: ctx.workspaceId,
+      entityType: 'invitation',
+      entityId: ctx.invitationId,
+      userId: ctx.userId,
+      source: 'ui',
+    });
+    return invitationEmailOutcome(result);
   }
 
   private async resolveWorkspace(slug: string) {

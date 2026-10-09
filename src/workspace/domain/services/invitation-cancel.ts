@@ -4,6 +4,7 @@ import { InvitationStatus } from '../enums/invitation-status.enum';
 
 interface CancelInvitationProps {
   invitationId: string;
+  workspaceId: string;
 }
 
 export class CancelInvitation {
@@ -13,7 +14,8 @@ export class CancelInvitation {
 
   async execute(props: CancelInvitationProps): Promise<void> {
     const invitation = await this.invitationRepository.findById(props.invitationId);
-    if (!invitation) {
+    // An invitation from another workspace is reported as missing, never touched
+    if (!invitation || invitation.workspaceId !== props.workspaceId) {
       throw new EntityNotFoundError('Invitation not found');
     }
 

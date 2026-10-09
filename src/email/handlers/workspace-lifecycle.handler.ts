@@ -2,7 +2,11 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
-import { EmailService } from '../domain/email.service';
+import { EmailService, SendEmailResult } from '../domain/email.service';
+import { TypeOrmAuditLogRepository } from '../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
+import { RecordEmailSend } from '../../audit-log/domain/services/audit-log-record-email-send';
+import { UlidGenerator } from '../../shared/infrastructure/ulid-generator';
+import { connectionErrorDetail } from '../../shared/infrastructure/connection-error-detail';
 import { EMAIL_SERVICE } from '../email.constants';
 import { WorkspaceLifecycleEvent } from '../domain/events';
 import { WorkspaceLifecycleKind, WorkspaceLifecycleTemplate } from '../templates/workspace-lifecycle.template';
@@ -27,6 +31,8 @@ export class WorkspaceLifecycleHandler {
     private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
     private readonly dataSource: DataSource,
     config: ConfigService,
+    private readonly auditLogRepository: TypeOrmAuditLogRepository,
+    private readonly idGenerator: UlidGenerator,
   ) {
     this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
   }
@@ -69,7 +75,7 @@ export class WorkspaceLifecycleHandler {
           restoreUrl: `${this.frontendUrl}/dashboard/deleted-workspaces`,
           lang,
         };
-        await this.send(user, template.subject(data), template.html(data));
+        await this.send(user, template.subject(data), template.html(data), kind, event.workspaceId);
       }
     } catch (err) {
       this.logger.error(`Workspace ${kind} email for ${event.workspaceId} failed: ${(err as Error).message}`);
@@ -82,8 +88,16 @@ export class WorkspaceLifecycleHandler {
     return row?.ownerId ?? null;
   }
 
-  private async send(user: User, subject: string, html: string): Promise<void> {
-    await this.emailService.send({ to: user.email, subject, html });
+  private async send(user: User, subject: string, html: string, kind: WorkspaceLifecycleKind, workspaceId: string): Promise<void> {
+    let result: SendEmailResult;
+    try {
+      result = await this.emailService.send({ to: user.email, subject, html });
+    } catch (err) {
+      result = { success: false, error: connectionErrorDetail(err) };
+    }
+    await new RecordEmailSend(this.idGenerator, this.auditLogRepository).execute({
+      result, type: `workspace-${kind}`, to: user.email, subject, workspaceId, entityType: 'workspace', entityId: workspaceId,
+    });
   }
 }
 

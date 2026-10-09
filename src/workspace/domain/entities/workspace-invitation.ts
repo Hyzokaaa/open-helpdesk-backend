@@ -12,6 +12,7 @@ interface Props {
   expiresAt: Date;
   invitedById: string;
   createdAt?: Date;
+  lastSentAt?: Date | null;
 }
 
 export class WorkspaceInvitation {
@@ -24,6 +25,8 @@ export class WorkspaceInvitation {
   expiresAt: Date;
   invitedById: string;
   createdAt: Date;
+  /** When the current link was issued: creation, then every resend */
+  lastSentAt: Date;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -35,6 +38,8 @@ export class WorkspaceInvitation {
     this.expiresAt = props.expiresAt;
     this.invitedById = props.invitedById;
     this.createdAt = props.createdAt ?? new Date();
+    // Invitations from before the column existed were last sent when they were created
+    this.lastSentAt = props.lastSentAt ?? this.createdAt;
   }
 
   getId(): string {

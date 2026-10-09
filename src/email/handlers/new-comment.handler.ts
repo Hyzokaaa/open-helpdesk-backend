@@ -14,15 +14,12 @@ import { sendWorkspaceEmail } from '../domain/resolve-email-sender';
 import { TypeOrmTicketRepository } from '../../ticket/infrastructure/typeorm/repositories/typeorm-ticket.repository';
 import { TypeOrmTicketParticipantRepository } from '../../ticket/infrastructure/typeorm/repositories/typeorm-ticket-participant.repository';
 import { TypeOrmAuditLogRepository } from '../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
-import { CreateAuditLogEntry } from '../../audit-log/domain/services/audit-log-create';
-import { AuditAction } from '../../audit-log/domain/enums/audit-action.enum';
-import { AuditCategory } from '../../audit-log/domain/enums/audit-category.enum';
-import { AuditLevel } from '../../audit-log/domain/enums/audit-level.enum';
 import { ResolveTicketStakeholders } from '../../notification/domain/services/notification-resolve-ticket-stakeholders';
 import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
 import { WorkspaceFrontendResolver } from '../../shared/infrastructure/workspace-frontend-resolver';
 import { htmlToPlainText } from '../../shared/domain/sanitize-plain-text';
+import { RecordEmailSend } from '../../audit-log/domain/services/audit-log-record-email-send';
 
 @Injectable()
 export class NewCommentHandler {
@@ -85,9 +82,10 @@ export class NewCommentHandler {
     const sender = await this.emailSenderRepository.findByWorkspaceId(event.workspaceId);
 
     for (const [lang, emails] of emailRecipients) {
+      const subject = template.subject({ ticketName: event.ticketName, ticketNumber: event.ticketNumber, ticketUrl, authorName: event.authorName, commentPreview: preview, workspaceName: event.workspaceName, lang });
       const result = await sendWorkspaceEmail(this.emailService, sender, {
         to: emails,
-        subject: template.subject({ ticketName: event.ticketName, ticketNumber: event.ticketNumber, ticketUrl, authorName: event.authorName, commentPreview: preview, workspaceName: event.workspaceName, lang }),
+        subject,
         html: template.html({ ticketName: event.ticketName, ticketNumber: event.ticketNumber, ticketUrl, authorName: event.authorName, commentPreview: preview, workspaceName: event.workspaceName, lang }),
         ...(emailDomain && {
           messageId: `<comment-${event.commentId}@${emailDomain}>`,
@@ -96,33 +94,9 @@ export class NewCommentHandler {
         }),
         ...(mailbox && { replyTo: mailbox.address }),
       });
-      if (!result.success) {
-        const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-        await auditLog.execute({
-          action: AuditAction.EMAIL_SEND_FAILED,
-          entityType: 'email',
-          entityId: event.ticketId,
-          userId: null,
-          workspaceId: event.workspaceId,
-          metadata: { reason: 'notification', to: emails, ticketId: event.ticketId },
-          category: AuditCategory.EMAIL,
-          level: AuditLevel.ERROR,
-          source: 'system',
-        }).catch(() => {});
-      } else {
-        const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-        await auditLog.execute({
-          action: AuditAction.EMAIL_SENT,
-          entityType: 'email',
-          entityId: event.ticketId,
-          userId: null,
-          workspaceId: event.workspaceId,
-          metadata: { to: emails, ticketId: event.ticketId, type: 'comment-notification' },
-          category: AuditCategory.EMAIL,
-          level: AuditLevel.INFO,
-          source: 'system',
-        }).catch(() => {});
-      }
+      await new RecordEmailSend(this.idGenerator, this.auditLogRepository).execute({
+        result, type: 'comment-notification', to: emails, subject, workspaceId: event.workspaceId, ticketId: event.ticketId, ticketName: event.ticketName, ticketReference: event.ticketNumber,
+      });
     }
   }
 }

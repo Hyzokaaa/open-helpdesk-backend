@@ -40,8 +40,13 @@ export class CreateInvitation {
       props.workspaceId,
       props.email,
     );
-    if (pendingInvitation) {
+    if (pendingInvitation && !pendingInvitation.isExpired()) {
       throw new ConflictError('A pending invitation already exists for this email');
+    }
+    // An expired invitation can no longer be accepted, so it gives way to the new one
+    if (pendingInvitation) {
+      pendingInvitation.cancel();
+      await this.invitationRepository.update(pendingInvitation);
     }
 
     const expiresAt = new Date();

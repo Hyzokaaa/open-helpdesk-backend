@@ -106,6 +106,8 @@ export enum AuditAction {
 
   // Mailbox
   MAILBOX_CREATED = 'mailbox-created',
+  /** A refused attempt, so a mailbox that "fails to add" leaves a reason behind */
+  MAILBOX_CREATE_FAILED = 'mailbox-create-failed',
   MAILBOX_UPDATED = 'mailbox-updated',
   MAILBOX_DELETED = 'mailbox-deleted',
   MAILBOX_PAUSED = 'mailbox-paused',

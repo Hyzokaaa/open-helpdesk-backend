@@ -6,6 +6,8 @@ import {
   SendEmailParams,
   SendEmailResult,
 } from '../domain/email.service';
+import { connectionErrorDetail } from '../../shared/infrastructure/connection-error-detail';
+import { connectionErrorKind } from '../../shared/infrastructure/connection-error-kind';
 
 export class PostmarkEmailService implements EmailService {
   private readonly logger = new Logger(PostmarkEmailService.name);
@@ -42,6 +44,8 @@ export class PostmarkEmailService implements EmailService {
       return { success: true };
     }
 
+    let lastError: string | undefined;
+    let lastErrorCode: string | undefined;
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
         const headers: postmark.Models.Header[] = [];
@@ -63,7 +67,9 @@ export class PostmarkEmailService implements EmailService {
         this.logger.log(`Email sent to ${recipient}: ${params.subject}`);
         return { success: true };
       } catch (error) {
-        const msg = error instanceof Error ? error.message : 'Unknown error';
+        const msg = connectionErrorDetail(error);
+        lastError = msg;
+        lastErrorCode = connectionErrorKind(error);
         this.logger.error(
           `Email attempt ${attempt}/${this.maxRetries} failed for ${recipient}: ${msg}`,
         );
@@ -74,6 +80,6 @@ export class PostmarkEmailService implements EmailService {
       }
     }
 
-    return { success: false };
+    return { success: false, error: lastError, errorCode: lastErrorCode };
   }
 }

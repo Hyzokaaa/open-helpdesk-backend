@@ -7,6 +7,8 @@ import {
   SendEmailResult,
 } from '../domain/email.service';
 import { SystemEmailSettingsRepository } from '../../config/domain/repositories/system-email-settings.repository';
+import { connectionErrorDetail } from '../../shared/infrastructure/connection-error-detail';
+import { connectionErrorKind } from '../../shared/infrastructure/connection-error-kind';
 
 export class SmtpEmailService implements EmailService {
   private readonly logger = new Logger(SmtpEmailService.name);
@@ -110,6 +112,8 @@ export class SmtpEmailService implements EmailService {
       return { success: true, mock: true };
     }
 
+    let lastError: string | undefined;
+    let lastErrorCode: string | undefined;
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
         await transporter.sendMail({
@@ -126,7 +130,9 @@ export class SmtpEmailService implements EmailService {
         this.logger.log(`Email sent to ${recipient}: ${params.subject}`);
         return { success: true };
       } catch (error) {
-        const msg = error instanceof Error ? error.message : 'Unknown error';
+        const msg = connectionErrorDetail(error);
+        lastError = msg;
+        lastErrorCode = connectionErrorKind(error);
         this.logger.error(
           `Email attempt ${attempt}/${this.maxRetries} failed for ${recipient}: ${msg}`,
         );
@@ -137,6 +143,6 @@ export class SmtpEmailService implements EmailService {
       }
     }
 
-    return { success: false };
+    return { success: false, error: lastError, errorCode: lastErrorCode };
   }
 }

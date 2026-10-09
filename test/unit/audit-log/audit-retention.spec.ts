@@ -11,6 +11,10 @@ import { AuditRetentionSettingsRepository } from '../../../src/audit-log/domain/
 import { AuditLogPruner } from '../../../src/audit-log/domain/audit-log-pruner';
 import { DomainValidationError } from '../../../src/shared/domain/errors';
 import { FakeIdGenerator } from '../../mocks/fake-id-generator';
+import { WorkspaceAuditRetention } from '../../../src/audit-log/domain/entities/workspace-audit-retention';
+import { WorkspaceAuditRetentionRepository } from '../../../src/audit-log/domain/repositories/workspace-audit-retention.repository';
+import { UpdateWorkspaceAuditRetention } from '../../../src/audit-log/domain/services/workspace-audit-retention-update';
+import { nextAuditRetentionRun } from '../../../src/audit-log/infrastructure/nest/audit-retention.scheduler';
 
 class InMemorySettings implements AuditRetentionSettingsRepository {
   settings: AuditRetentionSettings | null = null;
@@ -67,9 +71,26 @@ describe('Audit retention', () => {
       expect(() => normalizeWorkspaceRetention({ security: 30 }, installation)).toThrow(DomainValidationError);
     });
 
-    it('drops values that change nothing', () => {
+    it('ignores categories the installation already keeps forever', () => {
       const forever = { ...installation, billing: null };
-      expect(normalizeWorkspaceRetention({ ticket: 365, billing: 900 }, forever)).toEqual({});
+      expect(normalizeWorkspaceRetention({ billing: 900 }, forever)).toEqual({});
+    });
+
+    it('keeps a value equal to the installation, so lowering the installation later does not shorten it', () => {
+      const own = normalizeWorkspaceRetention({ ticket: 365 }, installation);
+      expect(own).toEqual({ ticket: 365 });
+      expect(effectiveRetention({ ...installation, ticket: 100 }, own).ticket).toBe(365);
+    });
+
+    it('merges a save into what the workspace had, leaving untouched categories as they were', async () => {
+      const store: { saved: WorkspaceAuditRetention | null } = { saved: new WorkspaceAuditRetention({ workspaceId: 'w1', days: { ticket: 800 } }) };
+      const repository: WorkspaceAuditRetentionRepository = {
+        findByWorkspaceId: async () => store.saved,
+        save: async (retention) => { store.saved = retention; },
+      };
+      const settings = new AuditRetentionSettings({ id: 's1' });
+      const { retention } = await new UpdateWorkspaceAuditRetention(repository).execute({ workspaceId: 'w1', days: { email: 30 }, installation: settings });
+      expect(retention.days).toEqual({ ticket: 800, email: 30 });
     });
 
     it('applies the longer of the two, and forever wins', () => {
@@ -111,6 +132,15 @@ describe('Audit retention', () => {
       expect(calls.filter((c) => c.category === 'email')).toHaveLength(3);
       expect(calls.some((c) => c.category === 'billing')).toBe(false);
       expect(calls.find((c) => c.category === 'security')?.days).toBe(90);
+    });
+  });
+
+  describe('schedule', () => {
+    it('runs next at 02:00 server time, today if it is still before, otherwise tomorrow', () => {
+      const before = nextAuditRetentionRun(new Date(2026, 9, 8, 1, 30));
+      expect([before.getDate(), before.getHours(), before.getMinutes()]).toEqual([8, 2, 0]);
+      const after = nextAuditRetentionRun(new Date(2026, 9, 8, 2, 0));
+      expect([after.getDate(), after.getHours()]).toEqual([9, 2]);
     });
   });
 });

@@ -12,6 +12,8 @@ import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit
 import { AuditAction } from '../../../../audit-log/domain/enums/audit-action.enum';
 import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
+import { connectionErrorDetail } from '../../../../shared/infrastructure/connection-error-detail';
+import { connectionErrorKind } from '../../../../shared/infrastructure/connection-error-kind';
 
 @Controller('system')
 export class SystemEmailSettingsController {
@@ -151,7 +153,8 @@ export class SystemEmailSettingsController {
 
       return { success: true };
     } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Unknown error';
+      const msg = connectionErrorDetail(error);
+      const errorCode = connectionErrorKind(error);
 
       const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
       await auditLog.execute({
@@ -160,13 +163,13 @@ export class SystemEmailSettingsController {
         entityId: 'system',
         userId: user.userId,
         workspaceId: null,
-        metadata: { host: body.smtpHost, port: body.smtpPort, success: false, error: msg },
+        metadata: { host: body.smtpHost, port: body.smtpPort, success: false, error: msg, errorCode },
         category: AuditCategory.SYSTEM,
         level: AuditLevel.WARNING,
         source: 'ui',
       });
 
-      return { success: false, error: msg };
+      return { success: false, error: msg, errorCode };
     } finally {
       transporter.close();
     }

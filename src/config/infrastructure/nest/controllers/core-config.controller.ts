@@ -8,6 +8,10 @@ import { TypeOrmSystemAnalyticsSettingsRepository } from '../../typeorm/reposito
 import { toPublicAnalyticsConfig } from '../../../domain/services/analytics-public-config';
 import { StorageService } from '../../../../shared/domain/storage-service';
 import { STORAGE_SERVICE } from '../../../../shared/shared.module';
+import { ConfigService } from '@nestjs/config';
+import { sessionPolicyFromConfig } from '../../../../user/infrastructure/nest/session-policy';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 @Public()
 @SkipThrottle()
@@ -19,6 +23,7 @@ export class CoreConfigController {
     @Inject() private readonly systemNotificationSettingsRepo: TypeOrmSystemNotificationSettingsRepository,
     @Inject() private readonly systemAnalyticsSettingsRepo: TypeOrmSystemAnalyticsSettingsRepository,
     @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
+    private readonly config: ConfigService,
   ) {}
 
   @Get('public')
@@ -39,6 +44,8 @@ export class CoreConfigController {
       brandingLogo: branding?.logo ? await this.storage.getPresignedUrl(branding.logo) : null,
       brandingIcon: branding?.icon ? await this.storage.getPresignedUrl(branding.icon) : null,
       analytics: toPublicAnalyticsConfig(analyticsSettings),
+      // How long "keep me signed in" lasts, so the sign-in page can say it
+      sessionRememberDays: Math.round(sessionPolicyFromConfig(this.config).rememberedSessionTtlMs / DAY_MS),
     };
   }
 }

@@ -32,6 +32,7 @@ import { TypeOrmEmailRuleRepository } from '../../../email-rule/infrastructure/t
 import { TypeOrmOrganizationRepository } from '../../../organization/infrastructure/typeorm/repositories/typeorm-organization.repository';
 import { TypeOrmTicketCategoryRepository } from '../../../project/infrastructure/typeorm/repositories/typeorm-ticket-category.repository';
 import { EvaluateEmailRules } from '../../../email-rule/domain/services/email-rule-evaluate';
+import { connectionErrorDetail } from '../../../shared/infrastructure/connection-error-detail';
 
 const REFRESH_INTERVAL = 60000;
 
@@ -242,7 +243,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
         state.timer = setTimeout(() => this.pollMailbox(mailbox, state), (mailbox.pollInterval ?? 30) * 1000);
       }
     } catch (err) {
-      const errMsg = err instanceof Error ? err.message : 'Unknown error';
+      const errMsg = connectionErrorDetail(err);
       this.logger.error(`IMAP [${mailbox.address}] poll failed: ${errMsg}`);
 
       // Retries back off but keep failing the same way: recorded when the mailbox starts failing or the error changes
