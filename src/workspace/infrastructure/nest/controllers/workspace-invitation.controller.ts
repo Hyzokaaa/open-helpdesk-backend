@@ -113,7 +113,8 @@ export class WorkspaceInvitationController {
       inviterName,
       invitationUrl,
       workspaceUrl: frontendUrl,
-      lang: 'en',
+      // The invitee has no language of their own yet: the inviter's is the best guess
+      lang: inviter?.language ?? 'en',
     }), { workspaceId: workspace.getId(), invitationId: result.id, userId: user.userId });
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
@@ -171,7 +172,7 @@ export class WorkspaceInvitationController {
             inviterName,
             invitationUrl,
             workspaceUrl: frontendUrl,
-            lang: 'en',
+            lang: inviter?.language ?? 'en',
           }), { workspaceId: workspace.getId(), invitationId: invitation.getId(), userId: user.userId }));
         }
       }
@@ -265,7 +266,7 @@ export class WorkspaceInvitationController {
       inviterName,
       invitationUrl,
       workspaceUrl: frontendUrl,
-      lang: 'en',
+      lang: inviter?.language ?? 'en',
     }), { workspaceId: workspace.getId(), invitationId: invitation.getId(), userId: user.userId });
     const emailSent = email.emailSent;
 
