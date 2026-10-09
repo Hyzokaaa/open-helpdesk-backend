@@ -58,7 +58,7 @@ export class TicketCategoryController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
-    await this.ensurePermission(workspaceId, user, PERMISSIONS.PROJECT_MANAGE);
+    await this.ensurePermission(workspaceId, user, PERMISSIONS.CATEGORY_MANAGE);
 
     const service = new CreateTicketCategory(this.idGenerator, this.categoryRepository);
     const category = await service.execute({
@@ -92,7 +92,7 @@ export class TicketCategoryController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
-    await this.ensurePermission(workspaceId, user, PERMISSIONS.PROJECT_MANAGE);
+    await this.ensurePermission(workspaceId, user, PERMISSIONS.CATEGORY_MANAGE);
 
     const previous = await this.categoryRepository.findById(categoryId);
     const service = new UpdateTicketCategory(this.categoryRepository);
@@ -131,7 +131,7 @@ export class TicketCategoryController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
-    await this.ensurePermission(workspaceId, user, PERMISSIONS.PROJECT_MANAGE);
+    await this.ensurePermission(workspaceId, user, PERMISSIONS.CATEGORY_MANAGE);
 
     const existing = await this.categoryRepository.findById(categoryId);
     if (!existing) throw new EntityNotFoundError('Category not found');
