@@ -91,6 +91,20 @@ export class MailboxController {
       autoReply: body.autoReply,
       postProcessAction: body.postProcessAction,
       postProcessFolder: body.postProcessFolder,
+    }).catch(async (err: unknown) => {
+      // Recorded after the permission check, so only a member allowed to try leaves this entry
+      await new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository).execute({
+        action: AuditAction.MAILBOX_CREATE_FAILED,
+        entityType: 'mailbox',
+        entityId: workspaceId,
+        userId: user.userId,
+        workspaceId,
+        metadata: { address: body.address, imapHost: body.imapHost, imapPort: body.imapPort, error: err instanceof Error ? err.message : String(err) },
+        category: AuditCategory.CONFIG,
+        level: AuditLevel.WARNING,
+        source: 'ui',
+      }).catch(() => undefined);
+      throw err;
     });
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
