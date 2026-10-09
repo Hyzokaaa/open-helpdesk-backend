@@ -12,6 +12,7 @@ import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit
 import { AuditAction } from '../../../../audit-log/domain/enums/audit-action.enum';
 import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
+import { connectionErrorDetail } from '../../../../shared/infrastructure/connection-error-detail';
 
 @Controller('system')
 export class SystemEmailSettingsController {
@@ -151,7 +152,7 @@ export class SystemEmailSettingsController {
 
       return { success: true };
     } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Unknown error';
+      const msg = connectionErrorDetail(error);
 
       const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
       await auditLog.execute({

@@ -21,6 +21,7 @@ import { NestEventPublisher } from '../../../../shared/infrastructure/nest-event
 import { CreateMailboxRequest } from '../dto/create-mailbox.request';
 import { UpdateMailboxRequest } from '../dto/update-mailbox.request';
 import { TestMailboxConnectionRequest } from '../dto/test-mailbox-connection.request';
+import { connectionErrorDetail } from '../../../../shared/infrastructure/connection-error-detail';
 
 @Controller('workspaces/:slug/mailboxes')
 export class MailboxController {
@@ -265,7 +266,7 @@ export class MailboxController {
 
       return { success: true, folders };
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Connection failed';
+      const msg = connectionErrorDetail(err);
 
       const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
       await auditLog.execute({
@@ -358,7 +359,7 @@ export class MailboxController {
       }
     } catch (err) {
       if (err instanceof BadRequestException) throw err;
-      throw new BadRequestException(`Could not connect to IMAP server to validate folder: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      throw new BadRequestException(`Could not connect to IMAP server to validate folder: ${connectionErrorDetail(err)}`);
     } finally {
       try { await client.logout(); } catch {}
     }

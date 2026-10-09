@@ -152,6 +152,7 @@ import { imageUploadOptions, LOGO_IMAGE_MIMES } from "../../../../shared/infrast
 import { TypeOrmOrganizationRepository } from "../../../../organization/infrastructure/typeorm/repositories/typeorm-organization.repository";
 import { OrganizationModel } from "../../../../organization/infrastructure/typeorm/models/organization.model";
 import { TypeOrmWorkspaceTicketReferenceRepository } from "../../typeorm/repositories/typeorm-workspace-ticket-reference.repository";
+import { connectionErrorDetail } from "../../../../shared/infrastructure/connection-error-detail";
 
 const IMPORT_LIMITS = importLimitsFromEnv();
 
@@ -1507,7 +1508,7 @@ export class WorkspaceController {
 
       return { success: true };
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Connection failed";
+      const msg = connectionErrorDetail(err);
 
       await auditLog.execute({
         action: AuditAction.EMAIL_SENDER_TEST_CONNECTION,
