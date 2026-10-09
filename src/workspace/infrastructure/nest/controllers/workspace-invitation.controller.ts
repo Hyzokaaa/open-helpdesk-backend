@@ -37,7 +37,28 @@ import { BatchInvitationRequest } from '../dto/batch-invitation.request';
 import { BatchInvitationCommand } from '../../../application/commands/batch-invitation.command';
 import { invitationEmail } from '../../../../email/templates/workspace-invitation.template';
 import { sendWorkspaceEmail } from '../../../../email/domain/resolve-email-sender';
+import { SendEmailResult } from '../../../../email/domain/email.service';
+import { connectionErrorDetail } from '../../../../shared/infrastructure/connection-error-detail';
+import { connectionErrorKind } from '../../../../shared/infrastructure/connection-error-kind';
 import { WorkspaceFrontendResolver } from '../../../../shared/infrastructure/workspace-frontend-resolver';
+
+/** Whether the invitation email left, and if not why, for the inviter to see instead of a guess */
+interface InvitationEmailOutcome {
+  emailSent: boolean;
+  emailFailure?: {
+    reason: 'no-email-service' | 'send-failed';
+    detail?: string;
+    /** Kind of failure (`connectionErrorKind`), so the client can say it in plain words */
+    code?: string;
+    via?: 'workspace' | 'global';
+  };
+}
+
+function invitationEmailOutcome(result: SendEmailResult): InvitationEmailOutcome {
+  if (result.success && !result.mock) return { emailSent: true };
+  if (result.mock) return { emailSent: false, emailFailure: { reason: 'no-email-service' } };
+  return { emailSent: false, emailFailure: { reason: 'send-failed', detail: result.error, code: result.errorCode, via: result.via } };
+}
 
 @Controller('workspaces')
 export class WorkspaceInvitationController {
@@ -84,17 +105,19 @@ export class WorkspaceInvitationController {
     const invitationUrl = `${frontendUrl}/invite/${result.token}`;
 
     const sender = await this.emailSenderRepository.findByWorkspaceId(workspace.getId());
+    let email: InvitationEmailOutcome;
     try {
-      await sendWorkspaceEmail(this.emailService, sender, invitationEmail({
+      email = invitationEmailOutcome(await sendWorkspaceEmail(this.emailService, sender, invitationEmail({
         to: body.email,
         workspaceName: workspace.name,
         inviterName,
         invitationUrl,
         workspaceUrl: frontendUrl,
         lang: 'en',
-      }));
-    } catch {
+      })));
+    } catch (err) {
       // Email failure should not fail the invitation creation
+      email = invitationEmailOutcome({ success: false, error: connectionErrorDetail(err), errorCode: connectionErrorKind(err) });
     }
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
@@ -110,7 +133,7 @@ export class WorkspaceInvitationController {
       source: 'ui',
     });
 
-    return { id: result.id, email: result.email, role: result.role, status: result.status, expiresAt: result.expiresAt };
+    return { id: result.id, email: result.email, role: result.role, status: result.status, expiresAt: result.expiresAt, ...email };
   }
 
   @Post(':slug/invitations/batch')
@@ -155,9 +178,9 @@ export class WorkspaceInvitationController {
               workspaceUrl: frontendUrl,
               lang: 'en',
             }));
-            (result as any).emailSent = emailResult.success && !emailResult.mock;
-          } catch {
-            (result as any).emailSent = false;
+            Object.assign(result, invitationEmailOutcome(emailResult));
+          } catch (err) {
+            Object.assign(result, invitationEmailOutcome({ success: false, error: connectionErrorDetail(err), errorCode: connectionErrorKind(err) }));
           }
         }
       }
@@ -245,20 +268,21 @@ export class WorkspaceInvitationController {
     const invitationUrl = `${frontendUrl}/invite/${invitation.token}`;
 
     const sender = await this.emailSenderRepository.findByWorkspaceId(workspace.getId());
-    let emailSent = false;
+    let email: InvitationEmailOutcome;
     try {
-      const emailResult = await sendWorkspaceEmail(this.emailService, sender, invitationEmail({
+      email = invitationEmailOutcome(await sendWorkspaceEmail(this.emailService, sender, invitationEmail({
         to: invitation.email,
         workspaceName: workspace.name,
         inviterName,
         invitationUrl,
         workspaceUrl: frontendUrl,
         lang: 'en',
-      }));
-      emailSent = emailResult.success && !emailResult.mock;
-    } catch {
+      })));
+    } catch (err) {
       // Email failure should not fail the resend
+      email = invitationEmailOutcome({ success: false, error: connectionErrorDetail(err), errorCode: connectionErrorKind(err) });
     }
+    const emailSent = email.emailSent;
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({
@@ -273,7 +297,7 @@ export class WorkspaceInvitationController {
       source: 'ui',
     });
 
-    return { id: invitation.getId(), email: invitation.email, expiresAt: invitation.expiresAt, emailSent };
+    return { id: invitation.getId(), email: invitation.email, expiresAt: invitation.expiresAt, ...email };
   }
 
   @Delete(':slug/invitations/:id')

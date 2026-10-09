@@ -5,6 +5,8 @@ import {
   SendEmailParams,
   SendEmailResult,
 } from '../domain/email.service';
+import { connectionErrorDetail } from '../../shared/infrastructure/connection-error-detail';
+import { connectionErrorKind } from '../../shared/infrastructure/connection-error-kind';
 
 export class ResendEmailService implements EmailService {
   private readonly logger = new Logger(ResendEmailService.name);
@@ -39,6 +41,8 @@ export class ResendEmailService implements EmailService {
       return { success: true };
     }
 
+    let lastError: string | undefined;
+    let lastErrorCode: string | undefined;
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
         const headers: Record<string, string> = {};
@@ -73,7 +77,9 @@ export class ResendEmailService implements EmailService {
         this.logger.log(`Email sent to ${recipient}: ${params.subject}`);
         return { success: true };
       } catch (error) {
-        const msg = error instanceof Error ? error.message : 'Unknown error';
+        const msg = connectionErrorDetail(error);
+        lastError = msg;
+        lastErrorCode = connectionErrorKind(error);
         this.logger.error(
           `Email attempt ${attempt}/${this.maxRetries} failed for ${recipient}: ${msg}`,
         );
@@ -84,6 +90,6 @@ export class ResendEmailService implements EmailService {
       }
     }
 
-    return { success: false };
+    return { success: false, error: lastError, errorCode: lastErrorCode };
   }
 }

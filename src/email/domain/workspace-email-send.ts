@@ -2,6 +2,8 @@ import { Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import { SmtpConfig } from '../../workspace/domain/entities/workspace-email-sender';
 import { SendEmailParams, SendEmailResult } from './email.service';
+import { connectionErrorDetail } from '../../shared/infrastructure/connection-error-detail';
+import { connectionErrorKind } from '../../shared/infrastructure/connection-error-kind';
 
 const logger = new Logger('WorkspaceEmailSend');
 
@@ -37,8 +39,8 @@ export async function sendViaWorkspaceSmtp(config: SmtpConfig, params: SendEmail
     logger.log(`Email sent via workspace SMTP to ${recipient}: ${params.subject}`);
     return { success: true };
   } catch (error) {
-    const msg = error instanceof Error ? error.message : 'Unknown error';
+    const msg = connectionErrorDetail(error);
     logger.error(`Workspace SMTP send failed for ${recipient}: ${msg}`);
-    return { success: false };
+    return { success: false, error: msg, errorCode: connectionErrorKind(error) };
   }
 }

@@ -16,7 +16,7 @@ export async function sendWorkspaceEmail(
     if (!result.success) {
       logger.error(`Workspace SMTP failed for ${sender.smtpFrom}, email not sent`);
     }
-    return result;
+    return { ...result, via: 'workspace' };
   }
-  return await globalService.send(params);
+  return { ...(await globalService.send(params)), via: 'global' };
 }
