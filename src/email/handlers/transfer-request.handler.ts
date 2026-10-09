@@ -13,13 +13,10 @@ import { TypeOrmWorkspaceEmailSenderRepository } from '../../workspace/infrastru
 import { TypeOrmTicketRepository } from '../../ticket/infrastructure/typeorm/repositories/typeorm-ticket.repository';
 import { sendWorkspaceEmail } from '../domain/resolve-email-sender';
 import { TypeOrmAuditLogRepository } from '../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
-import { CreateAuditLogEntry } from '../../audit-log/domain/services/audit-log-create';
-import { AuditAction } from '../../audit-log/domain/enums/audit-action.enum';
-import { AuditCategory } from '../../audit-log/domain/enums/audit-category.enum';
-import { AuditLevel } from '../../audit-log/domain/enums/audit-level.enum';
 import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
 import { WorkspaceFrontendResolver } from '../../shared/infrastructure/workspace-frontend-resolver';
+import { RecordEmailSend } from '../../audit-log/domain/services/audit-log-record-email-send';
 
 @Injectable()
 export class TransferRequestHandler {
@@ -67,9 +64,10 @@ export class TransferRequestHandler {
     const sender = await this.emailSenderRepository.findByWorkspaceId(event.workspaceId);
 
     for (const [lang, emails] of emailRecipients) {
+      const subject = template.createdSubject({ ticketName: event.ticketName, ticketUrl, requesterName: event.requesterName, workspaceName: event.workspaceName, lang });
       const result = await sendWorkspaceEmail(this.emailService, sender, {
         to: emails,
-        subject: template.createdSubject({ ticketName: event.ticketName, ticketUrl, requesterName: event.requesterName, workspaceName: event.workspaceName, lang }),
+        subject,
         html: template.createdHtml({ ticketName: event.ticketName, ticketUrl, requesterName: event.requesterName, workspaceName: event.workspaceName, lang }),
         ...(emailDomain && {
           messageId: `<transfer-${event.requestId}@${emailDomain}>`,
@@ -78,34 +76,9 @@ export class TransferRequestHandler {
         }),
         ...(mailbox && { replyTo: mailbox.address }),
       });
-      // Without any mail server the send is only simulated: that is not a sent email
-      if (!result.success || result.mock) {
-        const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-        await auditLog.execute({
-          action: AuditAction.EMAIL_SEND_FAILED,
-          entityType: 'email',
-          entityId: event.ticketId,
-          userId: null,
-          workspaceId: event.workspaceId,
-          metadata: { reason: result.mock ? 'no-email-service' : 'notification', to: emails, ticketId: event.ticketId },
-          category: AuditCategory.EMAIL,
-          level: result.mock ? AuditLevel.WARNING : AuditLevel.ERROR,
-          source: 'system',
-        }).catch(() => {});
-      } else {
-        const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-        await auditLog.execute({
-          action: AuditAction.EMAIL_SENT,
-          entityType: 'email',
-          entityId: event.ticketId,
-          userId: null,
-          workspaceId: event.workspaceId,
-          metadata: { to: emails, ticketId: event.ticketId, type: 'transfer-request' },
-          category: AuditCategory.EMAIL,
-          level: AuditLevel.INFO,
-          source: 'system',
-        }).catch(() => {});
-      }
+      await new RecordEmailSend(this.idGenerator, this.auditLogRepository).execute({
+        result, type: 'transfer-request', to: emails, subject, workspaceId: event.workspaceId, ticketId: event.ticketId,
+      });
     }
   }
 
@@ -140,9 +113,10 @@ export class TransferRequestHandler {
     const sender = await this.emailSenderRepository.findByWorkspaceId(event.workspaceId);
 
     for (const [lang, emails] of emailRecipients) {
+      const subject = template.resolvedSubject({ ticketName: event.ticketName, ticketUrl, resolution: event.resolution, workspaceName: event.workspaceName, lang });
       const result = await sendWorkspaceEmail(this.emailService, sender, {
         to: emails,
-        subject: template.resolvedSubject({ ticketName: event.ticketName, ticketUrl, resolution: event.resolution, workspaceName: event.workspaceName, lang }),
+        subject,
         html: template.resolvedHtml({ ticketName: event.ticketName, ticketUrl, resolution: event.resolution, workspaceName: event.workspaceName, lang }),
         ...(emailDomain && {
           inReplyTo: `<transfer-${event.requestId}@${emailDomain}>`,
@@ -150,34 +124,9 @@ export class TransferRequestHandler {
         }),
         ...(mailbox && { replyTo: mailbox.address }),
       });
-      // Without any mail server the send is only simulated: that is not a sent email
-      if (!result.success || result.mock) {
-        const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-        await auditLog.execute({
-          action: AuditAction.EMAIL_SEND_FAILED,
-          entityType: 'email',
-          entityId: event.ticketId,
-          userId: null,
-          workspaceId: event.workspaceId,
-          metadata: { reason: result.mock ? 'no-email-service' : 'notification', to: emails, ticketId: event.ticketId },
-          category: AuditCategory.EMAIL,
-          level: result.mock ? AuditLevel.WARNING : AuditLevel.ERROR,
-          source: 'system',
-        }).catch(() => {});
-      } else {
-        const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-        await auditLog.execute({
-          action: AuditAction.EMAIL_SENT,
-          entityType: 'email',
-          entityId: event.ticketId,
-          userId: null,
-          workspaceId: event.workspaceId,
-          metadata: { to: emails, ticketId: event.ticketId, type: 'transfer-request' },
-          category: AuditCategory.EMAIL,
-          level: AuditLevel.INFO,
-          source: 'system',
-        }).catch(() => {});
-      }
+      await new RecordEmailSend(this.idGenerator, this.auditLogRepository).execute({
+        result, type: 'transfer-request', to: emails, subject, workspaceId: event.workspaceId, ticketId: event.ticketId,
+      });
     }
   }
 }

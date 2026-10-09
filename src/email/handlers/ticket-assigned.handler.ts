@@ -13,13 +13,10 @@ import { TypeOrmWorkspaceEmailSenderRepository } from '../../workspace/infrastru
 import { TypeOrmTicketRepository } from '../../ticket/infrastructure/typeorm/repositories/typeorm-ticket.repository';
 import { sendWorkspaceEmail } from '../domain/resolve-email-sender';
 import { TypeOrmAuditLogRepository } from '../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
-import { CreateAuditLogEntry } from '../../audit-log/domain/services/audit-log-create';
-import { AuditAction } from '../../audit-log/domain/enums/audit-action.enum';
-import { AuditCategory } from '../../audit-log/domain/enums/audit-category.enum';
-import { AuditLevel } from '../../audit-log/domain/enums/audit-level.enum';
 import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
 import { WorkspaceFrontendResolver } from '../../shared/infrastructure/workspace-frontend-resolver';
+import { RecordEmailSend } from '../../audit-log/domain/services/audit-log-record-email-send';
 
 @Injectable()
 export class TicketAssignedHandler {
@@ -71,42 +68,18 @@ export class TicketAssignedHandler {
 
         for (const [lang, emails] of emailRecipients) {
           const data = { ticketName: event.ticketName, ticketUrl, workspaceName: event.workspaceName, lang };
+          const subject = template.unassignedSubject(data);
           const result = await sendWorkspaceEmail(this.emailService, sender, {
             to: emails,
-            subject: template.unassignedSubject(data),
+            subject,
             html: template.unassignedHtml(data),
             ...(emailDomain && { messageId: `<assign-${event.ticketId}-${Date.now()}@${emailDomain}>` }),
             ...threading,
             ...(mailbox && { replyTo: mailbox.address }),
           });
-          // Without any mail server the send is only simulated: that is not a sent email
-          if (!result.success || result.mock) {
-            const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-            await auditLog.execute({
-              action: AuditAction.EMAIL_SEND_FAILED,
-              entityType: 'email',
-              entityId: event.ticketId,
-              userId: null,
-              workspaceId: event.workspaceId,
-              metadata: { reason: result.mock ? 'no-email-service' : 'notification', to: emails, ticketId: event.ticketId },
-              category: AuditCategory.EMAIL,
-              level: result.mock ? AuditLevel.WARNING : AuditLevel.ERROR,
-              source: 'system',
-            }).catch(() => {});
-          } else {
-            const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-            await auditLog.execute({
-              action: AuditAction.EMAIL_SENT,
-              entityType: 'email',
-              entityId: event.ticketId,
-              userId: null,
-              workspaceId: event.workspaceId,
-              metadata: { to: emails, ticketId: event.ticketId, type: 'assignment' },
-              category: AuditCategory.EMAIL,
-              level: AuditLevel.INFO,
-              source: 'system',
-            }).catch(() => {});
-          }
+          await new RecordEmailSend(this.idGenerator, this.auditLogRepository).execute({
+            result, type: 'assignment', to: emails, subject, workspaceId: event.workspaceId, ticketId: event.ticketId,
+          });
         }
       }
     }
@@ -133,42 +106,18 @@ export class TicketAssignedHandler {
             workspaceName: event.workspaceName,
             lang,
           };
+          const subject = template.assignedSubject(data);
           const result = await sendWorkspaceEmail(this.emailService, sender, {
             to: emails,
-            subject: template.assignedSubject(data),
+            subject,
             html: template.assignedHtml(data),
             ...(emailDomain && { messageId: `<assign-${event.ticketId}-${Date.now()}@${emailDomain}>` }),
             ...threading,
             ...(mailbox && { replyTo: mailbox.address }),
           });
-          // Without any mail server the send is only simulated: that is not a sent email
-          if (!result.success || result.mock) {
-            const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-            await auditLog.execute({
-              action: AuditAction.EMAIL_SEND_FAILED,
-              entityType: 'email',
-              entityId: event.ticketId,
-              userId: null,
-              workspaceId: event.workspaceId,
-              metadata: { reason: result.mock ? 'no-email-service' : 'notification', to: emails, ticketId: event.ticketId },
-              category: AuditCategory.EMAIL,
-              level: result.mock ? AuditLevel.WARNING : AuditLevel.ERROR,
-              source: 'system',
-            }).catch(() => {});
-          } else {
-            const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-            await auditLog.execute({
-              action: AuditAction.EMAIL_SENT,
-              entityType: 'email',
-              entityId: event.ticketId,
-              userId: null,
-              workspaceId: event.workspaceId,
-              metadata: { to: emails, ticketId: event.ticketId, type: 'assignment' },
-              category: AuditCategory.EMAIL,
-              level: AuditLevel.INFO,
-              source: 'system',
-            }).catch(() => {});
-          }
+          await new RecordEmailSend(this.idGenerator, this.auditLogRepository).execute({
+            result, type: 'assignment', to: emails, subject, workspaceId: event.workspaceId, ticketId: event.ticketId,
+          });
         }
       }
     }
