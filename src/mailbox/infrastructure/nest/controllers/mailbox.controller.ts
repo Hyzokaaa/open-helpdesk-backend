@@ -22,6 +22,7 @@ import { CreateMailboxRequest } from '../dto/create-mailbox.request';
 import { UpdateMailboxRequest } from '../dto/update-mailbox.request';
 import { TestMailboxConnectionRequest } from '../dto/test-mailbox-connection.request';
 import { connectionErrorDetail } from '../../../../shared/infrastructure/connection-error-detail';
+import { connectionErrorKind } from '../../../../shared/infrastructure/connection-error-kind';
 
 @Controller('workspaces/:slug/mailboxes')
 export class MailboxController {
@@ -267,6 +268,7 @@ export class MailboxController {
       return { success: true, folders };
     } catch (err) {
       const msg = connectionErrorDetail(err);
+      const errorCode = connectionErrorKind(err);
 
       const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
       await auditLog.execute({
@@ -275,13 +277,13 @@ export class MailboxController {
         entityId: body.mailboxId ?? workspaceId,
         userId: user.userId,
         workspaceId,
-        metadata: { host: body.imapHost, port: body.imapPort, success: false, error: msg },
+        metadata: { host: body.imapHost, port: body.imapPort, success: false, error: msg, errorCode },
         category: AuditCategory.CONFIG,
         level: AuditLevel.WARNING,
         source: 'ui',
       });
 
-      return { success: false, error: msg, folders: [] };
+      return { success: false, error: msg, errorCode, folders: [] };
     }
   }
 
