@@ -238,7 +238,7 @@ export class WorkspaceInvitationController {
     });
 
     const service = new ResendInvitation(this.invitationRepository);
-    const invitation = await service.execute({ invitationId: id });
+    const invitation = await service.execute({ invitationId: id, workspaceId: workspace.getId() });
 
     const inviter = await this.userRepository.findById(user.userId);
     const inviterName = inviter ? `${inviter.firstName} ${inviter.lastName}` : '';
