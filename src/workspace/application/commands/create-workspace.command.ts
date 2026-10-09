@@ -17,6 +17,8 @@ interface Props {
   creatorIsSystemAdmin: boolean;
   accountId?: string;
   supportEmailDomain?: string;
+  /** The creator's language, which emails to people without an account yet start from */
+  defaultLanguage?: string | null;
 }
 
 export interface CreateWorkspaceResponse {
@@ -43,6 +45,7 @@ export class CreateWorkspaceCommand implements Command<Props, CreateWorkspaceRes
       name: props.name,
       description: props.description,
       accountId: props.accountId,
+      defaultLanguage: props.defaultLanguage,
     });
 
     await this.addMember.execute({

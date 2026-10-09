@@ -29,6 +29,7 @@ export enum AuditAction {
   /** Erased for good with all its data and files, by the scheduler or a system admin. */
   WORKSPACE_PURGED = 'workspace-purged',
   WORKSPACE_PALETTE_UPDATED = 'workspace-palette-updated',
+  WORKSPACE_DEFAULT_LANGUAGE_UPDATED = 'workspace-default-language-updated',
   WORKSPACE_SLA_UPDATED = 'workspace-sla-updated',
   /** No longer emitted: older entries were written after an import finished. See WORKSPACE_IMPORT_COMPLETED. */
   WORKSPACE_IMPORT_STARTED = 'workspace-import-started',

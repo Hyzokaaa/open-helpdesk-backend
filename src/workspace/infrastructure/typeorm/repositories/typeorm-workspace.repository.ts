@@ -136,6 +136,7 @@ export class TypeOrmWorkspaceRepository implements WorkspaceRepository {
       description: model.description,
       accountId: model.accountId,
       palette: (model.metadata as any)?.palette ?? null,
+      defaultLanguage: (model.metadata as any)?.defaultLanguage ?? null,
       slaPolicy: model.slaPolicy as any ?? null,
       systemMailboxEnabled: model.systemMailboxEnabled ?? true,
       customDomain: model.customDomain ?? null,
@@ -159,7 +160,7 @@ export class TypeOrmWorkspaceRepository implements WorkspaceRepository {
     model.slug = workspace.slug;
     model.description = workspace.description;
     model.accountId = workspace.accountId;
-    model.metadata = { palette: workspace.palette };
+    model.metadata = { palette: workspace.palette, defaultLanguage: workspace.defaultLanguage };
     model.slaPolicy = workspace.slaPolicy as any;
     model.systemMailboxEnabled = workspace.systemMailboxEnabled;
     model.customDomain = workspace.customDomain;

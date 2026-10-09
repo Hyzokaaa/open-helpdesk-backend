@@ -43,6 +43,8 @@ import { WorkspaceEmailSender } from '../../../domain/entities/workspace-email-s
 import { connectionErrorDetail } from '../../../../shared/infrastructure/connection-error-detail';
 import { connectionErrorKind } from '../../../../shared/infrastructure/connection-error-kind';
 import { WorkspaceFrontendResolver } from '../../../../shared/infrastructure/workspace-frontend-resolver';
+import { Workspace } from '../../../domain/entities/workspace';
+import { User } from '../../../../user/domain/entities/user';
 
 /** Whether the invitation email left, and if not why, for the inviter to see instead of a guess */
 interface InvitationEmailOutcome {
@@ -113,8 +115,7 @@ export class WorkspaceInvitationController {
       inviterName,
       invitationUrl,
       workspaceUrl: frontendUrl,
-      // The invitee has no language of their own yet: the inviter's is the best guess
-      lang: inviter?.language ?? 'en',
+      lang: await this.invitationLanguage(workspace, body.email, inviter),
     }), { workspaceId: workspace.getId(), invitationId: result.id, userId: user.userId });
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
@@ -172,7 +173,7 @@ export class WorkspaceInvitationController {
             inviterName,
             invitationUrl,
             workspaceUrl: frontendUrl,
-            lang: inviter?.language ?? 'en',
+            lang: await this.invitationLanguage(workspace, result.email, inviter),
           }), { workspaceId: workspace.getId(), invitationId: invitation.getId(), userId: user.userId }));
         }
       }
@@ -266,7 +267,7 @@ export class WorkspaceInvitationController {
       inviterName,
       invitationUrl,
       workspaceUrl: frontendUrl,
-      lang: inviter?.language ?? 'en',
+      lang: await this.invitationLanguage(workspace, invitation.email, inviter),
     }), { workspaceId: workspace.getId(), invitationId: invitation.getId(), userId: user.userId });
     const emailSent = email.emailSent;
 
@@ -347,6 +348,15 @@ export class WorkspaceInvitationController {
       source: 'ui',
     });
     return invitationEmailOutcome(result);
+  }
+
+  /**
+   * Someone who already has an account reads it in their own language. Someone who has none yet
+   * gets the workspace's language, or the inviter's when the workspace has none set.
+   */
+  private async invitationLanguage(workspace: Workspace, email: string, inviter: User | null): Promise<string> {
+    const invitee = await this.userRepository.findByEmail(email);
+    return invitee?.language ?? workspace.defaultLanguage ?? inviter?.language ?? 'en';
   }
 
   private async resolveWorkspace(slug: string) {
