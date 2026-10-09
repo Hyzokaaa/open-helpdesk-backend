@@ -25,6 +25,7 @@ import { ResolveTicketStakeholders } from '../../notification/domain/services/no
 import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
 import { WorkspaceFrontendResolver } from '../../shared/infrastructure/workspace-frontend-resolver';
+
 import { TypeOrmTicketCategoryRepository } from '../../project/infrastructure/typeorm/repositories/typeorm-ticket-category.repository';
 
 @Injectable()
@@ -105,7 +106,8 @@ export class TicketCreatedHandler {
         ...(emailDomain && { messageId: `<ticket-${event.ticketId}@${emailDomain}>` }),
         ...(mailbox && { replyTo: mailbox.address }),
       });
-      if (!result.success) {
+      // Without any mail server the send is only simulated: that is not a sent email
+      if (!result.success || result.mock) {
         const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
         await auditLog.execute({
           action: AuditAction.EMAIL_SEND_FAILED,
@@ -113,9 +115,9 @@ export class TicketCreatedHandler {
           entityId: event.ticketId,
           userId: null,
           workspaceId: event.workspaceId,
-          metadata: { reason: 'notification', to: emails, ticketId: event.ticketId },
+          metadata: { reason: result.mock ? 'no-email-service' : 'notification', to: emails, ticketId: event.ticketId },
           category: AuditCategory.EMAIL,
-          level: AuditLevel.ERROR,
+          level: result.mock ? AuditLevel.WARNING : AuditLevel.ERROR,
           source: 'system',
         }).catch(() => {});
       } else {
@@ -161,7 +163,8 @@ export class TicketCreatedHandler {
       html: template.html({ ticketName: event.ticketName, portalUrl, lang }),
       ...(mailbox && { replyTo: mailbox.address }),
     });
-    if (!result.success) {
+    // Without any mail server the send is only simulated: that is not a sent email
+    if (!result.success || result.mock) {
       const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
       await auditLog.execute({
         action: AuditAction.EMAIL_SEND_FAILED,
@@ -169,9 +172,9 @@ export class TicketCreatedHandler {
         entityId: event.ticketId,
         userId: null,
         workspaceId: event.workspaceId,
-        metadata: { reason: 'notification', to: creator.email, ticketId: event.ticketId },
+        metadata: { reason: result.mock ? 'no-email-service' : 'notification', to: creator.email, ticketId: event.ticketId },
         category: AuditCategory.EMAIL,
-        level: AuditLevel.ERROR,
+        level: result.mock ? AuditLevel.WARNING : AuditLevel.ERROR,
         source: 'system',
       }).catch(() => {});
     } else {

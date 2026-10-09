@@ -79,7 +79,8 @@ export class TicketAssignedHandler {
             ...threading,
             ...(mailbox && { replyTo: mailbox.address }),
           });
-          if (!result.success) {
+          // Without any mail server the send is only simulated: that is not a sent email
+          if (!result.success || result.mock) {
             const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
             await auditLog.execute({
               action: AuditAction.EMAIL_SEND_FAILED,
@@ -87,9 +88,9 @@ export class TicketAssignedHandler {
               entityId: event.ticketId,
               userId: null,
               workspaceId: event.workspaceId,
-              metadata: { reason: 'notification', to: emails, ticketId: event.ticketId },
+              metadata: { reason: result.mock ? 'no-email-service' : 'notification', to: emails, ticketId: event.ticketId },
               category: AuditCategory.EMAIL,
-              level: AuditLevel.ERROR,
+              level: result.mock ? AuditLevel.WARNING : AuditLevel.ERROR,
               source: 'system',
             }).catch(() => {});
           } else {
@@ -140,7 +141,8 @@ export class TicketAssignedHandler {
             ...threading,
             ...(mailbox && { replyTo: mailbox.address }),
           });
-          if (!result.success) {
+          // Without any mail server the send is only simulated: that is not a sent email
+          if (!result.success || result.mock) {
             const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
             await auditLog.execute({
               action: AuditAction.EMAIL_SEND_FAILED,
@@ -148,9 +150,9 @@ export class TicketAssignedHandler {
               entityId: event.ticketId,
               userId: null,
               workspaceId: event.workspaceId,
-              metadata: { reason: 'notification', to: emails, ticketId: event.ticketId },
+              metadata: { reason: result.mock ? 'no-email-service' : 'notification', to: emails, ticketId: event.ticketId },
               category: AuditCategory.EMAIL,
-              level: AuditLevel.ERROR,
+              level: result.mock ? AuditLevel.WARNING : AuditLevel.ERROR,
               source: 'system',
             }).catch(() => {});
           } else {
