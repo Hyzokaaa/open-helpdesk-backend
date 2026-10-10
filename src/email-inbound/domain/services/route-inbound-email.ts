@@ -193,7 +193,7 @@ export class RouteInboundEmail {
             commentId: comment.getId(),
             authorId: user.getId(),
             authorName: `${user.firstName} ${user.lastName}`.trim(),
-            commentContent: parsed.body,
+            commentContent: comment.content,
             assigneeId: ticket.assigneeId,
             mentionedUserIds: [],
             workspaceId: workspace.getId(),
