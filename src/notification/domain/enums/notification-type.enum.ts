@@ -6,4 +6,5 @@ export enum NotificationType {
   COMMENT_CREATED = 'comment-created',
   TRANSFER_REQUEST = 'transfer-request',
   UPGRADE_AVAILABLE = 'upgrade-available',
+  INVITATION_EXPIRED = 'invitation-expired',
 }

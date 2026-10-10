@@ -155,6 +155,8 @@ import { TypeOrmWorkspaceTicketReferenceRepository } from "../../typeorm/reposit
 import { connectionErrorDetail } from "../../../../shared/infrastructure/connection-error-detail";
 import { connectionErrorKind } from "../../../../shared/infrastructure/connection-error-kind";
 import { RecordEmailSend } from "../../../../audit-log/domain/services/audit-log-record-email-send";
+import { UpdateWorkspaceDefaultLanguage } from "../../../domain/services/workspace-update-default-language";
+import { UpdateWorkspaceDefaultLanguageRequest } from "../dto/update-workspace-default-language.request";
 
 const IMPORT_LIMITS = importLimitsFromEnv();
 
@@ -244,9 +246,11 @@ export class WorkspaceController {
       seedCategories,
       createMailbox,
     );
+    const creator = await this.userRepository.findById(user.userId);
     return command.execute({
       name: body.name,
       description: body.description,
+      defaultLanguage: creator?.language ?? null,
       creatorUserId: user.userId,
       creatorIsSystemAdmin: user.isSystemAdmin,
       accountId: account?.getId(),
@@ -746,6 +750,43 @@ export class WorkspaceController {
     });
   }
 
+  /** The language of emails to people who have no account yet, such as a new invitee */
+  @Patch(":slug/default-language")
+  async updateDefaultLanguage(
+    @Param("slug") slug: string,
+    @Body() body: UpdateWorkspaceDefaultLanguageRequest,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(
+      this.memberRepository,
+    );
+    await ensurePermission.execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+    const { before, after } = await new UpdateWorkspaceDefaultLanguage(this.workspaceRepository).execute({
+      workspaceId,
+      language: body.language,
+    });
+
+    await new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository).execute({
+      action: AuditAction.WORKSPACE_DEFAULT_LANGUAGE_UPDATED,
+      entityType: "workspace",
+      entityId: workspaceId,
+      userId: user.userId,
+      workspaceId,
+      metadata: { before: { defaultLanguage: before }, after: { defaultLanguage: after } },
+      category: AuditCategory.WORKSPACE,
+      level: AuditLevel.INFO,
+      source: "ui",
+    });
+
+    return { defaultLanguage: after };
+  }
+
   @Patch(":slug/palette")
   async updatePalette(
     @Param("slug") slug: string,
@@ -794,10 +835,11 @@ export class WorkspaceController {
     const ensurePermission = new EnsureWorkspacePermission(
       this.memberRepository,
     );
+    // Read by whoever works tickets, so the ticket's SLA card has its targets; saving needs the settings
     await ensurePermission.execute({
       workspaceId,
       userId: user.userId,
-      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      permission: PERMISSIONS.SLA_VIEW,
       isSystemAdmin: user.isSystemAdmin,
     });
     const workspace = await this.workspaceRepository.findById(workspaceId);

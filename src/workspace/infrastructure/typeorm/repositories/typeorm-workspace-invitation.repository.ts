@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, LessThanOrEqual, Repository } from 'typeorm';
 import { WorkspaceInvitation } from '../../../domain/entities/workspace-invitation';
 import { WorkspaceInvitationRepository } from '../../../domain/repositories/workspace-invitation.repository';
 import { WorkspaceInvitationModel } from '../models/workspace-invitation.model';
@@ -49,6 +49,15 @@ export class TypeOrmWorkspaceInvitationRepository implements WorkspaceInvitation
     await this.repository.save(this.toModel(invitation));
   }
 
+  async findExpiredUnnotified(now: Date, limit: number): Promise<WorkspaceInvitation[]> {
+    const models = await this.repository.find({
+      where: { status: 'pending', expiresAt: LessThanOrEqual(now), expiryNotifiedAt: IsNull() },
+      order: { expiresAt: 'ASC' },
+      take: limit,
+    });
+    return models.map((m) => this.toDomain(m));
+  }
+
   private toDomain(model: WorkspaceInvitationModel): WorkspaceInvitation {
     return new WorkspaceInvitation({
       id: model.id,
@@ -61,6 +70,7 @@ export class TypeOrmWorkspaceInvitationRepository implements WorkspaceInvitation
       invitedById: model.invitedById,
       createdAt: model.createdAt,
       lastSentAt: model.lastSentAt,
+      expiryNotifiedAt: model.expiryNotifiedAt,
     });
   }
 
@@ -75,6 +85,7 @@ export class TypeOrmWorkspaceInvitationRepository implements WorkspaceInvitation
     model.expiresAt = invitation.expiresAt;
     model.invitedById = invitation.invitedById;
     model.lastSentAt = invitation.lastSentAt;
+    model.expiryNotifiedAt = invitation.expiryNotifiedAt;
     return model;
   }
 }

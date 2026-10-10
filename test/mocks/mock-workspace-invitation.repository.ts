@@ -43,4 +43,11 @@ export class MockWorkspaceInvitationRepository implements WorkspaceInvitationRep
   seed(invitation: WorkspaceInvitation): void {
     this.invitations.push(invitation);
   }
+
+  async findExpiredUnnotified(now: Date, limit: number): Promise<WorkspaceInvitation[]> {
+    return this.invitations
+      .filter((i) => i.status === InvitationStatus.PENDING && i.expiresAt <= now && !i.expiryNotifiedAt)
+      .sort((a, b) => a.expiresAt.getTime() - b.expiresAt.getTime())
+      .slice(0, limit);
+  }
 }

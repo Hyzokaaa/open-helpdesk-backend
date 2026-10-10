@@ -19,6 +19,7 @@ interface Props {
   inAppTransferRequest: boolean;
   emailUpgradeAvailable: boolean;
   inAppUpgradeAvailable: boolean;
+  inAppInvitationExpired?: boolean;
   bellUnreadOnly: boolean;
 }
 
@@ -41,6 +42,7 @@ export class NotificationPreference {
   inAppTransferRequest: boolean;
   emailUpgradeAvailable: boolean;
   inAppUpgradeAvailable: boolean;
+  inAppInvitationExpired: boolean;
   bellUnreadOnly: boolean;
 
   constructor(props: Props) {
@@ -62,6 +64,7 @@ export class NotificationPreference {
     this.inAppTransferRequest = props.inAppTransferRequest;
     this.emailUpgradeAvailable = props.emailUpgradeAvailable;
     this.inAppUpgradeAvailable = props.inAppUpgradeAvailable;
+    this.inAppInvitationExpired = props.inAppInvitationExpired ?? true;
     this.bellUnreadOnly = props.bellUnreadOnly;
   }
 

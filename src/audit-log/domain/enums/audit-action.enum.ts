@@ -29,6 +29,7 @@ export enum AuditAction {
   /** Erased for good with all its data and files, by the scheduler or a system admin. */
   WORKSPACE_PURGED = 'workspace-purged',
   WORKSPACE_PALETTE_UPDATED = 'workspace-palette-updated',
+  WORKSPACE_DEFAULT_LANGUAGE_UPDATED = 'workspace-default-language-updated',
   WORKSPACE_SLA_UPDATED = 'workspace-sla-updated',
   /** No longer emitted: older entries were written after an import finished. See WORKSPACE_IMPORT_COMPLETED. */
   WORKSPACE_IMPORT_STARTED = 'workspace-import-started',
@@ -70,6 +71,8 @@ export enum AuditAction {
   INVITATION_CANCELLED = 'invitation-cancelled',
   INVITATION_ACCEPTED = 'invitation-accepted',
   INVITATION_REJECTED = 'invitation-rejected',
+  /** Noticed by the hourly check once its link stopped working; recorded with no actor */
+  INVITATION_EXPIRED = 'invitation-expired',
 
   // User
   USER_CREATED = 'user-created',

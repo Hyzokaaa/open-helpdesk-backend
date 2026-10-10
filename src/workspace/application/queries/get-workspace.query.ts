@@ -18,6 +18,7 @@ export interface WorkspaceResponse {
   slug: string;
   description: string;
   palette: string | null;
+  defaultLanguage: string | null;
   supportEmail: string | null;
   systemMailboxEnabled: boolean;
   customDomain: string | null;
@@ -72,6 +73,7 @@ export class GetWorkspaceQuery implements Query<Props, WorkspaceResponse> {
       slug: workspace.slug,
       description: workspace.description,
       palette: workspace.palette,
+      defaultLanguage: workspace.defaultLanguage,
       supportEmail: mailbox?.address ?? null,
       systemMailboxEnabled: workspace.systemMailboxEnabled,
       customDomain: workspace.customDomain,

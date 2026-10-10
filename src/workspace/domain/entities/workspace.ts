@@ -19,6 +19,8 @@ interface Props {
   description: string;
   accountId?: string | null;
   palette?: string | null;
+  /** Language of emails to people without an account yet, such as a new invitee; null falls back to the inviter's */
+  defaultLanguage?: string | null;
   slaPolicy?: SlaPolicy | null;
   systemMailboxEnabled?: boolean;
   customDomain?: string | null;
@@ -41,6 +43,7 @@ export class Workspace {
   description: string;
   accountId: string | null;
   palette: string | null;
+  defaultLanguage: string | null;
   slaPolicy: SlaPolicy | null;
   systemMailboxEnabled: boolean;
   customDomain: string | null;
@@ -63,6 +66,7 @@ export class Workspace {
     this.description = props.description;
     this.accountId = props.accountId ?? null;
     this.palette = props.palette ?? null;
+    this.defaultLanguage = props.defaultLanguage ?? null;
     this.slaPolicy = props.slaPolicy ?? null;
     this.systemMailboxEnabled = props.systemMailboxEnabled ?? true;
     this.customDomain = props.customDomain ?? null;

@@ -8,6 +8,7 @@ interface CreateWorkspaceProps {
   name: string;
   description: string;
   accountId?: string;
+  defaultLanguage?: string | null;
 }
 
 export class CreateWorkspace {
@@ -30,6 +31,7 @@ export class CreateWorkspace {
       slug,
       description: props.description,
       accountId: props.accountId,
+      defaultLanguage: props.defaultLanguage ?? null,
     });
 
     await this.repository.create(workspace);

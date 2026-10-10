@@ -327,8 +327,10 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
 
   private async processMessage(msg: FetchedMessage, parser: ImapEmailParser, router: RouteInboundEmail, mailboxId?: string, workspaceId?: string | null, mailbox?: Mailbox): Promise<'created' | 'rejected' | 'skipped'> {
     try {
+      // Marked per mailbox: a mailbox that skips a message must not hide it from another one on the same inbox
+      const markKey = mailboxId ?? 'system';
       if (msg.envelope.messageId) {
-        const alreadyProcessed = await this.processedEmailRepository.exists(msg.envelope.messageId);
+        const alreadyProcessed = await this.processedEmailRepository.exists(msg.envelope.messageId, markKey);
         if (alreadyProcessed) return 'skipped';
       }
 
@@ -351,7 +353,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
 
         if (!matches) {
           if (msg.envelope.messageId) {
-            await this.processedEmailRepository.markProcessed(msg.envelope.messageId);
+            await this.processedEmailRepository.markProcessed(msg.envelope.messageId, markKey);
           }
           return 'skipped';
         }
@@ -366,7 +368,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       if (result.reason === 'workspace-deleted') return 'skipped';
 
       if (msg.envelope.messageId) {
-        await this.processedEmailRepository.markProcessed(msg.envelope.messageId);
+        await this.processedEmailRepository.markProcessed(msg.envelope.messageId, markKey);
       }
 
       if (mailboxId) {

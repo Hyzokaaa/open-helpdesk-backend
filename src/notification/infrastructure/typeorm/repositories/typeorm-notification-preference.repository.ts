@@ -56,6 +56,7 @@ export class TypeOrmNotificationPreferenceRepository
       inAppTransferRequest: model.inAppTransferRequest,
       emailUpgradeAvailable: model.emailUpgradeAvailable,
       inAppUpgradeAvailable: model.inAppUpgradeAvailable,
+      inAppInvitationExpired: model.inAppInvitationExpired,
       bellUnreadOnly: model.bellUnreadOnly,
     });
   }
@@ -82,6 +83,7 @@ export class TypeOrmNotificationPreferenceRepository
     model.inAppTransferRequest = pref.inAppTransferRequest;
     model.emailUpgradeAvailable = pref.emailUpgradeAvailable;
     model.inAppUpgradeAvailable = pref.inAppUpgradeAvailable;
+    model.inAppInvitationExpired = pref.inAppInvitationExpired;
     model.bellUnreadOnly = pref.bellUnreadOnly;
     return model;
   }

@@ -84,8 +84,8 @@ export class TicketAssignedHandler {
       }
     }
 
-    // Assigned — notify new assignee
-    if (event.newAssigneeId) {
+    // Assigned — notify new assignee, unless they assigned it to themselves (a pickup, for one)
+    if (event.newAssigneeId && event.newAssigneeId !== event.assignedById) {
       const newUsers = await this.userRepository.findByIds([event.newAssigneeId]);
       if (newUsers.length > 0) {
         const { emailRecipients } = await dispatch.execute({

@@ -16,6 +16,52 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.32.0',
+    date: '2026-10-09',
+    categories: [
+      {
+        title: { en: 'Invitations', es: 'Invitaciones' },
+        features: [
+          { en: 'The inviter gets a notice in the app when an invitation of theirs expires, once, with a preference to turn it off', es: 'Quien invita recibe un aviso en la app cuando caduca una de sus invitaciones, una sola vez, con una preferencia para desactivarlo' },
+          { en: 'Expired invitations no longer take up agent seats of the plan', es: 'Las invitaciones caducadas ya no ocupan plazas de agente del plan' },
+          { en: 'Invitations to an email without an account use the workspace language, set in Settings → Email language; anyone with an account gets them in their own language', es: 'Las invitaciones a un email sin cuenta usan el idioma del espacio, en Ajustes → Idioma de los emails; quien ya tiene cuenta las recibe en su propio idioma' },
+          { en: 'Clearer notices when an invitation email cannot be sent: what happened, what to do and the server answer', es: 'Avisos más claros cuando no se puede enviar una invitación: qué pasó, qué hacer y la respuesta del servidor' },
+        ],
+      },
+      {
+        title: { en: 'Tickets', es: 'Tickets' },
+        features: [
+          { en: 'Picking up a ticket now notifies like a status change and an assignment: emails, in-app notices and webhooks', es: 'Coger un ticket avisa ahora como un cambio de estado y una asignación: emails, avisos en la app y webhooks' },
+          { en: 'Supervisors and agents see the SLA targets of the ticket', es: 'Supervisores y agentes ven los objetivos SLA del ticket' },
+          { en: 'Followers show like the assignee, with their card and a link to their stats', es: 'Los seguidores se muestran como el asignado, con su tarjeta y enlace a sus estadísticas' },
+          { en: 'Ticket categories have their own view and manage permissions; agents see them read-only', es: 'Las categorías de ticket tienen sus propios permisos de ver y gestionar; los agentes las ven en solo lectura' },
+        ],
+      },
+      {
+        title: { en: 'Mailboxes and email', es: 'Buzones y email' },
+        features: [
+          { en: 'Two mailboxes on the same inbox no longer lose emails meant for the other one', es: 'Dos buzones sobre la misma bandeja ya no pierden los correos destinados al otro' },
+          { en: 'A notice when another mailbox already reads the same inbox, and when a sender password would travel unencrypted', es: 'Un aviso cuando otro buzón ya lee la misma bandeja, y cuando la contraseña de un remitente viajaría sin cifrar' },
+        ],
+      },
+      {
+        title: { en: 'Sessions and interface', es: 'Sesión e interfaz' },
+        features: [
+          { en: 'Without keep me signed in, the session ends when the browser closes, and stays across tabs; the choice is remembered', es: 'Sin mantener sesión iniciada, la sesión termina al cerrar el navegador y se mantiene entre pestañas; la elección se recuerda' },
+          { en: 'Help text, badges and small labels are larger and easier to read', es: 'Los textos de ayuda, badges y etiquetas pequeñas son más grandes y fáciles de leer' },
+          { en: 'After a deployment, an open tab reloads by itself instead of failing to open a screen', es: 'Tras un despliegue, una pestaña abierta recarga sola en vez de fallar al abrir una pantalla' },
+          { en: 'The site root takes a signed-in user to the dashboard', es: 'La raíz del sitio lleva al panel a quien ya ha iniciado sesión' },
+        ],
+      },
+      {
+        title: { en: 'Audit log', es: 'Registro de auditoría' },
+        features: [
+          { en: 'Priority, status and role values are translated in the entry details', es: 'Los valores de prioridad, estado y rol se traducen en el detalle de las entradas' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.31.0',
     date: '2026-10-09',
     categories: [
