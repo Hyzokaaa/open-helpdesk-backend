@@ -13,18 +13,19 @@ const ESCAPES: Record<string, string> = {
  * comments are rendered as HTML — so without this the line breaks collapse and the
  * editor reports a phantom edit the first time someone saves an imported ticket.
  *
- * Input that already carries markup is returned untouched.
+ * The input is always treated as text: anything that looks like a tag, such as
+ * `<john@example.com>`, is escaped and shown as written.
  */
 export function textToHtml(value: string | null | undefined): string {
-  const text = (value ?? '').trim();
+  const text = (value ?? '').replace(/\r\n?/g, '\n').trim();
   if (!text) return '';
-  if (/<[a-z][^>]*>/i.test(text)) return text;
 
   return text
-    .split(/\n{2,}/)
+    .split(/\n\s*\n/)
     .map((block) =>
       block
-        .split(/\n/)
+        .trim()
+        .split('\n')
         .map((line) => line.replace(/[&<>"']/g, (c) => ESCAPES[c]))
         .join('<br>'),
     )
