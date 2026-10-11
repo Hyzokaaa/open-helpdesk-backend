@@ -10,6 +10,7 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Readable } from 'stream';
 import { StorageService, StoredObjectInfo } from '../domain/storage-service';
+import { presignedLinkWindow } from '../domain/presigned-link-window';
 import { fileDelivery } from './file-delivery';
 import { exactLength } from './exact-length';
 
@@ -102,9 +103,12 @@ export class S3StorageService implements StorageService {
       Key: key,
       ResponseContentType: delivery.contentType,
       ResponseContentDisposition: delivery.contentDisposition,
+      // Same as files served from local storage, so the browser keeps them while the link stays the same
+      ResponseCacheControl: 'private, max-age=3600',
     });
+    const window = presignedLinkWindow(expiresIn);
     try {
-      return await getSignedUrl(this.client, command, { expiresIn });
+      return await getSignedUrl(this.client, command, { expiresIn: window.expiresIn, signingDate: window.signedAt });
     } catch (error) {
       throw this.handleConnectionError(error);
     }

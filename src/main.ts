@@ -61,6 +61,8 @@ async function bootstrap() {
       }
     },
     exposedHeaders: ["X-Unread-Count", "Date", "Content-Disposition"],
+    // Lets the browser reuse a preflight answer for an hour instead of repeating the OPTIONS request before most calls
+    maxAge: 3600,
   });
 
   // Public API document at /api/v1/openapi.json; /docs and /api/v1/docs redirect to the web app's /docs page

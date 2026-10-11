@@ -16,6 +16,28 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.32.1',
+    date: '2026-10-11',
+    categories: [
+      {
+        title: { en: 'Tickets', es: 'Tickets' },
+        features: [
+          { en: 'Tickets and replies that arrive by email keep their paragraphs and line breaks', es: 'Los tickets y respuestas que llegan por email conservan sus párrafos y saltos de línea' },
+          { en: 'Saving a ticket or a comment without changing it no longer marks it as edited', es: 'Guardar un ticket o un comentario sin cambiarlo ya no lo marca como editado' },
+        ],
+      },
+      {
+        title: { en: 'Speed', es: 'Velocidad' },
+        features: [
+          { en: 'Moving between screens shows a loading indicator right away instead of seeming frozen', es: 'Al cambiar de pantalla se muestra un indicador de carga al instante en vez de parecer congelada' },
+          { en: 'The ticket list opens faster: the ticket view and the editor load only when a ticket is opened', es: 'La lista de tickets abre más rápido: la vista del ticket y el editor se cargan solo al abrir un ticket' },
+          { en: 'Logos, avatars and attachments are reused from the browser cache instead of downloading on every visit', es: 'Los logos, avatares y adjuntos se reutilizan desde la caché del navegador en vez de descargarse en cada visita' },
+          { en: 'Fewer round trips to the server when the app and the API are on different domains', es: 'Menos viajes al servidor cuando la aplicación y la API están en dominios distintos' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.32.0',
     date: '2026-10-09',
     categories: [

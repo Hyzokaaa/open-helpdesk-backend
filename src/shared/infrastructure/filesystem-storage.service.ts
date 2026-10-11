@@ -6,6 +6,7 @@ import { dirname, resolve, sep } from 'path';
 import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
 import { StorageService, StoredObjectInfo } from '../domain/storage-service';
+import { presignedLinkWindow } from '../domain/presigned-link-window';
 import { exactLength } from './exact-length';
 
 @Injectable()
@@ -61,7 +62,7 @@ export class FilesystemStorageService implements StorageService {
   }
 
   async getPresignedUrl(key: string, expiresIn = 3600): Promise<string> {
-    const expires = Math.floor(Date.now() / 1000) + expiresIn;
+    const expires = presignedLinkWindow(expiresIn).expiresAt;
     const signature = this.sign(key, expires);
     return `${this.baseUrl}/storage/files/${key}?expires=${expires}&signature=${signature}`;
   }
