@@ -24,9 +24,10 @@ import { TypeOrmSystemEmailSettingsRepository } from '../config/infrastructure/t
 
 import { ProjectModule } from '../project/project.module';
 import { WorkspaceLifecycleHandler } from './handlers/workspace-lifecycle.handler';
+import { AttachmentModule } from '../attachment/attachment.module';
 @Global()
 @Module({
-  imports: [UserModule, WorkspaceModule, NotificationModule, SharedModule, CsatModule, TicketModule, MailboxModule, AuditLogModule, CoreConfigModule, ProjectModule],
+  imports: [UserModule, WorkspaceModule, NotificationModule, SharedModule, CsatModule, TicketModule, MailboxModule, AuditLogModule, CoreConfigModule, ProjectModule, AttachmentModule],
   controllers: [AdminEmailController],
   providers: [
     {

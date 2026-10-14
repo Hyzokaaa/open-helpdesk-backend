@@ -4,6 +4,7 @@ import { TicketRepository } from '../../domain/repositories/ticket.repository';
 import { EnsureTicketAccess, TicketAccessLevel } from '../../domain/services/ticket-ensure-access';
 import { ticketReferenceOf } from '../../domain/ticket-reference';
 import { SummarizeUsers, UserSummary } from '../../../user/domain/services/user-summarize';
+import { AuditActivityRepository } from '../../../audit-log/domain/repositories/audit-activity.repository';
 
 interface Props {
   ticketId: string;
@@ -41,6 +42,8 @@ export interface TicketDetailResponse {
   accessLevel: TicketAccessLevel;
   aiCache: Record<string, { source: string; result: string }>;
   descriptionEditedAt: Date | null;
+  /** When a person last did anything to the ticket: a change, a comment, a file, an edit... */
+  lastActivityAt?: Date | null;
   reporter?: UserSummary | null;
   assignee?: UserSummary | null;
   registeredBy?: UserSummary | null;
@@ -52,6 +55,7 @@ export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
     private readonly repository: TicketRepository,
     private readonly ensureTicketAccess: EnsureTicketAccess,
     private readonly summarizeUsers?: SummarizeUsers,
+    private readonly activity?: AuditActivityRepository,
   ) {}
 
   async execute(props: Props): Promise<TicketDetailResponse> {
@@ -66,6 +70,11 @@ export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
       ? await this.summarizeUsers.execute([ticket.reporterId, ticket.assigneeId, ticket.registeredById, ticket.resolvedById])
       : null;
     const person = (id: string | null) => (id ? people?.get(id) ?? null : null);
+
+    // Its creation counts too, so a ticket always has one, also once retention removed its entries
+    const lastActivityAt = this.activity
+      ? latest(await this.activity.findLastActivityAt(props.workspaceId, 'ticket', ticket.getId()), ticket.createdAt)
+      : undefined;
 
     return {
       id: ticket.getId(),
@@ -96,6 +105,7 @@ export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
       accessLevel,
       aiCache: ticket.aiCache ?? {},
       descriptionEditedAt: ticket.descriptionEditedAt,
+      ...(lastActivityAt !== undefined && { lastActivityAt }),
       ...(people && {
         reporter: person(ticket.reporterId),
         assignee: person(ticket.assigneeId),
@@ -104,4 +114,9 @@ export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
       }),
     };
   }
+}
+
+function latest(...dates: (Date | null)[]): Date | null {
+  const times = dates.filter((d): d is Date => d !== null).map((d) => d.getTime());
+  return times.length > 0 ? new Date(Math.max(...times)) : null;
 }

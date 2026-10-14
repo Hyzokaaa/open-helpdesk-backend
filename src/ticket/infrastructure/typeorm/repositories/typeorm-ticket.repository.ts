@@ -212,6 +212,14 @@ export class TypeOrmTicketRepository implements TicketRepository {
     return model ? this.toDomain(model) : null;
   }
 
+  async findByReference(workspaceId: string, reference: string): Promise<Ticket | null> {
+    const model = await this.repository.findOne({
+      where: { workspaceId, reference },
+      relations: ['tags'],
+    });
+    return model ? this.toDomain(model) : null;
+  }
+
   async countByWorkspaceIdSince(workspaceId: string, since: Date): Promise<number> {
     return this.repository.count({
       where: { workspaceId, createdAt: MoreThanOrEqual(since) },

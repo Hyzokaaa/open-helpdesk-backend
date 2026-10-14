@@ -23,6 +23,11 @@ export class AssignTicket {
       ticket.status = TicketStatus.PENDING;
     }
 
+    // The other way round: a ticket nobody owns is open, so it shows in the queue to be picked up
+    if (!props.assigneeId && (ticket.status === TicketStatus.PENDING || ticket.status === TicketStatus.IN_PROGRESS)) {
+      ticket.status = TicketStatus.OPEN;
+    }
+
     await this.repository.update(ticket);
     return ticket;
   }

@@ -15,6 +15,7 @@ import { UpgradeAvailableTemplate } from '../../../../email/templates/upgrade-av
 import { resolveBackendVersion } from '../resolve-backend-version';
 import { RecordEmailSend } from '../../../../audit-log/domain/services/audit-log-record-email-send';
 import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
+import { eachEmailRecipient } from '../../../../email/domain/each-email-recipient';
 import { connectionErrorDetail } from '../../../../shared/infrastructure/connection-error-detail';
 
 const backendVersion: string = resolveBackendVersion();
@@ -75,7 +76,7 @@ export class VersionCheckScheduler {
 
         if (settings.upgradeEmail) {
           const template = new UpgradeAvailableTemplate();
-          for (const [lang, emails] of notifyResult.emailRecipients) {
+          for (const [lang, emails] of eachEmailRecipient(notifyResult.emailRecipients)) {
             const data = { version: latestProduct, releaseUrl: result.latestRelease!.url, lang };
             const subject = template.subject(data);
             const sent: SendEmailResult = await this.emailService.send({

@@ -1,10 +1,14 @@
+import { extractThreadIds, ThreadIds } from '../../../email/domain/ticket-email-thread';
+import { stripQuotedReply } from '../../domain/strip-quoted-reply';
+
 export interface ParsedInboundEmail {
   fromAddress: string;
   fromName?: string;
   toAddresses: string[];
   subject: string;
   body: string;
-  inReplyToTicketId: string | null;
+  /** Ticket and comment ids of the thread the email replies to; empty for a new conversation. */
+  thread: ThreadIds;
   attachments: ParsedAttachment[];
   mailboxId?: string;
   date?: Date;
@@ -17,11 +21,7 @@ export interface ParsedAttachment {
   content: Buffer;
 }
 
-const TICKET_ID_REGEX = /<ticket-([a-zA-Z0-9]+)@[^>]+>/;
-
 export class ImapEmailParser {
-  private readonly ticketIdRegex = TICKET_ID_REGEX;
-
   async parse(envelope: ImapEnvelope, rawMime: string): Promise<ParsedInboundEmail> {
     const fromAddress = (envelope.from ?? '').toLowerCase();
     const toAddresses = [
@@ -30,15 +30,9 @@ export class ImapEmailParser {
     ].map((a) => a.toLowerCase());
     const subject = envelope.subject || '(No subject)';
 
-    let inReplyToTicketId: string | null = null;
-    if (envelope.inReplyTo) {
-      const match = envelope.inReplyTo.match(this.ticketIdRegex);
-      if (match) {
-        inReplyToTicketId = match[1];
-      }
-    }
-
-    const { body, attachments } = await this.parseRawMime(rawMime);
+    const { body, attachments, inReplyTo, references } = await this.parseRawMime(rawMime);
+    // The answered message is in In-Reply-To; References holds the rest of the thread
+    const thread = extractThreadIds(envelope.inReplyTo, inReplyTo, references);
 
     return {
       fromAddress,
@@ -46,13 +40,18 @@ export class ImapEmailParser {
       toAddresses,
       subject,
       body: body || '(No content)',
-      inReplyToTicketId,
+      thread,
       attachments,
       date: envelope.date ?? undefined,
     };
   }
 
-  private async parseRawMime(raw: string): Promise<{ body: string; attachments: ParsedAttachment[] }> {
+  private async parseRawMime(raw: string): Promise<{
+    body: string;
+    attachments: ParsedAttachment[];
+    inReplyTo?: string;
+    references?: string | string[];
+  }> {
     try {
       const { simpleParser } = require('mailparser');
       const parsed = await simpleParser(raw);
@@ -65,7 +64,7 @@ export class ImapEmailParser {
         content: att.content,
       }));
 
-      return { body, attachments };
+      return { body, attachments, inReplyTo: parsed.inReplyTo, references: parsed.references };
     } catch {
       return { body: this.cleanBody(raw), attachments: [] };
     }
@@ -93,14 +92,8 @@ export class ImapEmailParser {
         .replace(/&#x27;/gi, "'");
     }
 
-    // Strip quoted replies
-    cleaned = cleaned
-      .split('\n')
-      .filter((line) => !line.startsWith('>'))
-      .join('\n');
-
-    // Strip "On ... wrote:" pattern
-    cleaned = cleaned.replace(/\n\s*On .+wrote:\s*$/s, '');
+    // Keep what the person wrote, not the quote of the message they answer
+    cleaned = stripQuotedReply(cleaned);
 
     // Strip signatures
     const sigIndex = cleaned.indexOf('\n-- \n');

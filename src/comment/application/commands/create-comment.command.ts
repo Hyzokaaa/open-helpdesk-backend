@@ -12,9 +12,11 @@ import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-lo
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
 import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
-import { AddTicketParticipant } from '../../../ticket/domain/services/ticket-add-participant';
-import { ParticipantRole } from '../../../ticket/domain/enums/participant-role.enum';
+import { FollowTicket } from '../../../ticket/domain/services/ticket-follow';
 import { ticketReferenceOf } from '../../../ticket/domain/ticket-reference';
+import { EnsureWorkspacePermission } from '../../../workspace/domain/services/workspace-ensure-permission';
+import { PERMISSIONS } from '../../../workspace/domain/permissions';
+import { ClaimStagedAttachments } from '../../../attachment/domain/services/attachment-claim-staged';
 import { commentPreview } from '../../domain/comment-preview';
 
 interface Props {
@@ -25,6 +27,14 @@ interface Props {
   isSystemAdmin: boolean;
   /** Set when the action came through the public API, with the key that made it. */
   apiKeyId?: string;
+  /** Files uploaded beforehand (POST /uploads) that belong to this comment. */
+  uploadTokens?: string[];
+}
+
+/** What a comment needs to take files uploaded beforehand. */
+export interface CommentAttachments {
+  ensurePermission: EnsureWorkspacePermission;
+  claim: ClaimStagedAttachments;
 }
 
 export interface CreateCommentResponse {
@@ -43,7 +53,8 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
     private readonly userRepository: UserRepository,
     private readonly eventPublisher: EventPublisher,
     private readonly createAuditLog: CreateAuditLogEntry,
-    private readonly addParticipant?: AddTicketParticipant,
+    private readonly followTicket?: FollowTicket,
+    private readonly attachments?: CommentAttachments,
   ) {}
 
   async execute(props: Props): Promise<CreateCommentResponse> {
@@ -59,6 +70,18 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
     const ticket = await this.ticketRepository.findById(props.ticketId);
     if (!ticket) throw new EntityNotFoundError('Ticket not found');
 
+    const uploadTokens = props.uploadTokens ?? [];
+    if (uploadTokens.length > 0) {
+      // Checked before the comment exists, so a refused upload leaves no comment behind
+      if (!this.attachments) throw new Error('This comment cannot take attachments');
+      await this.attachments.ensurePermission.execute({
+        workspaceId: workspace.getId(),
+        userId: props.authorId,
+        permission: PERMISSIONS.ATTACHMENT_UPLOAD,
+        isSystemAdmin: props.isSystemAdmin,
+      });
+    }
+
     const extractMentions = new ExtractMentions();
     const mentionedUserIds = extractMentions.execute(props.content);
 
@@ -68,6 +91,22 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
       authorId: props.authorId,
       mentionedUserIds,
     });
+
+    if (uploadTokens.length > 0 && this.attachments) {
+      await this.attachments.claim.execute({
+        tokens: uploadTokens,
+        ticketId: props.ticketId,
+        uploadedById: props.authorId,
+        commentId: comment.getId(),
+      });
+    }
+
+    // Whoever joins the conversation follows it, so the answer to their comment reaches them
+    // even when the ticket is not assigned to them
+    const source = props.apiKeyId ? 'api' : 'ui';
+    if (this.followTicket && props.authorId !== ticket.reporterId && props.authorId !== ticket.assigneeId) {
+      await this.followTicket.execute({ ticketId: props.ticketId, workspaceId: workspace.getId(), userId: props.authorId, actorId: props.authorId, reason: 'comment', source });
+    }
 
     const author = await this.userRepository.findById(props.authorId);
 
@@ -95,13 +134,9 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
       };
       this.eventPublisher.emit('comment.created', event);
 
-      if (this.addParticipant && mentionedUserIds.length > 0) {
+      if (this.followTicket && mentionedUserIds.length > 0) {
         for (const userId of mentionedUserIds) {
-          await this.addParticipant.execute({
-            ticketId: props.ticketId,
-            userId,
-            role: ParticipantRole.FOLLOWER,
-          });
+          await this.followTicket.execute({ ticketId: props.ticketId, workspaceId: workspace.getId(), userId, actorId: props.authorId, reason: 'mention', source });
         }
       }
     }
@@ -110,12 +145,12 @@ export class CreateCommentCommand implements Command<Props, CreateCommentRespons
       action: AuditAction.COMMENT_CREATED,
       category: AuditCategory.TICKET,
       level: AuditLevel.INFO,
-      source: props.apiKeyId ? 'api' : 'ui',
+      source,
       entityType: 'ticket',
       entityId: props.ticketId,
       userId: props.authorId,
       workspaceId: workspace.getId(),
-      metadata: { ...(props.apiKeyId ? { apiKeyId: props.apiKeyId } : {}), ticketName: ticket.name, commentId: comment.getId(), content: commentPreview(props.content) },
+      metadata: { ...(props.apiKeyId ? { apiKeyId: props.apiKeyId } : {}), ticketName: ticket.name, commentId: comment.getId(), content: commentPreview(props.content), ...(uploadTokens.length > 0 ? { attachmentsClaimed: uploadTokens.length } : {}) },
     });
 
     return {

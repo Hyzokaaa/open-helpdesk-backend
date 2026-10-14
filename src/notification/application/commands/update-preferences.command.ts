@@ -20,6 +20,8 @@ interface Props {
   emailUpgradeAvailable?: boolean;
   inAppUpgradeAvailable?: boolean;
   inAppInvitationExpired?: boolean;
+  inAppUnattendedReply?: boolean;
+  emailUnattendedReply?: boolean;
   bellUnreadOnly?: boolean;
 }
 
@@ -41,6 +43,8 @@ export interface UpdatePreferencesResponse {
   emailUpgradeAvailable: boolean;
   inAppUpgradeAvailable: boolean;
   inAppInvitationExpired: boolean;
+  inAppUnattendedReply: boolean;
+  emailUnattendedReply: boolean;
   bellUnreadOnly: boolean;
 }
 
@@ -70,6 +74,8 @@ export class UpdatePreferencesCommand implements Command<Props, UpdatePreference
       emailUpgradeAvailable: pref.emailUpgradeAvailable,
       inAppUpgradeAvailable: pref.inAppUpgradeAvailable,
       inAppInvitationExpired: pref.inAppInvitationExpired,
+      inAppUnattendedReply: pref.inAppUnattendedReply,
+      emailUnattendedReply: pref.emailUnattendedReply,
       bellUnreadOnly: pref.bellUnreadOnly,
     };
   }

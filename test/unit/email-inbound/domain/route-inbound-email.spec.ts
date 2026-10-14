@@ -51,7 +51,7 @@ function baseParsedEmail(overrides: Partial<ParsedInboundEmail> = {}): ParsedInb
     toAddresses: ['support@company.com'],
     subject: 'Need help',
     body: 'I have a problem',
-    inReplyToTicketId: null,
+    thread: { ticketIds: [], commentIds: [] },
     attachments: [],
     ...overrides,
   };
@@ -167,7 +167,7 @@ describe('RouteInboundEmail', () => {
     ticketRepository.create(existingTicket);
 
     const result = await service.execute(baseParsedEmail({
-      inReplyToTicketId: 'ticket-abc',
+      thread: { ticketIds: ['ticket-abc'], commentIds: [] },
       body: 'Thanks for looking into this',
     }));
 
@@ -259,7 +259,7 @@ describe('RouteInboundEmail', () => {
       discardReason: null,
     }));
 
-    await service.execute(baseParsedEmail({ inReplyToTicketId: 'ticket-abc' }));
+    await service.execute(baseParsedEmail({ thread: { ticketIds: ['ticket-abc'], commentIds: [] } }));
 
     const commentEvents = eventPublisher.events.filter((e) => e.event === 'comment.created');
     expect(commentEvents).toHaveLength(1);

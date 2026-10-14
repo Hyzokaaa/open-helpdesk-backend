@@ -64,6 +64,7 @@ import { TypeOrmCustomFieldDefinitionRepository } from '../../../../custom-field
 import { ValidateCustomFieldValues } from '../../../../custom-field/domain/services/custom-field-validate-values';
 import { BulkChangeStatusCommand } from '../../../application/commands/bulk-change-status.command';
 import { AddTicketParticipant } from '../../../domain/services/ticket-add-participant';
+import { FollowTicket } from '../../../domain/services/ticket-follow';
 import { EnsureTicketAccess } from '../../../domain/services/ticket-ensure-access';
 import { EnsureTicketAssignee } from '../../../domain/services/ticket-ensure-assignee';
 import { EnsureTicketReferences } from '../../../domain/services/ticket-ensure-references';
@@ -285,7 +286,7 @@ export class TicketController {
   ) {
     const workspace = await this.resolveWorkspace(slug);
     const ensureAccess = this.createEnsureTicketAccess();
-    const query = new GetTicketQuery(this.ticketRepository, ensureAccess, new SummarizeUsers(this.userRepository));
+    const query = new GetTicketQuery(this.ticketRepository, ensureAccess, new SummarizeUsers(this.userRepository), this.auditLogRepository);
     return query.execute({ ticketId: id, workspaceId: workspace.getId(), userId: user.userId, isSystemAdmin: user.isSystemAdmin });
   }
 
@@ -441,7 +442,7 @@ export class TicketController {
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new CreateTransferRequest(this.idGenerator, this.ticketRepository, this.transferRequestRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-    const addParticipant = new AddTicketParticipant(this.idGenerator, this.participantRepository);
+    const followTicket = new FollowTicket(new AddTicketParticipant(this.idGenerator, this.participantRepository), auditLog, this.userRepository);
     const command = new CreateTransferRequestCommand(
       service,
       ensurePermission,
@@ -451,7 +452,7 @@ export class TicketController {
       this.userRepository,
       this.eventPublisher,
       auditLog,
-      addParticipant,
+      followTicket,
     );
     return command.execute({
       ticketId: id,

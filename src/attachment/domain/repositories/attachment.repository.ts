@@ -8,7 +8,8 @@ export interface AttachmentRepository {
   delete(id: string): Promise<void>;
   findByTokens(tokens: string[]): Promise<Attachment[]>;
   /** Attaches to the ticket only the staged uploads among `tokens` that `uploadedById` made. */
-  claimStagedAttachments(tokens: string[], ticketId: string, uploadedById: string): Promise<void>;
+  /** Hands staged uploads to a ticket, and to one of its comments when `commentId` is set. */
+  claimStagedAttachments(tokens: string[], ticketId: string, uploadedById: string, commentId?: string | null): Promise<void>;
   findExpiredStaged(before: Date): Promise<Attachment[]>;
   deleteMany(ids: string[]): Promise<void>;
 }

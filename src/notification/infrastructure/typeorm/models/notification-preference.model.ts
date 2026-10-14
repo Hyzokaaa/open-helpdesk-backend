@@ -70,6 +70,12 @@ export class NotificationPreferenceModel {
   @Column({ default: true })
   inAppInvitationExpired!: boolean;
 
+  @Column({ default: true })
+  inAppUnattendedReply!: boolean;
+
+  @Column({ default: true })
+  emailUnattendedReply!: boolean;
+
   @Column({ default: false })
   bellUnreadOnly!: boolean;
 

@@ -5,6 +5,7 @@ import { UserModule } from '../user/user.module';
 import { WorkspaceModule } from '../workspace/workspace.module';
 import { TicketModule } from '../ticket/ticket.module';
 import { AuditLogModule } from '../audit-log/audit-log.module';
+import { AttachmentModule } from '../attachment/attachment.module';
 import { CommentModel } from './infrastructure/typeorm/models/comment.model';
 import { CommentEditModel } from './infrastructure/typeorm/models/comment-edit.model';
 import { TypeOrmCommentRepository } from './infrastructure/typeorm/repositories/typeorm-comment.repository';
@@ -18,6 +19,7 @@ import { CommentController } from './infrastructure/nest/controllers/comment.con
     WorkspaceModule,
     TicketModule,
     AuditLogModule,
+    AttachmentModule,
     TypeOrmModule.forFeature([CommentModel, CommentEditModel]),
   ],
   controllers: [CommentController],

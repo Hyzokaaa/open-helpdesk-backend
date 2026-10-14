@@ -28,10 +28,11 @@ export class MockAttachmentRepository implements AttachmentRepository {
     return this.attachments.filter((a) => a.token !== null && tokens.includes(a.token));
   }
 
-  async claimStagedAttachments(tokens: string[], ticketId: string, uploadedById: string): Promise<void> {
+  async claimStagedAttachments(tokens: string[], ticketId: string, uploadedById: string, commentId: string | null = null): Promise<void> {
     for (const a of this.attachments) {
       if (a.token !== null && tokens.includes(a.token) && a.uploadedById === uploadedById) {
         a.ticketId = ticketId;
+        a.commentId = commentId;
         a.token = null;
         a.stagedAt = null;
       }

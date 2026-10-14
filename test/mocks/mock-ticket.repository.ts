@@ -36,6 +36,10 @@ export class MockTicketRepository implements TicketRepository {
     return this.tickets.find((t) => t.portalToken === portalToken) ?? null;
   }
 
+  async findByReference(workspaceId: string, reference: string): Promise<Ticket | null> {
+    return this.tickets.find((t) => t.workspaceId === workspaceId && t.reference === reference) ?? null;
+  }
+
   async countByWorkspaceIdSince(workspaceId: string, since: Date): Promise<number> {
     return this.tickets.filter(
       (t) => t.workspaceId === workspaceId && t.createdAt && t.createdAt >= since,

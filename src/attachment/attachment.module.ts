@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { SharedModule } from '../shared/shared.module';
 import { AuditLogModule } from '../audit-log/audit-log.module';
 import { WorkspaceModule } from '../workspace/workspace.module';
+import { UserModule } from '../user/user.module';
 import { AttachmentModel } from './infrastructure/typeorm/models/attachment.model';
 import { TypeOrmAttachmentRepository } from './infrastructure/typeorm/repositories/typeorm-attachment.repository';
 import { AttachmentController } from './infrastructure/nest/controllers/attachment.controller';
@@ -24,6 +25,7 @@ import { TypeOrmCommentRepository } from '../comment/infrastructure/typeorm/repo
     SharedModule,
     AuditLogModule,
     WorkspaceModule,
+    UserModule,
     MulterModule.registerAsync({ inject: [ConfigService], useFactory: attachmentUploadOptions }),
     TypeOrmModule.forFeature([AttachmentModel, TicketModel, TicketParticipantModel, CommentModel]),
   ],

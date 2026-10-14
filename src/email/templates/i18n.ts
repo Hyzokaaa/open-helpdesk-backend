@@ -70,6 +70,18 @@ const translations: Translations = {
     en: 'Reply to this email to respond · {ticketNumber} · {workspaceName}',
     es: 'Responde a este email para comentar · {ticketNumber} · {workspaceName}',
   },
+  'newComment.footerNoReply': {
+    en: 'Open the ticket to respond · {ticketNumber} · {workspaceName}',
+    es: 'Abre el ticket para responder · {ticketNumber} · {workspaceName}',
+  },
+  'newComment.unattendedNotice': {
+    en: 'The customer answered a ticket nobody on the team owns or follows yet.',
+    es: 'El cliente respondió en un ticket que nadie del equipo tiene asignado ni sigue todavía.',
+  },
+  'newComment.files': {
+    en: 'Attached files, available in the ticket:',
+    es: 'Archivos adjuntos, disponibles en el ticket:',
+  },
 
   // Status changed
   'statusChanged.title': {

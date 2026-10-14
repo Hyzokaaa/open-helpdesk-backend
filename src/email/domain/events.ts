@@ -50,6 +50,8 @@ export interface StatusChangedEvent {
   workspaceId: string;
   workspaceName: string;
   workspaceSlug: string;
+  /** Set when the change only follows another one people were already told about (an assignment). */
+  quiet?: boolean;
 }
 
 export interface TransferRequestCreatedEvent {

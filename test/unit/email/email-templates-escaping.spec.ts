@@ -38,7 +38,8 @@ function render(lang: string): Rendered[] {
   const invitation = invitationEmail({ to: 'a@b.c', workspaceName: EVIL, inviterName: EVIL, invitationUrl: EVIL_URL, workspaceUrl: EVIL_URL, lang });
 
   const comment = new NewCommentTemplate();
-  const commentData = { ticketName: EVIL, ticketNumber: EVIL, ticketUrl: EVIL_URL, authorName: EVIL, commentPreview: `${EVIL}\nline2`, workspaceName: EVIL, lang };
+  // The comment body is sanitized rather than escaped (see comment-email-body.spec); here it only carries a script
+  const commentData = { ticketName: EVIL, ticketNumber: EVIL, ticketUrl: EVIL_URL, authorName: EVIL, commentContent: '<script>1</script>line', canReply: true, workspaceName: EVIL, lang };
 
   const status = new StatusChangedTemplate();
   const statusData = { ticketName: EVIL, ticketUrl: EVIL_URL, oldStatus: 'open', newStatus: 'closed', workspaceName: EVIL, lang };
@@ -101,14 +102,14 @@ describe('email templates escape user and tenant values', () => {
     const count = (html: string) => html.split('&lt;script&gt;').length - 1;
     const byName = Object.fromEntries(render('en').map((r) => [r.name, r.html]));
     expect(count(byName['ticket-created'])).toBe(4); // reporter, workspace, title, category
-    expect(count(byName['new-comment'])).toBe(4); // author, preview, ticket number, workspace
+    expect(count(byName['new-comment'])).toBe(4); // author, plain-text comment, ticket number, workspace
     expect(count(byName['ticket-assigned'])).toBe(3); // assignee, workspace, title
     expect(count(byName['workspace-invitation'])).toBe(2); // inviter, workspace
     expect(count(byName['upgrade-available'])).toBe(2); // version in title and body
   });
 
-  it('keeps line breaks of the comment preview as <br>', () => {
-    const html = new NewCommentTemplate().html({ ticketName: 't', ticketUrl: 'u', authorName: 'a', commentPreview: 'one\ntwo', workspaceName: 'w', lang: 'en' });
+  it('keeps line breaks of a plain-text comment as <br>', () => {
+    const html = new NewCommentTemplate().html({ ticketName: 't', ticketUrl: 'u', authorName: 'a', commentContent: 'one\ntwo', canReply: true, workspaceName: 'w', lang: 'en' });
     expect(html).toContain('one<br>two');
   });
 
@@ -119,7 +120,7 @@ describe('email templates escape user and tenant values', () => {
     const data = { ticketName: EVIL_LINE, ticketUrl: 'u', reporterName: 'r', priority: 'high', category: '', workspaceName: EVIL_LINE, lang };
     all.push({ name: 'ticket-created', html: '', subject: created.subject(data) });
     const comment = new NewCommentTemplate();
-    all.push({ name: 'new-comment', html: '', subject: comment.subject({ ticketName: EVIL_LINE, ticketNumber: 'TK-1', ticketUrl: 'u', authorName: 'a', commentPreview: '', workspaceName: 'w', lang }) });
+    all.push({ name: 'new-comment', html: '', subject: comment.subject({ ticketName: EVIL_LINE, ticketNumber: 'TK-1', ticketUrl: 'u', authorName: 'a', commentContent: '', canReply: true, workspaceName: 'w', lang }) });
     all.push(...render(lang));
 
     for (const r of all) {

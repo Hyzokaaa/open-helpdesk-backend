@@ -16,6 +16,7 @@ import { TypeOrmAuditLogRepository } from '../../audit-log/infrastructure/typeor
 import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
 import { WorkspaceFrontendResolver } from '../../shared/infrastructure/workspace-frontend-resolver';
+import { eachEmailRecipient } from '../domain/each-email-recipient';
 import { RecordEmailSend } from '../../audit-log/domain/services/audit-log-record-email-send';
 
 @Injectable()
@@ -63,7 +64,7 @@ export class TransferRequestHandler {
     const emailDomain = mailbox ? mailbox.address.split('@')[1] : null;
     const sender = await this.emailSenderRepository.findByWorkspaceId(event.workspaceId);
 
-    for (const [lang, emails] of emailRecipients) {
+    for (const [lang, emails] of eachEmailRecipient(emailRecipients)) {
       const subject = template.createdSubject({ ticketName: event.ticketName, ticketUrl, requesterName: event.requesterName, workspaceName: event.workspaceName, lang });
       const result = await sendWorkspaceEmail(this.emailService, sender, {
         to: emails,
@@ -112,7 +113,7 @@ export class TransferRequestHandler {
     const emailDomain = mailbox ? mailbox.address.split('@')[1] : null;
     const sender = await this.emailSenderRepository.findByWorkspaceId(event.workspaceId);
 
-    for (const [lang, emails] of emailRecipients) {
+    for (const [lang, emails] of eachEmailRecipient(emailRecipients)) {
       const subject = template.resolvedSubject({ ticketName: event.ticketName, ticketUrl, resolution: event.resolution, workspaceName: event.workspaceName, lang });
       const result = await sendWorkspaceEmail(this.emailService, sender, {
         to: emails,

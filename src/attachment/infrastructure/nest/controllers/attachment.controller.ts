@@ -36,6 +36,8 @@ import { DeleteAttachmentCommand } from '../../../application/commands/delete-at
 import { StageUploadCommand } from '../../../application/commands/stage-upload.command';
 import { GetAttachmentQuery } from '../../../application/queries/get-attachment.query';
 import { ListTicketAttachmentsQuery } from '../../../application/queries/list-ticket-attachments.query';
+import { TypeOrmUserRepository } from '../../../../user/infrastructure/typeorm/repositories/typeorm-user.repository';
+import { SummarizeUsers } from '../../../../user/domain/services/user-summarize';
 import { TypeOrmAttachmentRepository } from '../../typeorm/repositories/typeorm-attachment.repository';
 
 @Controller()
@@ -50,6 +52,7 @@ export class AttachmentController {
     @Inject() private readonly ticketRepository: TypeOrmTicketRepository,
     @Inject() private readonly participantRepository: TypeOrmTicketParticipantRepository,
     @Inject() private readonly commentRepository: TypeOrmCommentRepository,
+    @Inject() private readonly userRepository: TypeOrmUserRepository,
   ) {}
 
   @Post('uploads')
@@ -120,6 +123,7 @@ export class AttachmentController {
       this.storage,
       this.createEnsureTicketAccess(),
       ensurePermission,
+      new SummarizeUsers(this.userRepository),
     );
     return query.execute({
       ticketId,

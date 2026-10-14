@@ -31,9 +31,12 @@ import { SummarizeUsers } from "../../../../user/domain/services/user-summarize"
 import { TypeOrmAuditLogRepository } from "../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository";
 import { CreateAuditLogEntry } from "../../../../audit-log/domain/services/audit-log-create";
 import { AddTicketParticipant } from "../../../../ticket/domain/services/ticket-add-participant";
+import { FollowTicket } from "../../../../ticket/domain/services/ticket-follow";
 import { EnsureTicketAccess } from "../../../../ticket/domain/services/ticket-ensure-access";
 import { TypeOrmTicketParticipantRepository } from "../../../../ticket/infrastructure/typeorm/repositories/typeorm-ticket-participant.repository";
 import { CreateCommentRequest } from "../dto/create-comment.request";
+import { TypeOrmAttachmentRepository } from "../../../../attachment/infrastructure/typeorm/repositories/typeorm-attachment.repository";
+import { ClaimStagedAttachments } from "../../../../attachment/domain/services/attachment-claim-staged";
 
 @Controller("workspaces/:slug/tickets/:ticketId/comments")
 export class CommentController {
@@ -48,6 +51,7 @@ export class CommentController {
     @Inject() private readonly participantRepository: TypeOrmTicketParticipantRepository,
     @Inject() private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
     @Inject() private readonly commentEditRepository: TypeOrmCommentEditRepository,
+    @Inject() private readonly attachmentRepository: TypeOrmAttachmentRepository,
   ) {}
 
   @Post()
@@ -59,7 +63,7 @@ export class CommentController {
   ) {
     const service = new CreateComment(this.idGenerator, this.commentRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-    const addParticipant = new AddTicketParticipant(this.idGenerator, this.participantRepository);
+    const followTicket = new FollowTicket(new AddTicketParticipant(this.idGenerator, this.participantRepository), auditLog, this.userRepository);
     const command = new CreateCommentCommand(
       service,
       this.createEnsureTicketAccess(),
@@ -68,7 +72,11 @@ export class CommentController {
       this.userRepository,
       this.eventPublisher,
       auditLog,
-      addParticipant,
+      followTicket,
+      {
+        ensurePermission: new EnsureWorkspacePermission(this.memberRepository),
+        claim: new ClaimStagedAttachments(this.attachmentRepository),
+      },
     );
     return command.execute({
       content: body.content,
@@ -76,6 +84,7 @@ export class CommentController {
       authorId: user.userId,
       workspaceSlug: slug,
       isSystemAdmin: user.isSystemAdmin,
+      uploadTokens: body.uploadTokens,
     });
   }
 

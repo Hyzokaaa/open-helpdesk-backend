@@ -7,10 +7,11 @@ import {
   AuditLogFilters,
   AuditLogRepository,
 } from '../../../domain/repositories/audit-log.repository';
+import { AuditActivityRepository } from '../../../domain/repositories/audit-activity.repository';
 import { AuditLogEntryModel } from '../models/audit-log-entry.model';
 
 @Injectable()
-export class TypeOrmAuditLogRepository implements AuditLogRepository {
+export class TypeOrmAuditLogRepository implements AuditLogRepository, AuditActivityRepository {
   constructor(
     @InjectRepository(AuditLogEntryModel)
     private readonly repository: Repository<AuditLogEntryModel>,
@@ -48,6 +49,18 @@ export class TypeOrmAuditLogRepository implements AuditLogRepository {
       page,
       limit,
     };
+  }
+
+  async findLastActivityAt(workspaceId: string, entityType: string, entityId: string): Promise<Date | null> {
+    const row = await this.repository
+      .createQueryBuilder('audit')
+      .select('MAX(audit.createdAt)', 'last')
+      .where('audit.workspaceId = :workspaceId', { workspaceId })
+      .andWhere('audit.entityType = :entityType', { entityType })
+      .andWhere('audit.entityId = :entityId', { entityId })
+      .andWhere('audit.userId IS NOT NULL')
+      .getRawOne<{ last: Date | string | null }>();
+    return row?.last ? new Date(row.last) : null;
   }
 
   async findAllUnscoped(

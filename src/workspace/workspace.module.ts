@@ -1,4 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { NodeMailDnsLookup } from '../email/infrastructure/dns/node-mail-dns-lookup';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SharedModule } from '../shared/shared.module';
 import { UserModule } from '../user/user.module';
@@ -46,7 +47,7 @@ import { TypeOrmWorkspaceTicketReferenceRepository } from './infrastructure/type
     TypeOrmModule.forFeature([WorkspaceModel, WorkspaceMemberModel, WorkspaceInvitationModel, WorkspaceEmailSenderModel, WorkspaceCreationSettingsModel, WorkspaceImportLinkModel, WorkspaceAnalyticsSettingsModel, WorkspaceTicketReferenceModel]),
   ],
   controllers: [WorkspaceController, WorkspaceInvitationController, WorkspaceImportController, InvitationPublicController, DomainCheckController, WorkspaceCreationSettingsController, WorkspaceAnalyticsController],
-  providers: [TypeOrmWorkspaceRepository, TypeOrmWorkspaceMemberRepository, TypeOrmWorkspaceInvitationRepository, TypeOrmWorkspaceEmailSenderRepository, TypeOrmWorkspaceCreationSettingsRepository, TypeOrmWorkspaceAnalyticsSettingsRepository, WorkspaceFrontendResolver, WorkspacePurgeScheduler, InvitationExpiryScheduler, TypeOrmWorkspaceTicketReferenceRepository],
+  providers: [NodeMailDnsLookup, TypeOrmWorkspaceRepository, TypeOrmWorkspaceMemberRepository, TypeOrmWorkspaceInvitationRepository, TypeOrmWorkspaceEmailSenderRepository, TypeOrmWorkspaceCreationSettingsRepository, TypeOrmWorkspaceAnalyticsSettingsRepository, WorkspaceFrontendResolver, WorkspacePurgeScheduler, InvitationExpiryScheduler, TypeOrmWorkspaceTicketReferenceRepository],
   exports: [TypeOrmWorkspaceRepository, TypeOrmWorkspaceMemberRepository, TypeOrmWorkspaceInvitationRepository, TypeOrmWorkspaceEmailSenderRepository, TypeOrmWorkspaceCreationSettingsRepository, TypeOrmWorkspaceAnalyticsSettingsRepository, WorkspaceFrontendResolver, TypeOrmWorkspaceTicketReferenceRepository],
 })
 export class WorkspaceModule {}

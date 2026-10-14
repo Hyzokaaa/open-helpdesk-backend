@@ -1,8 +1,9 @@
 import { PaginatedResult } from '../../src/shared/domain/paginated-result';
 import { AuditLogEntry } from '../../src/audit-log/domain/entities/audit-log-entry';
 import { AuditLogFilters, AuditLogRepository } from '../../src/audit-log/domain/repositories/audit-log.repository';
+import { AuditActivityRepository } from '../../src/audit-log/domain/repositories/audit-activity.repository';
 
-export class MockAuditLogRepository implements AuditLogRepository {
+export class MockAuditLogRepository implements AuditLogRepository, AuditActivityRepository {
   readonly entries: AuditLogEntry[] = [];
 
   async create(entry: AuditLogEntry): Promise<void> {
@@ -16,5 +17,12 @@ export class MockAuditLogRepository implements AuditLogRepository {
 
   async findAllUnscoped(_filters: AuditLogFilters, page: number, limit: number): Promise<PaginatedResult<AuditLogEntry>> {
     return { items: this.entries.slice((page - 1) * limit, page * limit), total: this.entries.length, page, limit };
+  }
+
+  async findLastActivityAt(workspaceId: string, entityType: string, entityId: string): Promise<Date | null> {
+    const times = this.entries
+      .filter((e) => e.workspaceId === workspaceId && e.entityType === entityType && e.entityId === entityId && e.userId !== null)
+      .map((e) => e.createdAt?.getTime() ?? 0);
+    return times.length > 0 ? new Date(Math.max(...times)) : null;
   }
 }

@@ -23,5 +23,7 @@ export class UpdatePreferencesRequest {
   @IsOptional() @IsBoolean() emailUpgradeAvailable?: boolean;
   @IsOptional() @IsBoolean() inAppUpgradeAvailable?: boolean;
   @IsOptional() @IsBoolean() inAppInvitationExpired?: boolean;
+  @IsOptional() @IsBoolean() inAppUnattendedReply?: boolean;
+  @IsOptional() @IsBoolean() emailUnattendedReply?: boolean;
   @IsOptional() @IsBoolean() bellUnreadOnly?: boolean;
 }

@@ -20,10 +20,14 @@ import { TypeOrmAuditLogRepository } from '../../audit-log/infrastructure/typeor
 import { ResolveTicketStakeholders } from '../../notification/domain/services/notification-resolve-ticket-stakeholders';
 import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
-import { WorkspaceFrontendResolver } from '../../shared/infrastructure/workspace-frontend-resolver';
+import { WorkspaceFrontendResolver } from '../../shared/infrastructure/workspace-frontend-resolver';
 import { RecordEmailSend } from '../../audit-log/domain/services/audit-log-record-email-send';
 
 import { TypeOrmTicketCategoryRepository } from '../../project/infrastructure/typeorm/repositories/typeorm-ticket-category.repository';
+import { ticketReferenceOf } from '../../ticket/domain/ticket-reference';
+import { eachEmailRecipient } from '../domain/each-email-recipient';
+import { ticketThreadHeaders } from '../domain/ticket-email-thread';
+import { ResolveTicketReplyMailbox } from '../domain/services/ticket-reply-mailbox-resolve';
 
 @Injectable()
 export class TicketCreatedHandler {
@@ -95,7 +99,7 @@ export class TicketCreatedHandler {
     const category = event.categoryId ? await this.categoryRepository.findById(event.categoryId) : null;
     const categoryName = category?.name ?? '';
 
-    for (const [lang, emails] of emailRecipients) {
+    for (const [lang, emails] of eachEmailRecipient(emailRecipients)) {
       const subject = template.subject({ ticketName: event.ticketName, ticketUrl, reporterName: event.reporterName, priority: event.priority, category: categoryName, workspaceName: event.workspaceName, lang });
       const result = await sendWorkspaceEmail(this.emailService, sender, {
         to: emails,
@@ -125,20 +129,27 @@ export class TicketCreatedHandler {
     const frontendUrl = await this.frontendResolver.resolve(event.workspaceId);
     const portalUrl = `${frontendUrl}/portal/tickets/${event.portalToken}`;
     const template = new TicketConfirmationTemplate();
-    const mailbox = event.mailboxId
-      ? await this.mailboxRepository.findById(event.mailboxId)
-      : null;
+    // The mailbox it came through, or one the workspace reads, so the customer can answer by email
+    const mailbox = await new ResolveTicketReplyMailbox(this.mailboxRepository).execute({
+      ticketMailboxId: event.mailboxId,
+      workspaceId: event.workspaceId,
+    });
     const sender = await this.emailSenderRepository.findByWorkspaceId(event.workspaceId);
+    const ticket = await this.ticketRepository.findById(event.ticketId);
+    const ticketNumber = ticket ? ticketReferenceOf(ticket) : undefined;
+    const emailDomain = mailbox ? mailbox.address.split('@')[1] : null;
 
-    const subject = template.subject({ ticketName: event.ticketName, portalUrl, lang });
+    const subject = template.subject({ ticketName: event.ticketName, ticketNumber, portalUrl, lang });
     const result = await sendWorkspaceEmail(this.emailService, sender, {
       to: [creator.email],
       subject,
       html: template.html({ ticketName: event.ticketName, portalUrl, lang }),
+      // In the ticket's thread, so the customer's reply to this email lands on the ticket
+      ...(emailDomain && ticketThreadHeaders(event.ticketId, emailDomain, `confirmation-${event.ticketId}`)),
       ...(mailbox && { replyTo: mailbox.address }),
     });
     await new RecordEmailSend(this.idGenerator, this.auditLogRepository).execute({
-      result, type: 'confirmation', to: [creator.email], subject, workspaceId: event.workspaceId, ticketId: event.ticketId, ticketName: event.ticketName,
+      result, type: 'confirmation', to: [creator.email], subject, workspaceId: event.workspaceId, ticketId: event.ticketId, ticketName: event.ticketName, ticketReference: ticketNumber,
     });
   }
 }

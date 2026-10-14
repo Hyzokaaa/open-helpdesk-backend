@@ -23,6 +23,8 @@ export interface PreferencesResponse {
   emailUpgradeAvailable: boolean;
   inAppUpgradeAvailable: boolean;
   inAppInvitationExpired: boolean;
+  inAppUnattendedReply: boolean;
+  emailUnattendedReply: boolean;
   bellUnreadOnly: boolean;
 }
 
@@ -44,6 +46,8 @@ const DEFAULTS: PreferencesResponse = {
   emailUpgradeAvailable: true,
   inAppUpgradeAvailable: true,
   inAppInvitationExpired: true,
+  inAppUnattendedReply: true,
+  emailUnattendedReply: true,
   bellUnreadOnly: false,
 };
 
@@ -72,6 +76,8 @@ export class GetPreferencesQuery implements Query<Props, PreferencesResponse> {
       emailUpgradeAvailable: pref.emailUpgradeAvailable,
       inAppUpgradeAvailable: pref.inAppUpgradeAvailable,
       inAppInvitationExpired: pref.inAppInvitationExpired,
+      inAppUnattendedReply: pref.inAppUnattendedReply,
+      emailUnattendedReply: pref.emailUnattendedReply,
       bellUnreadOnly: pref.bellUnreadOnly,
     };
   }

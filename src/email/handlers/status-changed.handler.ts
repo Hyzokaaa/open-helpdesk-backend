@@ -21,7 +21,11 @@ import { WorkspaceFrontendResolver } from '../../shared/infrastructure/workspace
 import { TypeOrmWorkspaceMemberRepository } from '../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
 import { ResolveWorkspaceAdmins } from '../../notification/domain/services/notification-resolve-workspace-admins';
 import { TicketStatus } from '../../ticket/domain/enums/ticket-status.enum';
+import { ticketThreadHeaders } from '../domain/ticket-email-thread';
+import { eachEmailRecipient } from '../domain/each-email-recipient';
 import { RecordEmailSend } from '../../audit-log/domain/services/audit-log-record-email-send';
+import { ResolveTicketReplyMailbox } from '../domain/services/ticket-reply-mailbox-resolve';
+import { ticketLinkFor } from '../domain/ticket-email-link';
 
 // Statuses that mean someone is expected to be working the ticket. An unassigned ticket in one
 // of these has left the open queue without an owner, so admins and supervisors should assign it.
@@ -48,6 +52,8 @@ export class StatusChangedHandler {
 
   @OnEvent('ticket.statusChanged')
   async handle(event: StatusChangedEvent): Promise<void> {
+    // A quiet change comes with an assignment, which already notified the people involved
+    if (event.quiet) return;
     await this.notifyUnassigned(event);
     await this.notifyStakeholders(event);
   }
@@ -101,25 +107,34 @@ export class StatusChangedHandler {
 
     const template = new StatusChangedTemplate();
     const frontendUrl = await this.frontendResolver.resolve(event.workspaceId);
-    const ticketUrl = `${frontendUrl}/dashboard/workspaces/${event.workspaceSlug}/tickets/${event.ticketId}`;
     const ticket = await this.ticketRepository.findById(event.ticketId);
-    const mailbox = ticket?.mailboxId
-      ? await this.mailboxRepository.findById(ticket.mailboxId)
-      : null;
+    // The ticket's own mailbox, or one the workspace reads, so a reply by email reaches the ticket
+    const mailbox = await new ResolveTicketReplyMailbox(this.mailboxRepository).execute({
+      ticketMailboxId: ticket?.mailboxId,
+      workspaceId: event.workspaceId,
+    });
     const emailDomain = mailbox ? mailbox.address.split('@')[1] : null;
     const sender = await this.emailSenderRepository.findByWorkspaceId(event.workspaceId);
+    const usersByEmail = new Map(users.map((u) => [u.email.toLowerCase(), u]));
 
-    for (const [lang, emails] of emailRecipients) {
+    for (const [lang, emails] of eachEmailRecipient(emailRecipients)) {
+      // The portal for customers, the dashboard for the team
+      const recipient = usersByEmail.get(emails[0].toLowerCase());
+      const member = recipient ? await this.memberRepository.findByWorkspaceAndUser(event.workspaceId, recipient.getId()) : null;
+      const ticketUrl = ticketLinkFor({
+        frontendUrl,
+        workspaceSlug: event.workspaceSlug,
+        ticketId: event.ticketId,
+        portalToken: ticket?.portalToken,
+        role: member?.role ?? null,
+        isSystemAdmin: recipient?.isSystemAdmin ?? false,
+      });
       const subject = template.subject({ ticketName: event.ticketName, ticketUrl, oldStatus: event.oldStatus, newStatus: event.newStatus, workspaceName: event.workspaceName, lang });
       const result = await sendWorkspaceEmail(this.emailService, sender, {
         to: emails,
         subject,
         html: template.html({ ticketName: event.ticketName, ticketUrl, oldStatus: event.oldStatus, newStatus: event.newStatus, workspaceName: event.workspaceName, lang }),
-        ...(emailDomain && {
-          messageId: `<status-${event.ticketId}-${Date.now()}@${emailDomain}>`,
-          inReplyTo: `<ticket-${event.ticketId}@${emailDomain}>`,
-          references: `<ticket-${event.ticketId}@${emailDomain}>`,
-        }),
+        ...(emailDomain && ticketThreadHeaders(event.ticketId, emailDomain, `status-${event.ticketId}-${Date.now()}`)),
         ...(mailbox && { replyTo: mailbox.address }),
       });
       await new RecordEmailSend(this.idGenerator, this.auditLogRepository).execute({

@@ -16,6 +16,51 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.33.0',
+    date: '2026-10-14',
+    categories: [
+      {
+        title: { en: 'Tickets', es: 'Tickets' },
+        features: [
+          { en: 'Attach files while commenting, with the clip, by dragging or by pasting, also from the portal; each file shows with its comment', es: 'Adjunta archivos al comentar, con el clip, arrastrando o pegando, también desde el portal; cada archivo se muestra con su comentario' },
+          { en: 'The Activity tab tells the whole story of the ticket in one timeline, in a full or a summary view', es: 'La pestaña Actividad cuenta la historia completa del ticket en una sola línea de tiempo, en vista completa o resumida' },
+          { en: 'Add and remove followers at any time, without entering edit mode, with a notice each time', es: 'Añade y quita seguidores en cualquier momento, sin entrar en edición, con un aviso cada vez' },
+          { en: 'The story says why someone follows a ticket: they commented, were mentioned or were offered the ticket', es: 'La historia dice por qué alguien sigue un ticket: comentó, le mencionaron o le ofrecieron el ticket' },
+          { en: 'Admins and supervisors can leave a ticket unassigned, and agents can unassign themselves; the ticket goes back to the open queue', es: 'Admins y supervisores pueden dejar un ticket sin asignar, y los agentes pueden desasignarse; el ticket vuelve a la cola de abiertos' },
+          { en: 'The ticket sidebar shows when it was created, when and by whom it was resolved, and its last activity', es: 'La barra lateral del ticket muestra cuándo se creó, cuándo y quién lo resolvió, y su última actividad' },
+          { en: 'SLA targets show under each time, with what is left or how late it is', es: 'Los objetivos SLA aparecen bajo cada tiempo, con lo que queda o cuánto se ha pasado' },
+          { en: 'The new ticket form is laid out in two columns, like the ticket itself', es: 'El formulario de nuevo ticket se organiza en dos columnas, como el propio ticket' },
+          { en: 'In the ticket list, a row with many tags stays on one line', es: 'En la lista de tickets, una fila con muchas etiquetas se mantiene en una línea' },
+        ],
+      },
+      {
+        title: { en: 'Email', es: 'Email' },
+        features: [
+          { en: 'A reply to any ticket email lands on its ticket, also when answering the confirmation, instead of opening a new one', es: 'La respuesta a cualquier email de un ticket llega a su ticket, también al contestar la confirmación, en vez de abrir uno nuevo' },
+          { en: 'The quoted text of Gmail, Outlook and Thunderbird is left out of emailed replies', es: 'El texto citado de Gmail, Outlook y Thunderbird se quita de las respuestas por email' },
+          { en: 'Every recipient gets their own email, so nobody sees the other addresses', es: 'Cada destinatario recibe su propio email, así nadie ve las otras direcciones' },
+          { en: 'Comment emails bring the whole formatted comment and its files, and link customers to the portal and the team to the dashboard', es: 'Los emails de comentarios traen el comentario completo con formato y sus archivos, y llevan al cliente al portal y al equipo al panel' },
+          { en: 'Commenting on a ticket makes you follow it, so the answer reaches you', es: 'Comentar en un ticket hace que lo sigas, para que te llegue la respuesta' },
+          { en: 'When a customer answers a ticket nobody on the team owns or follows, admins and supervisors are told in the app and by email, with a preference to turn it off', es: 'Cuando un cliente responde a un ticket que nadie del equipo tiene asignado ni sigue, se avisa a admins y supervisores en la app y por email, con una preferencia para desactivarlo' },
+          { en: 'Email settings suggest the mail server for the address\'s domain, follow it when the domain changes and say where it came from, also in the system settings', es: 'Los ajustes de email sugieren el servidor del dominio de la dirección, lo siguen cuando cambia el dominio y dicen de dónde sale, también en los ajustes del sistema' },
+        ],
+      },
+      {
+        title: { en: 'Portal', es: 'Portal' },
+        features: [
+          { en: 'The description and the replies show with their formatting', es: 'La descripción y las respuestas se muestran con su formato' },
+          { en: 'Custom fields show by their name, with readable values', es: 'Los campos personalizados se muestran con su nombre y valores legibles' },
+        ],
+      },
+      {
+        title: { en: 'Stats', es: 'Estadísticas' },
+        features: [
+          { en: 'My stats lists your tickets, and a ticket opens in a window over the page, as from the ticket list', es: 'Mis estadísticas lista tus tickets, y un ticket se abre en una ventana sobre la página, como desde la lista de tickets' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.32.1',
     date: '2026-10-11',
     categories: [

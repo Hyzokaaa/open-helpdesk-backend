@@ -9,6 +9,10 @@ import { TypeOrmWorkspaceMemberRepository } from '../../../workspace/infrastruct
 import { TypeOrmWorkspaceRepository } from '../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository';
 import { TypeOrmTicketRepository } from '../../../ticket/infrastructure/typeorm/repositories/typeorm-ticket.repository';
 import { TypeOrmCommentRepository } from '../../../comment/infrastructure/typeorm/repositories/typeorm-comment.repository';
+import { TypeOrmTicketParticipantRepository } from '../../../ticket/infrastructure/typeorm/repositories/typeorm-ticket-participant.repository';
+import { FindRepliedTicket } from '../../domain/services/inbound-email-find-ticket';
+import { AddTicketParticipant } from '../../../ticket/domain/services/ticket-add-participant';
+import { FollowTicket } from '../../../ticket/domain/services/ticket-follow';
 import { TypeOrmAuditLogRepository } from '../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
 import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
 import { RecordAutoCreated } from '../../../audit-log/domain/services/audit-log-record-auto-created';
@@ -69,6 +73,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     @Inject() private readonly emailRuleRepository: TypeOrmEmailRuleRepository,
     @Inject() private readonly organizationRepository: TypeOrmOrganizationRepository,
     @Inject() private readonly ticketCategoryRepository: TypeOrmTicketCategoryRepository,
+    @Inject() private readonly participantRepository: TypeOrmTicketParticipantRepository,
   ) {}
 
   async onModuleInit() {
@@ -516,6 +521,8 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       this.organizationRepository,
       this.ticketCategoryRepository,
       new RecordAutoCreated(new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository)),
+      new FindRepliedTicket(this.ticketRepository, this.commentRepository, this.participantRepository),
+      new FollowTicket(new AddTicketParticipant(this.idGenerator, this.participantRepository), new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository), this.userRepository),
     );
   }
 

@@ -14,6 +14,9 @@ import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category
 import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
 import { connectionErrorDetail } from '../../../../shared/infrastructure/connection-error-detail';
 import { connectionErrorKind } from '../../../../shared/infrastructure/connection-error-kind';
+import { ResolveMailServer } from '../../../../email/domain/services/mail-server-resolve';
+import { NodeMailDnsLookup } from '../../../../email/infrastructure/dns/node-mail-dns-lookup';
+import { ResolveMailServerRequest } from '../../../../email/infrastructure/nest/dto/resolve-mail-server.request';
 
 @Controller('system')
 export class SystemEmailSettingsController {
@@ -21,10 +24,18 @@ export class SystemEmailSettingsController {
     @Inject() private readonly repository: TypeOrmSystemEmailSettingsRepository,
     @Inject() private readonly idGenerator: UlidGenerator,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
+    @Inject() private readonly mailDns: NodeMailDnsLookup,
   ) {}
 
   private ensureAdmin(user: AuthUser) {
     if (!user.isSystemAdmin) throw new AccessDeniedError('System admin required');
+  }
+
+  /** The domain's mail servers, for the installation's email and platform mailbox forms */
+  @Post('resolve-mail-server')
+  async resolveMailServer(@Body() body: ResolveMailServerRequest, @CurrentUser() user: AuthUser) {
+    this.ensureAdmin(user);
+    return new ResolveMailServer(this.mailDns).execute(body.domain);
   }
 
   @Get('email-settings')

@@ -41,4 +41,6 @@ export interface TicketRepository {
   softDelete(id: string): Promise<void>;
   countByWorkspaceIdSince(workspaceId: string, since: Date): Promise<number>;
   findByPortalToken(portalToken: string): Promise<Ticket | null>;
+  /** The ticket of a workspace with this reference as stored (TK-000042), or null. */
+  findByReference(workspaceId: string, reference: string): Promise<Ticket | null>;
 }

@@ -12,6 +12,8 @@ interface Props {
   uploadedById: string | null;
   token: string | null;
   stagedAt: Date | null;
+  /** When it was uploaded, shown next to the file; unset before it is saved. */
+  createdAt?: Date | null;
 }
 
 export class Attachment {
@@ -26,6 +28,7 @@ export class Attachment {
   uploadedById: string | null;
   token: string | null;
   stagedAt: Date | null;
+  createdAt: Date | null;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -39,6 +42,7 @@ export class Attachment {
     this.uploadedById = props.uploadedById;
     this.token = props.token;
     this.stagedAt = props.stagedAt;
+    this.createdAt = props.createdAt ?? null;
   }
 
   getId(): string {

@@ -3,8 +3,7 @@ import { EventPublisher } from '../../../shared/domain/event-publisher';
 import { CreateTransferRequest } from '../../domain/services/transfer-request-create';
 import { EnsureTicketAccess } from '../../domain/services/ticket-ensure-access';
 import { EnsureTicketAssignee } from '../../domain/services/ticket-ensure-assignee';
-import { AddTicketParticipant } from '../../domain/services/ticket-add-participant';
-import { ParticipantRole } from '../../domain/enums/participant-role.enum';
+import { FollowTicket } from '../../domain/services/ticket-follow';
 import { TicketRepository } from '../../domain/repositories/ticket.repository';
 import { UserRepository } from '../../../user/domain/repositories/user.repository';
 import { EnsureWorkspacePermission } from '../../../workspace/domain/services/workspace-ensure-permission';
@@ -42,7 +41,7 @@ export class CreateTransferRequestCommand implements Command<Props, CreateTransf
     private readonly userRepository: UserRepository,
     private readonly eventPublisher: EventPublisher,
     private readonly createAuditLog: CreateAuditLogEntry,
-    private readonly addParticipant: AddTicketParticipant,
+    private readonly followTicket: FollowTicket,
   ) {}
 
   async execute(props: Props): Promise<CreateTransferRequestResponse> {
@@ -106,10 +105,13 @@ export class CreateTransferRequestCommand implements Command<Props, CreateTransf
     this.eventPublisher.emit('transfer-request.created', event);
 
     // The target follows the ticket so they can read it while deciding.
-    await this.addParticipant.execute({
+    await this.followTicket.execute({
       ticketId: props.ticketId,
+      workspaceId: props.workspaceId,
       userId: props.targetUserId,
-      role: ParticipantRole.FOLLOWER,
+      actorId: props.userId,
+      reason: 'transfer-request',
+      source: 'ui',
     });
 
     return { id: props.ticketId, transferRequestId: request.getId(), status: 'pending', expiresAt: request.expiresAt };

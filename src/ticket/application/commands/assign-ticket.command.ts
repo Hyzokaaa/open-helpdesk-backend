@@ -6,7 +6,7 @@ import { AssignTicket } from '../../domain/services/ticket-assign';
 import { EnsureTicketAssignee } from '../../domain/services/ticket-ensure-assignee';
 import { EnsureWorkspacePermission } from '../../../workspace/domain/services/workspace-ensure-permission';
 import { PERMISSIONS } from '../../../workspace/domain/permissions';
-import { TicketAssignedEvent } from '../../../email/domain/events';
+import { StatusChangedEvent, TicketAssignedEvent } from '../../../email/domain/events';
 import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
 import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
@@ -42,14 +42,19 @@ export class AssignTicketCommand implements Command<Props, AssignTicketResponse>
   ) {}
 
   async execute(props: Props): Promise<AssignTicketResponse> {
-    await this.ensurePermission.execute({
-      workspaceId: props.workspaceId,
-      userId: props.userId,
-      permission: PERMISSIONS.TICKET_ASSIGN,
-      isSystemAdmin: props.isSystemAdmin,
-    });
-
     const ticket = await this.ticketRepository.findById(props.ticketId);
+
+    // The assignee may let go of their own ticket; anything else needs ticket.assign
+    const releasingOwn = props.assigneeId === null && !!ticket && ticket.assigneeId === props.userId;
+    if (!releasingOwn) {
+      await this.ensurePermission.execute({
+        workspaceId: props.workspaceId,
+        userId: props.userId,
+        permission: PERMISSIONS.TICKET_ASSIGN,
+        isSystemAdmin: props.isSystemAdmin,
+      });
+    }
+
     if (!ticket || ticket.workspaceId !== props.workspaceId) throw new EntityNotFoundError('Ticket not found');
 
     if (props.assigneeId && this.ensureAssignee) {
@@ -57,6 +62,7 @@ export class AssignTicketCommand implements Command<Props, AssignTicketResponse>
     }
 
     const previousAssigneeId = ticket.assigneeId;
+    const previousStatus = ticket.status;
 
     const updated = await this.assignTicket.execute({
       ticketId: props.ticketId,
@@ -86,6 +92,41 @@ export class AssignTicketCommand implements Command<Props, AssignTicketResponse>
       workspaceId: props.workspaceId,
       metadata: { ...(props.apiKeyId ? { apiKeyId: props.apiKeyId } : {}), ticketName: ticket.name, before: { assignee: props.previousAssigneeLabel }, after: { assignee: props.assigneeLabel } },
     });
+
+    // Assigning an open ticket makes it pending, and leaving one unassigned opens it again
+    if (updated.status !== previousStatus) {
+      const statusChanged: StatusChangedEvent = {
+        ticketId: props.ticketId,
+        ticketName: ticket.name,
+        oldStatus: previousStatus,
+        newStatus: updated.status,
+        changedById: props.userId,
+        workspaceId: props.workspaceId,
+        workspaceName: props.workspaceName,
+        workspaceSlug: props.workspaceSlug,
+        // The assignment already told people; only webhooks and open screens need this one
+        quiet: true,
+      };
+      this.eventPublisher.emit('ticket.statusChanged', statusChanged);
+
+      await this.createAuditLog.execute({
+        action: AuditAction.TICKET_STATUS_CHANGED,
+        category: AuditCategory.TICKET,
+        level: AuditLevel.INFO,
+        source: props.apiKeyId ? 'api' : 'ui',
+        entityType: 'ticket',
+        entityId: props.ticketId,
+        userId: props.userId,
+        workspaceId: props.workspaceId,
+        metadata: {
+          ...(props.apiKeyId ? { apiKeyId: props.apiKeyId } : {}),
+          ticketName: ticket.name,
+          before: { status: previousStatus },
+          after: { status: updated.status },
+          reason: props.assigneeId ? 'assigned' : 'unassigned',
+        },
+      });
+    }
 
     return {
       id: updated.getId(),

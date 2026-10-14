@@ -57,6 +57,8 @@ export class TypeOrmNotificationPreferenceRepository
       emailUpgradeAvailable: model.emailUpgradeAvailable,
       inAppUpgradeAvailable: model.inAppUpgradeAvailable,
       inAppInvitationExpired: model.inAppInvitationExpired,
+      inAppUnattendedReply: model.inAppUnattendedReply,
+      emailUnattendedReply: model.emailUnattendedReply,
       bellUnreadOnly: model.bellUnreadOnly,
     });
   }
@@ -84,6 +86,8 @@ export class TypeOrmNotificationPreferenceRepository
     model.emailUpgradeAvailable = pref.emailUpgradeAvailable;
     model.inAppUpgradeAvailable = pref.inAppUpgradeAvailable;
     model.inAppInvitationExpired = pref.inAppInvitationExpired;
+    model.inAppUnattendedReply = pref.inAppUnattendedReply;
+    model.emailUnattendedReply = pref.emailUnattendedReply;
     model.bellUnreadOnly = pref.bellUnreadOnly;
     return model;
   }

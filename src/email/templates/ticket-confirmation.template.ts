@@ -5,13 +5,16 @@ import { singleLineText } from '../../shared/domain/sanitize-plain-text';
 
 interface Data {
   ticketName: string;
+  /** The ticket's reference (TK-000042); in the subject so a reply without headers still finds it. */
+  ticketNumber?: string;
   portalUrl: string;
   lang: string;
 }
 
 export class TicketConfirmationTemplate {
   subject(data: Data): string {
-    return singleLineText(`${t('ticketConfirmation.subject', data.lang)} — #${data.ticketName}`);
+    const ref = data.ticketNumber ? ` — ${data.ticketNumber}` : '';
+    return singleLineText(`${t('ticketConfirmation.subject', data.lang)}: ${data.ticketName}${ref}`);
   }
 
   html(data: Data): string {

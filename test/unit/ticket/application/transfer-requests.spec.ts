@@ -9,6 +9,8 @@ import { RejectTransferRequest } from '../../../../src/ticket/domain/services/tr
 import { CancelTransferRequest } from '../../../../src/ticket/domain/services/transfer-request-cancel';
 import { EnsureTicketAssignee } from '../../../../src/ticket/domain/services/ticket-ensure-assignee';
 import { AddTicketParticipant } from '../../../../src/ticket/domain/services/ticket-add-participant';
+import { FollowTicket } from '../../../../src/ticket/domain/services/ticket-follow';
+import { AuditAction } from '../../../../src/audit-log/domain/enums/audit-action.enum';
 import { CreateTransferRequestCommand } from '../../../../src/ticket/application/commands/create-transfer-request.command';
 import { AcceptTransferRequestCommand } from '../../../../src/ticket/application/commands/accept-transfer-request.command';
 import { RejectTransferRequestCommand } from '../../../../src/ticket/application/commands/reject-transfer-request.command';
@@ -58,7 +60,7 @@ describe('Transfer requests', () => {
     const create = () => new CreateTransferRequestCommand(
       new CreateTransferRequest(w.ids, w.tickets, requests),
       w.ensurePermission(), w.ensureTicketAccess(), new EnsureTicketAssignee(w.members),
-      w.tickets, w.users, events, w.auditLog(), new AddTicketParticipant(w.ids, w.participants),
+      w.tickets, w.users, events, w.auditLog(), new FollowTicket(new AddTicketParticipant(w.ids, w.participants), w.auditLog(), w.users),
     );
 
     it('a ticket of workspace B cannot be transferred through workspace A', async () => {
@@ -91,6 +93,9 @@ describe('Transfer requests', () => {
       expect(result.status).toBe('pending');
       expect(await w.participants.exists('ticket-a', 'agent2-a')).toBe(true);
       expect(events.events.map((e) => e.event)).toEqual(['transfer-request.created']);
+      const follow = w.audit.entries.find((e) => e.action === AuditAction.PARTICIPANT_ADDED)!;
+      expect(follow.userId).toBe('agent-a');
+      expect(follow.metadata).toMatchObject({ participantUserId: 'agent2-a', role: 'follower', reason: 'transfer-request' });
     });
   });
 

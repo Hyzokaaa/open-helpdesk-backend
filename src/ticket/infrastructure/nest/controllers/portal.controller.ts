@@ -263,12 +263,23 @@ export class PortalController {
         mimeType: a.mimeType,
         size: a.size,
         downloadUrl: await this.storage.getPresignedUrl(a.s3Key),
+        // Lets the portal show each file with the reply it came with
+        commentId: a.commentId,
+        createdAt: a.createdAt,
       })),
     );
 
     const category = ticket.categoryId
       ? await this.ticketCategoryRepository.findById(ticket.categoryId)
       : null;
+
+    // The values by the name and type of their field, in the workspace's order: the customer
+    // cannot read the field definitions, and an id means nothing to them
+    const definitions = await this.customFieldDefinitionRepository.findByWorkspaceId(ticket.workspaceId);
+    const values = ticket.customFields ?? {};
+    const customFieldValues = definitions
+      .filter((def) => values[def.getId()] !== undefined && values[def.getId()] !== null && values[def.getId()] !== '')
+      .map((def) => ({ name: def.name, type: def.type, value: values[def.getId()] }));
 
     return {
       ticketNumber: ticketReferenceOf(ticket),
@@ -278,9 +289,12 @@ export class PortalController {
       priority: ticket.priority,
       categoryName: category?.name ?? null,
       customFields: ticket.customFields,
+      customFieldValues,
       createdAt: ticket.createdAt,
       reporterName: creator ? `${creator.firstName} ${creator.lastName}`.trim() : '',
       workspaceName: workspace?.name ?? '',
+      // Already in the portal's address; the page needs it to upload files with a reply
+      workspaceSlug: workspace?.slug ?? '',
       workspacePalette: workspace?.palette ?? null,
       attachments: attachmentList,
       comments: comments.map((c) => ({
@@ -310,6 +324,17 @@ export class PortalController {
       authorId: ticket.reporterId,
     });
 
+    // Files the customer uploaded while writing, staged anonymously like those of a new ticket
+    const uploadTokens = body.uploadTokens ?? [];
+    if (uploadTokens.length > 0) {
+      await new ClaimStagedAttachments(this.attachmentRepository).execute({
+        tokens: uploadTokens,
+        ticketId: ticket.getId(),
+        uploadedById: PORTAL_UPLOADER,
+        commentId: comment.getId(),
+      });
+    }
+
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({
       action: AuditAction.PORTAL_COMMENT_CREATED,
@@ -321,7 +346,7 @@ export class PortalController {
       entityId: ticket.getId(),
       userId: ticket.reporterId,
       workspaceId: ticket.workspaceId,
-      metadata: { ticketId: ticket.getId(), commentId: comment.getId(), ticketName: ticket.name, content: commentPreview(comment.content) },
+      metadata: { ticketId: ticket.getId(), commentId: comment.getId(), ticketName: ticket.name, content: commentPreview(comment.content), ...(uploadTokens.length > 0 ? { attachmentsClaimed: uploadTokens.length } : {}) },
     });
 
     // Tell the team, like any other reply: email to stakeholders, in-app notification and live update

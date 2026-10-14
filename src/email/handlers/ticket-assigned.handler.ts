@@ -16,6 +16,8 @@ import { TypeOrmAuditLogRepository } from '../../audit-log/infrastructure/typeor
 import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
 import { WorkspaceFrontendResolver } from '../../shared/infrastructure/workspace-frontend-resolver';
+import { ticketThreadHeaders } from '../domain/ticket-email-thread';
+import { eachEmailRecipient } from '../domain/each-email-recipient';
 import { RecordEmailSend } from '../../audit-log/domain/services/audit-log-record-email-send';
 
 @Injectable()
@@ -47,13 +49,9 @@ export class TicketAssignedHandler {
       : null;
     const emailDomain = mailbox ? mailbox.address.split('@')[1] : null;
     const sender = await this.emailSenderRepository.findByWorkspaceId(event.workspaceId);
-    const threading = emailDomain ? {
-      inReplyTo: `<ticket-${event.ticketId}@${emailDomain}>`,
-      references: `<ticket-${event.ticketId}@${emailDomain}>`,
-    } : {};
 
-    // Unassigned — notify previous assignee
-    if (event.previousAssigneeId && event.previousAssigneeId !== event.newAssigneeId) {
+    // Unassigned — notify previous assignee, unless they let go of the ticket themselves
+    if (event.previousAssigneeId && event.previousAssigneeId !== event.newAssigneeId && event.previousAssigneeId !== event.assignedById) {
       const prevUsers = await this.userRepository.findByIds([event.previousAssigneeId]);
       if (prevUsers.length > 0) {
         const { emailRecipients } = await dispatch.execute({
@@ -66,15 +64,14 @@ export class TicketAssignedHandler {
           emailPrefKey: 'emailTicketAssigned',
         });
 
-        for (const [lang, emails] of emailRecipients) {
+        for (const [lang, emails] of eachEmailRecipient(emailRecipients)) {
           const data = { ticketName: event.ticketName, ticketUrl, workspaceName: event.workspaceName, lang };
           const subject = template.unassignedSubject(data);
           const result = await sendWorkspaceEmail(this.emailService, sender, {
             to: emails,
             subject,
             html: template.unassignedHtml(data),
-            ...(emailDomain && { messageId: `<assign-${event.ticketId}-${Date.now()}@${emailDomain}>` }),
-            ...threading,
+            ...(emailDomain && ticketThreadHeaders(event.ticketId, emailDomain, `assign-${event.ticketId}-${Date.now()}`)),
             ...(mailbox && { replyTo: mailbox.address }),
           });
           await new RecordEmailSend(this.idGenerator, this.auditLogRepository).execute({
@@ -98,7 +95,7 @@ export class TicketAssignedHandler {
           emailPrefKey: 'emailTicketAssigned',
         });
 
-        for (const [lang, emails] of emailRecipients) {
+        for (const [lang, emails] of eachEmailRecipient(emailRecipients)) {
           const data = {
             ticketName: event.ticketName,
             ticketUrl,
@@ -111,8 +108,7 @@ export class TicketAssignedHandler {
             to: emails,
             subject,
             html: template.assignedHtml(data),
-            ...(emailDomain && { messageId: `<assign-${event.ticketId}-${Date.now()}@${emailDomain}>` }),
-            ...threading,
+            ...(emailDomain && ticketThreadHeaders(event.ticketId, emailDomain, `assign-${event.ticketId}-${Date.now()}`)),
             ...(mailbox && { replyTo: mailbox.address }),
           });
           await new RecordEmailSend(this.idGenerator, this.auditLogRepository).execute({

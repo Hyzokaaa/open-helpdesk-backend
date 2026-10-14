@@ -22,8 +22,10 @@ export class WebhookDeliveryService {
   }
 
   @OnEvent('ticket.statusChanged')
-  async onTicketStatusChanged(event: BaseEvent): Promise<void> {
-    await this.deliver('ticket.statusChanged', event);
+  async onTicketStatusChanged(event: BaseEvent & { quiet?: boolean }): Promise<void> {
+    // quiet only steers our own notifications; it is not part of the webhook payload
+    const { quiet: _quiet, ...data } = event;
+    await this.deliver('ticket.statusChanged', data);
   }
 
   @OnEvent('ticket.assigned')

@@ -4,6 +4,7 @@ import { EnsureWorkspacePermission } from '../../../workspace/domain/services/wo
 import { EnsureTicketAccess } from '../../../ticket/domain/services/ticket-ensure-access';
 import { AttachmentRepository } from '../../domain/repositories/attachment.repository';
 import { AttachmentDeleter, canDeleteAttachment } from '../../domain/services/attachment-ensure-access';
+import { SummarizeUsers, UserSummary } from '../../../user/domain/services/user-summarize';
 
 interface Props {
   ticketId: string;
@@ -20,6 +21,10 @@ export interface AttachmentListItem {
   downloadUrl: string;
   /** Whether the caller may delete it, so the client follows the server's rule instead of repeating it. */
   canDelete: boolean;
+  /** The comment it was attached to, or null when it belongs to the ticket itself. */
+  commentId: string | null;
+  createdAt: Date | null;
+  uploadedBy: UserSummary | null;
 }
 
 export class ListTicketAttachmentsQuery implements Query<Props, AttachmentListItem[]> {
@@ -28,6 +33,7 @@ export class ListTicketAttachmentsQuery implements Query<Props, AttachmentListIt
     private readonly storage: StorageService,
     private readonly ensureTicketAccess: EnsureTicketAccess,
     private readonly ensurePermission: EnsureWorkspacePermission,
+    private readonly summarizeUsers: SummarizeUsers,
   ) {}
 
   async execute(props: Props): Promise<AttachmentListItem[]> {
@@ -42,6 +48,7 @@ export class ListTicketAttachmentsQuery implements Query<Props, AttachmentListIt
     };
 
     const attachments = await this.repository.findByTicketId(props.ticketId);
+    const uploaders = await this.summarizeUsers.execute(attachments.map((a) => a.uploadedById));
     return Promise.all(
       attachments.map(async (a) => ({
         id: a.getId(),
@@ -50,6 +57,9 @@ export class ListTicketAttachmentsQuery implements Query<Props, AttachmentListIt
         size: a.size,
         downloadUrl: await this.storage.getPresignedUrl(a.s3Key),
         canDelete: canDeleteAttachment(a, deleter),
+        commentId: a.commentId,
+        createdAt: a.createdAt,
+        uploadedBy: (a.uploadedById && uploaders.get(a.uploadedById)) || null,
       })),
     );
   }

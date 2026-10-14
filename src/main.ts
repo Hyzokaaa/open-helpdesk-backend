@@ -5,6 +5,7 @@ import { AppModule } from "./app.module";
 import { ensureDatabase } from "./shared/infrastructure/ensure-database";
 import { DataSource } from "typeorm";
 import { DomainExceptionFilter } from "./shared/nest/filters/domain-exception.filter";
+import { RejectNullCharactersPipe } from "./shared/nest/pipes/reject-null-characters.pipe";
 import { AccessDeniedAuditRecorder } from "./audit-log/infrastructure/nest/access-denied-audit-recorder";
 import { setupApiDocs } from "./api/infrastructure/nest/openapi/api-docs";
 import { resolveBackendVersion } from "./config/infrastructure/nest/resolve-backend-version";
@@ -19,6 +20,7 @@ async function bootstrap() {
   app.use("/inbound/email", json({ limit: "25mb" }));
 
   app.useGlobalPipes(
+    new RejectNullCharactersPipe(),
     new ValidationPipe({
       whitelist: true,
       transform: true,

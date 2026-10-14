@@ -22,6 +22,9 @@ import { EvaluateEmailRules } from '../../../email-rule/domain/services/email-ru
 import { OrganizationRepository } from '../../../organization/domain/repositories/organization.repository';
 import { AutoEnrollOrganization } from '../../../organization/domain/services/organization-auto-enroll';
 import { RecordAutoCreated } from '../../../audit-log/domain/services/audit-log-record-auto-created';
+import { FindRepliedTicket } from './inbound-email-find-ticket';
+import { FollowTicket } from '../../../ticket/domain/services/ticket-follow';
+import { ticketReferenceOf } from '../../../ticket/domain/ticket-reference';
 
 export interface RouteInboundEmailResult {
   action: 'ticket-created' | 'comment-added' | 'rejected';
@@ -52,6 +55,8 @@ export class RouteInboundEmail {
     private readonly organizationRepository?: OrganizationRepository,
     private readonly ticketCategoryRepository?: TicketCategoryRepository,
     private readonly recordAutoCreated?: RecordAutoCreated,
+    private readonly findRepliedTicket?: FindRepliedTicket,
+    private readonly followTicket?: FollowTicket,
   ) {}
 
   async execute(parsed: ParsedInboundEmail): Promise<RouteInboundEmailResult> {
@@ -176,20 +181,35 @@ export class RouteInboundEmail {
     });
 
     // 4. Route: reply to existing ticket or create new
-    if (parsed.inReplyToTicketId) {
-      const ticket = await this.ticketRepository.findById(parsed.inReplyToTicketId);
-      if (ticket && ticket.workspaceId === workspaceId) {
+    {
+      const findReplied = this.findRepliedTicket ?? new FindRepliedTicket(this.ticketRepository);
+      const ticket = await findReplied.execute({
+        thread: parsed.thread,
+        subject: parsed.subject,
+        workspaceId,
+        senderId: user.getId(),
+      });
+      if (ticket) {
         const comment = await this.createComment.execute({
           content: textToHtml(parsed.body),
           ticketId: ticket.getId(),
           authorId: user.getId(),
         });
 
+        // As in the app: whoever joins the conversation by email follows it from then on
+        if (this.followTicket && user.getId() !== ticket.reporterId && user.getId() !== ticket.assigneeId) {
+          await this.followTicket.execute({ ticketId: ticket.getId(), workspaceId, userId: user.getId(), actorId: user.getId(), reason: 'comment', source: 'email' });
+        }
+
+        // Files first, so the notification can list them
+        await this.uploadAttachments(parsed, ticket.getId(), comment.getId(), user.getId());
+
         const workspace = await this.workspaceRepository.findById(workspaceId);
         if (workspace) {
           const event: NewCommentEvent = {
             ticketId: ticket.getId(),
             ticketName: ticket.name,
+            ticketNumber: ticketReferenceOf(ticket),
             commentId: comment.getId(),
             authorId: user.getId(),
             authorName: `${user.firstName} ${user.lastName}`.trim(),
@@ -204,7 +224,6 @@ export class RouteInboundEmail {
           this.eventPublisher.emit('comment.created', event);
         }
 
-        await this.uploadAttachments(parsed, ticket.getId(), comment.getId(), user.getId());
         return { action: 'comment-added', ticketId: ticket.getId(), authorId: user.getId() };
       }
     }

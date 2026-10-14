@@ -19,11 +19,12 @@ import { TypeOrmSystemBrandingRepository } from './infrastructure/typeorm/reposi
 import { TypeOrmSystemNotificationSettingsRepository } from './infrastructure/typeorm/repositories/typeorm-system-notification-settings.repository';
 import { TypeOrmSystemAnalyticsSettingsRepository } from './infrastructure/typeorm/repositories/typeorm-system-analytics-settings.repository';
 import { VersionCheckScheduler } from './infrastructure/nest/services/version-check.scheduler';
+import { NodeMailDnsLookup } from '../email/infrastructure/dns/node-mail-dns-lookup';
 
 @Module({
   imports: [SharedModule, AuditLogModule, UserModule, NotificationModule, TypeOrmModule.forFeature([SystemEmailSettingsModel, SystemBrandingModel, SystemNotificationSettingsModel, SystemAnalyticsSettingsModel])],
   controllers: [CoreConfigController, SystemEmailSettingsController, SystemBrandingController, SystemNotificationSettingsController, SystemVersionController, SystemAnalyticsController],
-  providers: [TypeOrmSystemEmailSettingsRepository, TypeOrmSystemBrandingRepository, TypeOrmSystemNotificationSettingsRepository, TypeOrmSystemAnalyticsSettingsRepository, VersionCheckScheduler],
+  providers: [NodeMailDnsLookup, TypeOrmSystemEmailSettingsRepository, TypeOrmSystemBrandingRepository, TypeOrmSystemNotificationSettingsRepository, TypeOrmSystemAnalyticsSettingsRepository, VersionCheckScheduler],
   exports: [TypeOrmSystemEmailSettingsRepository, TypeOrmSystemBrandingRepository, TypeOrmSystemNotificationSettingsRepository, TypeOrmSystemAnalyticsSettingsRepository],
 })
 export class CoreConfigModule {}

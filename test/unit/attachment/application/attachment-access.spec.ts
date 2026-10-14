@@ -26,6 +26,9 @@ import { MockTicketParticipantRepository } from '../../../mocks/mock-ticket-part
 import { MockWorkspaceMemberRepository } from '../../../mocks/mock-workspace-member.repository';
 import { FakeIdGenerator } from '../../../mocks/fake-id-generator';
 import { FakeS3Storage } from '../../../mocks/fake-s3-storage';
+import { MockUserRepository } from '../../../mocks/mock-user.repository';
+import { SummarizeUsers } from '../../../../src/user/domain/services/user-summarize';
+import { makeUser } from '../../ticket/application/ticket-security-fixtures';
 
 // ws-1 holds ticket-1, opened by "reporter" and assigned to "agent". ws-2 holds ticket-2.
 function makeTicket(id: string, workspaceId: string) {
@@ -121,7 +124,7 @@ describe('Attachment access', () => {
     });
 
     it('does not list the attachments of a ticket in another workspace', async () => {
-      const list = new ListTicketAttachmentsQuery(attachments, storage as any, ensureTicketAccess(), ensurePermission());
+      const list = new ListTicketAttachmentsQuery(attachments, storage as any, ensureTicketAccess(), ensurePermission(), new SummarizeUsers(new MockUserRepository()));
       await expect(
         list.execute({ ticketId: 'ticket-2', workspaceId: 'ws-1', ...caller('admin') }),
       ).rejects.toThrow(EntityNotFoundError);
@@ -165,10 +168,23 @@ describe('Attachment access', () => {
     });
 
     it('tells the client which attachments the caller may delete, with the same rule', async () => {
-      const list = new ListTicketAttachmentsQuery(attachments, storage as any, ensureTicketAccess(), ensurePermission());
+      const list = new ListTicketAttachmentsQuery(attachments, storage as any, ensureTicketAccess(), ensurePermission(), new SummarizeUsers(new MockUserRepository()));
       const items = await list.execute({ ticketId: 'ticket-1', workspaceId: 'ws-1', ...caller('reporter') });
       const deletable = items.filter((i) => i.canDelete).map((i) => i.id);
       expect(deletable).toEqual(['by-reporter']);
+    });
+
+    it('says which comment each file belongs to and who uploaded it, so the client can place it', async () => {
+      attachments.seed(makeAttachment('reply-file', { ticketId: 'ticket-1', commentId: 'comment-1', uploadedById: 'agent' }));
+      const users = new MockUserRepository();
+      users.seed(makeUser('agent'));
+      const list = new ListTicketAttachmentsQuery(attachments, storage as any, ensureTicketAccess(), ensurePermission(), new SummarizeUsers(users));
+
+      const items = await list.execute({ ticketId: 'ticket-1', workspaceId: 'ws-1', ...caller('admin') });
+
+      expect(items.find((i) => i.id === 'reply-file')).toMatchObject({ commentId: 'comment-1', uploadedBy: { id: 'agent', firstName: 'agent' } });
+      expect(items.find((i) => i.id === 'by-agent')).toMatchObject({ commentId: null, uploadedBy: { id: 'agent' } });
+      expect(items.find((i) => i.id === 'by-email')).toMatchObject({ commentId: null, uploadedBy: null });
     });
   });
 
