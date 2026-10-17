@@ -8,6 +8,7 @@ export interface SessionRotation {
 
 export interface UserSessionRepository {
   create(session: UserSession): Promise<void>;
+  findById(id: string): Promise<UserSession | null>;
   findByTokenHash(tokenHash: string): Promise<UserSession | null>;
   findByPreviousTokenHash(tokenHash: string): Promise<UserSession | null>;
   update(session: UserSession): Promise<void>;
@@ -16,6 +17,10 @@ export interface UserSessionRepository {
    * refreshes racing on the same token cannot both rotate it. False when another one won.
    */
   rotate(sessionId: string, expectedTokenHash: string, rotation: SessionRotation): Promise<boolean>;
+  /** Moves the expiry of every live session of the family forward, so they keep ending together. */
+  extendFamily(rootId: string, expiresAt: Date): Promise<void>;
+  /** Revokes every live session of the family: the root and the ones handed over from it. */
+  revokeFamily(rootId: string, revokedAt: Date): Promise<void>;
   /** Revokes every live session of the user, except `exceptId` when given. */
   revokeAllForUser(userId: string, revokedAt: Date, exceptId?: string): Promise<void>;
   /** Deletes sessions that expired or were revoked before `before`. Returns how many. */

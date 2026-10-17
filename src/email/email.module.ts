@@ -24,6 +24,7 @@ import { TypeOrmSystemEmailSettingsRepository } from '../config/infrastructure/t
 
 import { ProjectModule } from '../project/project.module';
 import { WorkspaceLifecycleHandler } from './handlers/workspace-lifecycle.handler';
+import { CustomDomainCheckHandler } from './handlers/custom-domain-check.handler';
 import { AttachmentModule } from '../attachment/attachment.module';
 @Global()
 @Module({
@@ -51,6 +52,7 @@ import { AttachmentModule } from '../attachment/attachment.module';
     CsatSurveyHandler,
     TransferRequestHandler,
     WorkspaceLifecycleHandler,
+    CustomDomainCheckHandler,
   ],
   exports: [EMAIL_SERVICE],
 })

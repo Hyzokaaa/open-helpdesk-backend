@@ -33,6 +33,11 @@ export class TypeOrmWorkspaceRepository implements WorkspaceRepository {
     return models.map((m) => this.toDomain(m));
   }
 
+  async findWithVerifiedCustomDomain(): Promise<Workspace[]> {
+    const models = await this.repository.findBy({ customDomainVerified: true, customDomain: Not(IsNull()) });
+    return models.map((m) => this.toDomain(m));
+  }
+
   private static readonly VALID_SORT_FIELDS: Record<string, { col: string; lower: boolean }> = {
     name: { col: 'workspace.name', lower: true },
     slug: { col: 'workspace.slug', lower: true },
@@ -142,6 +147,8 @@ export class TypeOrmWorkspaceRepository implements WorkspaceRepository {
       customDomain: model.customDomain ?? null,
       customDomainVerified: model.customDomainVerified ?? false,
       domainVerificationToken: model.domainVerificationToken ?? null,
+      customDomainCheckFailures: model.customDomainCheckFailures ?? 0,
+      customDomainFailingSince: model.customDomainFailingSince ?? null,
       appName: model.appName ?? null,
       appSubtitle: model.appSubtitle ?? null,
       logo: model.logo ?? null,
@@ -166,6 +173,8 @@ export class TypeOrmWorkspaceRepository implements WorkspaceRepository {
     model.customDomain = workspace.customDomain;
     model.customDomainVerified = workspace.customDomainVerified;
     model.domainVerificationToken = workspace.domainVerificationToken;
+    model.customDomainCheckFailures = workspace.customDomainCheckFailures;
+    model.customDomainFailingSince = workspace.customDomainFailingSince;
     model.appName = workspace.appName;
     model.appSubtitle = workspace.appSubtitle;
     model.logo = workspace.logo;

@@ -1,4 +1,3 @@
-import { randomUUID } from 'crypto';
 import {
   BadRequestException,
   Body,
@@ -28,12 +27,16 @@ import { ClaimStagedAttachments } from '../../../../attachment/domain/services/a
 import { StageAttachment } from '../../../../attachment/domain/services/attachment-stage';
 import { StageUploadCommand, StageUploadResponse } from '../../.././../attachment/application/commands/stage-upload.command';
 import { TicketPriority } from '../../../domain/enums/ticket-priority.enum';
+import { WorkspaceRole } from '../../../../workspace/domain/enums/workspace-role.enum';
 import { TicketSource } from '../../../domain/enums/ticket-source.enum';
 import { NewCommentEvent, TicketCreatedEvent } from '../../../../email/domain/events';
 import { TypeOrmWorkspaceRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository';
 import { TypeOrmWorkspaceMemberRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
 import { TypeOrmUserRepository } from '../../../../user/infrastructure/typeorm/repositories/typeorm-user.repository';
 import { TypeOrmTicketRepository } from '../../typeorm/repositories/typeorm-ticket.repository';
+import { TypeOrmTicketPortalAccessRepository } from '../../typeorm/repositories/typeorm-ticket-portal-access.repository';
+import { EnsureTicketPortalAccess } from '../../../domain/services/ticket-portal-access-ensure';
+import { ResolveTicketPortalAccess } from '../../../domain/services/ticket-portal-access-resolve';
 import { TypeOrmCommentRepository } from '../../../../comment/infrastructure/typeorm/repositories/typeorm-comment.repository';
 import { TypeOrmAttachmentRepository } from '../../../../attachment/infrastructure/typeorm/repositories/typeorm-attachment.repository';
 import { TypeOrmCustomFieldDefinitionRepository } from '../../../../custom-field/infrastructure/typeorm/repositories/typeorm-custom-field-definition.repository';
@@ -64,6 +67,7 @@ export class PortalController {
     @Inject() private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
     @Inject() private readonly userRepository: TypeOrmUserRepository,
     @Inject() private readonly ticketRepository: TypeOrmTicketRepository,
+    @Inject() private readonly portalAccessRepository: TypeOrmTicketPortalAccessRepository,
     @Inject() private readonly attachmentRepository: TypeOrmAttachmentRepository,
     @Inject() private readonly idGenerator: UlidGenerator,
     @Inject() private readonly passwordHasher: BcryptPasswordHasher,
@@ -162,12 +166,11 @@ export class PortalController {
     }
 
     // Create ticket
-    const portalToken = randomUUID();
     const defaultCategory = await this.ticketCategoryRepository.findBySlugAndWorkspace('issue', workspace.getId());
     const allCategories = defaultCategory ? null : await this.ticketCategoryRepository.findByWorkspaceId(workspace.getId());
     const categoryId = defaultCategory?.getId() ?? allCategories?.[0]?.getId() ?? '';
-    const createTicketService = new CreateTicket(this.idGenerator, this.ticketRepository);
-    const ticket = await createTicketService.execute({
+    const createTicketService = new CreateTicket(this.idGenerator, this.ticketRepository, new EnsureTicketPortalAccess(this.idGenerator, this.portalAccessRepository));
+    const { ticket, reporterAccess } = await createTicketService.execute({
       name: body.subject,
       description: body.description,
       priority: TicketPriority.MEDIUM,
@@ -179,7 +182,6 @@ export class PortalController {
       departmentId: body.departmentId ?? null,
       organizationId,
       source: TicketSource.PORTAL,
-      portalToken,
     });
 
     // Claim staged attachments
@@ -203,7 +205,7 @@ export class PortalController {
       workspaceId: workspace.getId(),
       workspaceName: workspace.name,
       workspaceSlug: workspace.slug,
-      portalToken,
+      portalToken: reporterAccess.token,
       source: 'portal',
     };
     this.eventPublisher.emit('ticket.created', event);
@@ -228,29 +230,29 @@ export class PortalController {
     return {
       ticketNumber: ticketReferenceOf(ticket),
       // null for an existing account: the link was emailed to its owner instead
-      portalToken: reporter.mayRevealPortalLink ? ticket.portalToken : null,
+      portalToken: reporter.mayRevealPortalLink ? reporterAccess.token : null,
       message: 'Ticket created',
     };
   }
 
   @Get('tickets/:portalToken')
   async getPortalTicket(@Param('portalToken') portalToken: string) {
-    const ticket = await this.ticketRepository.findByPortalToken(portalToken);
-    if (!ticket) throw new EntityNotFoundError('Ticket not found');
-
-    const creator = await this.userRepository.findById(ticket.reporterId);
-    // A ticket of a deleted workspace is gone for its portal link too
-    const workspace = await this.workspaceRepository.findById(ticket.workspaceId);
-    if (!workspace) throw new EntityNotFoundError('Ticket not found');
+    const { ticket, workspace, user: viewer } = await this.resolveAccess(portalToken);
+    const creator = ticket.reporterId === viewer.getId() ? viewer : await this.userRepository.findById(ticket.reporterId);
 
     // Fetch comments with author names and dates
     const comments = await this.commentRepository.findByTicketIdWithDates(ticket.getId());
     const authorIds = [...new Set(comments.map((c) => c.authorId))];
     const authors = new Map<string, string>();
+    // Who answers for the workspace: several customers can write on one ticket, so not being
+    // the reporter does not make an author part of the team
+    const team = new Set<string>();
     for (const authorId of authorIds) {
       const user = await this.userRepository.findById(authorId);
       if (user) {
         authors.set(authorId, `${user.firstName} ${user.lastName}`.trim());
+        const member = await this.memberRepository.findByWorkspaceAndUser(ticket.workspaceId, authorId);
+        if (user.isSystemAdmin || (member && member.role !== WorkspaceRole.USER)) team.add(authorId);
       }
     }
 
@@ -302,6 +304,9 @@ export class PortalController {
         content: c.content,
         authorName: authors.get(c.authorId) ?? '',
         isReporter: c.authorId === ticket.reporterId,
+        // Whose link this is: their own replies, not only the reporter's, sit on their side
+        isOwn: c.authorId === viewer.getId(),
+        isTeam: team.has(c.authorId),
         createdAt: c.createdAt,
       })),
     };
@@ -313,15 +318,14 @@ export class PortalController {
     @Param('portalToken') portalToken: string,
     @Body() body: CreatePortalCommentRequest,
   ) {
-    const ticket = await this.ticketRepository.findByPortalToken(portalToken);
-    if (!ticket) throw new EntityNotFoundError('Ticket not found');
-    if (!(await this.workspaceRepository.findById(ticket.workspaceId))) throw new EntityNotFoundError('Ticket not found');
+    // The reply is the link owner's: the reporter's link or that of another customer on the ticket
+    const { ticket, workspace, user: author } = await this.resolveAccess(portalToken);
 
     const createComment = new CreateComment(this.idGenerator, this.commentRepository);
     const comment = await createComment.execute({
       content: body.content,
       ticketId: ticket.getId(),
-      authorId: ticket.reporterId,
+      authorId: author.getId(),
     });
 
     // Files the customer uploaded while writing, staged anonymously like those of a new ticket
@@ -344,24 +348,20 @@ export class PortalController {
       // On the ticket, like any other comment, so the reply shows in the ticket's activity
       entityType: 'ticket',
       entityId: ticket.getId(),
-      userId: ticket.reporterId,
+      userId: author.getId(),
       workspaceId: ticket.workspaceId,
       metadata: { ticketId: ticket.getId(), commentId: comment.getId(), ticketName: ticket.name, content: commentPreview(comment.content), ...(uploadTokens.length > 0 ? { attachmentsClaimed: uploadTokens.length } : {}) },
     });
 
     // Tell the team, like any other reply: email to stakeholders, in-app notification and live update
-    const [workspace, reporter] = await Promise.all([
-      this.workspaceRepository.findById(ticket.workspaceId),
-      this.userRepository.findById(ticket.reporterId),
-    ]);
-    if (workspace && reporter) {
+    {
       const event: NewCommentEvent = {
         ticketId: ticket.getId(),
         ticketName: ticket.name,
         ticketNumber: ticketReferenceOf(ticket),
         commentId: comment.getId(),
-        authorId: ticket.reporterId,
-        authorName: `${reporter.firstName} ${reporter.lastName}`.trim(),
+        authorId: author.getId(),
+        authorName: `${author.firstName} ${author.lastName}`.trim(),
         commentContent: body.content,
         assigneeId: ticket.assigneeId,
         mentionedUserIds: [],
@@ -374,6 +374,14 @@ export class PortalController {
     }
 
     return { message: 'Comment added' };
+  }
+
+  /** The ticket, its workspace and the person a portal link belongs to; a dead link is a 404. */
+  private async resolveAccess(token: string) {
+    const resolve = new ResolveTicketPortalAccess(this.portalAccessRepository, this.ticketRepository, this.workspaceRepository, this.userRepository);
+    const access = await resolve.execute(token);
+    if (!access) throw new EntityNotFoundError('Ticket not found');
+    return access;
   }
 
   @Post(':slug/uploads')

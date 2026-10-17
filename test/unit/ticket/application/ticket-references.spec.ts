@@ -1,3 +1,5 @@
+import { EnsureTicketPortalAccess } from '../../../../src/ticket/domain/services/ticket-portal-access-ensure';
+import { MockTicketPortalAccessRepository } from '../../../mocks/mock-ticket-portal-access.repository';
 import { TicketSource } from '../../../../src/ticket/domain/enums/ticket-source.enum';
 import { EntityNotFoundError } from '../../../../src/shared/domain/errors';
 import { WorkspaceRole } from '../../../../src/workspace/domain/enums/workspace-role.enum';
@@ -32,7 +34,7 @@ describe('A ticket only points at things in its own workspace', () => {
   const validateCustomFields = () => new ValidateCustomFieldValues({ findByWorkspaceId: async () => [] } as any);
   const update = () => new UpdateTicketCommand(new UpdateTicket(w.tickets), w.tickets, w.ensurePermission(), w.auditLog(), validateCustomFields(), references());
   const create = () => new CreateTicketCommand(
-    new CreateTicket(w.ids, w.tickets), w.ensurePermission(), w.users, new FakeEventPublisher(), w.auditLog(), validateCustomFields(), undefined, references(),
+    new CreateTicket(w.ids, w.tickets, new EnsureTicketPortalAccess(w.ids, new MockTicketPortalAccessRepository())), w.ensurePermission(), w.users, new FakeEventPublisher(), w.auditLog(), validateCustomFields(), undefined, references(),
   );
   const base = { ticketId: 'ticket-a', workspaceId: WS_A, workspaceName: 'A', workspaceSlug: 'a', userId: 'admin-a', isSystemAdmin: false };
 
@@ -98,7 +100,7 @@ describe('A ticket only points at things in its own workspace', () => {
   it('reports the channel a ticket came through in its created event', async () => {
     const events = new FakeEventPublisher();
     const command = new CreateTicketCommand(
-      new CreateTicket(w.ids, w.tickets), w.ensurePermission(), w.users, events, w.auditLog(), validateCustomFields(), undefined, references(),
+      new CreateTicket(w.ids, w.tickets, new EnsureTicketPortalAccess(w.ids, new MockTicketPortalAccessRepository())), w.ensurePermission(), w.users, events, w.auditLog(), validateCustomFields(), undefined, references(),
     );
     await command.execute({
       name: 'x', description: 'y', priority: TicketPriority.LOW, categoryId: 'cat-a', tagIds: [], source: TicketSource.API,

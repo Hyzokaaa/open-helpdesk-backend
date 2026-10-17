@@ -28,7 +28,6 @@ function makeTicket(overrides: Partial<{ id: string; workspaceId: string; report
     tagIds: [],
     customFields: {},
     discardReason: null,
-    portalToken: null,
     firstResponseAt: null,
     resolvedAt: null,
     firstResponseBreached: false,

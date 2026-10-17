@@ -1,22 +1,41 @@
-import { ticketLinkFor } from '../../../src/email/domain/ticket-email-link';
+import { ResolveTicketEmailLink } from '../../../src/email/domain/ticket-email-link';
+import { EnsureTicketPortalAccess } from '../../../src/ticket/domain/services/ticket-portal-access-ensure';
+import { MockTicketPortalAccessRepository } from '../../mocks/mock-ticket-portal-access.repository';
+import { FakeIdGenerator } from '../../mocks/fake-id-generator';
 import { ResolveTicketReplyMailbox } from '../../../src/email/domain/services/ticket-reply-mailbox-resolve';
 import { WorkspaceRole } from '../../../src/workspace/domain/enums/workspace-role.enum';
 import { MailboxType } from '../../../src/mailbox/domain/enums/mailbox-type.enum';
 
-describe('ticketLinkFor', () => {
-  const base = { frontendUrl: 'https://help.x.com', workspaceSlug: 'acme', ticketId: 'T1', portalToken: 'tok' };
+describe('ResolveTicketEmailLink', () => {
+  let accesses: MockTicketPortalAccessRepository;
+  let resolve: ResolveTicketEmailLink;
+  const base = { frontendUrl: 'https://help.x.com', workspaceSlug: 'acme', ticketId: 'T1', isSystemAdmin: false };
 
-  it('sends customers to the portal and the team to the dashboard', () => {
-    expect(ticketLinkFor({ ...base, role: WorkspaceRole.USER, isSystemAdmin: false })).toBe('https://help.x.com/portal/tickets/tok');
-    expect(ticketLinkFor({ ...base, role: null, isSystemAdmin: false })).toBe('https://help.x.com/portal/tickets/tok');
-    for (const role of [WorkspaceRole.AGENT, WorkspaceRole.SUPERVISOR, WorkspaceRole.ADMIN]) {
-      expect(ticketLinkFor({ ...base, role, isSystemAdmin: false })).toBe('https://help.x.com/dashboard/workspaces/acme/tickets/T1');
-    }
-    expect(ticketLinkFor({ ...base, role: null, isSystemAdmin: true })).toContain('/dashboard/');
+  beforeEach(() => {
+    accesses = new MockTicketPortalAccessRepository();
+    resolve = new ResolveTicketEmailLink(new EnsureTicketPortalAccess(new FakeIdGenerator(), accesses));
   });
 
-  it('falls back to the dashboard when the ticket has no portal link', () => {
-    expect(ticketLinkFor({ ...base, portalToken: null, role: WorkspaceRole.USER, isSystemAdmin: false })).toContain('/dashboard/');
+  it("sends each customer to the portal through their own link, the same one every time", async () => {
+    const reporter = await resolve.execute({ ...base, userId: 'reporter', role: WorkspaceRole.USER });
+    const colleague = await resolve.execute({ ...base, userId: 'colleague', role: WorkspaceRole.USER });
+
+    expect(reporter).toMatch(/^https:\/\/help\.x\.com\/portal\/tickets\/[0-9a-f-]{36}$/);
+    expect(colleague).toMatch(/\/portal\/tickets\//);
+    expect(colleague).not.toBe(reporter);
+    expect(await resolve.execute({ ...base, userId: 'reporter', role: WorkspaceRole.USER })).toBe(reporter);
+    expect(accesses.all().map((a) => a.userId)).toEqual(['reporter', 'colleague']);
+  });
+
+  it('sends the team, system admins and people no longer in the workspace to the dashboard, without a portal link', async () => {
+    const dashboard = 'https://help.x.com/dashboard/workspaces/acme/tickets/T1';
+    for (const role of [WorkspaceRole.AGENT, WorkspaceRole.SUPERVISOR, WorkspaceRole.ADMIN]) {
+      expect(await resolve.execute({ ...base, userId: 'u', role })).toBe(dashboard);
+    }
+    expect(await resolve.execute({ ...base, userId: 'admin', role: WorkspaceRole.USER, isSystemAdmin: true })).toBe(dashboard);
+    expect(await resolve.execute({ ...base, userId: 'gone', role: null })).toBe(dashboard);
+    expect(await resolve.execute({ ...base, userId: null, role: WorkspaceRole.USER })).toBe(dashboard);
+    expect(accesses.all()).toEqual([]);
   });
 });
 

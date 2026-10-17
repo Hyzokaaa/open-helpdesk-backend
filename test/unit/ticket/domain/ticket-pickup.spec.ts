@@ -21,7 +21,6 @@ function makeTicket(overrides: Partial<{ status: TicketStatus; assigneeId: strin
     tagIds: [],
     customFields: {},
     discardReason: null,
-    portalToken: null,
     firstResponseAt: null,
     resolvedAt: null,
     resolvedById: null,

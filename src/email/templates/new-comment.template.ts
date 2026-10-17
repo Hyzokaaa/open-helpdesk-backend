@@ -60,6 +60,6 @@ export class NewCommentTemplate {
       <p style="color: #9ca3af; font-size: 12px; margin-top: 24px;">
         ${t(footerKey, data.lang, { ticketNumber: escapeHtml(data.ticketNumber ?? ''), workspaceName: escapeHtml(data.workspaceName) })}
       </p>`;
-    return emailLayout(data.lang, content);
+    return emailLayout(data.lang, content, { replyMarker: data.canReply });
   }
 }

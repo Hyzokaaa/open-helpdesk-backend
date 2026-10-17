@@ -1,3 +1,4 @@
+import { EmailQuoteRepository } from '../../domain/repositories/email-quote.repository';
 import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { Query } from '../../../shared/domain/query';
 import { TicketRepository } from '../../domain/repositories/ticket.repository';
@@ -44,6 +45,8 @@ export interface TicketDetailResponse {
   descriptionEditedAt: Date | null;
   /** When a person last did anything to the ticket: a change, a comment, a file, an edit... */
   lastActivityAt?: Date | null;
+  /** Lines of quoted text folded under the description (the opening email's signature). */
+  descriptionQuotedLines?: number;
   reporter?: UserSummary | null;
   assignee?: UserSummary | null;
   registeredBy?: UserSummary | null;
@@ -56,6 +59,7 @@ export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
     private readonly ensureTicketAccess: EnsureTicketAccess,
     private readonly summarizeUsers?: SummarizeUsers,
     private readonly activity?: AuditActivityRepository,
+    private readonly emailQuotes?: EmailQuoteRepository,
   ) {}
 
   async execute(props: Props): Promise<TicketDetailResponse> {
@@ -74,6 +78,10 @@ export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
     // Its creation counts too, so a ticket always has one, also once retention removed its entries
     const lastActivityAt = this.activity
       ? latest(await this.activity.findLastActivityAt(props.workspaceId, 'ticket', ticket.getId()), ticket.createdAt)
+      : undefined;
+
+    const descriptionQuote = this.emailQuotes
+      ? (await this.emailQuotes.findSummariesByTicketId(ticket.getId())).find((q) => q.commentId === null)
       : undefined;
 
     return {
@@ -106,6 +114,7 @@ export class GetTicketQuery implements Query<Props, TicketDetailResponse> {
       aiCache: ticket.aiCache ?? {},
       descriptionEditedAt: ticket.descriptionEditedAt,
       ...(lastActivityAt !== undefined && { lastActivityAt }),
+      ...(descriptionQuote && { descriptionQuotedLines: descriptionQuote.lineCount }),
       ...(people && {
         reporter: person(ticket.reporterId),
         assignee: person(ticket.assigneeId),

@@ -16,6 +16,11 @@ export class TypeOrmUserSessionRepository implements UserSessionRepository {
     await this.repository.save(this.toModel(session));
   }
 
+  async findById(id: string): Promise<UserSession | null> {
+    const model = await this.repository.findOneBy({ id });
+    return model ? this.toDomain(model) : null;
+  }
+
   async findByTokenHash(tokenHash: string): Promise<UserSession | null> {
     const model = await this.repository.findOneBy({ tokenHash });
     return model ? this.toDomain(model) : null;
@@ -43,6 +48,21 @@ export class TypeOrmUserSessionRepository implements UserSessionRepository {
     return result.affected === 1;
   }
 
+  async extendFamily(rootId: string, expiresAt: Date): Promise<void> {
+    await this.familyUpdate(rootId).set({ expiresAt }).execute();
+  }
+
+  async revokeFamily(rootId: string, revokedAt: Date): Promise<void> {
+    await this.familyUpdate(rootId).set({ revokedAt }).execute();
+  }
+
+  private familyUpdate(rootId: string) {
+    return this.repository
+      .createQueryBuilder()
+      .update()
+      .where('("id" = :rootId OR "rootSessionId" = :rootId) AND "revokedAt" IS NULL', { rootId });
+  }
+
   async revokeAllForUser(userId: string, revokedAt: Date, exceptId?: string): Promise<void> {
     await this.repository.update(
       { userId, revokedAt: IsNull(), ...(exceptId && { id: Not(exceptId) }) },
@@ -63,6 +83,7 @@ export class TypeOrmUserSessionRepository implements UserSessionRepository {
     return new UserSession({
       id: model.id,
       userId: model.userId,
+      rootSessionId: model.rootSessionId,
       tokenHash: model.tokenHash,
       previousTokenHash: model.previousTokenHash,
       rotatedAt: model.rotatedAt,
@@ -77,6 +98,7 @@ export class TypeOrmUserSessionRepository implements UserSessionRepository {
     const model = new UserSessionModel();
     model.id = session.getId();
     model.userId = session.userId;
+    model.rootSessionId = session.rootSessionId;
     model.tokenHash = session.tokenHash;
     model.previousTokenHash = session.previousTokenHash;
     model.rotatedAt = session.rotatedAt;

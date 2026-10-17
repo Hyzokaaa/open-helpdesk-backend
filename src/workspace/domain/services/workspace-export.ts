@@ -175,7 +175,7 @@ export class ExportWorkspace {
       const tickets = await qr.query(`
         SELECT t.id, t.name, t.description, t.priority, t.status, tc.slug AS category,
           t."reporterId", t."assigneeId", t."ticketNumber", t.reference, t."customFields",
-          t."discardReason", t."portalToken", t."firstResponseAt", t."resolvedAt",
+          t."discardReason", t."firstResponseAt", t."resolvedAt",
           t."resolvedById", t."firstResponseBreached", t."resolutionBreached",
           t."organizationId", t."departmentId", t."projectId", t.source, t."registeredById", t."mailboxId",
           t."originDate", t."descriptionEditedAt", t."createdAt", t."updatedAt",
@@ -220,6 +220,12 @@ export class ExportWorkspace {
       const participants = await qr.query(`
         SELECT tp."ticketId", tp."userId", tp.role
         FROM ticket_participants tp JOIN tickets t ON tp."ticketId" = t.id
+        WHERE t."workspaceId" = $1 AND t."deletedAt" IS NULL
+      `, [workspaceId]);
+
+      const emailQuotes = await qr.query(`
+        SELECT q."ticketId", q."commentId", q.content, q.method
+        FROM email_quotes q JOIN tickets t ON q."ticketId" = t.id
         WHERE t."workspaceId" = $1 AND t."deletedAt" IS NULL
       `, [workspaceId]);
 
@@ -403,7 +409,6 @@ export class ExportWorkspace {
           reference: t.reference ?? formatTicketReference(t.ticketNumber, referenceFormat),
           customFields: t.customFields ?? {},
           discardReason: t.discardReason,
-          portalToken: t.portalToken,
           firstResponseAt: t.firstResponseAt?.toISOString() ?? null,
           resolvedAt: t.resolvedAt?.toISOString() ?? null,
           resolvedByEmail: emailFor(t.resolvedById),
@@ -472,6 +477,12 @@ export class ExportWorkspace {
           ticketId: p.ticketId,
           userEmail: emailFor(p.userId),
           role: p.role,
+        })),
+        emailQuotes: emailQuotes.map((q: any) => ({
+          ticketId: q.ticketId,
+          commentId: q.commentId,
+          content: q.content,
+          method: q.method,
         })),
         cannedResponses: cannedResponses.map((cr: any) => ({
           id: cr.id,

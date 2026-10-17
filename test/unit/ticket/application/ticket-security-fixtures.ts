@@ -53,10 +53,13 @@ export function makeMember(userId: string, role: WorkspaceRole, workspaceId = WS
   return new WorkspaceMember({ id: `mem-${workspaceId}-${userId}`, workspaceId, userId, role });
 }
 
+import { MockTicketPortalAccessRepository } from '../../../mocks/mock-ticket-portal-access.repository';
+
 export class TicketWorld {
   readonly tickets = new MockTicketRepository();
   readonly members = new MockWorkspaceMemberRepository();
   readonly participants = new MockTicketParticipantRepository();
+  readonly portalAccesses = new MockTicketPortalAccessRepository();
   readonly users = new MockUserRepository();
   readonly audit = new MockAuditLogRepository();
   readonly ids = new FakeIdGenerator();

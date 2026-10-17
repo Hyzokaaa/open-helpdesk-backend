@@ -5,6 +5,8 @@ import { TicketParticipant } from '../../../../src/ticket/domain/entities/ticket
 import { AddTicketParticipant } from '../../../../src/ticket/domain/services/ticket-add-participant';
 import { AddTicketParticipantCommand } from '../../../../src/ticket/application/commands/add-ticket-participant.command';
 import { RemoveTicketParticipantCommand } from '../../../../src/ticket/application/commands/remove-ticket-participant.command';
+import { RevokeTicketPortalAccess } from '../../../../src/ticket/domain/services/ticket-portal-access-revoke';
+import { TicketPortalAccess } from '../../../../src/ticket/domain/entities/ticket-portal-access';
 import { ListTicketParticipantsQuery } from '../../../../src/ticket/application/queries/list-ticket-participants.query';
 import { TicketWorld, WS_A, WS_B, makeTicket } from './ticket-security-fixtures';
 
@@ -14,7 +16,9 @@ describe('Ticket followers', () => {
   const add = () => new AddTicketParticipantCommand(
     new AddTicketParticipant(w.ids, w.participants), w.ensureTicketAccess(), w.ensurePermission(), w.members, w.auditLog(),
   );
-  const remove = () => new RemoveTicketParticipantCommand(w.participants, w.ensureTicketAccess(), w.ensurePermission(), w.auditLog());
+  const remove = () => new RemoveTicketParticipantCommand(
+    w.participants, w.ensureTicketAccess(), w.ensurePermission(), w.auditLog(), new RevokeTicketPortalAccess(w.tickets, w.portalAccesses),
+  );
   const list = () => new ListTicketParticipantsQuery(w.participants, w.users, w.ensureTicketAccess());
 
   beforeEach(async () => {
@@ -121,6 +125,17 @@ describe('Ticket followers', () => {
     it('an admin removes another follower', async () => {
       await remove().execute({ ticketId: 'ticket-a', workspaceId: WS_A, userId: 'admin-a', targetUserId: 'agent-a', isSystemAdmin: false });
       expect(await w.participants.exists('ticket-a', 'agent-a')).toBe(false);
+    });
+
+    it("a removed follower's portal link stops opening the ticket, and the reporter's stays", async () => {
+      await w.portalAccesses.create(new TicketPortalAccess({ id: 'pa-1', ticketId: 'ticket-a', userId: 'agent-a', token: 'tok-follower' }));
+      await w.portalAccesses.create(new TicketPortalAccess({ id: 'pa-2', ticketId: 'ticket-a', userId: 'reporter-a', token: 'tok-reporter' }));
+
+      await remove().execute({ ticketId: 'ticket-a', workspaceId: WS_A, userId: 'admin-a', targetUserId: 'agent-a', isSystemAdmin: false });
+      await remove().execute({ ticketId: 'ticket-a', workspaceId: WS_A, userId: 'admin-a', targetUserId: 'reporter-a', isSystemAdmin: false });
+
+      expect(await w.portalAccesses.findByToken('tok-follower')).toBeNull();
+      expect(await w.portalAccesses.findByToken('tok-reporter')).not.toBeNull();
     });
   });
 });

@@ -204,14 +204,6 @@ export class TypeOrmTicketRepository implements TicketRepository {
     await this.repository.softDelete(id);
   }
 
-  async findByPortalToken(portalToken: string): Promise<Ticket | null> {
-    const model = await this.repository.findOne({
-      where: { portalToken },
-      relations: ['tags'],
-    });
-    return model ? this.toDomain(model) : null;
-  }
-
   async findByReference(workspaceId: string, reference: string): Promise<Ticket | null> {
     const model = await this.repository.findOne({
       where: { workspaceId, reference },
@@ -258,7 +250,6 @@ export class TypeOrmTicketRepository implements TicketRepository {
       tagIds: model.tags ? model.tags.map((t) => t.id) : [],
       customFields: model.customFields ?? {},
       discardReason: model.discardReason as TicketDiscardReason | null,
-      portalToken: model.portalToken ?? null,
       firstResponseBreached: model.firstResponseBreached ?? false,
       resolutionBreached: model.resolutionBreached ?? false,
       aiCache: model.aiCache ?? {},
@@ -291,7 +282,6 @@ export class TypeOrmTicketRepository implements TicketRepository {
     model.reference = ticket.reference;
     model.customFields = ticket.customFields;
     model.discardReason = ticket.discardReason;
-    model.portalToken = ticket.portalToken;
     model.firstResponseBreached = ticket.firstResponseBreached;
     model.resolutionBreached = ticket.resolutionBreached;
     model.aiCache = ticket.aiCache;

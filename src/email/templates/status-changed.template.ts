@@ -9,6 +9,8 @@ interface Data {
   oldStatus: string;
   newStatus: string;
   workspaceName: string;
+  /** Whether a reply to this email reaches the ticket (a mailbox reads it). */
+  canReply?: boolean;
   lang: string;
 }
 
@@ -27,6 +29,6 @@ export class StatusChangedTemplate {
         <span style="background-color: #ecfdf5; padding: 6px 12px; border-radius: 4px; color: #059669; font-weight: bold;">${t(`status.${data.newStatus}`, data.lang)}</span>
       </div>
       ${buttonHtml(data.lang, data.ticketUrl)}`;
-    return emailLayout(data.lang, content);
+    return emailLayout(data.lang, content, { replyMarker: data.canReply });
   }
 }

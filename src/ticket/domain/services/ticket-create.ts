@@ -5,6 +5,8 @@ import { TicketStatus } from '../enums/ticket-status.enum';
 import { TicketSource } from '../enums/ticket-source.enum';
 import { TicketRepository } from '../repositories/ticket.repository';
 import { sanitizeHtml } from '../../../shared/domain/sanitize-html';
+import { TicketPortalAccess } from '../entities/ticket-portal-access';
+import { EnsureTicketPortalAccess } from './ticket-portal-access-ensure';
 
 interface CreateTicketProps {
   name: string;
@@ -20,18 +22,24 @@ interface CreateTicketProps {
   projectId?: string | null;
   source?: TicketSource;
   registeredById?: string | null;
-  portalToken?: string | null;
   mailboxId?: string | null;
   originDate?: Date | null;
+}
+
+export interface CreatedTicket {
+  ticket: Ticket;
+  /** The reporter's portal link: every ticket is born with one, whatever way it came in. */
+  reporterAccess: TicketPortalAccess;
 }
 
 export class CreateTicket {
   constructor(
     private readonly idGenerator: IdGenerator,
     private readonly repository: TicketRepository,
+    private readonly ensurePortalAccess: EnsureTicketPortalAccess,
   ) {}
 
-  async execute(props: CreateTicketProps): Promise<Ticket> {
+  async execute(props: CreateTicketProps): Promise<CreatedTicket> {
     const ticket = new Ticket({
       id: this.idGenerator.create(),
       name: props.name,
@@ -55,12 +63,12 @@ export class CreateTicket {
       projectId: props.projectId ?? null,
       source: props.source,
       registeredById: props.registeredById ?? null,
-      portalToken: props.portalToken ?? null,
       mailboxId: props.mailboxId ?? null,
       originDate: props.originDate ?? null,
     });
 
     await this.repository.create(ticket);
-    return ticket;
+    const reporterAccess = await this.ensurePortalAccess.execute({ ticketId: ticket.getId(), userId: ticket.reporterId });
+    return { ticket, reporterAccess };
   }
 }

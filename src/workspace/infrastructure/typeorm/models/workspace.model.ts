@@ -44,6 +44,12 @@ export class WorkspaceModel {
   @Column({ type: 'varchar', nullable: true })
   domainVerificationToken!: string | null;
 
+  @Column({ type: 'int', default: 0 })
+  customDomainCheckFailures!: number;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  customDomainFailingSince!: Date | null;
+
   @Column({ type: 'varchar', length: 50, nullable: true })
   appName!: string | null;
 

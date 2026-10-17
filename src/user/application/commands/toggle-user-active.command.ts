@@ -1,6 +1,7 @@
 import { Command } from '../../../shared/domain/command';
 import { AccessDeniedError } from '../../../shared/domain/errors';
 import { ToggleUserActive } from '../../domain/services/user-toggle-active';
+import { RevokeUserSessions } from '../../domain/services/user-sessions-revoke';
 import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
 import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
@@ -22,6 +23,7 @@ export class ToggleUserActiveCommand implements Command<Props, ToggleUserActiveR
   constructor(
     private readonly toggleActive: ToggleUserActive,
     private readonly createAuditLog: CreateAuditLogEntry,
+    private readonly revokeSessions?: RevokeUserSessions,
   ) {}
 
   async execute(props: Props): Promise<ToggleUserActiveResponse> {
@@ -34,6 +36,8 @@ export class ToggleUserActiveCommand implements Command<Props, ToggleUserActiveR
       isActive: props.isActive,
       requestingUserId: props.requestingUserId,
     });
+    // A deactivated user is out at once, not when their access token expires
+    if (!props.isActive) await this.revokeSessions?.execute({ userId: props.targetUserId });
 
     await this.createAuditLog.execute({
       action: props.isActive ? AuditAction.USER_ACTIVATED : AuditAction.USER_DEACTIVATED,

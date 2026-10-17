@@ -8,6 +8,8 @@ interface Data {
   /** The ticket's reference (TK-000042); in the subject so a reply without headers still finds it. */
   ticketNumber?: string;
   portalUrl: string;
+  /** Whether a reply to this email reaches the ticket (a mailbox reads it). */
+  canReply?: boolean;
   lang: string;
 }
 
@@ -29,6 +31,6 @@ export class TicketConfirmationTemplate {
         <a href="${escapeAttr(data.portalUrl)}" style="background-color: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">${t('ticketConfirmation.button', data.lang)}</a>
       </div>
       <p style="color: #9ca3af; font-size: 13px;">${t('ticketConfirmation.updates', data.lang)}</p>`;
-    return emailLayout(data.lang, content);
+    return emailLayout(data.lang, content, { replyMarker: data.canReply });
   }
 }

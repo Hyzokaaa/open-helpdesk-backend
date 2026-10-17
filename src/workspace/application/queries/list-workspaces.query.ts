@@ -16,7 +16,8 @@ export interface WorkspaceListItem {
   name: string;
   slug: string;
   description: string;
-  role: string;
+  // Null when a system admin sees a workspace they are not a member of
+  role: string | null;
   ownerName?: string;
   palette: string | null;
   customDomain: string | null;
@@ -50,7 +51,7 @@ export class ListWorkspacesQuery implements Query<Props, WorkspaceListItem[]> {
           name: workspace.name,
           slug: workspace.slug,
           description: workspace.description,
-          role: membership?.role ?? 'admin',
+          role: membership?.role ?? null,
           ownerName,
           palette: workspace.palette,
           customDomain: workspace.customDomain,

@@ -12,13 +12,13 @@ const MINUTE = 60 * 1000;
 
 // Tokens are plain strings mapped to who they authenticate and for how long
 class FakeVerifier {
-  tokens = new Map<string, { userId: string; isSystemAdmin?: boolean; ttlMs: number }>();
+  tokens = new Map<string, { userId: string; isSystemAdmin?: boolean; ttlMs: number; sessionId?: string }>();
 
   verify(token: unknown): VerifiedAccessToken | null {
     const entry = typeof token === 'string' ? this.tokens.get(token) : undefined;
     if (!entry) return null;
     return {
-      user: { userId: entry.userId, email: '', isSystemAdmin: entry.isSystemAdmin ?? false, isEmailVerified: true },
+      user: { userId: entry.userId, email: '', isSystemAdmin: entry.isSystemAdmin ?? false, isEmailVerified: true, sessionId: entry.sessionId },
       expiresAt: new Date(Date.now() + entry.ttlMs),
     };
   }
@@ -45,10 +45,13 @@ describe('EventsGateway', () => {
   let workspaces: MockWorkspaceRepository;
   let members: MockWorkspaceMemberRepository;
   let broadcasts: { room: string; event: string; payload: unknown }[];
+  let liveSessions: Set<string>;
+  let sockets: FakeSocket[];
 
-  const connect = (token?: string) => {
+  const connect = async (token?: string) => {
     const socket = new FakeSocket({ auth: token ? { token } : {} });
-    gateway.handleConnection(socket as any);
+    sockets.push(socket);
+    await gateway.handleConnection(socket as any);
     return socket;
   };
 
@@ -65,10 +68,16 @@ describe('EventsGateway', () => {
     verifier.tokens.set('agent-token-renewed', { userId: 'agent-1', ttlMs: 15 * MINUTE });
     verifier.tokens.set('stranger-token', { userId: 'stranger', ttlMs: 15 * MINUTE });
     verifier.tokens.set('root-token', { userId: 'root', isSystemAdmin: true, ttlMs: 15 * MINUTE });
+    verifier.tokens.set('session-token', { userId: 'agent-1', ttlMs: 15 * MINUTE, sessionId: 's-live' });
+    verifier.tokens.set('revoked-token', { userId: 'agent-1', ttlMs: 15 * MINUTE, sessionId: 's-revoked' });
+    sockets = [];
 
-    gateway = new EventsGateway(emitter, verifier as unknown as AccessTokenVerifier, workspaces as any, members as any);
+    liveSessions = new Set(['s-live']);
+    const liveness = { isLive: async (sid: string) => liveSessions.has(sid) };
+    gateway = new EventsGateway(emitter, verifier as unknown as AccessTokenVerifier, liveness as any, workspaces as any, members as any);
     broadcasts = [];
     gateway.server = {
+      sockets: { sockets: { values: () => sockets.values() } },
       to: (room: string) => ({ emit: (event: string, payload: unknown) => broadcasts.push({ room, event, payload }) }),
     } as any;
     gateway.onModuleInit();
@@ -76,9 +85,9 @@ describe('EventsGateway', () => {
 
   afterEach(() => jest.useRealTimers());
 
-  it('drops a connection without a valid access token', () => {
-    const anonymous = connect();
-    const forged = connect('not-a-token');
+  it('drops a connection without a valid access token', async () => {
+    const anonymous = await connect();
+    const forged = await connect('not-a-token');
 
     expect(anonymous.disconnected).toBe(true);
     expect(forged.disconnected).toBe(true);
@@ -86,7 +95,7 @@ describe('EventsGateway', () => {
   });
 
   it('lets a member join their workspace, keyed by id', async () => {
-    const socket = connect('agent-token');
+    const socket = await connect('agent-token');
 
     await expect(gateway.handleJoin(socket as any, 'acme')).resolves.toEqual({ ok: true });
 
@@ -94,7 +103,7 @@ describe('EventsGateway', () => {
   });
 
   it('refuses a workspace the user does not belong to', async () => {
-    const socket = connect('stranger-token');
+    const socket = await connect('stranger-token');
 
     await expect(gateway.handleJoin(socket as any, 'acme')).resolves.toEqual({ ok: false });
 
@@ -102,12 +111,12 @@ describe('EventsGateway', () => {
   });
 
   it('lets a system admin join any workspace', async () => {
-    const socket = connect('root-token');
+    const socket = await connect('root-token');
 
     await expect(gateway.handleJoin(socket as any, 'other')).resolves.toEqual({ ok: true });
   });
 
-  it('relays ids only, to the workspace room', () => {
+  it('relays ids only, to the workspace room', async () => {
     emitter.emit('ticket.created', {
       ticketId: 't-1', ticketName: 'Secret project', reporterName: 'Jane', workspaceId: 'ws-1', workspaceSlug: 'acme',
     });
@@ -117,8 +126,8 @@ describe('EventsGateway', () => {
     ]);
   });
 
-  it('disconnects a socket when its token expires', () => {
-    const socket = connect('agent-token');
+  it('disconnects a socket when its token expires', async () => {
+    const socket = await connect('agent-token');
 
     jest.advanceTimersByTime(15 * MINUTE + 1);
 
@@ -127,7 +136,7 @@ describe('EventsGateway', () => {
   });
 
   it('keeps a socket alive when the renewed token arrives in time', async () => {
-    const socket = connect('agent-token');
+    const socket = await connect('agent-token');
     jest.advanceTimersByTime(14 * MINUTE);
 
     await expect(gateway.handleAuth(socket as any, 'agent-token-renewed')).resolves.toEqual({ ok: true });
@@ -137,15 +146,37 @@ describe('EventsGateway', () => {
   });
 
   it('refuses a renewed token that belongs to someone else', async () => {
-    const socket = connect('agent-token');
+    const socket = await connect('agent-token');
 
     await expect(gateway.handleAuth(socket as any, 'stranger-token')).resolves.toEqual({ ok: false });
 
     expect(socket.disconnected).toBe(true);
   });
 
+  it('refuses a connection whose session was signed out', async () => {
+    const socket = await connect('revoked-token');
+
+    expect(socket.emitted).toContain('auth:invalid');
+    expect(socket.disconnected).toBe(true);
+  });
+
+  it('closes the sockets of a session as soon as it is revoked', async () => {
+    const socket = await connect('session-token');
+    const other = await connect('root-token');
+    expect(socket.disconnected).toBe(false);
+
+    liveSessions.delete('s-live');
+    emitter.emit('user.sessions-revoked', { userId: 'agent-1' });
+    // The check runs asynchronously; fake timers leave only microtasks to flush
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    expect(socket.emitted).toContain('auth:invalid');
+    expect(socket.disconnected).toBe(true);
+    expect(other.disconnected).toBe(false);
+  });
+
   it('leaves workspaces the user was removed from when the token is renewed', async () => {
-    const socket = connect('agent-token');
+    const socket = await connect('agent-token');
     await gateway.handleJoin(socket as any, 'acme');
     await members.delete('m-1');
 

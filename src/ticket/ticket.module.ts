@@ -15,11 +15,16 @@ import { ProjectModule } from '../project/project.module';
 import { TagModule } from '../tag/tag.module';
 import { TicketModel } from './infrastructure/typeorm/models/ticket.model';
 import { TicketParticipantModel } from './infrastructure/typeorm/models/ticket-participant.model';
+import { TicketPortalAccessModel } from './infrastructure/typeorm/models/ticket-portal-access.model';
+import { EmailQuoteModel } from './infrastructure/typeorm/models/email-quote.model';
+import { TypeOrmEmailQuoteRepository } from './infrastructure/typeorm/repositories/typeorm-email-quote.repository';
 import { TransferRequestModel } from './infrastructure/typeorm/models/transfer-request.model';
 import { TicketDescriptionEditModel } from './infrastructure/typeorm/models/ticket-description-edit.model';
 import { CommentModel } from '../comment/infrastructure/typeorm/models/comment.model';
 import { TypeOrmTicketRepository } from './infrastructure/typeorm/repositories/typeorm-ticket.repository';
 import { TypeOrmTicketParticipantRepository } from './infrastructure/typeorm/repositories/typeorm-ticket-participant.repository';
+import { TypeOrmTicketPortalAccessRepository } from './infrastructure/typeorm/repositories/typeorm-ticket-portal-access.repository';
+import { PortalAccessCleanupService } from './infrastructure/nest/services/portal-access-cleanup.service';
 import { TypeOrmTransferRequestRepository } from './infrastructure/typeorm/repositories/typeorm-transfer-request.repository';
 import { TypeOrmTicketDescriptionEditRepository } from './infrastructure/typeorm/repositories/typeorm-ticket-description-edit.repository';
 import { TypeOrmCommentRepository } from '../comment/infrastructure/typeorm/repositories/typeorm-comment.repository';
@@ -29,9 +34,9 @@ import { SlaBreachCheckerService } from './infrastructure/nest/services/sla-brea
 import { TransferRequestExpiryService } from './infrastructure/nest/services/transfer-request-expiry.service';
 
 @Module({
-  imports: [SharedModule, UserModule, WorkspaceModule, AuditLogModule, CustomFieldModule, AttachmentModule, MulterModule.registerAsync({ inject: [ConfigService], useFactory: attachmentUploadOptions }), DepartmentModule, OrganizationModule, ProjectModule, TagModule, TypeOrmModule.forFeature([TicketModel, TicketParticipantModel, TransferRequestModel, TicketDescriptionEditModel, CommentModel])],
+  imports: [SharedModule, UserModule, WorkspaceModule, AuditLogModule, CustomFieldModule, AttachmentModule, MulterModule.registerAsync({ inject: [ConfigService], useFactory: attachmentUploadOptions }), DepartmentModule, OrganizationModule, ProjectModule, TagModule, TypeOrmModule.forFeature([TicketModel, TicketParticipantModel, TicketPortalAccessModel, EmailQuoteModel, TransferRequestModel, TicketDescriptionEditModel, CommentModel])],
   controllers: [TicketController, PortalController],
-  providers: [TypeOrmTicketRepository, TypeOrmTicketParticipantRepository, TypeOrmTransferRequestRepository, TypeOrmTicketDescriptionEditRepository, TypeOrmCommentRepository, SlaBreachCheckerService, TransferRequestExpiryService],
-  exports: [TypeOrmTicketRepository, TypeOrmTicketParticipantRepository, TypeOrmTransferRequestRepository, TypeOrmTicketDescriptionEditRepository],
+  providers: [TypeOrmTicketRepository, TypeOrmTicketParticipantRepository, TypeOrmTicketPortalAccessRepository, TypeOrmEmailQuoteRepository, TypeOrmTransferRequestRepository, TypeOrmTicketDescriptionEditRepository, TypeOrmCommentRepository, SlaBreachCheckerService, TransferRequestExpiryService, PortalAccessCleanupService],
+  exports: [TypeOrmTicketRepository, TypeOrmTicketParticipantRepository, TypeOrmTicketPortalAccessRepository, TypeOrmEmailQuoteRepository, TypeOrmTransferRequestRepository, TypeOrmTicketDescriptionEditRepository],
 })
 export class TicketModule {}

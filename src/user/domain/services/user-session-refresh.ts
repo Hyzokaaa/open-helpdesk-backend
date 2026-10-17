@@ -20,7 +20,9 @@ interface RefreshUserSessionProps {
 /**
  * Trades a refresh token for a new access token and rotates it. Presenting a token that was
  * already rotated means it was copied: within the grace window it is two tabs racing and gets
- * an access token only; after it, the session is revoked.
+ * an access token only; after it, the session is revoked with the whole family, since the copy
+ * may have reached the other domains too. A remembered session slides its family forward, so
+ * working on any domain keeps the session of every domain alive.
  */
 export class RefreshUserSession {
   constructor(
@@ -38,13 +40,15 @@ export class RefreshUserSession {
     if (current) {
       this.ensureUsable(current, now);
       const secret = SessionSecret.generate();
+      const expiresAt = current.rememberMe
+        ? new Date(now.getTime() + this.policy.rememberedSessionTtlMs)
+        : current.expiresAt;
       const rotated = await this.sessionRepository.rotate(current.getId(), hash, {
         tokenHash: secret.hash,
         rotatedAt: now,
-        expiresAt: current.rememberMe
-          ? new Date(now.getTime() + this.policy.rememberedSessionTtlMs)
-          : current.expiresAt,
+        expiresAt,
       });
+      if (rotated && current.rememberMe) await this.sessionRepository.extendFamily(current.getRootId(), expiresAt);
       // Losing the race means another request rotated this very token an instant ago
       return { accessToken: await this.sign(current), refreshToken: rotated ? secret.raw : null };
     }
@@ -55,8 +59,7 @@ export class RefreshUserSession {
     const withinGrace = rotated.rotatedAt !== null
       && now.getTime() - rotated.rotatedAt.getTime() <= this.policy.rotationGraceMs;
     if (!withinGrace) {
-      rotated.revokedAt = now;
-      await this.sessionRepository.update(rotated);
+      await this.sessionRepository.revokeFamily(rotated.getRootId(), now);
       throw new InvalidCredentialsError('Invalid session');
     }
 

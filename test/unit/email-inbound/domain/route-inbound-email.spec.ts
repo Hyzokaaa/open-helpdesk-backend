@@ -1,3 +1,7 @@
+import { KeepEmailQuote } from '../../../../src/ticket/domain/services/email-quote-keep';
+import { MockEmailQuoteRepository } from '../../../mocks/mock-email-quote.repository';
+import { EnsureTicketPortalAccess } from '../../../../src/ticket/domain/services/ticket-portal-access-ensure';
+import { MockTicketPortalAccessRepository } from '../../../mocks/mock-ticket-portal-access.repository';
 import { RouteInboundEmail } from '../../../../src/email-inbound/domain/services/route-inbound-email';
 import { ParsedInboundEmail } from '../../../../src/email-inbound/infrastructure/imap/imap-email-parser';
 import { CreateUser } from '../../../../src/user/domain/services/user-create';
@@ -58,6 +62,7 @@ function baseParsedEmail(overrides: Partial<ParsedInboundEmail> = {}): ParsedInb
 }
 
 describe('RouteInboundEmail', () => {
+  let quotes: MockEmailQuoteRepository;
   let service: RouteInboundEmail;
   let mailboxRepository: MockMailboxRepository;
   let userRepository: MockUserRepository;
@@ -81,8 +86,9 @@ describe('RouteInboundEmail', () => {
     const passwordHasher = new FakePasswordHasher();
     const createUser = new CreateUser(idGenerator, userRepository, passwordHasher);
     const addMember = new AddWorkspaceMember(idGenerator, memberRepository);
-    const createTicket = new CreateTicket(idGenerator, ticketRepository);
+    const createTicket = new CreateTicket(idGenerator, ticketRepository, new EnsureTicketPortalAccess(idGenerator, new MockTicketPortalAccessRepository()));
     const createComment = new CreateComment(idGenerator, commentRepository);
+    quotes = new MockEmailQuoteRepository();
 
     service = new RouteInboundEmail(
       mailboxRepository,
@@ -95,6 +101,8 @@ describe('RouteInboundEmail', () => {
       createTicket,
       createComment,
       eventPublisher,
+      undefined, undefined, undefined, undefined, undefined, undefined, undefined,
+      new KeepEmailQuote(idGenerator, quotes),
     );
 
     // Seed a mailbox and workspace
@@ -177,6 +185,34 @@ describe('RouteInboundEmail', () => {
     const comments = commentRepository.getAll();
     expect(comments).toHaveLength(1);
     expect(comments[0].ticketId).toBe('ticket-abc');
+  });
+
+  it('keeps what the sender wrote as the comment and folds the quote under it', async () => {
+    const created = await service.execute(baseParsedEmail());
+    const reply = await service.execute(baseParsedEmail({
+      thread: { ticketIds: [created.ticketId!], commentIds: [] },
+      body: 'Ya funciona, gracias.\n\nOn Tue, 14 Oct 2026 at 12:35, Support <support@company.com> wrote:\n> We restarted the printer.',
+    }));
+
+    expect(reply.action).toBe('comment-added');
+    const [comment] = commentRepository.getAll();
+    expect(comment.content).toContain('Ya funciona, gracias.');
+    expect(comment.content).not.toContain('restarted');
+    const quote = await quotes.findByTicketAndComment(created.ticketId!, comment.getId());
+    expect(quote).toMatchObject({ method: 'text' });
+    expect(quote!.content).toContain('We restarted the printer.');
+  });
+
+  it('takes the email that opens a ticket whole, a forward included, and folds only its signature', async () => {
+    const result = await service.execute(baseParsedEmail({
+      body: 'Mira abajo.\n\n---------- Forwarded message ---------\nFrom: Proveedor <p@prov.com>\nDate: Tue, 14 Oct 2026\nSubject: Factura\nTo: cliente@external.com\n\nLa factura vence mañana.\n-- \nAna Pérez',
+    }));
+
+    const [ticket] = ticketRepository.getAll();
+    expect(ticket.description).toContain('La factura vence mañana.');
+    expect(ticket.description).not.toContain('Ana Pérez');
+    const quote = await quotes.findByTicketAndComment(result.ticketId!, null);
+    expect(quote!.content).toContain('Ana Pérez');
   });
 
   it('should auto-create a user when email is from unknown address', async () => {

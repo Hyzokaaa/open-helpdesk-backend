@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsArray,
+  IsEmail,
   IsEnum,
   IsNotEmpty,
   IsObject,
@@ -49,4 +50,13 @@ export class CreateApiTicketRequest {
   @IsObject()
   @IsOptional()
   customFields?: Record<string, unknown>;
+
+  @ApiPropertyOptional({
+    description: 'Email of the customer the ticket is opened for. They become its reporter: their account and their membership of the workspace (as a customer) are created when missing, they get the confirmation email with their link to the ticket in the portal, and the key creator is recorded as who registered it. Needs the key creator to have the permission to open tickets on behalf of others. Without it, the key creator is the reporter.',
+    format: 'email',
+    example: 'customer@example.com',
+  })
+  @IsEmail()
+  @IsOptional()
+  onBehalfOf?: string;
 }

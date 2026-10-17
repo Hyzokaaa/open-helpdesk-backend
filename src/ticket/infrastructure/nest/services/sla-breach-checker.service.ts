@@ -39,6 +39,8 @@ export class SlaBreachCheckerService implements OnModuleInit, OnModuleDestroy {
 
       if (workspaces.length === 0) return;
 
+      // The API server's clock, the one that wrote the tickets' times
+      const now = new Date();
       let totalFirstResponse = 0;
       let totalResolution = 0;
 
@@ -61,9 +63,9 @@ export class SlaBreachCheckerService implements OnModuleInit, OnModuleDestroy {
                  AND "firstResponseBreached" = false
                  AND status NOT IN ('resolved', 'discarded')
                  AND "deletedAt" IS NULL
-                 AND "createdAt" + ($3 || ' hours')::interval < NOW()
+                 AND "createdAt" + ($3 || ' hours')::interval < $4
                RETURNING id`,
-              [ws.id, priority, String(hours)],
+              [ws.id, priority, String(hours), now],
             );
             const breachedIds: string[] = (result[0] ?? []).map((r: { id: string }) => r.id);
             totalFirstResponse += breachedIds.length;
@@ -86,9 +88,9 @@ export class SlaBreachCheckerService implements OnModuleInit, OnModuleDestroy {
                  AND "resolutionBreached" = false
                  AND status NOT IN ('resolved', 'discarded')
                  AND "deletedAt" IS NULL
-                 AND "createdAt" + ($3 || ' hours')::interval < NOW()
+                 AND "createdAt" + ($3 || ' hours')::interval < $4
                RETURNING id`,
-              [ws.id, priority, String(hours)],
+              [ws.id, priority, String(hours), now],
             );
             const breachedIds: string[] = (result[0] ?? []).map((r: { id: string }) => r.id);
             totalResolution += breachedIds.length;

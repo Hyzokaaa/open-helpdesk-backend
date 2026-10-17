@@ -46,6 +46,12 @@ export enum AuditAction {
   /** A DNS check that did not pass; says which record was missing. */
   WORKSPACE_CUSTOM_DOMAIN_VERIFICATION_FAILED = 'workspace-custom-domain-verification-failed',
   WORKSPACE_CUSTOM_DOMAIN_REMOVED = 'workspace-custom-domain-removed',
+  /** The daily check found the verified domain no longer pointing to the installation. */
+  WORKSPACE_CUSTOM_DOMAIN_CHECK_FAILED = 'workspace-custom-domain-check-failed',
+  /** It kept failing: sessions are no longer handed over to it until it points here again. */
+  WORKSPACE_CUSTOM_DOMAIN_DISTRUSTED = 'workspace-custom-domain-distrusted',
+  /** It points to the installation again after failing. */
+  WORKSPACE_CUSTOM_DOMAIN_RECOVERED = 'workspace-custom-domain-recovered',
   WORKSPACE_BRANDING_UPDATED = 'workspace-branding-updated',
   WORKSPACE_LOGO_UPDATED = 'workspace-logo-updated',
   WORKSPACE_LOGO_REMOVED = 'workspace-logo-removed',
@@ -103,6 +109,8 @@ export enum AuditAction {
   USER_OAUTH_LOGIN_FAILED = 'user-oauth-login-failed',
   /** An API key exchanged an email for a session (POST /api/v1/auth/exchange). */
   API_SESSION_EXCHANGED = 'api-session-exchanged',
+  /** A signed-in browser carried its session to another address of the installation (#37). */
+  SESSION_HANDED_OVER = 'session-handed-over',
   /** A request refused for lack of permission, recorded by the exception filter. */
   PERMISSION_DENIED = 'permission-denied',
   USER_RESEND_VERIFICATION = 'user-resend-verification',

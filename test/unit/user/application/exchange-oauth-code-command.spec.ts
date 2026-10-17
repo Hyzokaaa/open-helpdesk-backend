@@ -74,16 +74,26 @@ describe('ExchangeOAuthCodeCommand', () => {
 });
 
 describe('JwtStrategy', () => {
-  const strategy = new JwtStrategy({ getOrThrow: () => 'secret' } as any);
+  const liveSessions = new Set(['s-1']);
+  const strategy = new JwtStrategy({ getOrThrow: () => 'secret' } as any, { isLive: async (sid: string) => liveSessions.has(sid) } as any);
+  const claims = { sub: 'user-1', email: 'a@b.c', isSystemAdmin: false, isEmailVerified: true };
 
-  it('does not accept single-purpose tokens as access tokens', () => {
-    expect(() => strategy.validate({ sub: 'user-1', type: OAUTH_CODE_TYPE, jti: 'code-1' } as any)).toThrow();
-    expect(() => strategy.validate({ sub: 'user-1', type: 'password-reset' } as any)).toThrow();
+  it('does not accept single-purpose tokens as access tokens', async () => {
+    await expect(strategy.validate({ sub: 'user-1', type: OAUTH_CODE_TYPE, jti: 'code-1' } as any)).rejects.toThrow();
+    await expect(strategy.validate({ sub: 'user-1', type: 'password-reset' } as any)).rejects.toThrow();
   });
 
-  it('exposes the session of a session access token', () => {
-    const user = strategy.validate({ sub: 'user-1', email: 'a@b.c', isSystemAdmin: false, isEmailVerified: true, sid: 's-1' });
+  it('exposes the session of a session access token', async () => {
+    const user = await strategy.validate({ ...claims, sid: 's-1' });
 
     expect(user).toMatchObject({ userId: 'user-1', sessionId: 's-1' });
+  });
+
+  it('refuses a token whose session was signed out, at once', async () => {
+    await expect(strategy.validate({ ...claims, sid: 's-revoked' })).rejects.toThrow();
+  });
+
+  it('accepts tokens without a session, from the API token exchange', async () => {
+    await expect(strategy.validate(claims)).resolves.toMatchObject({ userId: 'user-1' });
   });
 });

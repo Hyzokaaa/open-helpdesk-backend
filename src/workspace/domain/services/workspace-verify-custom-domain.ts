@@ -40,6 +40,8 @@ export class VerifyCustomDomain {
 
     if (dnsValid && txtValid) {
       workspace.customDomainVerified = true;
+      workspace.customDomainCheckFailures = 0;
+      workspace.customDomainFailingSince = null;
       await this.repository.update(workspace);
     }
 
@@ -52,26 +54,8 @@ export class VerifyCustomDomain {
     };
   }
 
-  private async checkDns(domain: string): Promise<boolean> {
-    // Check CNAME first
-    try {
-      const cnames = await dns.resolveCname(domain);
-      const expected = normalizeHost(this.expectedCnameTarget);
-      if (cnames.some((c) => normalizeHost(c) === expected)) {
-        return true;
-      }
-    } catch {}
-
-    // Fallback: check if A record resolves to same IPs as our server
-    try {
-      const domainIps = await dns.resolve4(domain);
-      const serverIps = await dns.resolve4(this.expectedCnameTarget);
-      if (domainIps.some((ip) => serverIps.includes(ip))) {
-        return true;
-      }
-    } catch {}
-
-    return false;
+  private checkDns(domain: string): Promise<boolean> {
+    return pointsToInstallation(domain, this.expectedCnameTarget);
   }
 
   private async checkTxt(domain: string, token: string): Promise<boolean> {
@@ -82,4 +66,22 @@ export class VerifyCustomDomain {
       return false;
     }
   }
+}
+
+/** Whether the domain's DNS points to the installation: a CNAME to the target, or an A record with its IPs. */
+export async function pointsToInstallation(domain: string, cnameTarget: string): Promise<boolean> {
+  try {
+    const cnames = await dns.resolveCname(domain);
+    const expected = normalizeHost(cnameTarget);
+    if (cnames.some((c) => normalizeHost(c) === expected)) return true;
+  } catch {}
+
+  // Fallback: an A record resolving to the same IPs as the target
+  try {
+    const domainIps = await dns.resolve4(domain);
+    const serverIps = await dns.resolve4(cnameTarget);
+    if (domainIps.some((ip) => serverIps.includes(ip))) return true;
+  } catch {}
+
+  return false;
 }

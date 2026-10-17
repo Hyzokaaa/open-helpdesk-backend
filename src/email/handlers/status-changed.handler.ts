@@ -25,7 +25,9 @@ import { ticketThreadHeaders } from '../domain/ticket-email-thread';
 import { eachEmailRecipient } from '../domain/each-email-recipient';
 import { RecordEmailSend } from '../../audit-log/domain/services/audit-log-record-email-send';
 import { ResolveTicketReplyMailbox } from '../domain/services/ticket-reply-mailbox-resolve';
-import { ticketLinkFor } from '../domain/ticket-email-link';
+import { ResolveTicketEmailLink } from '../domain/ticket-email-link';
+import { EnsureTicketPortalAccess } from '../../ticket/domain/services/ticket-portal-access-ensure';
+import { TypeOrmTicketPortalAccessRepository } from '../../ticket/infrastructure/typeorm/repositories/typeorm-ticket-portal-access.repository';
 
 // Statuses that mean someone is expected to be working the ticket. An unassigned ticket in one
 // of these has left the open queue without an owner, so admins and supervisors should assign it.
@@ -48,6 +50,7 @@ export class StatusChangedHandler {
     private readonly auditLogRepository: TypeOrmAuditLogRepository,
     private readonly frontendResolver: WorkspaceFrontendResolver,
     private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
+    private readonly portalAccessRepository: TypeOrmTicketPortalAccessRepository,
   ) {}
 
   @OnEvent('ticket.statusChanged')
@@ -116,16 +119,17 @@ export class StatusChangedHandler {
     const emailDomain = mailbox ? mailbox.address.split('@')[1] : null;
     const sender = await this.emailSenderRepository.findByWorkspaceId(event.workspaceId);
     const usersByEmail = new Map(users.map((u) => [u.email.toLowerCase(), u]));
+    const resolveLink = new ResolveTicketEmailLink(new EnsureTicketPortalAccess(this.idGenerator, this.portalAccessRepository));
 
     for (const [lang, emails] of eachEmailRecipient(emailRecipients)) {
       // The portal for customers, the dashboard for the team
       const recipient = usersByEmail.get(emails[0].toLowerCase());
       const member = recipient ? await this.memberRepository.findByWorkspaceAndUser(event.workspaceId, recipient.getId()) : null;
-      const ticketUrl = ticketLinkFor({
+      const ticketUrl = await resolveLink.execute({
         frontendUrl,
         workspaceSlug: event.workspaceSlug,
         ticketId: event.ticketId,
-        portalToken: ticket?.portalToken,
+        userId: recipient?.getId() ?? null,
         role: member?.role ?? null,
         isSystemAdmin: recipient?.isSystemAdmin ?? false,
       });
@@ -133,7 +137,7 @@ export class StatusChangedHandler {
       const result = await sendWorkspaceEmail(this.emailService, sender, {
         to: emails,
         subject,
-        html: template.html({ ticketName: event.ticketName, ticketUrl, oldStatus: event.oldStatus, newStatus: event.newStatus, workspaceName: event.workspaceName, lang }),
+        html: template.html({ ticketName: event.ticketName, ticketUrl, oldStatus: event.oldStatus, newStatus: event.newStatus, workspaceName: event.workspaceName, canReply: !!mailbox, lang }),
         ...(emailDomain && ticketThreadHeaders(event.ticketId, emailDomain, `status-${event.ticketId}-${Date.now()}`)),
         ...(mailbox && { replyTo: mailbox.address }),
       });

@@ -1,4 +1,5 @@
 import { EntityNotFoundError } from '../../../shared/domain/errors';
+import { isCustomDomainTrusted } from '../../domain/services/workspace-custom-domain-trust';
 import { Query } from '../../../shared/domain/query';
 import { WorkspaceRepository } from '../../domain/repositories/workspace.repository';
 import { MailboxRepository } from '../../../mailbox/domain/repositories/mailbox.repository';
@@ -24,6 +25,10 @@ export interface WorkspaceResponse {
   customDomain: string | null;
   customDomainVerified: boolean;
   domainVerificationToken: string | null;
+  /** Since when the daily check finds the domain not pointing here (ISO), null while it passes. */
+  customDomainFailingSince: string | null;
+  /** Whether sessions are still carried over to the domain; false after several failed checks. */
+  customDomainTrusted: boolean;
   appName: string | null;
   appSubtitle: string | null;
   logo: string | null;
@@ -79,6 +84,8 @@ export class GetWorkspaceQuery implements Query<Props, WorkspaceResponse> {
       customDomain: workspace.customDomain,
       customDomainVerified: workspace.customDomainVerified,
       domainVerificationToken: workspace.domainVerificationToken,
+      customDomainFailingSince: workspace.customDomainFailingSince?.toISOString() ?? null,
+      customDomainTrusted: isCustomDomainTrusted(workspace),
       appName: workspace.appName,
       appSubtitle: workspace.appSubtitle,
       logo: workspace.logo,

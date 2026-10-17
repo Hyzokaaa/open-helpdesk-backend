@@ -16,6 +16,68 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.34.0',
+    date: '2026-10-17',
+    categories: [
+      {
+        title: { en: 'Sign-in', es: 'Inicio de sesión' },
+        features: [
+          { en: 'Signed in with "Keep me signed in", workspaces on their own domain open without asking for the password again', es: 'Con "Mantener sesión iniciada", los espacios con dominio propio se abren sin volver a pedir la contraseña' },
+          { en: 'Signing out ends the session at once on every address of the installation and in every open tab', es: 'Cerrar sesión la termina al momento en todas las direcciones de la instalación y en todas las pestañas abiertas' },
+          { en: 'A deactivated user is signed out at once', es: 'Un usuario desactivado sale al momento de todas sus sesiones' },
+          { en: 'Workspace admins get an email when their custom domain stops pointing to the installation', es: 'Los administradores de un espacio reciben un correo si su dominio propio deja de apuntar a la instalación' },
+        ],
+      },
+      {
+        title: { en: 'Workspaces', es: 'Espacios de trabajo' },
+        features: [
+          { en: 'A system admin viewing a workspace they are not a member of is told what they miss and can join as admin in one click, also from where they would expect to see themselves: assigning, adding a follower, mentioning and adding agents to a department', es: 'Un administrador del sistema que ve un espacio del que no es miembro recibe un aviso de lo que se pierde y puede unirse como admin con un clic, también desde donde esperaría verse: al asignar, al añadir un seguidor, al mencionar y al añadir agentes a un departamento' },
+          { en: 'The workspace list shows "Not a member" for those workspaces instead of "Admin"', es: 'La lista de espacios muestra "No eres miembro" en esos espacios en lugar de "Admin"' },
+        ],
+      },
+      {
+        title: { en: 'Tickets', es: 'Tickets' },
+        features: [
+          { en: 'The ticket sidebar always shows the first response and resolution times, as "<1m" when it took less than a minute', es: 'La barra lateral del ticket siempre muestra los tiempos de primera respuesta y de resolución, como "<1m" si tardó menos de un minuto' },
+          { en: 'Saving a ticket or comment without changing its text no longer marks it as edited', es: 'Guardar un ticket o un comentario sin cambiar su texto ya no lo marca como editado' },
+          { en: 'Closing a ticket you are editing asks before discarding your changes, also with the X, a click outside or Escape', es: 'Cerrar un ticket que estás editando pregunta antes de descartar los cambios, también con la X, un clic fuera o Escape' },
+        ],
+      },
+      {
+        title: { en: 'Email', es: 'Email' },
+        features: [
+          { en: 'Emailed replies keep only what the customer wrote, in any language and from Gmail, Outlook, Thunderbird, Apple Mail and more', es: 'Las respuestas por email muestran solo lo que escribió el cliente, en cualquier idioma y desde Gmail, Outlook, Thunderbird, Apple Mail y otros' },
+          { en: 'Nothing of an email is lost: the quoted message and the signature are folded under the comment, under "Show quoted text"', es: 'No se pierde nada del email: el mensaje citado y la firma quedan plegados bajo el comentario, en "Mostrar texto citado"' },
+          { en: 'The email that opens a ticket is kept whole, forwards included', es: 'El email que abre un ticket se guarda entero, también si es un reenvío' },
+          { en: 'Emails you can answer show a line to write the reply above', es: 'Los emails a los que se puede responder muestran una línea para escribir la respuesta encima' },
+        ],
+      },
+      {
+        title: { en: 'Account', es: 'Cuenta' },
+        features: [
+          { en: 'After verifying your email, Continue takes you to where you left the setup; a tab waiting for it moves on by itself', es: 'Tras verificar tu correo, Continuar te lleva a donde dejaste la configuración; una pestaña que lo esperaba avanza sola' },
+          { en: 'Signing in with Google, or from another device, no longer skips setting up your first workspace', es: 'Entrar con Google, o desde otro dispositivo, ya no se salta la creación de tu primer espacio' },
+          { en: 'Right after verifying your email, the next steps work without signing in again', es: 'Justo después de verificar tu correo, los pasos siguientes funcionan sin volver a iniciar sesión' },
+        ],
+      },
+      {
+        title: { en: 'Portal', es: 'Portal' },
+        features: [
+          { en: 'Every customer on a ticket gets their own portal link, so a colleague in copy who answers can follow the ticket and reply from the portal under their own name', es: 'Cada cliente de un ticket tiene su propio enlace al portal: un compañero en copia que responde puede seguir el ticket y contestar desde el portal con su nombre' },
+          { en: 'Tickets opened on behalf of a customer, in the app or through the API, send them the confirmation with their portal link', es: 'Los tickets abiertos en nombre de un cliente, desde la app o la API, le envían la confirmación con su enlace al portal' },
+          { en: 'A portal link stops working when its owner is removed as a follower, leaves the workspace or is deactivated', es: 'Un enlace al portal deja de funcionar cuando se quita a su dueño como seguidor, sale del espacio o se desactiva' },
+          { en: 'In the portal, only the team\'s replies carry the Agent label', es: 'En el portal, solo las respuestas del equipo llevan la etiqueta Agente' },
+        ],
+      },
+      {
+        title: { en: 'API', es: 'API' },
+        features: [
+          { en: 'Open a ticket on behalf of a customer through the public API with onBehalfOf', es: 'Abre un ticket en nombre de un cliente desde la API pública con onBehalfOf' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.33.0',
     date: '2026-10-14',
     categories: [

@@ -90,9 +90,6 @@ export class TicketModel {
   @Column({ type: 'varchar', nullable: true })
   discardReason!: string | null;
 
-  @Column({ type: 'varchar', nullable: true, unique: true })
-  portalToken!: string | null;
-
   @Column({ default: false })
   firstResponseBreached!: boolean;
 

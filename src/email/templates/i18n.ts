@@ -8,6 +8,11 @@ const translations: Translations = {
     en: APP_NAME,
     es: APP_NAME,
   },
+  // The "##-" and "-##" ends are what replies are cut by (see ExtractEmailReply); keep them
+  'email.replyMarker': {
+    en: '##- Please type your reply above this line -##',
+    es: '##- Escribe tu respuesta encima de esta línea -##',
+  },
   'email.viewTicket': {
     en: 'View Ticket',
     es: 'Ver Ticket',
@@ -192,6 +197,40 @@ const translations: Translations = {
   'workspaceLifecycle.restoreButton': {
     en: 'Restore workspace',
     es: 'Restaurar workspace',
+  },
+
+  // Daily check of a workspace's custom domain
+  'customDomainCheck.failing.subject': {
+    en: '{domain} no longer points to your helpdesk',
+    es: '{domain} ya no apunta a tu helpdesk',
+  },
+  'customDomainCheck.failing.title': {
+    en: 'We could not reach your helpdesk at {domain}',
+    es: 'No hemos podido llegar a tu helpdesk en {domain}',
+  },
+  'customDomainCheck.failing.body': {
+    en: 'Since {date}, the DNS of {domain}, the custom domain of "{workspace}", does not point to this installation. If it stays like this for 3 days, signing in on that domain will always ask for the password: the session of another address is no longer carried over to it.',
+    es: 'Desde el {date}, el DNS de {domain}, el dominio propio de "{workspace}", no apunta a esta instalación. Si sigue así 3 días, al entrar en ese dominio siempre se pedirá la contraseña: la sesión de otra dirección ya no se traslada a él.',
+  },
+  'customDomainCheck.distrusted.subject': {
+    en: 'Sessions are no longer carried over to {domain}',
+    es: 'La sesión ya no se traslada a {domain}',
+  },
+  'customDomainCheck.distrusted.title': {
+    en: '{domain} still does not point to your helpdesk',
+    es: '{domain} sigue sin apuntar a tu helpdesk',
+  },
+  'customDomainCheck.distrusted.body': {
+    en: 'Since {date}, the DNS of {domain}, the custom domain of "{workspace}", does not point to this installation. To keep your team safe in case the domain is now someone else\'s, signing in on it always asks for the password until it points here again.',
+    es: 'Desde el {date}, el DNS de {domain}, el dominio propio de "{workspace}", no apunta a esta instalación. Para proteger a tu equipo por si el dominio ya es de otra persona, al entrar en él siempre se pedirá la contraseña hasta que vuelva a apuntar aquí.',
+  },
+  'customDomainCheck.fix': {
+    en: 'If you changed the DNS on purpose, remove or update the domain in the workspace settings. Otherwise, restore its CNAME record; once the check passes again, everything goes back to normal by itself.',
+    es: 'Si cambiaste el DNS a propósito, quita o actualiza el dominio en la configuración del workspace. Si no, restaura su registro CNAME; en cuanto la comprobación vuelva a pasar, todo vuelve a la normalidad solo.',
+  },
+  'customDomainCheck.button': {
+    en: 'Open the domain settings',
+    es: 'Abrir la configuración del dominio',
   },
 
   // Import welcome

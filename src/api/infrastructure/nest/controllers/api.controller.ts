@@ -49,6 +49,8 @@ import { GetTicketQuery } from '../../../../ticket/application/queries/get-ticke
 import { ListTicketsQuery } from '../../../../ticket/application/queries/list-tickets.query';
 import { ListTicketCommentsQuery } from '../../../../comment/application/queries/list-ticket-comments.query';
 import { TypeOrmTicketRepository } from '../../../../ticket/infrastructure/typeorm/repositories/typeorm-ticket.repository';
+import { TypeOrmTicketPortalAccessRepository } from '../../../../ticket/infrastructure/typeorm/repositories/typeorm-ticket-portal-access.repository';
+import { EnsureTicketPortalAccess } from '../../../../ticket/domain/services/ticket-portal-access-ensure';
 import { TypeOrmCommentRepository } from '../../../../comment/infrastructure/typeorm/repositories/typeorm-comment.repository';
 import { TypeOrmWorkspaceRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository';
 import { TypeOrmWorkspaceMemberRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
@@ -82,6 +84,9 @@ import { API_KEY_SECURITY_SCHEME } from '../openapi/api-docs.constants';
 import { ExchangeToken } from '../../../../user/domain/services/user-exchange-token';
 import { ExchangeTokenCommand } from '../../../../user/application/commands/exchange-token.command';
 import { AddWorkspaceMember } from '../../../../workspace/domain/services/workspace-add-member';
+import { CreateUser } from '../../../../user/domain/services/user-create';
+import { ResolveOnBehalfOfCommand } from '../../../../ticket/application/commands/resolve-on-behalf-of.command';
+import { RecordAutoCreated } from '../../../../audit-log/domain/services/audit-log-record-auto-created';
 import { WorkspaceRole } from '../../../../workspace/domain/enums/workspace-role.enum';
 import { JwtTokenService } from '../../../../shared/infrastructure/jwt-token-service';
 import { BcryptPasswordHasher } from '../../../../shared/infrastructure/bcrypt-password-hasher';
@@ -107,6 +112,7 @@ export class ApiController {
 
   constructor(
     @Inject() private readonly ticketRepository: TypeOrmTicketRepository,
+    @Inject() private readonly portalAccessRepository: TypeOrmTicketPortalAccessRepository,
     @Inject() private readonly commentRepository: TypeOrmCommentRepository,
     @Inject() private readonly workspaceRepository: TypeOrmWorkspaceRepository,
     @Inject() private readonly ticketReferenceRepository: TypeOrmWorkspaceTicketReferenceRepository,
@@ -208,7 +214,7 @@ export class ApiController {
   @ApiScopedOperation({
     scope: ApiKeyScope.TICKETS_WRITE,
     summary: 'Create a ticket',
-    description: "Opens a ticket in the key's workspace with source `api`, reported by the key creator. Category and tags must belong to the workspace, and required custom fields must be sent.",
+    description: "Opens a ticket in the key's workspace with source `api`. It is reported by the key creator or, with `onBehalfOf`, by that customer, who then gets the confirmation email with their portal link. Category and tags must belong to the workspace, and required custom fields must be sent.",
     validates: true,
   })
   @ApiCreatedResponse({ type: ApiCreatedTicket })
@@ -222,8 +228,29 @@ export class ApiController {
     if (!workspace) throw new EntityNotFoundError('Workspace not found');
 
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
-    const service = new CreateTicket(this.idGenerator, this.ticketRepository);
+    const service = new CreateTicket(this.idGenerator, this.ticketRepository, new EnsureTicketPortalAccess(this.idGenerator, this.portalAccessRepository));
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+
+    // A ticket opened for a customer is theirs, as in the web app; the key creator registers it
+    let reporter = { userId: user.userId, email: user.email };
+    if (body.onBehalfOf) {
+      const resolveOnBehalfOf = new ResolveOnBehalfOfCommand(
+        ensurePermission,
+        this.userRepository,
+        this.memberRepository,
+        new CreateUser(this.idGenerator, this.userRepository, this.passwordHasher),
+        new AddWorkspaceMember(this.idGenerator, this.memberRepository),
+        new RecordAutoCreated(auditLog),
+      );
+      reporter = await resolveOnBehalfOf.execute({
+        email: body.onBehalfOf,
+        workspaceId: workspace.getId(),
+        userId: user.userId,
+        isSystemAdmin: user.isSystemAdmin,
+        source: 'api',
+      });
+    }
+
     const validateCustomFields = new ValidateCustomFieldValues(this.customFieldDefinitionRepository);
     const command = new CreateTicketCommand(service, ensurePermission, this.userRepository, this.eventPublisher, auditLog, validateCustomFields, undefined, this.createEnsureReferences());
     return command.execute({
@@ -234,11 +261,12 @@ export class ApiController {
       workspaceId: workspace.getId(),
       workspaceName: workspace.name,
       workspaceSlug: workspace.slug,
-      userId: user.userId,
-      userEmail: user.email,
+      userId: reporter.userId,
+      userEmail: reporter.email,
       tagIds: body.tagIds,
       customFields: body.customFields,
       source: TicketSource.API,
+      registeredById: body.onBehalfOf ? user.userId : null,
       isSystemAdmin: user.isSystemAdmin,
       apiKeyId: user.apiKeyId,
     });

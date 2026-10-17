@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from 'crypto';
+import { randomBytes } from 'crypto';
 import { Logger } from '@nestjs/common';
 import { EventPublisher } from '../../../shared/domain/event-publisher';
 import { textToHtml } from '../../../shared/domain/text-to-html';
@@ -25,6 +25,8 @@ import { RecordAutoCreated } from '../../../audit-log/domain/services/audit-log-
 import { FindRepliedTicket } from './inbound-email-find-ticket';
 import { FollowTicket } from '../../../ticket/domain/services/ticket-follow';
 import { ticketReferenceOf } from '../../../ticket/domain/ticket-reference';
+import { KeepEmailQuote } from '../../../ticket/domain/services/email-quote-keep';
+import { ExtractEmailReply } from './email-reply-extract';
 
 export interface RouteInboundEmailResult {
   action: 'ticket-created' | 'comment-added' | 'rejected';
@@ -57,6 +59,8 @@ export class RouteInboundEmail {
     private readonly recordAutoCreated?: RecordAutoCreated,
     private readonly findRepliedTicket?: FindRepliedTicket,
     private readonly followTicket?: FollowTicket,
+    /** Keeps the quote and signature folded; without it they are dropped, as before. */
+    private readonly keepQuote?: KeepEmailQuote,
   ) {}
 
   async execute(parsed: ParsedInboundEmail): Promise<RouteInboundEmailResult> {
@@ -190,11 +194,14 @@ export class RouteInboundEmail {
         senderId: user.getId(),
       });
       if (ticket) {
+        // A reply: what the sender wrote becomes the comment, the quote is folded under it
+        const extracted = new ExtractEmailReply().execute({ text: parsed.body, html: parsed.html });
         const comment = await this.createComment.execute({
-          content: textToHtml(parsed.body),
+          content: textToHtml(extracted.reply),
           ticketId: ticket.getId(),
           authorId: user.getId(),
         });
+        await this.keepQuote?.execute({ ticketId: ticket.getId(), commentId: comment.getId(), quoted: extracted.quoted, method: extracted.method });
 
         // As in the app: whoever joins the conversation by email follows it from then on
         if (this.followTicket && user.getId() !== ticket.reporterId && user.getId() !== ticket.assigneeId) {
@@ -249,21 +256,24 @@ export class RouteInboundEmail {
       }
     }
 
-    const ticket = await this.createTicket.execute({
+    // The email that opens a ticket is taken whole (a forward is its content); only its signature is folded
+    const opening = new ExtractEmailReply().keepWhole(parsed.body);
+    const { ticket, reporterAccess } = await this.createTicket.execute({
       name: parsed.subject,
-      description: textToHtml(parsed.body),
+      description: textToHtml(opening.reply),
       priority: ruleResult.priority ?? TicketPriority.MEDIUM,
       categoryId: ruleResult.category ?? (this.ticketCategoryRepository ? (await this.ticketCategoryRepository.findBySlugAndWorkspace('issue', workspaceId))?.getId() ?? '' : ''),
       workspaceId: workspaceId,
       reporterId: user.getId(),
       tagIds: ruleResult.tagIds ?? [],
       source: TicketSource.EMAIL,
-      portalToken: randomUUID(),
       mailboxId: mailbox.getId(),
       originDate: parsed.date ?? null,
       departmentId: ruleResult.departmentId ?? null,
       organizationId,
     });
+
+    await this.keepQuote?.execute({ ticketId: ticket.getId(), commentId: null, quoted: opening.quoted, method: opening.method });
 
     const ticketEvent: TicketCreatedEvent = {
       ticketId: ticket.getId(),
@@ -275,7 +285,7 @@ export class RouteInboundEmail {
       workspaceId: workspace.getId(),
       workspaceName: workspace.name,
       workspaceSlug: workspace.slug,
-      portalToken: ticket.portalToken,
+      portalToken: reporterAccess.token,
       source: 'email',
       mailboxId: mailbox.getId(),
     };

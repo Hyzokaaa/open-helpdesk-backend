@@ -1,3 +1,4 @@
+import { EmailQuoteRepository } from '../../../ticket/domain/repositories/email-quote.repository';
 import { Query } from '../../../shared/domain/query';
 import { PaginatedResult } from '../../../shared/domain/paginated-result';
 import { CommentRepository } from '../../domain/repositories/comment.repository';
@@ -21,6 +22,8 @@ export interface CommentListItem {
   createdAt: Date | null;
   editedAt: Date | null;
   author?: UserSummary | null;
+  /** Lines of quoted text folded under the comment (an emailed reply's quote and signature). */
+  quotedLines?: number;
 }
 
 export class ListTicketCommentsQuery
@@ -30,6 +33,7 @@ export class ListTicketCommentsQuery
     private readonly repository: CommentRepository,
     private readonly ensureTicketAccess: EnsureTicketAccess,
     private readonly summarizeUsers?: SummarizeUsers,
+    private readonly emailQuotes?: EmailQuoteRepository,
   ) {}
 
   async execute(props: Props): Promise<PaginatedResult<CommentListItem>> {
@@ -46,6 +50,12 @@ export class ListTicketCommentsQuery
       props.limit,
     );
 
+    const quotedLines = new Map(
+      (this.emailQuotes ? await this.emailQuotes.findSummariesByTicketId(props.ticketId) : [])
+        .filter((q) => q.commentId)
+        .map((q) => [q.commentId as string, q.lineCount]),
+    );
+
     const authors = this.summarizeUsers
       ? await this.summarizeUsers.execute(result.items.map((comment) => comment.authorId))
       : null;
@@ -59,6 +69,7 @@ export class ListTicketCommentsQuery
         createdAt: comment.createdAt,
         editedAt: comment.editedAt,
         ...(authors && { author: authors.get(comment.authorId) ?? null }),
+        ...(quotedLines.has(comment.getId()) && { quotedLines: quotedLines.get(comment.getId()) }),
       })),
       total: result.total,
       page: result.page,

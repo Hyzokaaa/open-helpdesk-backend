@@ -31,6 +31,8 @@ export class SetCustomDomain {
       workspace.customDomain = null;
       workspace.customDomainVerified = false;
       workspace.domainVerificationToken = null;
+      workspace.customDomainCheckFailures = 0;
+      workspace.customDomainFailingSince = null;
       await this.repository.update(workspace);
       return workspace;
     }
@@ -47,6 +49,8 @@ export class SetCustomDomain {
     workspace.customDomain = domain;
     workspace.customDomainVerified = !!props.autoVerify;
     workspace.domainVerificationToken = props.autoVerify ? null : `oh-verify=${randomBytes(16).toString('hex')}`;
+    workspace.customDomainCheckFailures = 0;
+    workspace.customDomainFailingSince = null;
     await this.repository.update(workspace);
     return workspace;
   }

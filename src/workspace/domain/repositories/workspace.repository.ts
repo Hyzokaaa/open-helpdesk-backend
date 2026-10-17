@@ -6,6 +6,8 @@ export interface WorkspaceRepository {
   findById(id: string): Promise<Workspace | null>;
   findBySlug(slug: string): Promise<Workspace | null>;
   findByCustomDomain(domain: string): Promise<Workspace[]>;
+  /** Live workspaces whose custom domain is verified, for the daily DNS check. */
+  findWithVerifiedCustomDomain(): Promise<Workspace[]>;
   findAll(sort?: SortOptions): Promise<Workspace[]>;
   update(workspace: Workspace): Promise<void>;
   /** Erases the workspace for good, deleted or not; its data goes with it. */

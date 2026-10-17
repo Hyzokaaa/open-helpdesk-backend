@@ -74,6 +74,7 @@ function emptyExport(overrides: Partial<WorkspaceExportData> = {}): WorkspaceExp
     commentEdits: [],
     attachments: [],
     participants: [],
+    emailQuotes: [],
     cannedResponses: [],
     customFields: [],
     csatResponses: [],
@@ -106,7 +107,6 @@ function ticket(id: string, category: string | null): WorkspaceExportData['ticke
     reference: `REF-${id}`.toUpperCase(),
     customFields: {},
     discardReason: null,
-    portalToken: null,
     firstResponseAt: null,
     resolvedAt: null,
     resolvedByEmail: null,
@@ -976,7 +976,7 @@ describe('ImportWorkspace organizations', () => {
     const memberInserts = qr.find(/INSERT INTO workspace_members/);
     expect(qr.queries.indexOf(orgInserts[0])).toBeLessThan(qr.queries.indexOf(memberInserts[0]));
     expect(memberInserts.map((q) => q.params[4])).toEqual(['org-existing', initechId]);
-    expect(qr.find(/INSERT INTO tickets/).map((q) => q.params[20])).toEqual([initechId, null]);
+    expect(qr.find(/INSERT INTO tickets/).map((q) => q.params[19])).toEqual([initechId, null]);
 
     const [audit] = qr.find(/INSERT INTO audit_log_entries/);
     expect(audit.params[3]).toBe(initechId);
@@ -1042,7 +1042,7 @@ describe('ImportWorkspace departments', () => {
     expect(memberInserts.map((q) => q.params.slice(1))).toEqual([
       ['dept-existing', 'u-1'], [techId, 'u-1'], [techId, carlId],
     ]);
-    expect(qr.find(/INSERT INTO tickets/).map((q) => q.params[21])).toEqual([techId, null]);
+    expect(qr.find(/INSERT INTO tickets/).map((q) => q.params[20])).toEqual([techId, null]);
     const [audit] = qr.find(/INSERT INTO audit_log_entries/);
     expect(audit.params[3]).toBe(techId);
     expect(withoutImportMark(audit.params[6])).toEqual({ departmentId: 'dept-existing' });
@@ -1089,7 +1089,7 @@ describe('ImportWorkspace projects', () => {
     expect(qr.find(/INSERT INTO project_categories/).map((q) => q.params)).toEqual([
       ['proj-existing', 'cat-existing'], [appId, 'cat-existing'], [appId, featureInsert.params[0]],
     ]);
-    expect(qr.find(/INSERT INTO tickets/).map((q) => q.params[22])).toEqual([appId, 'proj-existing']);
+    expect(qr.find(/INSERT INTO tickets/).map((q) => q.params[21])).toEqual([appId, 'proj-existing']);
     const [audit] = qr.find(/INSERT INTO audit_log_entries/);
     expect(audit.params[3]).toBe(appId);
     expect(withoutImportMark(audit.params[6])).toEqual({ projectId: 'proj-existing' });
@@ -1118,7 +1118,7 @@ describe('ImportWorkspace ticket fields', () => {
 
     const [insert] = qr.find(/INSERT INTO tickets/);
     expect(insert.sql).toMatch(/source, "registeredById", "originDate", "descriptionEditedAt"/);
-    expect(insert.params.slice(23, 28)).toEqual(['portal', 'u-1', '2025-12-31T00:00:00.000Z', '2026-01-02T00:00:00.000Z', null]);
+    expect(insert.params.slice(22, 27)).toEqual(['portal', 'u-1', '2025-12-31T00:00:00.000Z', '2026-01-02T00:00:00.000Z', null]);
   });
 
   it('imports a ticket from an older file as created from the UI with no registrar', async () => {
@@ -1131,7 +1131,7 @@ describe('ImportWorkspace ticket fields', () => {
 
     await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
 
-    expect(qr.find(/INSERT INTO tickets/)[0].params.slice(23, 28)).toEqual(['ui', null, null, null, null]);
+    expect(qr.find(/INSERT INTO tickets/)[0].params.slice(22, 27)).toEqual(['ui', null, null, null, null]);
   });
 
   it('rejects an unknown ticket source', async () => {
@@ -1183,6 +1183,40 @@ describe('ImportWorkspace edit history', () => {
     expect(qr.queries.indexOf(commentInsert)).toBeLessThan(qr.queries.indexOf(commentEditInserts[0]));
     expect(result.descriptionEditsImported).toBe(1);
     expect(result.commentEditsImported).toBe(1);
+  });
+
+  it('imports the quoted text folded under comments and descriptions, remapping both ids', async () => {
+    const qr = new FakeQueryRunner((sql) => {
+      if (/FROM users WHERE email = ANY/.test(sql)) return [{ id: 'u-1', email: 'alice@example.com' }];
+      if (/MAX\("ticketNumber"\)/.test(sql)) return [{ max: 0 }];
+      return [];
+    });
+    const data = emptyExport({
+      users: [{ id: 'src-alice', email: 'alice@example.com', firstName: 'Alice', lastName: 'A', role: 'admin' }],
+      tickets: [ticket('t-new', null)],
+      comments: [{ id: 'c-1', content: 'thanks', ticketId: 't-new', authorEmail: 'alice@example.com', mentionedUserIds: [], createdAt: at }],
+      emailQuotes: [
+        { ticketId: 't-new', commentId: 'c-1', content: 'On Tue, Support wrote: > hi', method: 'text' },
+        { ticketId: 't-new', commentId: null, content: 'Alice A, Acme', method: 'none' },
+        { ticketId: 't-unknown', commentId: null, content: 'x', method: 'none' },
+        { ticketId: 't-new', commentId: 'c-unknown', content: 'x', method: 'none' },
+      ],
+    });
+
+    await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
+
+    const [ticketInsert] = qr.find(/INSERT INTO tickets/);
+    const [commentInsert] = qr.find(/INSERT INTO comments/);
+    expect(qr.find(/INSERT INTO email_quotes/).map((q) => q.params.slice(1))).toEqual([
+      [ticketInsert.params[0], commentInsert.params[0], 'On Tue, Support wrote: > hi', 1, 'text'],
+      [ticketInsert.params[0], null, 'Alice A, Acme', 1, 'none'],
+    ]);
+  });
+
+  it('rejects quoted text of an unknown kind', async () => {
+    const qr = new FakeQueryRunner(() => []);
+    const data = emptyExport({ emailQuotes: [{ ticketId: 't', commentId: null, content: 'x', method: 'guess' } as never] });
+    await expect(new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data)).rejects.toThrow('emailQuotes[0].method');
   });
 
   it('rejects an edit without content', async () => {
@@ -2073,7 +2107,7 @@ describe('ImportWorkspace identity', () => {
     const { result } = await new ImportWorkspace(dataSourceOf(qr)).execute('ws-target', data);
 
     expect(result).toMatchObject({ organizationsImported: 0, tagsImported: 0 });
-    expect(qr.find(/INSERT INTO tickets/)[0].params[20]).toBe('org-renamed');
+    expect(qr.find(/INSERT INTO tickets/)[0].params[19]).toBe('org-renamed');
     expect(qr.find(/INSERT INTO ticket_tag/)[0].params[1]).toBe('tag-renamed');
   });
 
@@ -2431,7 +2465,7 @@ describe('ImportWorkspace configuration', () => {
       );
       const [ticketInsert] = created.qr.find(/INSERT INTO tickets/);
       expect(ticketInsert.sql).toMatch(/"mailboxId", reference\n/);
-      expect(ticketInsert.params[27]).toBe('mb-here');
+      expect(ticketInsert.params[26]).toBe('mb-here');
 
       const here = {
         mailboxes: [{ id: 'mb-here', address: 'support@acme.com' }],
@@ -2572,7 +2606,7 @@ describe('ImportWorkspace configuration', () => {
 
       const [upsert] = qr.find(/INSERT INTO workspace_email_senders/);
       expect(upsert.sql).toMatch(/ON CONFLICT \("workspaceId"\) DO UPDATE SET/);
-      expect(upsert.params.slice(1)).toEqual(['ws-target', 'smtp.acme.com', 587, 'mailer', 'p', 'no-reply@acme.com', 'tls', 'Acme', null]);
+      expect(upsert.params.slice(1)).toEqual(['ws-target', 'smtp.acme.com', 587, 'mailer', 'p', 'no-reply@acme.com', 'tls', 'Acme', null, expect.any(Date)]);
       expect(result.settingsApplied).toEqual(['emailSender']);
     });
 
@@ -2704,12 +2738,18 @@ describe('workspace analytics in exports', () => {
     expect(none.analytics).toBeNull();
   });
 
+  it('upgrades a 1.21 file, which folds no quoted text, to 1.22 with none', () => {
+    const legacy = emptyExport({ version: '1.21.0' }) as Partial<WorkspaceExportData>;
+    delete legacy.emailQuotes;
+    expect(applyTransforms(legacy as WorkspaceExportData).emailQuotes).toEqual([]);
+  });
+
   it('upgrades a 1.18 file, which carries no analytics, to 1.19 with none', () => {
     const legacy = emptyExport({ version: '1.18.0' }) as Partial<WorkspaceExportData>;
     delete legacy.analytics;
     const upgraded = applyTransforms(legacy as WorkspaceExportData);
     expect(upgraded.version).toBe(CURRENT_VERSION);
-    expect(CURRENT_VERSION).toBe('1.21.0');
+    expect(CURRENT_VERSION).toBe('1.22.0');
     expect(upgraded.analytics).toBeNull();
   });
 
@@ -2738,14 +2778,14 @@ describe('workspace analytics in exports', () => {
 
     const [upsert] = qr.find(/INSERT INTO workspace_analytics_settings/);
     expect(upsert.sql).toMatch(/ON CONFLICT \("workspaceId"\) DO UPDATE SET/);
-    expect(upsert.params.slice(1)).toEqual(['ws-target', 'matomo', 'https://stats.acme.com/m/', '4', true, false, false]);
+    expect(upsert.params.slice(1)).toEqual(['ws-target', 'matomo', 'https://stats.acme.com/m/', '4', true, false, false, expect.any(Date)]);
     expect(result.settingsApplied).toEqual(['analytics']);
   });
 
   it('applies a file whose source had no Matomo as off, keeping its share flag', async () => {
     const { qr } = await run(emptyExport({ analytics: { ...stored, provider: null } }), ['analytics']);
     const [upsert] = qr.find(/INSERT INTO workspace_analytics_settings/);
-    expect(upsert.params.slice(1)).toEqual(['ws-target', null, null, null, false, true, false]);
+    expect(upsert.params.slice(1)).toEqual(['ws-target', null, null, null, false, true, false, expect.any(Date)]);
   });
 
   it.each([
@@ -2783,7 +2823,7 @@ describe('ticket reference format in exports', () => {
     const legacy = emptyExport({ version: '1.19.0' }) as Partial<WorkspaceExportData>;
     delete legacy.ticketReference;
     const upgraded = applyTransforms(legacy as WorkspaceExportData);
-    expect(upgraded.version).toBe('1.21.0');
+    expect(upgraded.version).toBe(CURRENT_VERSION);
     expect(upgraded.ticketReference).toBeNull();
   });
 
@@ -2792,7 +2832,7 @@ describe('ticket reference format in exports', () => {
     delete plain.reference;
     const legacy = emptyExport({ version: '1.20.0', ticketReference: { style: 'sequential', prefix: 'SUP', secret: null }, tickets: [plain as WorkspaceExportData['tickets'][number]] });
     const upgraded = applyTransforms(legacy);
-    expect(upgraded.version).toBe('1.21.0');
+    expect(upgraded.version).toBe(CURRENT_VERSION);
     expect(upgraded.tickets[0].reference).toBe('SUP-000042');
 
     const fresh = { ...ticket('t-1', null), ticketNumber: 42 } as Partial<WorkspaceExportData['tickets'][number]>;
@@ -2841,7 +2881,7 @@ describe('ticket reference format in exports', () => {
     const inserts = qr.find(/INSERT INTO tickets/);
     // [name, number, reference]: t-1 keeps its reference (upper case); t-2's is taken in the target,
     // so it gets the next free one in the target format, skipping 11 and 12; t-3's duplicates t-1's
-    expect(inserts.map((q) => [q.params[1], q.params[9], q.params[28]])).toEqual([
+    expect(inserts.map((q) => [q.params[1], q.params[9], q.params[27]])).toEqual([
       ['Ticket t-1', 11, 'OLD-5'],
       ['Ticket t-2', 13, 'ACME-000013'],
       ['Ticket t-3', 14, 'ACME-000014'],
@@ -2863,7 +2903,7 @@ describe('ticket reference format in exports', () => {
     const { qr, result } = await run(emptyExport({ ticketReference: { style: 'random', prefix: 'acme', secret } }), ['ticketReference']);
     const [upsert] = qr.find(/INSERT INTO workspace_ticket_references/);
     expect(upsert.sql).toMatch(/ON CONFLICT \("workspaceId"\) DO UPDATE SET/);
-    expect(upsert.params).toEqual(['ws-target', 'random', 'ACME', secret]);
+    expect(upsert.params).toEqual(['ws-target', 'random', 'ACME', secret, expect.any(Date)]);
     expect(result.settingsApplied).toEqual(['ticketReference']);
   });
 

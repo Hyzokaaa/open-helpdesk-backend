@@ -11,6 +11,7 @@ import { ApiKeyAuthGuard } from "./shared/nest/guards/api-key-auth.guard";
 import { EmailVerifiedGuard } from "./shared/nest/guards/email-verified.guard";
 import { SharedModule } from "./shared/shared.module";
 import { UserModule } from "./user/user.module";
+import { OnboardingModule } from './onboarding/onboarding.module';
 import { WorkspaceModule } from "./workspace/workspace.module";
 import { RealtimeModule } from "./realtime/realtime.module";
 import { TagModule } from "./tag/tag.module";
@@ -77,6 +78,7 @@ import { SystemMailboxController } from "./mailbox/infrastructure/nest/controlle
     }),
     SharedModule,
     UserModule,
+    OnboardingModule,
     WorkspaceModule,
     RealtimeModule,
     TagModule,

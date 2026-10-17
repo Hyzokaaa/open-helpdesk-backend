@@ -24,7 +24,9 @@ import { eachEmailRecipient } from '../domain/each-email-recipient';
 import { TypeOrmWorkspaceMemberRepository } from '../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
 import { TypeOrmAttachmentRepository } from '../../attachment/infrastructure/typeorm/repositories/typeorm-attachment.repository';
 import { ResolveTicketReplyMailbox } from '../domain/services/ticket-reply-mailbox-resolve';
-import { ticketLinkFor } from '../domain/ticket-email-link';
+import { ResolveTicketEmailLink } from '../domain/ticket-email-link';
+import { EnsureTicketPortalAccess } from '../../ticket/domain/services/ticket-portal-access-ensure';
+import { TypeOrmTicketPortalAccessRepository } from '../../ticket/infrastructure/typeorm/repositories/typeorm-ticket-portal-access.repository';
 import { RecordEmailSend } from '../../audit-log/domain/services/audit-log-record-email-send';
 import { User } from '../../user/domain/entities/user';
 
@@ -45,6 +47,7 @@ export class NewCommentHandler {
     private readonly auditLogRepository: TypeOrmAuditLogRepository,
     private readonly frontendResolver: WorkspaceFrontendResolver,
     private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
+    private readonly portalAccessRepository: TypeOrmTicketPortalAccessRepository,
     private readonly attachmentRepository: TypeOrmAttachmentRepository,
   ) {}
 
@@ -121,16 +124,17 @@ export class NewCommentHandler {
     const sender = await this.emailSenderRepository.findByWorkspaceId(event.workspaceId);
     const files = (await this.attachmentRepository.findByCommentId(event.commentId)).map((a) => ({ name: a.originalName, size: a.size }));
     const usersByEmail = new Map(users.map((u) => [u.email.toLowerCase(), u]));
+    const resolveLink = new ResolveTicketEmailLink(new EnsureTicketPortalAccess(this.idGenerator, this.portalAccessRepository));
 
     for (const [lang, emails] of eachEmailRecipient(emailRecipients)) {
       // Each recipient gets the link they can open: the portal for customers, the dashboard for the team
       const recipient = usersByEmail.get(emails[0].toLowerCase());
       const member = recipient ? await this.memberRepository.findByWorkspaceAndUser(event.workspaceId, recipient.getId()) : null;
-      const ticketUrl = ticketLinkFor({
+      const ticketUrl = await resolveLink.execute({
         frontendUrl,
         workspaceSlug: event.workspaceSlug,
         ticketId: event.ticketId,
-        portalToken: ticket?.portalToken,
+        userId: recipient?.getId() ?? null,
         role: member?.role ?? null,
         isSystemAdmin: recipient?.isSystemAdmin ?? false,
       });

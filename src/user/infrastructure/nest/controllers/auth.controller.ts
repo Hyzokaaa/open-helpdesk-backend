@@ -9,6 +9,7 @@ import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { JwtTokenService } from '../../../../shared/infrastructure/jwt-token-service';
 import { BcryptPasswordHasher } from '../../../../shared/infrastructure/bcrypt-password-hasher';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
+import { NestEventPublisher } from '../../../../shared/infrastructure/nest-event-publisher';
 import { EmailService } from '../../../../email/domain/email.service';
 import { EMAIL_SERVICE } from '../../../../email/email.constants';
 import { AuthenticateUser } from '../../../domain/services/user-authenticate';
@@ -55,6 +56,14 @@ import { RevokeUserSessions } from '../../../domain/services/user-sessions-revok
 import { ExchangeOAuthCodeCommand } from '../../../application/commands/exchange-oauth-code.command';
 import { RefreshSessionCommand } from '../../../application/commands/refresh-session.command';
 import { LogoutCommand } from '../../../application/commands/logout.command';
+import { IssueSessionHandoffCommand } from '../../../application/commands/issue-session-handoff.command';
+import { ExchangeSessionHandoffCommand } from '../../../application/commands/exchange-session-handoff.command';
+import { StartSessionHandoffCommand } from '../../../application/commands/start-session-handoff.command';
+import { StartSessionHandoff } from '../../../domain/services/user-session-handoff-start';
+import { IssueSessionHandoff } from '../../../domain/services/user-session-handoff-issue';
+import { ExchangeSessionHandoff } from '../../../domain/services/user-session-handoff-exchange';
+import { ResolveHandoffAudience } from '../../../domain/services/user-session-handoff-audience';
+import { ExchangeSessionHandoffRequest, IssueSessionHandoffRequest, StartSessionHandoffRequest } from '../dto/session-handoff.request';
 import { ExchangeOAuthCodeRequest } from '../dto/exchange-oauth-code.request';
 import { RefreshSessionRequest } from '../dto/refresh-session.request';
 import { sessionPolicyFromConfig } from '../session-policy';
@@ -81,6 +90,7 @@ export class AuthController {
     @Inject() private readonly workspaceRepository: TypeOrmWorkspaceRepository,
     @Inject() private readonly sessionRepository: TypeOrmUserSessionRepository,
     @Inject() private readonly usedTokenRepository: TypeOrmUsedTokenRepository,
+    @Inject() private readonly eventPublisher: NestEventPublisher,
     private readonly config: ConfigService,
   ) {
     this.frontendUrl = config.get('FRONTEND_URL', 'http://localhost:5173');
@@ -226,9 +236,69 @@ export class AuthController {
   @Public()
   @Post('logout')
   async logout(@Body() body: RefreshSessionRequest) {
-    const command = new LogoutCommand(new EndUserSession(this.sessionRepository));
+    const command = new LogoutCommand(new EndUserSession(this.sessionRepository, this.eventPublisher));
     await command.execute({ refreshToken: body.refreshToken });
     return { message: 'Signed out' };
+  }
+
+  // Session handoff (#37): a browser signed in on one address of the installation (its own URL or
+  // a workspace's custom domain) carries the session to another one through a page redirect.
+
+  /**
+   * The installation's address, reached from a custom domain without a session: a code for it,
+   * or { loginRequired } when this browser has no session kept signed in here. One call, so the
+   * page in between loads nothing else.
+   */
+  @Public()
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
+  @Post('handoff/start')
+  startHandoff(@Body() body: StartSessionHandoffRequest, @Req() req: Request) {
+    const issue = new IssueSessionHandoff(this.tokenService, this.sessionRepository, this.createResolveAudience());
+    const command = new StartSessionHandoffCommand(new StartSessionHandoff(this.sessionRepository, this.createResolveAudience(), issue));
+    return command.execute({
+      audience: body.audience,
+      codeChallenge: body.codeChallenge,
+      refreshToken: body.refreshToken ?? null,
+      fromOrigin: requestOrigin(req),
+    });
+  }
+
+  /** A signed-in custom domain sending its session to the installation's address, after a sign-in there. */
+  @SkipEmailVerification()
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
+  @Post('handoff/codes')
+  issueHandoffCode(@Body() body: IssueSessionHandoffRequest, @CurrentUser() user: AuthUser, @Req() req: Request) {
+    const service = new IssueSessionHandoff(this.tokenService, this.sessionRepository, this.createResolveAudience());
+    const command = new IssueSessionHandoffCommand(service);
+    return command.execute({
+      userId: user.userId,
+      sessionId: user.sessionId,
+      audience: body.audience,
+      codeChallenge: body.codeChallenge,
+      fromOrigin: requestOrigin(req),
+    });
+  }
+
+  @Public()
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  @Post('handoff/exchange')
+  exchangeHandoffCode(@Body() body: ExchangeSessionHandoffRequest, @Req() req: Request) {
+    const origin = requestOrigin(req);
+    if (!origin) throw new InvalidCredentialsError('Invalid or expired sign-in code');
+    const service = new ExchangeSessionHandoff(
+      new ConsumeOneTimeToken(this.tokenService, this.usedTokenRepository),
+      this.sessionRepository,
+      this.userRepository,
+      this.memberRepository,
+      this.createResolveAudience(),
+      this.createStartSession(),
+    );
+    const command = new ExchangeSessionHandoffCommand(service, new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository));
+    return command.execute({ code: body.code, codeVerifier: body.codeVerifier, origin, client: clientInfo(req) });
+  }
+
+  private createResolveAudience(): ResolveHandoffAudience {
+    return new ResolveHandoffAudience(this.workspaceRepository, this.frontendUrl);
   }
 
   @Public()
@@ -265,7 +335,7 @@ export class AuthController {
   async resetPassword(@Body() body: ResetPasswordRequest, @Req() req: Request) {
     const service = new ResetPassword(this.userRepository, this.passwordHasher);
     const consumeToken = new ConsumeOneTimeToken(this.tokenService, this.usedTokenRepository);
-    const command = new ResetPasswordCommand(service, consumeToken, new RevokeUserSessions(this.sessionRepository));
+    const command = new ResetPasswordCommand(service, consumeToken, new RevokeUserSessions(this.sessionRepository, this.eventPublisher));
     try {
       await command.execute({ token: body.token, newPassword: body.newPassword });
     } catch (error) {
@@ -316,33 +386,10 @@ export class AuthController {
 
   @Public()
   @Post('verify-email')
-  async verifyEmail(@Body() body: { token: string }) {
+  async verifyEmail(@Body() body: { token: string }, @Req() req: Request) {
     const service = new VerifyEmail(this.userRepository);
-    const command = new VerifyEmailCommand(service, this.tokenService);
-    await command.execute({ token: body.token });
-
-    let userId: string | null = null;
-    try {
-      const payload = this.tokenService.verify<{ sub: string }>(body.token);
-      userId = payload.sub;
-    } catch { /* token already consumed, best effort */ }
-
-    if (userId) {
-      const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-      await auditLog.execute({
-        action: AuditAction.USER_EMAIL_VERIFIED,
-        entityType: 'user',
-        entityId: userId,
-        userId,
-        workspaceId: null,
-        metadata: { userId },
-        category: AuditCategory.USER,
-        level: AuditLevel.INFO,
-        source: 'ui',
-      });
-    }
-
-    return { message: 'Email verified' };
+    const command = new VerifyEmailCommand(service, this.tokenService, new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository));
+    return command.execute({ token: body.token, client: { ...clientInfo(req) } });
   }
 
   @SkipEmailVerification()
@@ -471,4 +518,10 @@ export class AuthController {
     } catch {}
     return this.frontendUrl;
   }
+}
+
+/** The Origin header the browser sent, which a page cannot forge for another site. */
+function requestOrigin(req: Request): string | null {
+  const origin = req.headers.origin;
+  return typeof origin === 'string' && origin ? origin : null;
 }

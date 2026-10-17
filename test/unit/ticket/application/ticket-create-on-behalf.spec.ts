@@ -3,6 +3,7 @@ import { WorkspaceRole } from '../../../../src/workspace/domain/enums/workspace-
 import { CreateUser } from '../../../../src/user/domain/services/user-create';
 import { AddWorkspaceMember } from '../../../../src/workspace/domain/services/workspace-add-member';
 import { ResolveOnBehalfOfCommand } from '../../../../src/ticket/application/commands/resolve-on-behalf-of.command';
+import { RecordAutoCreated } from '../../../../src/audit-log/domain/services/audit-log-record-auto-created';
 import { FakePasswordHasher } from '../../../mocks/fake-password-hasher';
 import { TicketWorld, WS_A, WS_B, makeUser } from './ticket-security-fixtures';
 
@@ -13,6 +14,7 @@ describe('Opening a ticket on behalf of someone', () => {
     w.ensurePermission(), w.users, w.members,
     new CreateUser(w.ids, w.users, new FakePasswordHasher()),
     new AddWorkspaceMember(w.ids, w.members),
+    new RecordAutoCreated(w.auditLog()),
   );
 
   beforeEach(() => {
@@ -46,5 +48,12 @@ describe('Opening a ticket on behalf of someone', () => {
     expect(result.email).toBe('new.contact@example.com');
     const member = await w.members.findByWorkspaceAndUser(WS_A, result.userId);
     expect(member!.role).toBe(WorkspaceRole.USER);
+  });
+
+  it('records where the ticket was opened: the web app by default, or the public API', async () => {
+    await resolve().execute({ email: 'web@example.com', workspaceId: WS_A, userId: 'agent-a', isSystemAdmin: false });
+    await resolve().execute({ email: 'api@example.com', workspaceId: WS_A, userId: 'agent-a', isSystemAdmin: false, source: 'api' });
+    const sources = w.audit.entries.map((e) => e.source);
+    expect(sources).toEqual(expect.arrayContaining(['ui', 'api']));
   });
 });

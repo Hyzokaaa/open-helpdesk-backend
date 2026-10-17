@@ -34,7 +34,7 @@ describe('Two mailboxes reading the same inbox', () => {
     routed = [];
     service = new ImapPollingService(
       {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, new FakeIdGenerator() as any, {} as any, {} as any,
-      processed as any, {} as any, {} as any, new MockAuditLogRepository() as any, {} as any, {} as any, {} as any, {} as any,
+      processed as any, {} as any, {} as any, new MockAuditLogRepository() as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any,
     );
   });
 

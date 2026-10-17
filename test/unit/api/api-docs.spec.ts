@@ -74,6 +74,13 @@ describe('public API OpenAPI document', () => {
     ]);
   });
 
+  it('documents opening a ticket on behalf of a customer', () => {
+    const schema = (document.components!.schemas as any).CreateApiTicketRequest;
+    expect(schema.properties.onBehalfOf).toMatchObject({ type: 'string', format: 'email' });
+    expect(schema.required ?? []).not.toContain('onBehalfOf');
+    expect(document.paths['/api/v1/tickets'].post!.description).toContain('onBehalfOf');
+  });
+
   it('requires the API key and names a known scope on every operation', () => {
     for (const { path, method, op } of operations(document)) {
       const label = `${method} ${path}`;

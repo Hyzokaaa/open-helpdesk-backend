@@ -29,9 +29,9 @@ export class SystemEmailSettingsModel {
   @Column({ default: 'tls' })
   encryption!: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt!: Date;
 }

@@ -15,6 +15,8 @@ interface Props {
   /** Who is opening the ticket for someone else. */
   userId: string;
   isSystemAdmin: boolean;
+  /** Where the ticket is being opened, for the audit entry. Defaults to the web app. */
+  source?: 'ui' | 'api';
 }
 
 export interface ResolveOnBehalfOfResponse {
@@ -76,7 +78,7 @@ export class ResolveOnBehalfOfCommand implements Command<Props, ResolveOnBehalfO
       member: member ? { id: member.getId(), role: member.role } : null,
       workspaceId: props.workspaceId,
       actorUserId: props.userId,
-      source: 'ui',
+      source: props.source ?? 'ui',
     });
 
     return { userId: targetUser.getId(), email: targetUser.email };

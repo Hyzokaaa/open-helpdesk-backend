@@ -1,4 +1,5 @@
 import { Command } from '../../../shared/domain/command';
+import { RevokeTicketPortalAccess } from '../../domain/services/ticket-portal-access-revoke';
 import { TicketParticipantRepository } from '../../domain/repositories/ticket-participant.repository';
 import { EnsureTicketAccess } from '../../domain/services/ticket-ensure-access';
 import { EnsureWorkspacePermission } from '../../../workspace/domain/services/workspace-ensure-permission';
@@ -30,6 +31,7 @@ export class RemoveTicketParticipantCommand implements Command<Props, RemoveTick
     private readonly ensureTicketAccess: EnsureTicketAccess,
     private readonly ensurePermission: EnsureWorkspacePermission,
     private readonly createAuditLog: CreateAuditLogEntry,
+    private readonly revokePortalAccess: RevokeTicketPortalAccess,
     private readonly userRepository?: UserRepository,
   ) {}
 
@@ -49,6 +51,8 @@ export class RemoveTicketParticipantCommand implements Command<Props, RemoveTick
     }
 
     await this.participantRepository.remove(props.ticketId, props.targetUserId);
+    // No longer on the ticket: their portal link stops opening it
+    await this.revokePortalAccess.execute({ ticketId: props.ticketId, userId: props.targetUserId });
 
     await this.createAuditLog.execute({
       action: AuditAction.PARTICIPANT_REMOVED,

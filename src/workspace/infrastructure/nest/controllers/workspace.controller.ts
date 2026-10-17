@@ -392,10 +392,7 @@ export class WorkspaceController {
       icon: result.icon
         ? await this.storage.getPresignedUrl(result.icon)
         : null,
-      cnameTarget: this.config.get<string>(
-        "CUSTOM_DOMAIN_CNAME_TARGET",
-        "proxy.example.com",
-      ),
+      cnameTarget: this.customDomainTarget(),
     };
   }
 
@@ -742,6 +739,7 @@ export class WorkspaceController {
       service,
       ensurePermission,
       auditLog,
+      this.eventPublisher,
     );
     return command.execute({
       workspaceId,
@@ -1595,6 +1593,14 @@ export class WorkspaceController {
     return new ResolveMailServer(this.mailDns).execute(body.domain);
   }
 
+  /**
+   * The host custom domains point their CNAME to. Null when the installation did not set one:
+   * the settings then say so instead of giving DNS instructions that cannot work.
+   */
+  private customDomainTarget(): string | null {
+    return this.config.get<string>("CUSTOM_DOMAIN_CNAME_TARGET")?.trim() || null;
+  }
+
   @Patch(":slug/custom-domain")
   async setCustomDomain(
     @Param("slug") slug: string,
@@ -1654,10 +1660,7 @@ export class WorkspaceController {
       customDomain: workspace.customDomain,
       customDomainVerified: workspace.customDomainVerified,
       domainVerificationToken: workspace.domainVerificationToken,
-      cnameTarget: this.config.get<string>(
-        "CUSTOM_DOMAIN_CNAME_TARGET",
-        "proxy.example.com",
-      ),
+      cnameTarget: this.customDomainTarget(),
     };
   }
 
@@ -1677,10 +1680,12 @@ export class WorkspaceController {
       isSystemAdmin: user.isSystemAdmin,
     });
 
-    const cnameTarget = this.config.get<string>(
-      "CUSTOM_DOMAIN_CNAME_TARGET",
-      "proxy.example.com",
-    );
+    const cnameTarget = this.customDomainTarget();
+    if (!cnameTarget) {
+      throw new DomainValidationError(
+        "This installation has no target for custom domains yet: its administrator must set CUSTOM_DOMAIN_CNAME_TARGET",
+      );
+    }
     const service = new VerifyCustomDomain(
       this.workspaceRepository,
       cnameTarget,

@@ -24,7 +24,6 @@ interface Props {
   tagIds: string[];
   customFields: Record<string, unknown>;
   discardReason: TicketDiscardReason | null;
-  portalToken?: string | null;
   firstResponseBreached?: boolean;
   resolutionBreached?: boolean;
   aiCache?: Record<string, { source: string; result: string }>;
@@ -59,7 +58,6 @@ export class Ticket {
   tagIds: string[];
   customFields: Record<string, unknown>;
   discardReason: TicketDiscardReason | null;
-  portalToken: string | null;
   firstResponseBreached: boolean;
   resolutionBreached: boolean;
   aiCache: Record<string, { source: string; result: string }>;
@@ -92,7 +90,6 @@ export class Ticket {
     this.tagIds = props.tagIds;
     this.customFields = props.customFields ?? {};
     this.discardReason = props.discardReason ?? null;
-    this.portalToken = props.portalToken ?? null;
     this.firstResponseBreached = props.firstResponseBreached ?? false;
     this.resolutionBreached = props.resolutionBreached ?? false;
     this.aiCache = props.aiCache ?? {};

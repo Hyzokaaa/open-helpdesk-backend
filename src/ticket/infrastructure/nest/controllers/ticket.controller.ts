@@ -53,6 +53,11 @@ import { ListTicketParticipantsQuery } from '../../../application/queries/list-t
 import { GetTicketDescriptionHistoryQuery } from '../../../application/queries/get-ticket-description-history.query';
 import { ListTicketActivityQuery } from '../../../application/queries/list-ticket-activity.query';
 import { TypeOrmTicketRepository } from '../../typeorm/repositories/typeorm-ticket.repository';
+import { TypeOrmTicketPortalAccessRepository } from '../../typeorm/repositories/typeorm-ticket-portal-access.repository';
+import { EnsureTicketPortalAccess } from '../../../domain/services/ticket-portal-access-ensure';
+import { RevokeTicketPortalAccess } from '../../../domain/services/ticket-portal-access-revoke';
+import { TypeOrmEmailQuoteRepository } from '../../typeorm/repositories/typeorm-email-quote.repository';
+import { GetEmailQuoteQuery } from '../../../application/queries/get-email-quote.query';
 import { TypeOrmWorkspaceRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository';
 import { TypeOrmWorkspaceMemberRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
 import { TypeOrmUserRepository } from '../../../../user/infrastructure/typeorm/repositories/typeorm-user.repository';
@@ -98,6 +103,8 @@ import { TypeOrmWorkspaceTicketReferenceRepository } from '../../../../workspace
 export class TicketController {
   constructor(
     @Inject() private readonly ticketRepository: TypeOrmTicketRepository,
+    @Inject() private readonly portalAccessRepository: TypeOrmTicketPortalAccessRepository,
+    @Inject() private readonly emailQuoteRepository: TypeOrmEmailQuoteRepository,
     @Inject() private readonly workspaceRepository: TypeOrmWorkspaceRepository,
     @Inject() private readonly ticketReferenceRepository: TypeOrmWorkspaceTicketReferenceRepository,
     @Inject() private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
@@ -125,7 +132,7 @@ export class TicketController {
   ) {
     const workspace = await this.resolveWorkspace(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
-    const service = new CreateTicket(this.idGenerator, this.ticketRepository);
+    const service = new CreateTicket(this.idGenerator, this.ticketRepository, new EnsureTicketPortalAccess(this.idGenerator, this.portalAccessRepository));
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     const validateCustomFields = new ValidateCustomFieldValues(this.customFieldDefinitionRepository);
     const claimAttachments = new ClaimStagedAttachments(this.attachmentRepository);
@@ -286,8 +293,20 @@ export class TicketController {
   ) {
     const workspace = await this.resolveWorkspace(slug);
     const ensureAccess = this.createEnsureTicketAccess();
-    const query = new GetTicketQuery(this.ticketRepository, ensureAccess, new SummarizeUsers(this.userRepository), this.auditLogRepository);
+    const query = new GetTicketQuery(this.ticketRepository, ensureAccess, new SummarizeUsers(this.userRepository), this.auditLogRepository, this.emailQuoteRepository);
     return query.execute({ ticketId: id, workspaceId: workspace.getId(), userId: user.userId, isSystemAdmin: user.isSystemAdmin });
+  }
+
+  /** What the email that opened the ticket carried besides its text (its signature), folded. */
+  @Get(':id/quoted-text')
+  async descriptionQuotedText(
+    @Param('slug') slug: string,
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspace = await this.resolveWorkspace(slug);
+    const query = new GetEmailQuoteQuery(this.createEnsureTicketAccess(), this.emailQuoteRepository);
+    return query.execute({ ticketId: id, commentId: null, workspaceId: workspace.getId(), userId: user.userId, isSystemAdmin: user.isSystemAdmin });
   }
 
   @Patch(':id')
@@ -588,7 +607,7 @@ export class TicketController {
     const workspace = await this.resolveWorkspace(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-    const command = new RemoveTicketParticipantCommand(this.participantRepository, this.createEnsureTicketAccess(), ensurePermission, auditLog, this.userRepository);
+    const command = new RemoveTicketParticipantCommand(this.participantRepository, this.createEnsureTicketAccess(), ensurePermission, auditLog, new RevokeTicketPortalAccess(this.ticketRepository, this.portalAccessRepository), this.userRepository);
     return command.execute({
       ticketId: id,
       workspaceId: workspace.getId(),

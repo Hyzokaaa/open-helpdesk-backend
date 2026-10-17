@@ -493,6 +493,12 @@ function validateExportData(data: WorkspaceExportData): void {
     optionalText(a, p, 'uploadedByEmail');
     date(a, p, 'createdAt');
   });
+  each('emailQuotes', data.emailQuotes, (q, p) => {
+    text(q, p, 'ticketId');
+    optionalText(q, p, 'commentId');
+    if (typeof q.content !== 'string') fail(`${p}.content`, 'must be text');
+    member(q, p, 'method', oneOf({ marker: 'marker', html: 'html', text: 'text', none: 'none' }));
+  });
   each('participants', data.participants, (pt, p) => {
     text(pt, p, 'ticketId');
     optionalText(pt, p, 'userEmail');
@@ -909,15 +915,15 @@ export class ImportWorkspace {
             const sender = data.emailSender;
             if (!sender || !present(sender.smtpPass)) continue;
             await qr.query(`
-              INSERT INTO workspace_email_senders (id, "workspaceId", "smtpHost", "smtpPort", "smtpUser", "smtpPass", "smtpFrom", encryption, "fromName", "fromEmail")
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+              INSERT INTO workspace_email_senders (id, "workspaceId", "smtpHost", "smtpPort", "smtpUser", "smtpPass", "smtpFrom", encryption, "fromName", "fromEmail", "createdAt", "updatedAt")
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11)
               ON CONFLICT ("workspaceId") DO UPDATE SET
                 "smtpHost" = EXCLUDED."smtpHost", "smtpPort" = EXCLUDED."smtpPort", "smtpUser" = EXCLUDED."smtpUser",
                 "smtpPass" = EXCLUDED."smtpPass", "smtpFrom" = EXCLUDED."smtpFrom", encryption = EXCLUDED.encryption,
-                "fromName" = EXCLUDED."fromName", "fromEmail" = EXCLUDED."fromEmail", "updatedAt" = now()
+                "fromName" = EXCLUDED."fromName", "fromEmail" = EXCLUDED."fromEmail", "updatedAt" = $11
             `, [
               ulid(), targetWorkspaceId, sender.smtpHost, sender.smtpPort, sender.smtpUser, sender.smtpPass, sender.smtpFrom,
-              sender.encryption || 'tls', sender.fromName ?? null, sender.fromEmail ?? null,
+              sender.encryption || 'tls', sender.fromName ?? null, sender.fromEmail ?? null, new Date(),
             ]);
             result.settingsApplied.push(key);
             continue;
@@ -929,12 +935,12 @@ export class ImportWorkspace {
             if (!analytics) continue;
             const matomo = analytics.provider === AnalyticsProvider.MATOMO;
             await qr.query(`
-              INSERT INTO workspace_analytics_settings (id, "workspaceId", provider, "serverUrl", "siteId", "useCookies", "trackEvents", "shareWithInstallation")
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+              INSERT INTO workspace_analytics_settings (id, "workspaceId", provider, "serverUrl", "siteId", "useCookies", "trackEvents", "shareWithInstallation", "createdAt", "updatedAt")
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
               ON CONFLICT ("workspaceId") DO UPDATE SET
                 provider = EXCLUDED.provider, "serverUrl" = EXCLUDED."serverUrl", "siteId" = EXCLUDED."siteId",
                 "useCookies" = EXCLUDED."useCookies", "trackEvents" = EXCLUDED."trackEvents",
-                "shareWithInstallation" = EXCLUDED."shareWithInstallation", "updatedAt" = now()
+                "shareWithInstallation" = EXCLUDED."shareWithInstallation", "updatedAt" = $9
             `, [
               ulid(), targetWorkspaceId,
               matomo ? AnalyticsProvider.MATOMO : null,
@@ -943,6 +949,7 @@ export class ImportWorkspace {
               matomo ? analytics.useCookies === true : false,
               matomo ? analytics.trackEvents !== false : true,
               analytics.shareWithInstallation !== false,
+              new Date(),
             ]);
             result.settingsApplied.push(key);
             continue;
@@ -953,12 +960,12 @@ export class ImportWorkspace {
             const reference = data.ticketReference;
             if (!reference) continue;
             await qr.query(`
-              INSERT INTO workspace_ticket_references ("workspaceId", style, prefix, secret)
-              VALUES ($1, $2, $3, $4)
+              INSERT INTO workspace_ticket_references ("workspaceId", style, prefix, secret, "createdAt", "updatedAt")
+              VALUES ($1, $2, $3, $4, $5, $5)
               ON CONFLICT ("workspaceId") DO UPDATE SET
                 style = EXCLUDED.style, prefix = EXCLUDED.prefix,
-                secret = COALESCE(EXCLUDED.secret, workspace_ticket_references.secret), "updatedAt" = now()
-            `, [targetWorkspaceId, reference.style, normalizeTicketReferencePrefix(reference.prefix), reference.secret ?? null]);
+                secret = COALESCE(EXCLUDED.secret, workspace_ticket_references.secret), "updatedAt" = $5
+            `, [targetWorkspaceId, reference.style, normalizeTicketReferencePrefix(reference.prefix), reference.secret ?? null, new Date()]);
             result.settingsApplied.push(key);
             continue;
           }
@@ -1487,16 +1494,16 @@ export class ImportWorkspace {
             INSERT INTO tickets (
               id, name, description, priority, status, "categoryId",
               "workspaceId", "reporterId", "assigneeId", "ticketNumber",
-              "customFields", "discardReason", "portalToken",
+              "customFields", "discardReason",
               "firstResponseAt", "resolvedAt", "resolvedById",
               "firstResponseBreached", "resolutionBreached", "createdAt", "updatedAt",
               "organizationId", "departmentId", "projectId",
               source, "registeredById", "originDate", "descriptionEditedAt", "mailboxId", reference
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29)
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)
           `, [
             newId, t.name, sanitizeHtml(t.description ?? ''), t.priority, t.status, categoryIdFor(t.category),
             targetWorkspaceId, userIdFor(t.reporterEmail), userIdFor(t.assigneeEmail), ticketNumber,
-            JSON.stringify(remapCustomFields(t.customFields)), t.discardReason, null,
+            JSON.stringify(remapCustomFields(t.customFields)), t.discardReason,
             t.firstResponseAt, t.resolvedAt, userIdFor(t.resolvedByEmail),
             t.firstResponseBreached, t.resolutionBreached, t.createdAt, t.updatedAt,
             organizationIdFor(t.organizationId), departmentIdFor(t.departmentId), projectIdFor(t.projectId),
@@ -1706,6 +1713,18 @@ export class ImportWorkspace {
           `, [editId, sanitizeHtml(remapMentionMarkup(e.content)), commentId, editorId, e.createdAt]);
           links.record(LINK.commentEdit, originOf(e), editId);
           result.commentEditsImported++;
+        }
+
+        // 5c. Quoted text folded under emailed comments (and under descriptions). One per comment
+        // and one per description at most: a ticket being completed keeps the one it has.
+        for (const q of data.emailQuotes ?? []) {
+          const ticketId = ticketIdMap.get(q.ticketId) ?? completing.get(q.ticketId);
+          const commentId = q.commentId ? commentIdMap.get(q.commentId) : null;
+          if (!ticketId || commentId === undefined) continue;
+          await qr.query(`
+            INSERT INTO email_quotes (id, "ticketId", "commentId", content, "lineCount", method)
+            VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING
+          `, [ulid(), ticketId, commentId, q.content, q.content.split('\n').length, q.method]);
         }
 
         // 6. Attachments — on a ticket being completed, one already there (by identity, else same

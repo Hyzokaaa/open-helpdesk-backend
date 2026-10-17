@@ -81,7 +81,7 @@ export class CreateTicketCommand implements Command<Props, CreateTicketResponse>
       isCreate: true,
     });
 
-    const ticket = await this.createTicket.execute({
+    const { ticket, reporterAccess } = await this.createTicket.execute({
       name: props.name,
       description: props.description,
       priority: props.priority,
@@ -116,6 +116,7 @@ export class CreateTicketCommand implements Command<Props, CreateTicketResponse>
       workspaceId: props.workspaceId,
       workspaceName: props.workspaceName,
       workspaceSlug: props.workspaceSlug,
+      portalToken: reporterAccess.token,
       // The channel the ticket came through, so integrations can tell API-created tickets apart
       source: props.source ?? TicketSource.UI,
     };

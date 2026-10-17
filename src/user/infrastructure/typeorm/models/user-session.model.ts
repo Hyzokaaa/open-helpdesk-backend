@@ -5,6 +5,7 @@ import { UserModel } from './user.model';
 @Index('IDX_user_sessions_token_hash', ['tokenHash'], { unique: true })
 @Index('IDX_user_sessions_previous_token_hash', ['previousTokenHash'])
 @Index('IDX_user_sessions_user', ['userId'])
+@Index('IDX_user_sessions_root', ['rootSessionId'])
 export class UserSessionModel {
   @PrimaryColumn()
   id!: string;
@@ -14,6 +15,13 @@ export class UserSessionModel {
 
   @Column()
   userId!: string;
+
+  // A family ends together, so the sessions handed over from one go with it
+  @ManyToOne(() => UserSessionModel, { onDelete: 'CASCADE', nullable: true })
+  rootSession!: UserSessionModel | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  rootSessionId!: string | null;
 
   @Column()
   tokenHash!: string;

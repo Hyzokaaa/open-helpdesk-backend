@@ -46,6 +46,8 @@ export class CoreConfigController {
       analytics: toPublicAnalyticsConfig(analyticsSettings),
       // How long "keep me signed in" lasts, so the sign-in page can say it
       sessionRememberDays: Math.round(sessionPolicyFromConfig(this.config).rememberedSessionTtlMs / DAY_MS),
+      // The installation's own address, through which a custom domain picks up the session of another (#37)
+      appUrl: this.config.get<string>('FRONTEND_URL', 'http://localhost:5173'),
     };
   }
 }

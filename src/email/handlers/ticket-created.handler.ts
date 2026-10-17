@@ -28,6 +28,7 @@ import { ticketReferenceOf } from '../../ticket/domain/ticket-reference';
 import { eachEmailRecipient } from '../domain/each-email-recipient';
 import { ticketThreadHeaders } from '../domain/ticket-email-thread';
 import { ResolveTicketReplyMailbox } from '../domain/services/ticket-reply-mailbox-resolve';
+import { WorkspaceRole } from '../../workspace/domain/enums/workspace-role.enum';
 
 @Injectable()
 export class TicketCreatedHandler {
@@ -115,8 +116,6 @@ export class TicketCreatedHandler {
   }
 
   private async sendReporterConfirmation(event: TicketCreatedEvent): Promise<void> {
-    if (!event.portalToken) return;
-
     if (event.source === 'email' && event.mailboxId) {
       const sourceMailbox = await this.mailboxRepository.findById(event.mailboxId);
       if (sourceMailbox && sourceMailbox.autoReply === false) return;
@@ -124,6 +123,13 @@ export class TicketCreatedHandler {
 
     const creator = await this.userRepository.findById(event.reporterId);
     if (!creator) return;
+
+    // Only a customer is told their ticket was received, whatever way it came in (email, portal,
+    // opened for them in the dashboard or by themselves there). Someone of the team opening a
+    // ticket, for themselves or through the API, already knows.
+    if (creator.isSystemAdmin) return;
+    const member = await this.memberRepository.findByWorkspaceAndUser(event.workspaceId, creator.getId());
+    if (member?.role !== WorkspaceRole.USER) return;
 
     const lang = creator.language || 'en';
     const frontendUrl = await this.frontendResolver.resolve(event.workspaceId);
@@ -143,7 +149,7 @@ export class TicketCreatedHandler {
     const result = await sendWorkspaceEmail(this.emailService, sender, {
       to: [creator.email],
       subject,
-      html: template.html({ ticketName: event.ticketName, portalUrl, lang }),
+      html: template.html({ ticketName: event.ticketName, portalUrl, canReply: !!mailbox, lang }),
       // In the ticket's thread, so the customer's reply to this email lands on the ticket
       ...(emailDomain && ticketThreadHeaders(event.ticketId, emailDomain, `confirmation-${event.ticketId}`)),
       ...(mailbox && { replyTo: mailbox.address }),

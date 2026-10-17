@@ -11,21 +11,24 @@ interface Props {
 
 export interface MyPermissionsResponse {
   permissions: Permission[];
+  // The caller's own membership role, or null when not a member (a system admin may not be one)
+  role: WorkspaceRole | null;
 }
 
 export class GetMyPermissionsQuery implements Query<Props, MyPermissionsResponse> {
   constructor(private readonly memberRepository: WorkspaceMemberRepository) {}
 
   async execute(props: Props): Promise<MyPermissionsResponse> {
-    if (props.isSystemAdmin) {
-      return { permissions: getPermissionsForRole(WorkspaceRole.ADMIN) };
-    }
-
     const member = await this.memberRepository.findByWorkspaceAndUser(
       props.workspaceId,
       props.userId,
     );
-    if (!member) return { permissions: [] };
-    return { permissions: getPermissionsForRole(member.role) };
+    const role = member?.role ?? null;
+
+    if (props.isSystemAdmin) {
+      return { permissions: getPermissionsForRole(WorkspaceRole.ADMIN), role };
+    }
+    if (!member) return { permissions: [], role };
+    return { permissions: getPermissionsForRole(member.role), role };
   }
 }

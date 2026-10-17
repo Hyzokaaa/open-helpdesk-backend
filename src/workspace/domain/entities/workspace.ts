@@ -26,6 +26,8 @@ interface Props {
   customDomain?: string | null;
   customDomainVerified?: boolean;
   domainVerificationToken?: string | null;
+  customDomainCheckFailures?: number;
+  customDomainFailingSince?: Date | null;
   appName?: string | null;
   appSubtitle?: string | null;
   logo?: string | null;
@@ -49,6 +51,9 @@ export class Workspace {
   customDomain: string | null;
   customDomainVerified: boolean;
   domainVerificationToken: string | null;
+  /** Daily checks in a row that found the verified domain no longer pointing to the installation. */
+  customDomainCheckFailures: number;
+  customDomainFailingSince: Date | null;
   appName: string | null;
   appSubtitle: string | null;
   logo: string | null;
@@ -72,6 +77,8 @@ export class Workspace {
     this.customDomain = props.customDomain ?? null;
     this.customDomainVerified = props.customDomainVerified ?? false;
     this.domainVerificationToken = props.domainVerificationToken ?? null;
+    this.customDomainCheckFailures = props.customDomainCheckFailures ?? 0;
+    this.customDomainFailingSince = props.customDomainFailingSince ?? null;
     this.appName = props.appName ?? null;
     this.appSubtitle = props.appSubtitle ?? null;
     this.logo = props.logo ?? null;

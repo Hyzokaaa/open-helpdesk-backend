@@ -8,7 +8,8 @@ export interface TicketCreatedEvent {
   workspaceId: string;
   workspaceName: string;
   workspaceSlug: string;
-  portalToken?: string | null;
+  /** The reporter's portal link; every ticket has one. */
+  portalToken: string;
   source?: 'ui' | 'email' | 'portal' | 'api';
   mailboxId?: string;
 }
@@ -115,6 +116,16 @@ export interface TicketDeletedEvent {
  * A workspace was deleted, restored, or is about to be purged. Consumed by email only: its owner
  * and admins are told what happened and until when it can be undone.
  */
+/** A verified custom domain stopped pointing to the installation (workspace.custom-domain-failing / -distrusted). */
+export interface CustomDomainCheckEvent {
+  workspaceId: string;
+  workspaceName: string;
+  workspaceSlug: string;
+  domain: string;
+  /** When the checks started failing, ISO. */
+  failingSince: string;
+}
+
 export interface WorkspaceLifecycleEvent {
   workspaceId: string;
   workspaceName: string;

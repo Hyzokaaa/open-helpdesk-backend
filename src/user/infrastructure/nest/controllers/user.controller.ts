@@ -22,6 +22,7 @@ import { CurrentUser } from '../../../../shared/nest/decorators/current-user.dec
 import { SkipEmailVerification } from '../../../../shared/nest/decorators/skip-email-verification.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
+import { NestEventPublisher } from '../../../../shared/infrastructure/nest-event-publisher';
 import { BcryptPasswordHasher } from '../../../../shared/infrastructure/bcrypt-password-hasher';
 import { GetUserProfileQuery } from '../../../application/queries/get-user-profile.query';
 import { ListUsersQuery } from '../../../application/queries/list-users.query';
@@ -73,6 +74,7 @@ export class UserController {
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
     @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
     @Inject() private readonly sessionRepository: TypeOrmUserSessionRepository,
+    @Inject() private readonly eventPublisher: NestEventPublisher,
     @Inject() private readonly creationSettingsRepository: TypeOrmWorkspaceCreationSettingsRepository,
     private readonly config: ConfigService,
   ) {}
@@ -252,7 +254,7 @@ export class UserController {
     @CurrentUser() authUser: AuthUser,
   ) {
     const service = new ChangePassword(this.userRepository, this.passwordHasher);
-    const command = new ChangePasswordCommand(service, new RevokeUserSessions(this.sessionRepository));
+    const command = new ChangePasswordCommand(service, new RevokeUserSessions(this.sessionRepository, this.eventPublisher));
     let result: Awaited<ReturnType<ChangePasswordCommand['execute']>>;
     try {
       result = await command.execute({
@@ -434,7 +436,7 @@ export class UserController {
   ) {
     const service = new ToggleUserActive(this.userRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-    const command = new ToggleUserActiveCommand(service, auditLog);
+    const command = new ToggleUserActiveCommand(service, auditLog, new RevokeUserSessions(this.sessionRepository, this.eventPublisher));
     return command.execute({
       targetUserId: id,
       isActive: body.isActive,

@@ -34,6 +34,8 @@ import { AddTicketParticipant } from "../../../../ticket/domain/services/ticket-
 import { FollowTicket } from "../../../../ticket/domain/services/ticket-follow";
 import { EnsureTicketAccess } from "../../../../ticket/domain/services/ticket-ensure-access";
 import { TypeOrmTicketParticipantRepository } from "../../../../ticket/infrastructure/typeorm/repositories/typeorm-ticket-participant.repository";
+import { TypeOrmEmailQuoteRepository } from "../../../../ticket/infrastructure/typeorm/repositories/typeorm-email-quote.repository";
+import { GetEmailQuoteQuery } from "../../../../ticket/application/queries/get-email-quote.query";
 import { CreateCommentRequest } from "../dto/create-comment.request";
 import { TypeOrmAttachmentRepository } from "../../../../attachment/infrastructure/typeorm/repositories/typeorm-attachment.repository";
 import { ClaimStagedAttachments } from "../../../../attachment/domain/services/attachment-claim-staged";
@@ -49,6 +51,7 @@ export class CommentController {
     @Inject() private readonly eventPublisher: NestEventPublisher,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
     @Inject() private readonly participantRepository: TypeOrmTicketParticipantRepository,
+    @Inject() private readonly emailQuoteRepository: TypeOrmEmailQuoteRepository,
     @Inject() private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
     @Inject() private readonly commentEditRepository: TypeOrmCommentEditRepository,
     @Inject() private readonly attachmentRepository: TypeOrmAttachmentRepository,
@@ -96,7 +99,7 @@ export class CommentController {
     @CurrentUser() user: AuthUser,
   ) {
     const workspace = await this.resolveWorkspace(slug);
-    const query = new ListTicketCommentsQuery(this.commentRepository, this.createEnsureTicketAccess(), new SummarizeUsers(this.userRepository));
+    const query = new ListTicketCommentsQuery(this.commentRepository, this.createEnsureTicketAccess(), new SummarizeUsers(this.userRepository), this.emailQuoteRepository);
     return query.execute({
       ticketId,
       workspaceId: workspace.getId(),
@@ -127,6 +130,19 @@ export class CommentController {
       workspaceId: workspace.getId(),
       ticketId,
     });
+  }
+
+  /** The quoted message and signature an emailed reply carried, folded under its comment. */
+  @Get(":commentId/quoted-text")
+  async quotedText(
+    @Param("slug") slug: string,
+    @Param("ticketId") ticketId: string,
+    @Param("commentId") commentId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspace = await this.resolveWorkspace(slug);
+    const query = new GetEmailQuoteQuery(this.createEnsureTicketAccess(), this.emailQuoteRepository);
+    return query.execute({ ticketId, commentId, workspaceId: workspace.getId(), userId: user.userId, isSystemAdmin: user.isSystemAdmin });
   }
 
   @Get(":commentId/history")

@@ -8,6 +8,10 @@ export class MockUserSessionRepository implements UserSessionRepository {
     this.sessions.push(session);
   }
 
+  async findById(id: string): Promise<UserSession | null> {
+    return this.sessions.find((s) => s.getId() === id) ?? null;
+  }
+
   async findByTokenHash(tokenHash: string): Promise<UserSession | null> {
     return this.sessions.find((s) => s.tokenHash === tokenHash) ?? null;
   }
@@ -29,6 +33,18 @@ export class MockUserSessionRepository implements UserSessionRepository {
     session.rotatedAt = rotation.rotatedAt;
     session.expiresAt = rotation.expiresAt;
     return true;
+  }
+
+  async extendFamily(rootId: string, expiresAt: Date): Promise<void> {
+    for (const s of this.family(rootId)) s.expiresAt = expiresAt;
+  }
+
+  async revokeFamily(rootId: string, revokedAt: Date): Promise<void> {
+    for (const s of this.family(rootId)) s.revokedAt = revokedAt;
+  }
+
+  private family(rootId: string): UserSession[] {
+    return this.sessions.filter((s) => !s.revokedAt && (s.getId() === rootId || s.rootSessionId === rootId));
   }
 
   async revokeAllForUser(userId: string, revokedAt: Date, exceptId?: string): Promise<void> {

@@ -9,6 +9,7 @@ import { RejectNullCharactersPipe } from "./shared/nest/pipes/reject-null-charac
 import { AccessDeniedAuditRecorder } from "./audit-log/infrastructure/nest/access-denied-audit-recorder";
 import { setupApiDocs } from "./api/infrastructure/nest/openapi/api-docs";
 import { resolveBackendVersion } from "./config/infrastructure/nest/resolve-backend-version";
+import { enableAppCors } from "./shared/infrastructure/nest/cors";
 
 async function bootstrap() {
   await ensureDatabase();
@@ -29,43 +30,7 @@ async function bootstrap() {
 
   app.useGlobalFilters(new DomainExceptionFilter(new AccessDeniedAuditRecorder(app.get(DataSource))));
 
-  const corsOrigins = process.env.CORS_ORIGINS || process.env.FRONTEND_URL;
-  const allowedOrigins = corsOrigins
-    ? corsOrigins.split(",").map((u) => u.trim())
-    : ["http://localhost:5173"];
-
-  const verifiedDomainCache = new Map<string, boolean>();
-  let cacheExpiry = 0;
-
-  app.enableCors({
-    origin: async (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-
-      try {
-        const now = Date.now();
-        if (now > cacheExpiry) {
-          verifiedDomainCache.clear();
-          cacheExpiry = now + 60_000;
-        }
-
-        const host = new URL(origin).hostname;
-        if (verifiedDomainCache.has(host)) return callback(null, verifiedDomainCache.get(host));
-
-        const { TypeOrmWorkspaceRepository } = await import("./workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository");
-        const repo = app.get(TypeOrmWorkspaceRepository);
-        const workspaces = await repo.findByCustomDomain(host);
-        const allowed = workspaces.some((w) => w.customDomainVerified);
-        verifiedDomainCache.set(host, allowed);
-        callback(null, allowed);
-      } catch {
-        callback(null, false);
-      }
-    },
-    exposedHeaders: ["X-Unread-Count", "Date", "Content-Disposition"],
-    // Lets the browser reuse a preflight answer for an hour instead of repeating the OPTIONS request before most calls
-    maxAge: 3600,
-  });
+  enableAppCors(app);
 
   // Public API document at /api/v1/openapi.json; /docs and /api/v1/docs redirect to the web app's /docs page
   setupApiDocs(app, {

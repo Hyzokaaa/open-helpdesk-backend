@@ -25,6 +25,10 @@ export class MockWorkspaceRepository implements WorkspaceRepository {
     return this.live.filter((w) => w.customDomain === domain);
   }
 
+  async findWithVerifiedCustomDomain(): Promise<Workspace[]> {
+    return this.live.filter((w) => w.customDomain && w.customDomainVerified);
+  }
+
   async findAll(): Promise<Workspace[]> {
     return this.live;
   }

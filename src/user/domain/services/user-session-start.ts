@@ -19,6 +19,8 @@ export interface SessionPolicy {
 interface StartUserSessionProps {
   user: User;
   rememberMe: boolean;
+  /** The live session this one is handed over from: the new one joins its family and its lifetime. */
+  handedOverFrom?: UserSession;
   now?: Date;
 }
 
@@ -37,15 +39,17 @@ export class StartUserSession {
 
   async execute(props: StartUserSessionProps): Promise<SessionTokens> {
     const now = props.now ?? new Date();
+    const from = props.handedOverFrom;
     const ttl = props.rememberMe ? this.policy.rememberedSessionTtlMs : this.policy.sessionTtlMs;
     const secret = SessionSecret.generate();
 
     const session = new UserSession({
       id: this.idGenerator.create(),
       userId: props.user.getId(),
+      rootSessionId: from ? from.getRootId() : null,
       tokenHash: secret.hash,
-      rememberMe: props.rememberMe,
-      expiresAt: new Date(now.getTime() + ttl),
+      rememberMe: from ? from.rememberMe : props.rememberMe,
+      expiresAt: from ? from.expiresAt : new Date(now.getTime() + ttl),
       createdAt: now,
     });
     await this.sessionRepository.create(session);

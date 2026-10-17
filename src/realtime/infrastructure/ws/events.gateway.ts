@@ -9,6 +9,8 @@ import {
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Server, Socket } from 'socket.io';
 import { AccessTokenVerifier } from '../../../shared/infrastructure/access-token-verifier';
+import { SessionLiveness } from '../../../shared/infrastructure/session-liveness';
+import { SESSIONS_REVOKED_EVENT, SessionsRevokedEvent } from '../../../shared/domain/session-events';
 import type { AuthUser } from '../../../shared/nest/strategies/jwt.strategy';
 import { TypeOrmWorkspaceRepository } from '../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository';
 import { TypeOrmWorkspaceMemberRepository } from '../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
@@ -37,7 +39,8 @@ const room = (workspaceId: string) => `workspace:${workspaceId}`;
  * Relays domain events to the browsers of a workspace's members.
  *
  * Clients authenticate with their access token on connect and send the renewed one with 'auth'
- * whenever the session refreshes; a socket whose token lapses is disconnected. Events carry ids
+ * whenever the session refreshes; a socket whose token lapses, or whose session is revoked, is
+ * disconnected. Events carry ids
  * only: clients fetch what changed through the API, which applies each user's permissions, so
  * the gateway never has to.
  */
@@ -51,6 +54,7 @@ export class EventsGateway implements OnModuleInit, OnGatewayConnection, OnGatew
   constructor(
     private readonly eventEmitter: EventEmitter2,
     @Inject() private readonly tokenVerifier: AccessTokenVerifier,
+    @Inject() private readonly liveness: SessionLiveness,
     @Inject() private readonly workspaceRepository: TypeOrmWorkspaceRepository,
     @Inject() private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
   ) {}
@@ -66,13 +70,16 @@ export class EventsGateway implements OnModuleInit, OnGatewayConnection, OnGatew
         });
       });
     }
+    this.eventEmitter.on(SESSIONS_REVOKED_EVENT, (data: SessionsRevokedEvent) => {
+      if (data?.userId) void this.closeRevoked(data.userId);
+    });
     this.logger.log('WebSocket gateway initialized — forwarding events: ' + FORWARDED_EVENTS.join(', '));
   }
 
-  handleConnection(client: Socket): void {
+  async handleConnection(client: Socket): Promise<void> {
     const state: ClientState = { workspaces: new Map() };
     client.data = state;
-    if (!this.authenticate(client, client.handshake.auth?.token)) {
+    if (!(await this.authenticate(client, client.handshake.auth?.token))) {
       client.emit('auth:invalid');
       client.disconnect(true);
     }
@@ -86,7 +93,7 @@ export class EventsGateway implements OnModuleInit, OnGatewayConnection, OnGatew
   @SubscribeMessage('auth')
   async handleAuth(client: Socket, token: unknown): Promise<{ ok: boolean }> {
     const previous = this.state(client).user;
-    if (!this.authenticate(client, token, previous?.userId)) {
+    if (!(await this.authenticate(client, token, previous?.userId))) {
       client.emit('auth:invalid');
       client.disconnect(true);
       return { ok: false };
@@ -122,9 +129,10 @@ export class EventsGateway implements OnModuleInit, OnGatewayConnection, OnGatew
     state.workspaces.delete(workspaceSlug);
   }
 
-  private authenticate(client: Socket, token: unknown, expectedUserId?: string): boolean {
+  private async authenticate(client: Socket, token: unknown, expectedUserId?: string): Promise<boolean> {
     const verified = this.tokenVerifier.verify(token);
     if (!verified || (expectedUserId && verified.user.userId !== expectedUserId)) return false;
+    if (verified.user.sessionId && !(await this.liveness.isLive(verified.user.sessionId))) return false;
 
     const state = this.state(client);
     state.user = verified.user;
@@ -135,6 +143,17 @@ export class EventsGateway implements OnModuleInit, OnGatewayConnection, OnGatew
       client.disconnect(true);
     }, delay);
     return true;
+  }
+
+  /** Closes the user's sockets whose session no longer counts, e.g. right after signing out. */
+  private async closeRevoked(userId: string): Promise<void> {
+    for (const client of this.server.sockets.sockets.values()) {
+      const user = this.state(client).user;
+      if (!user || user.userId !== userId || !user.sessionId) continue;
+      if (await this.liveness.isLive(user.sessionId)) continue;
+      client.emit('auth:invalid');
+      client.disconnect(true);
+    }
   }
 
   /** Membership can change while a socket is open; drop channels the user no longer belongs to. */

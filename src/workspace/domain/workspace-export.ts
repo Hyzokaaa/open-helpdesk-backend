@@ -105,7 +105,12 @@ export interface WorkspaceExportTicket {
   reference: string;
   customFields: Record<string, unknown>;
   discardReason: string | null;
-  portalToken: string | null;
+  /**
+   * Files before core 1.34 carry the reporter's portal link. It was never imported and is no
+   * longer exported: a link opens tickets of the instance that made it, and the target creates
+   * each person's own link the first time it emails them.
+   */
+  portalToken?: string | null;
   firstResponseAt: string | null;
   resolvedAt: string | null;
   resolvedByEmail: string | null;
@@ -154,6 +159,16 @@ export interface WorkspaceExportDescriptionEdit {
 }
 
 /** A past version of a comment. Since 1.15. */
+/** The quoted text and signature an inbound email carried, folded under its comment. Since 1.22. */
+export interface WorkspaceExportEmailQuote {
+  ticketId: string;
+  /** Null when it belongs to the email that opened the ticket (its description). */
+  commentId: string | null;
+  /** Plain text. */
+  content: string;
+  method: 'marker' | 'html' | 'text' | 'none';
+}
+
 export interface WorkspaceExportCommentEdit {
   /** Since 1.17; older files carry none and their edits are matched by editor and second. */
   id?: string;
@@ -378,6 +393,8 @@ export interface WorkspaceExportData {
   commentEdits: WorkspaceExportCommentEdit[];
   attachments: WorkspaceExportAttachment[];
   participants: WorkspaceExportParticipant[];
+  /** Since 1.22; older files carry none. */
+  emailQuotes: WorkspaceExportEmailQuote[];
   cannedResponses: WorkspaceExportCannedResponse[];
   customFields: WorkspaceExportCustomField[];
   csatResponses: WorkspaceExportCsat[];

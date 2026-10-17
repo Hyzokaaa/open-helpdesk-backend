@@ -10,6 +10,10 @@ import { TypeOrmWorkspaceRepository } from '../../../workspace/infrastructure/ty
 import { TypeOrmTicketRepository } from '../../../ticket/infrastructure/typeorm/repositories/typeorm-ticket.repository';
 import { TypeOrmCommentRepository } from '../../../comment/infrastructure/typeorm/repositories/typeorm-comment.repository';
 import { TypeOrmTicketParticipantRepository } from '../../../ticket/infrastructure/typeorm/repositories/typeorm-ticket-participant.repository';
+import { TypeOrmTicketPortalAccessRepository } from '../../../ticket/infrastructure/typeorm/repositories/typeorm-ticket-portal-access.repository';
+import { EnsureTicketPortalAccess } from '../../../ticket/domain/services/ticket-portal-access-ensure';
+import { TypeOrmEmailQuoteRepository } from '../../../ticket/infrastructure/typeorm/repositories/typeorm-email-quote.repository';
+import { KeepEmailQuote } from '../../../ticket/domain/services/email-quote-keep';
 import { FindRepliedTicket } from '../../domain/services/inbound-email-find-ticket';
 import { AddTicketParticipant } from '../../../ticket/domain/services/ticket-add-participant';
 import { FollowTicket } from '../../../ticket/domain/services/ticket-follow';
@@ -74,6 +78,8 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
     @Inject() private readonly organizationRepository: TypeOrmOrganizationRepository,
     @Inject() private readonly ticketCategoryRepository: TypeOrmTicketCategoryRepository,
     @Inject() private readonly participantRepository: TypeOrmTicketParticipantRepository,
+    @Inject() private readonly portalAccessRepository: TypeOrmTicketPortalAccessRepository,
+    @Inject() private readonly emailQuoteRepository: TypeOrmEmailQuoteRepository,
   ) {}
 
   async onModuleInit() {
@@ -500,7 +506,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
   private createRouter(): RouteInboundEmail {
     const createUser = new CreateUser(this.idGenerator, this.userRepository, this.passwordHasher);
     const addMember = new AddWorkspaceMember(this.idGenerator, this.memberRepository);
-    const createTicket = new CreateTicket(this.idGenerator, this.ticketRepository);
+    const createTicket = new CreateTicket(this.idGenerator, this.ticketRepository, new EnsureTicketPortalAccess(this.idGenerator, this.portalAccessRepository));
     const createComment = new CreateComment(this.idGenerator, this.commentRepository);
     const createAttachment = new CreateAttachment(this.idGenerator, this.attachmentRepository, this.storage);
     const evaluateRules = new EvaluateEmailRules(this.emailRuleRepository);
@@ -523,6 +529,7 @@ export class ImapPollingService implements OnModuleInit, OnModuleDestroy {
       new RecordAutoCreated(new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository)),
       new FindRepliedTicket(this.ticketRepository, this.commentRepository, this.participantRepository),
       new FollowTicket(new AddTicketParticipant(this.idGenerator, this.participantRepository), new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository), this.userRepository),
+      new KeepEmailQuote(this.idGenerator, this.emailQuoteRepository),
     );
   }
 

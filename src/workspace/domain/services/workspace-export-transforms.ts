@@ -124,9 +124,22 @@ const TRANSFORMS: Record<string, Transform> = {
     data.version = '1.21.0';
     return data;
   },
-  // A 1.21 file written by hand may leave out its newer sections: they count as absent
-  '1.21.0': (data) => withTicketReferences(withTicketReference(withAnalytics(withConfigurationSections(data)))),
+  '1.21.0': (data) => {
+    // 1.21 → 1.22: the quoted text folded under emailed comments travels too. An older file carries none.
+    withTicketReferences(withTicketReference(withAnalytics(withConfigurationSections(data))));
+    withEmailQuotes(data);
+    data.version = '1.22.0';
+    return data;
+  },
+  // A 1.22 file written by hand may leave out its newer sections: they count as absent
+  '1.22.0': (data) => withEmailQuotes(withTicketReferences(withTicketReference(withAnalytics(withConfigurationSections(data))))),
 };
+
+/** A file without the 1.22 section carries no folded quotes. */
+function withEmailQuotes(data: WorkspaceExportData): WorkspaceExportData {
+  if (data.emailQuotes === undefined) data.emailQuotes = [];
+  return data;
+}
 
 /** Tickets without a stored reference show the one their number has in the file's format. */
 function withTicketReferences(data: WorkspaceExportData): WorkspaceExportData {
@@ -162,8 +175,8 @@ function withConfigurationSections(data: WorkspaceExportData): WorkspaceExportDa
   return data;
 }
 
-const VERSION_ORDER = ['1.11.0', '1.12.0', '1.13.0', '1.14.0', '1.15.0', '1.16.0', '1.17.0', '1.18.0', '1.19.0', '1.20.0', '1.21.0'];
-const CURRENT_VERSION = '1.21.0';
+const VERSION_ORDER = ['1.11.0', '1.12.0', '1.13.0', '1.14.0', '1.15.0', '1.16.0', '1.17.0', '1.18.0', '1.19.0', '1.20.0', '1.21.0', '1.22.0'];
+const CURRENT_VERSION = '1.22.0';
 const MIN_VERSION = '1.11.0';
 
 /** Sections every supported version has; the transforms walk some of them. */

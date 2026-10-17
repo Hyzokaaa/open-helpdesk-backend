@@ -42,24 +42,24 @@ export class WebhookTicketCreatedData extends WebhookWorkspaceFields {
   @ApiProperty({ example: ULID, description: 'Category id of the ticket. Empty for an email ticket when no email rule set a category and the workspace has no `issue` category.' })
   categoryId!: string;
 
-  @ApiProperty({ example: ULID, description: 'User who opened the ticket.' })
+  @ApiProperty({ example: ULID, description: 'The reporter: who the ticket is for. When it was opened on their behalf, in the web app or through the API, it is that customer, not who registered it.' })
   reporterId!: string;
 
   @ApiProperty({ example: 'Ada Lovelace', description: 'Full name of the reporter, or their email when the name is unknown.' })
   reporterName!: string;
 
   @ApiProperty({
-    enum: ['ui', 'email', 'portal'],
-    description: '`ui` for tickets created in the web app and through the public API (the event does not tell them apart yet), `email` for inbound email, `portal` for the public portal.',
+    enum: ['ui', 'api', 'email', 'portal'],
+    description: '`ui` for tickets created in the web app, `api` for the public API, `email` for inbound email, `portal` for the public portal.',
   })
-  source!: 'ui' | 'email' | 'portal';
+  source!: 'ui' | 'api' | 'email' | 'portal';
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     type: String,
     format: 'uuid',
-    description: 'Present on `email` and `portal` tickets only. Opens the public ticket page (/portal/tickets/{portalToken}) without signing in: treat it as a secret.',
+    description: 'The reporter\'s link to the public ticket page (/portal/tickets/{portalToken}), present on every ticket. It opens the ticket without signing in, and replies sent through it are the reporter\'s: treat it as a secret.',
   })
-  portalToken?: string;
+  portalToken!: string;
 
   @ApiPropertyOptional({ example: ULID, description: 'Present on `email` tickets only: the mailbox that received the message.' })
   mailboxId?: string;
