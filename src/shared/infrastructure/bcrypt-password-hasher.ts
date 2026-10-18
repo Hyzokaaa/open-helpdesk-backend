@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
+// bcryptjs: the same bcrypt hashes ($2b$, interchangeable with the native module's) in plain
+// JavaScript, so installing needs no native build or install script (npm 12 blocks those)
+import * as bcrypt from 'bcryptjs';
 import { PasswordHasher } from '../domain/password-hasher';
 
 @Injectable()

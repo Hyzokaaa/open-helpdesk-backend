@@ -1,7 +1,7 @@
 import { DataSource, QueryRunner } from 'typeorm';
 import type { Readable } from 'node:stream';
 import { ulid } from 'ulid';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { WorkspaceExportAttachment, WorkspaceExportData, WorkspaceExportOrganization } from '../workspace-export';
 import { applyTransforms } from './workspace-export-transforms';

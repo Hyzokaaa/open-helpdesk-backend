@@ -16,6 +16,19 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.34.1',
+    date: '2026-10-18',
+    categories: [
+      {
+        title: { en: 'Updates', es: 'Actualizaciones' },
+        features: [
+          { en: 'The Updates page and the updater explain that the product version is made of the backend and client versions, each with its own number', es: 'La página de Actualizaciones y el actualizador explican que la versión del producto está formada por las del backend y el client, cada una con su propio número' },
+          { en: 'Installing or updating no longer builds native code, so newer npm versions that block install scripts cannot break signing in', es: 'Instalar o actualizar ya no compila código nativo, así que las versiones nuevas de npm que bloquean los scripts de instalación no pueden romper el inicio de sesión' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.34.0',
     date: '2026-10-17',
     categories: [
