@@ -9,7 +9,7 @@ import { MailboxType } from '../../../src/mailbox/domain/enums/mailbox-type.enum
 describe('ResolveTicketEmailLink', () => {
   let accesses: MockTicketPortalAccessRepository;
   let resolve: ResolveTicketEmailLink;
-  const base = { frontendUrl: 'https://help.x.com', workspaceSlug: 'acme', ticketId: 'T1', isSystemAdmin: false };
+  const base = { frontendUrl: 'https://help.x.com', workspaceSlug: 'acme', ticketId: 'T1', isSystemAdmin: false, portalEnabled: true, autoCreated: false };
 
   beforeEach(() => {
     accesses = new MockTicketPortalAccessRepository();
@@ -36,6 +36,24 @@ describe('ResolveTicketEmailLink', () => {
     expect(await resolve.execute({ ...base, userId: 'gone', role: null })).toBe(dashboard);
     expect(await resolve.execute({ ...base, userId: null, role: WorkspaceRole.USER })).toBe(dashboard);
     expect(accesses.all()).toEqual([]);
+  });
+
+  describe('with the portal closed', () => {
+    const closed = { ...base, portalEnabled: false };
+    const dashboard = 'https://help.x.com/dashboard/workspaces/acme/tickets/T1';
+
+    it('sends a customer with an account to the dashboard, where they sign in', async () => {
+      expect(await resolve.execute({ ...closed, userId: 'invited', role: WorkspaceRole.USER })).toBe(dashboard);
+    });
+
+    it('gives someone who only ever wrote in no link at all: they reply to the email', async () => {
+      expect(await resolve.execute({ ...closed, userId: 'emailed', role: WorkspaceRole.USER, autoCreated: true })).toBeNull();
+    });
+
+    it('changes nothing for the team, and creates no portal link for anyone', async () => {
+      expect(await resolve.execute({ ...closed, userId: 'agent', role: WorkspaceRole.AGENT, autoCreated: true })).toBe(dashboard);
+      expect(accesses.all()).toEqual([]);
+    });
   });
 });
 

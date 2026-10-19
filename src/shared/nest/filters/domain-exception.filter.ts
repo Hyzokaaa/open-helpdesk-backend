@@ -11,6 +11,7 @@ import {
 
 const STATUS_MAP: Record<string, HttpStatus> = {
   EntityNotFoundError: HttpStatus.NOT_FOUND,
+  PortalClosedError: HttpStatus.NOT_FOUND,
   AccessDeniedError: HttpStatus.FORBIDDEN,
   ConflictError: HttpStatus.CONFLICT,
   DomainValidationError: HttpStatus.BAD_REQUEST,

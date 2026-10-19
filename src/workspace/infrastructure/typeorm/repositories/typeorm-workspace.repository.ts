@@ -144,6 +144,8 @@ export class TypeOrmWorkspaceRepository implements WorkspaceRepository {
       defaultLanguage: (model.metadata as any)?.defaultLanguage ?? null,
       slaPolicy: model.slaPolicy as any ?? null,
       systemMailboxEnabled: model.systemMailboxEnabled ?? true,
+      portalEnabled: model.portalEnabled ?? true,
+      publicKbEnabled: model.publicKbEnabled ?? true,
       customDomain: model.customDomain ?? null,
       customDomainVerified: model.customDomainVerified ?? false,
       domainVerificationToken: model.domainVerificationToken ?? null,
@@ -170,6 +172,8 @@ export class TypeOrmWorkspaceRepository implements WorkspaceRepository {
     model.metadata = { palette: workspace.palette, defaultLanguage: workspace.defaultLanguage };
     model.slaPolicy = workspace.slaPolicy as any;
     model.systemMailboxEnabled = workspace.systemMailboxEnabled;
+    model.portalEnabled = workspace.portalEnabled;
+    model.publicKbEnabled = workspace.publicKbEnabled;
     model.customDomain = workspace.customDomain;
     model.customDomainVerified = workspace.customDomainVerified;
     model.domainVerificationToken = workspace.domainVerificationToken;

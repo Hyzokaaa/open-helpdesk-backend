@@ -23,6 +23,8 @@ interface Props {
   defaultLanguage?: string | null;
   slaPolicy?: SlaPolicy | null;
   systemMailboxEnabled?: boolean;
+  portalEnabled?: boolean;
+  publicKbEnabled?: boolean;
   customDomain?: string | null;
   customDomainVerified?: boolean;
   domainVerificationToken?: string | null;
@@ -48,6 +50,10 @@ export class Workspace {
   defaultLanguage: string | null;
   slaPolicy: SlaPolicy | null;
   systemMailboxEnabled: boolean;
+  /** Anyone can open tickets and follow them through their email link without signing in. */
+  portalEnabled: boolean;
+  /** Published knowledge base articles can be read without signing in. */
+  publicKbEnabled: boolean;
   customDomain: string | null;
   customDomainVerified: boolean;
   domainVerificationToken: string | null;
@@ -74,6 +80,8 @@ export class Workspace {
     this.defaultLanguage = props.defaultLanguage ?? null;
     this.slaPolicy = props.slaPolicy ?? null;
     this.systemMailboxEnabled = props.systemMailboxEnabled ?? true;
+    this.portalEnabled = props.portalEnabled ?? true;
+    this.publicKbEnabled = props.publicKbEnabled ?? true;
     this.customDomain = props.customDomain ?? null;
     this.customDomainVerified = props.customDomainVerified ?? false;
     this.domainVerificationToken = props.domainVerificationToken ?? null;

@@ -49,6 +49,9 @@ export class DomainCheckController {
         appSubtitle: w.appSubtitle,
         logo: w.logo ? await this.storage.getPresignedUrl(w.logo) : null,
         icon: w.icon ? await this.storage.getPresignedUrl(w.icon) : null,
+        // What the domain shows someone signed out: the portal, or sign-in and maybe the articles
+        portalEnabled: w.portalEnabled,
+        publicKbEnabled: w.publicKbEnabled,
       })),
     );
 

@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
+import { ResolvePortalWorkspace } from '../../../domain/services/portal-workspace-resolve';
 import { Public } from '../../../../shared/nest/decorators/public.decorator';
 import { EntityNotFoundError } from '../../../../shared/domain/errors';
 import { UlidGenerator } from '../../../../shared/infrastructure/ulid-generator';
@@ -81,6 +82,7 @@ export class PortalController {
     @Inject() private readonly ticketCategoryRepository: TypeOrmTicketCategoryRepository,
   ) {}
 
+  /** Answers also when the portal is closed: the page needs to know where to send people */
   @Get(':slug')
   async getPortalInfo(@Param('slug') slug: string) {
     const workspace = await this.workspaceRepository.findBySlug(slug);
@@ -90,13 +92,14 @@ export class PortalController {
       name: workspace.name,
       slug: workspace.slug,
       palette: workspace.palette,
+      portalEnabled: workspace.portalEnabled,
+      publicKbEnabled: workspace.publicKbEnabled,
     };
   }
 
   @Get(':slug/custom-fields')
   async getCustomFields(@Param('slug') slug: string) {
-    const workspace = await this.workspaceRepository.findBySlug(slug);
-    if (!workspace) throw new EntityNotFoundError('Workspace not found');
+    const workspace = await new ResolvePortalWorkspace(this.workspaceRepository).execute(slug);
 
     const definitions = await this.customFieldDefinitionRepository.findByWorkspaceId(workspace.getId());
     return definitions.map((def) => ({
@@ -110,8 +113,7 @@ export class PortalController {
 
   @Get(':slug/departments')
   async getDepartments(@Param('slug') slug: string) {
-    const workspace = await this.workspaceRepository.findBySlug(slug);
-    if (!workspace) throw new EntityNotFoundError('Workspace not found');
+    const workspace = await new ResolvePortalWorkspace(this.workspaceRepository).execute(slug);
 
     const departments = await this.departmentRepository.findByWorkspaceId(workspace.getId());
     return departments.map((d) => ({
@@ -126,8 +128,7 @@ export class PortalController {
     @Param('slug') slug: string,
     @Body() body: CreatePortalTicketRequest,
   ) {
-    const workspace = await this.workspaceRepository.findBySlug(slug);
-    if (!workspace) throw new EntityNotFoundError('Workspace not found');
+    const workspace = await new ResolvePortalWorkspace(this.workspaceRepository).execute(slug);
 
     // Validate custom fields
     const validateCustomFields = new ValidateCustomFieldValues(this.customFieldDefinitionRepository);
@@ -391,9 +392,8 @@ export class PortalController {
     @Param('slug') slug: string,
     @UploadedFile() file: Express.Multer.File,
   ): Promise<StageUploadResponse> {
-    // Stays anonymous, but only for a portal that exists
-    const workspace = await this.workspaceRepository.findBySlug(slug);
-    if (!workspace) throw new EntityNotFoundError('Workspace not found');
+    // Stays anonymous, but only for a portal that exists and is open
+    const workspace = await new ResolvePortalWorkspace(this.workspaceRepository).execute(slug);
     if (!file) throw new BadRequestException('No file uploaded');
 
     const service = new StageAttachment(this.idGenerator, this.attachmentRepository, this.storage);

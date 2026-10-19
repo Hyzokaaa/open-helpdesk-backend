@@ -1,3 +1,4 @@
+import { PortalClosedError } from '../../../shared/domain/errors';
 import { User } from '../../../user/domain/entities/user';
 import { UserRepository } from '../../../user/domain/repositories/user.repository';
 import { Workspace } from '../../../workspace/domain/entities/workspace';
@@ -16,7 +17,9 @@ export interface ResolvedPortalAccess {
 /**
  * Who opens a ticket through a portal link, or null when the link no longer opens anything:
  * unknown token, ticket or workspace deleted, or its owner deactivated (a deactivated person
- * loses the portal as they lose the dashboard).
+ * loses the portal as they lose the dashboard). While the workspace's portal is closed a live link
+ * does not open either (PortalClosedError, so the page sends its owner to sign in); it works again
+ * once the portal is reopened.
  */
 export class ResolveTicketPortalAccess {
   constructor(
@@ -38,6 +41,7 @@ export class ResolveTicketPortalAccess {
       this.userRepository.findById(access.userId),
     ]);
     if (!workspace || !user || !user.isActive) return null;
+    if (!workspace.portalEnabled) throw new PortalClosedError('This portal requires signing in');
 
     return { ticket, workspace, user };
   }

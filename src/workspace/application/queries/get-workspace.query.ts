@@ -22,6 +22,8 @@ export interface WorkspaceResponse {
   defaultLanguage: string | null;
   supportEmail: string | null;
   systemMailboxEnabled: boolean;
+  portalEnabled: boolean;
+  publicKbEnabled: boolean;
   customDomain: string | null;
   customDomainVerified: boolean;
   domainVerificationToken: string | null;
@@ -81,6 +83,8 @@ export class GetWorkspaceQuery implements Query<Props, WorkspaceResponse> {
       defaultLanguage: workspace.defaultLanguage,
       supportEmail: mailbox?.address ?? null,
       systemMailboxEnabled: workspace.systemMailboxEnabled,
+      portalEnabled: workspace.portalEnabled,
+      publicKbEnabled: workspace.publicKbEnabled,
       customDomain: workspace.customDomain,
       customDomainVerified: workspace.customDomainVerified,
       domainVerificationToken: workspace.domainVerificationToken,

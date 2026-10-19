@@ -1,6 +1,7 @@
 import { Controller, Get, Inject, Param, Query } from '@nestjs/common';
 import { Public } from '../../../../shared/nest/decorators/public.decorator';
 import { EntityNotFoundError } from '../../../../shared/domain/errors';
+import { ResolvePublicKbWorkspace } from '../../../domain/services/kb-public-workspace-resolve';
 import { TypeOrmWorkspaceRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository';
 import { TypeOrmKbCategoryRepository } from '../../typeorm/repositories/typeorm-kb-category.repository';
 import { TypeOrmKbArticleRepository } from '../../typeorm/repositories/typeorm-kb-article.repository';
@@ -84,9 +85,9 @@ export class KbPortalController {
     }));
   }
 
+  /** Only a public knowledge base is served here; a private one is a 404 */
   private async resolveWorkspaceId(slug: string): Promise<string> {
-    const workspace = await this.workspaceRepository.findBySlug(slug);
-    if (!workspace) throw new EntityNotFoundError('Workspace not found');
+    const workspace = await new ResolvePublicKbWorkspace(this.workspaceRepository).execute(slug);
     return workspace.getId();
   }
 }

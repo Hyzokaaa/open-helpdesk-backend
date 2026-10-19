@@ -26,6 +26,7 @@ import { eachEmailRecipient } from '../domain/each-email-recipient';
 import { RecordEmailSend } from '../../audit-log/domain/services/audit-log-record-email-send';
 import { ResolveTicketReplyMailbox } from '../domain/services/ticket-reply-mailbox-resolve';
 import { ResolveTicketEmailLink } from '../domain/ticket-email-link';
+import { TypeOrmWorkspaceRepository } from '../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository';
 import { EnsureTicketPortalAccess } from '../../ticket/domain/services/ticket-portal-access-ensure';
 import { TypeOrmTicketPortalAccessRepository } from '../../ticket/infrastructure/typeorm/repositories/typeorm-ticket-portal-access.repository';
 
@@ -51,6 +52,7 @@ export class StatusChangedHandler {
     private readonly frontendResolver: WorkspaceFrontendResolver,
     private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
     private readonly portalAccessRepository: TypeOrmTicketPortalAccessRepository,
+    private readonly workspaceRepository: TypeOrmWorkspaceRepository,
   ) {}
 
   @OnEvent('ticket.statusChanged')
@@ -120,6 +122,7 @@ export class StatusChangedHandler {
     const sender = await this.emailSenderRepository.findByWorkspaceId(event.workspaceId);
     const usersByEmail = new Map(users.map((u) => [u.email.toLowerCase(), u]));
     const resolveLink = new ResolveTicketEmailLink(new EnsureTicketPortalAccess(this.idGenerator, this.portalAccessRepository));
+    const workspace = await this.workspaceRepository.findById(event.workspaceId);
 
     for (const [lang, emails] of eachEmailRecipient(emailRecipients)) {
       // The portal for customers, the dashboard for the team
@@ -132,6 +135,8 @@ export class StatusChangedHandler {
         userId: recipient?.getId() ?? null,
         role: member?.role ?? null,
         isSystemAdmin: recipient?.isSystemAdmin ?? false,
+        portalEnabled: workspace?.portalEnabled ?? true,
+        autoCreated: recipient?.autoCreated ?? false,
       });
       const subject = template.subject({ ticketName: event.ticketName, ticketUrl, oldStatus: event.oldStatus, newStatus: event.newStatus, workspaceName: event.workspaceName, lang });
       const result = await sendWorkspaceEmail(this.emailService, sender, {

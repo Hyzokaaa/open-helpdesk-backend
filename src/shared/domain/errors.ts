@@ -7,6 +7,9 @@ export class DomainError extends Error {
 
 export class EntityNotFoundError extends DomainError {}
 
+/** The workspace's portal is closed: a 404 that tells the page to send people to sign in instead. */
+export class PortalClosedError extends EntityNotFoundError {}
+
 export class AccessDeniedError extends DomainError {}
 
 export class ConflictError extends DomainError {}

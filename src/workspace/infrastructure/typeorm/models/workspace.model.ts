@@ -35,6 +35,12 @@ export class WorkspaceModel {
   @Column({ type: 'boolean', default: true })
   systemMailboxEnabled!: boolean;
 
+  @Column({ type: 'boolean', default: true })
+  portalEnabled!: boolean;
+
+  @Column({ type: 'boolean', default: true })
+  publicKbEnabled!: boolean;
+
   @Column({ type: 'varchar', nullable: true })
   customDomain!: string | null;
 

@@ -1,11 +1,12 @@
 import { t } from './i18n';
-import { emailLayout, buttonHtml } from './base.template';
+import { emailLayout, ticketActionHtml } from './base.template';
 import { escapeHtml } from '../../shared/domain/sanitize-html';
 import { singleLineText } from '../../shared/domain/sanitize-plain-text';
 
 interface Data {
   ticketName: string;
-  ticketUrl: string;
+  /** Null when the reader cannot open the ticket (closed portal, no account): they reply by email */
+  ticketUrl: string | null;
   oldStatus: string;
   newStatus: string;
   workspaceName: string;
@@ -28,7 +29,7 @@ export class StatusChangedTemplate {
         <span style="color: #6b7280; margin: 0 8px;">→</span>
         <span style="background-color: #ecfdf5; padding: 6px 12px; border-radius: 4px; color: #059669; font-weight: bold;">${t(`status.${data.newStatus}`, data.lang)}</span>
       </div>
-      ${buttonHtml(data.lang, data.ticketUrl)}`;
+      ${ticketActionHtml(data.lang, data.ticketUrl, !!data.canReply)}`;
     return emailLayout(data.lang, content, { replyMarker: data.canReply });
   }
 }

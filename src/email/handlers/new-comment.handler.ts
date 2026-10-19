@@ -25,6 +25,7 @@ import { TypeOrmWorkspaceMemberRepository } from '../../workspace/infrastructure
 import { TypeOrmAttachmentRepository } from '../../attachment/infrastructure/typeorm/repositories/typeorm-attachment.repository';
 import { ResolveTicketReplyMailbox } from '../domain/services/ticket-reply-mailbox-resolve';
 import { ResolveTicketEmailLink } from '../domain/ticket-email-link';
+import { TypeOrmWorkspaceRepository } from '../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository';
 import { EnsureTicketPortalAccess } from '../../ticket/domain/services/ticket-portal-access-ensure';
 import { TypeOrmTicketPortalAccessRepository } from '../../ticket/infrastructure/typeorm/repositories/typeorm-ticket-portal-access.repository';
 import { RecordEmailSend } from '../../audit-log/domain/services/audit-log-record-email-send';
@@ -49,6 +50,7 @@ export class NewCommentHandler {
     private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
     private readonly portalAccessRepository: TypeOrmTicketPortalAccessRepository,
     private readonly attachmentRepository: TypeOrmAttachmentRepository,
+    private readonly workspaceRepository: TypeOrmWorkspaceRepository,
   ) {}
 
   @OnEvent('comment.created')
@@ -125,6 +127,7 @@ export class NewCommentHandler {
     const files = (await this.attachmentRepository.findByCommentId(event.commentId)).map((a) => ({ name: a.originalName, size: a.size }));
     const usersByEmail = new Map(users.map((u) => [u.email.toLowerCase(), u]));
     const resolveLink = new ResolveTicketEmailLink(new EnsureTicketPortalAccess(this.idGenerator, this.portalAccessRepository));
+    const workspace = await this.workspaceRepository.findById(event.workspaceId);
 
     for (const [lang, emails] of eachEmailRecipient(emailRecipients)) {
       // Each recipient gets the link they can open: the portal for customers, the dashboard for the team
@@ -137,6 +140,8 @@ export class NewCommentHandler {
         userId: recipient?.getId() ?? null,
         role: member?.role ?? null,
         isSystemAdmin: recipient?.isSystemAdmin ?? false,
+        portalEnabled: workspace?.portalEnabled ?? true,
+        autoCreated: recipient?.autoCreated ?? false,
       });
       const data = {
         ticketName: event.ticketName,

@@ -32,6 +32,17 @@ export function emailLayout(lang: string, content: string, options: LayoutOption
 }
 
 /** `url` is the raw URL; it is escaped here for the attribute. */
+/**
+ * The way to the ticket: its button, or, when there is no link the reader can open, the reminder
+ * that replying to the email reaches the ticket (nothing when a reply would not either).
+ */
+export function ticketActionHtml(lang: string, url: string | null, canReply: boolean): string {
+  if (url) return buttonHtml(lang, url);
+  if (!canReply) return '';
+  return `
+<p style="color: #4b5563; text-align: center; margin: 30px 0;">${t('email.replyToAddInfo', lang)}</p>`;
+}
+
 export function buttonHtml(lang: string, url: string): string {
   return `
 <div style="text-align: center; margin: 30px 0;">

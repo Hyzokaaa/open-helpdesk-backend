@@ -16,6 +16,34 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.35.0',
+    date: '2026-10-18',
+    categories: [
+      {
+        title: { en: 'Portal', es: 'Portal' },
+        features: [
+          { en: 'Close the public portal from Settings: customers sign in to open and follow their tickets, on the custom domain and on the installation address', es: 'Cerrar el portal público desde Ajustes: los clientes inician sesión para crear y seguir sus tickets, en el dominio propio y en la dirección de la instalación' },
+          { en: 'The knowledge base has its own switch: public while the portal is closed, or private', es: 'La base de conocimiento tiene su propio interruptor: pública con el portal cerrado, o privada' },
+          { en: 'While the portal is closed, emails take customers to the dashboard, and those who only write by email are asked to reply to the email', es: 'Con el portal cerrado, los correos llevan a los clientes al panel, y a quien solo escribe por correo se le pide responder al correo' },
+          { en: 'An old ticket link opened while the portal is closed asks to sign in and then opens the ticket', es: 'Un enlace de ticket antiguo abierto con el portal cerrado pide iniciar sesión y luego abre el ticket' },
+        ],
+      },
+      {
+        title: { en: 'Accessibility', es: 'Accesibilidad' },
+        features: [
+          { en: 'Switches are easier to see and press, and screen readers say what each one does', es: 'Los interruptores se ven y se pulsan mejor, y los lectores de pantalla dicen qué hace cada uno' },
+          { en: 'Confirmation dialogs keep the keyboard inside and announce what they ask', es: 'Los diálogos de confirmación mantienen el teclado dentro y anuncian lo que preguntan' },
+        ],
+      },
+      {
+        title: { en: 'Updates', es: 'Actualizaciones' },
+        features: [
+          { en: 'After an update, a tab that was already open reloads into the new version instead of showing an error', es: 'Tras una actualización, una pestaña ya abierta se recarga a la versión nueva en vez de mostrar un error' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.34.1',
     date: '2026-10-18',
     categories: [

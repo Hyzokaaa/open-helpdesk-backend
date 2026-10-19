@@ -160,6 +160,8 @@ import { ResolveMailServer } from "../../../../email/domain/services/mail-server
 import { NodeMailDnsLookup } from "../../../../email/infrastructure/dns/node-mail-dns-lookup";
 import { ResolveMailServerRequest } from "../../../../email/infrastructure/nest/dto/resolve-mail-server.request";
 import { UpdateWorkspaceDefaultLanguageRequest } from "../dto/update-workspace-default-language.request";
+import { UpdateWorkspacePortalAccessRequest } from "../dto/update-workspace-portal-access.request";
+import { UpdateWorkspacePortalAccess } from "../../../domain/services/workspace-update-portal-access";
 
 const IMPORT_LIMITS = importLimitsFromEnv();
 
@@ -787,6 +789,42 @@ export class WorkspaceController {
     });
 
     return { defaultLanguage: after };
+  }
+
+  /** Opens or closes the portal and, separately, the public knowledge base */
+  @Patch(":slug/portal-access")
+  async updatePortalAccess(
+    @Param("slug") slug: string,
+    @Body() body: UpdateWorkspacePortalAccessRequest,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    await new EnsureWorkspacePermission(this.memberRepository).execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+    const { before, after } = await new UpdateWorkspacePortalAccess(this.workspaceRepository).execute({
+      workspaceId,
+      portalEnabled: body.portalEnabled,
+      publicKbEnabled: body.publicKbEnabled,
+    });
+
+    await new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository).execute({
+      action: AuditAction.WORKSPACE_PORTAL_ACCESS_UPDATED,
+      entityType: "workspace",
+      entityId: workspaceId,
+      userId: user.userId,
+      workspaceId,
+      metadata: { before, after },
+      category: AuditCategory.WORKSPACE,
+      // Closing the portal locks customers out of what they used without signing in
+      level: before.portalEnabled && !after.portalEnabled ? AuditLevel.WARNING : AuditLevel.INFO,
+      source: "ui",
+    });
+
+    return after;
   }
 
   @Patch(":slug/palette")

@@ -48,7 +48,7 @@ function render(lang: string): Rendered[] {
   const assignedData = { ticketName: EVIL, ticketUrl: EVIL_URL, workspaceName: EVIL, assigneeName: EVIL, lang };
 
   const confirmation = new TicketConfirmationTemplate();
-  const confirmationData = { ticketName: EVIL, portalUrl: EVIL_URL, lang };
+  const confirmationData = { ticketName: EVIL, ticketUrl: EVIL_URL, lang };
 
   const created = new TicketCreatedTemplate();
   const createdData = { ticketName: EVIL, ticketUrl: EVIL_URL, reporterName: EVIL, priority: 'high', category: EVIL, workspaceName: EVIL, lang };

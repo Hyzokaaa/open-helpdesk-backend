@@ -17,6 +17,11 @@ const translations: Translations = {
     en: 'View Ticket',
     es: 'Ver Ticket',
   },
+  // In place of the ticket's link, for someone who cannot open it (the portal is closed and they have no account)
+  'email.replyToAddInfo': {
+    en: 'Reply to this email to add information.',
+    es: 'Responde a este correo para añadir información.',
+  },
 
   // Ticket created
   'ticketCreated.title': {
@@ -78,6 +83,10 @@ const translations: Translations = {
   'newComment.footerNoReply': {
     en: 'Open the ticket to respond · {ticketNumber} · {workspaceName}',
     es: 'Abre el ticket para responder · {ticketNumber} · {workspaceName}',
+  },
+  'newComment.footerPlain': {
+    en: '{ticketNumber} · {workspaceName}',
+    es: '{ticketNumber} · {workspaceName}',
   },
   'newComment.unattendedNotice': {
     en: 'The customer answered a ticket nobody on the team owns or follows yet.',

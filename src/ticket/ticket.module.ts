@@ -30,12 +30,13 @@ import { TypeOrmTicketDescriptionEditRepository } from './infrastructure/typeorm
 import { TypeOrmCommentRepository } from '../comment/infrastructure/typeorm/repositories/typeorm-comment.repository';
 import { TicketController } from './infrastructure/nest/controllers/ticket.controller';
 import { PortalController } from './infrastructure/nest/controllers/portal.controller';
+import { PortalLinkController } from './infrastructure/nest/controllers/portal-link.controller';
 import { SlaBreachCheckerService } from './infrastructure/nest/services/sla-breach-checker.service';
 import { TransferRequestExpiryService } from './infrastructure/nest/services/transfer-request-expiry.service';
 
 @Module({
   imports: [SharedModule, UserModule, WorkspaceModule, AuditLogModule, CustomFieldModule, AttachmentModule, MulterModule.registerAsync({ inject: [ConfigService], useFactory: attachmentUploadOptions }), DepartmentModule, OrganizationModule, ProjectModule, TagModule, TypeOrmModule.forFeature([TicketModel, TicketParticipantModel, TicketPortalAccessModel, EmailQuoteModel, TransferRequestModel, TicketDescriptionEditModel, CommentModel])],
-  controllers: [TicketController, PortalController],
+  controllers: [TicketController, PortalController, PortalLinkController],
   providers: [TypeOrmTicketRepository, TypeOrmTicketParticipantRepository, TypeOrmTicketPortalAccessRepository, TypeOrmEmailQuoteRepository, TypeOrmTransferRequestRepository, TypeOrmTicketDescriptionEditRepository, TypeOrmCommentRepository, SlaBreachCheckerService, TransferRequestExpiryService, PortalAccessCleanupService],
   exports: [TypeOrmTicketRepository, TypeOrmTicketParticipantRepository, TypeOrmTicketPortalAccessRepository, TypeOrmEmailQuoteRepository, TypeOrmTransferRequestRepository, TypeOrmTicketDescriptionEditRepository],
 })

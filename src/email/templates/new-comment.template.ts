@@ -1,5 +1,5 @@
 import { t } from './i18n';
-import { emailLayout, buttonHtml } from './base.template';
+import { emailLayout, ticketActionHtml } from './base.template';
 import { escapeHtml } from '../../shared/domain/sanitize-html';
 import { singleLineText } from '../../shared/domain/sanitize-plain-text';
 import { commentEmailBody } from '../domain/comment-email-body';
@@ -12,7 +12,8 @@ export interface CommentEmailFile {
 interface Data {
   ticketName: string;
   ticketNumber?: string;
-  ticketUrl: string;
+  /** Null when the reader cannot open the ticket (closed portal, no account): they reply by email */
+  ticketUrl: string | null;
   authorName: string;
   /** The comment as stored; sanitized here into the email body (see commentEmailBody). */
   commentContent: string;
@@ -45,7 +46,7 @@ export class NewCommentTemplate {
       <ul style="color: #4b5563; font-size: 13px; margin: 0 0 16px; padding-left: 18px;">
         ${files.map((f) => `<li>📎 ${escapeHtml(f.name)} <span style="color: #9ca3af;">(${fileSize(f.size)})</span></li>`).join('')}
       </ul>`;
-    const footerKey = data.canReply ? 'newComment.footer' : 'newComment.footerNoReply';
+    const footerKey = data.canReply ? 'newComment.footer' : data.ticketUrl ? 'newComment.footerNoReply' : 'newComment.footerPlain';
     const notice = data.unattended
       ? `<p style="background-color: #fef3c7; color: #92400e; padding: 8px 12px; border-radius: 6px; font-size: 13px; margin: 0 0 16px;">${t('newComment.unattendedNotice', data.lang)}</p>`
       : '';
@@ -56,7 +57,7 @@ export class NewCommentTemplate {
         ${commentEmailBody(data.commentContent)}
       </div>
       ${filesHtml}
-      ${buttonHtml(data.lang, data.ticketUrl)}
+      ${ticketActionHtml(data.lang, data.ticketUrl, data.canReply)}
       <p style="color: #9ca3af; font-size: 12px; margin-top: 24px;">
         ${t(footerKey, data.lang, { ticketNumber: escapeHtml(data.ticketNumber ?? ''), workspaceName: escapeHtml(data.workspaceName) })}
       </p>`;

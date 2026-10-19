@@ -41,6 +41,8 @@ export enum AuditAction {
   WORKSPACE_EXPORT_CREATED = 'workspace-export-created',
   WORKSPACE_EXPORT_LINK_DOWNLOADED = 'workspace-export-link-downloaded',
   WORKSPACE_SYSTEM_MAILBOX_TOGGLED = 'workspace-system-mailbox-toggled',
+  /** The portal or the public knowledge base was opened or closed. */
+  WORKSPACE_PORTAL_ACCESS_UPDATED = 'workspace-portal-access-updated',
   WORKSPACE_CUSTOM_DOMAIN_SET = 'workspace-custom-domain-set',
   WORKSPACE_CUSTOM_DOMAIN_VERIFIED = 'workspace-custom-domain-verified',
   /** A DNS check that did not pass; says which record was missing. */

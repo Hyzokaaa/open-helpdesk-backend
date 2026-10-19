@@ -12,6 +12,10 @@ import { UlidGenerator } from '../../shared/infrastructure/ulid-generator';
 import { TypeOrmMailboxRepository } from '../../mailbox/infrastructure/typeorm/repositories/typeorm-mailbox.repository';
 import { TypeOrmWorkspaceEmailSenderRepository } from '../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-email-sender.repository';
 import { TypeOrmWorkspaceMemberRepository } from '../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
+import { TypeOrmWorkspaceRepository } from '../../workspace/infrastructure/typeorm/repositories/typeorm-workspace.repository';
+import { TypeOrmTicketPortalAccessRepository } from '../../ticket/infrastructure/typeorm/repositories/typeorm-ticket-portal-access.repository';
+import { EnsureTicketPortalAccess } from '../../ticket/domain/services/ticket-portal-access-ensure';
+import { ResolveTicketEmailLink } from '../domain/ticket-email-link';
 import { ResolveWorkspaceAdmins } from '../../notification/domain/services/notification-resolve-workspace-admins';
 import { sendWorkspaceEmail } from '../domain/resolve-email-sender';
 import { TypeOrmTicketRepository } from '../../ticket/infrastructure/typeorm/repositories/typeorm-ticket.repository';
@@ -48,6 +52,8 @@ export class TicketCreatedHandler {
     private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
     private readonly frontendResolver: WorkspaceFrontendResolver,
     private readonly categoryRepository: TypeOrmTicketCategoryRepository,
+    private readonly workspaceRepository: TypeOrmWorkspaceRepository,
+    private readonly portalAccessRepository: TypeOrmTicketPortalAccessRepository,
   ) {}
 
   @OnEvent('ticket.created')
@@ -133,7 +139,18 @@ export class TicketCreatedHandler {
 
     const lang = creator.language || 'en';
     const frontendUrl = await this.frontendResolver.resolve(event.workspaceId);
-    const portalUrl = `${frontendUrl}/portal/tickets/${event.portalToken}`;
+    // Their portal link while the portal is open; once it is closed, the dashboard or no link at all
+    const workspace = await this.workspaceRepository.findById(event.workspaceId);
+    const ticketUrl = await new ResolveTicketEmailLink(new EnsureTicketPortalAccess(this.idGenerator, this.portalAccessRepository)).execute({
+      frontendUrl,
+      workspaceSlug: event.workspaceSlug,
+      ticketId: event.ticketId,
+      userId: creator.getId(),
+      role: member.role,
+      isSystemAdmin: false,
+      portalEnabled: workspace?.portalEnabled ?? true,
+      autoCreated: creator.autoCreated,
+    });
     const template = new TicketConfirmationTemplate();
     // The mailbox it came through, or one the workspace reads, so the customer can answer by email
     const mailbox = await new ResolveTicketReplyMailbox(this.mailboxRepository).execute({
@@ -145,11 +162,11 @@ export class TicketCreatedHandler {
     const ticketNumber = ticket ? ticketReferenceOf(ticket) : undefined;
     const emailDomain = mailbox ? mailbox.address.split('@')[1] : null;
 
-    const subject = template.subject({ ticketName: event.ticketName, ticketNumber, portalUrl, lang });
+    const subject = template.subject({ ticketName: event.ticketName, ticketNumber, ticketUrl, lang });
     const result = await sendWorkspaceEmail(this.emailService, sender, {
       to: [creator.email],
       subject,
-      html: template.html({ ticketName: event.ticketName, portalUrl, canReply: !!mailbox, lang }),
+      html: template.html({ ticketName: event.ticketName, ticketUrl, canReply: !!mailbox, lang }),
       // In the ticket's thread, so the customer's reply to this email lands on the ticket
       ...(emailDomain && ticketThreadHeaders(event.ticketId, emailDomain, `confirmation-${event.ticketId}`)),
       ...(mailbox && { replyTo: mailbox.address }),
