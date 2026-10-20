@@ -1,4 +1,5 @@
 import { EntityNotFoundError } from '../../../shared/domain/errors';
+import { ensureSavedPasswordStaysWithItsServer } from '../../../shared/domain/stored-password';
 import { Mailbox } from '../entities/mailbox';
 import { MailboxRepository } from '../repositories/mailbox.repository';
 
@@ -31,6 +32,14 @@ export class UpdateMailbox {
     if (!mailbox || mailbox.workspaceId !== props.workspaceId) {
       throw new EntityNotFoundError('Mailbox not found');
     }
+    ensureSavedPasswordStaysWithItsServer(
+      {
+        host: props.imapHost !== undefined ? props.imapHost : mailbox.imapHost,
+        user: props.imapUser !== undefined ? props.imapUser : mailbox.imapUser,
+        password: props.imapPass,
+      },
+      { host: mailbox.imapHost, user: mailbox.imapUser, password: mailbox.imapPass },
+    );
 
     if (props.address !== undefined) mailbox.address = props.address;
     if (props.isActive !== undefined) mailbox.isActive = props.isActive;

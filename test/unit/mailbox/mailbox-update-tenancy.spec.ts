@@ -1,6 +1,7 @@
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { EntityNotFoundError } from '../../../src/shared/domain/errors';
+import { PasswordRequiredError } from '../../../src/shared/domain/stored-password';
 import { Mailbox } from '../../../src/mailbox/domain/entities/mailbox';
 import { MailboxType } from '../../../src/mailbox/domain/enums/mailbox-type.enum';
 import { UpdateMailbox } from '../../../src/mailbox/domain/services/mailbox-update';
@@ -66,12 +67,12 @@ describe('UpdateMailbox stays inside the caller\'s workspace', () => {
     const updated = await service.execute({
       id: 'own',
       workspaceId: MINE,
-      imapHost: 'imap.new.example',
+      imapPort: 143,
       postProcessAction: 'move',
       postProcessFolder: 'Processed',
     });
 
-    expect(updated.imapHost).toBe('imap.new.example');
+    expect(updated.imapPort).toBe(143);
     expect(updated.postProcessAction).toBe('move');
     expect(updated.postProcessFolder).toBe('Processed');
     expect(updated.imapPass).toBe('own-secret');
@@ -106,5 +107,37 @@ describe('UpdateMailboxRequest', () => {
     const bad = plainToInstance(UpdateMailboxRequest, { imapPort: 'abc' });
     const errors = await validate(bad, { whitelist: true });
     expect(errors.map((e) => e.property)).toEqual(['imapPort']);
+  });
+});
+
+describe('UpdateMailbox keeps the saved password with its own server', () => {
+  let repository: MockMailboxRepository;
+  let service: UpdateMailbox;
+
+  beforeEach(() => {
+    repository = new MockMailboxRepository();
+    repository.seed(imapMailbox('own', MINE, 'own-secret'));
+    service = new UpdateMailbox(repository);
+  });
+
+  it('refuses a new server without a new password, and changes nothing', async () => {
+    await expect(service.execute({ id: 'own', workspaceId: MINE, imapHost: 'attacker.example' })).rejects.toThrow(PasswordRequiredError);
+    expect((await repository.findById('own'))!.imapHost).toBe('imap.example.com');
+  });
+
+  it('refuses a new user without a new password', async () => {
+    await expect(service.execute({ id: 'own', workspaceId: MINE, imapUser: 'someone@example.com' })).rejects.toThrow(PasswordRequiredError);
+  });
+
+  it('takes a new server with its new password', async () => {
+    const mailbox = await service.execute({ id: 'own', workspaceId: MINE, imapHost: 'imap.other.example', imapPass: 'new-secret' });
+    expect(mailbox.imapHost).toBe('imap.other.example');
+    expect(mailbox.imapPass).toBe('new-secret');
+  });
+
+  it('keeps the saved password for other changes', async () => {
+    const mailbox = await service.execute({ id: 'own', workspaceId: MINE, imapHost: 'imap.example.com', imapPort: 143, isActive: false });
+    expect(mailbox.imapPass).toBe('own-secret');
+    expect(mailbox.isActive).toBe(false);
   });
 });

@@ -154,6 +154,7 @@ import { OrganizationModel } from "../../../../organization/infrastructure/typeo
 import { TypeOrmWorkspaceTicketReferenceRepository } from "../../typeorm/repositories/typeorm-workspace-ticket-reference.repository";
 import { connectionErrorDetail } from "../../../../shared/infrastructure/connection-error-detail";
 import { connectionErrorKind } from "../../../../shared/infrastructure/connection-error-kind";
+import { PASSWORD_REQUIRED, ensureSavedPasswordStaysWithItsServer, passwordForConnectionTest } from "../../../../shared/domain/stored-password";
 import { RecordEmailSend } from "../../../../audit-log/domain/services/audit-log-record-email-send";
 import { UpdateWorkspaceDefaultLanguage } from "../../../domain/services/workspace-update-default-language";
 import { ResolveMailServer } from "../../../../email/domain/services/mail-server-resolve";
@@ -1440,6 +1441,10 @@ export class WorkspaceController {
       ? { smtpHost: existing.smtpHost, smtpPort: existing.smtpPort, smtpUser: existing.smtpUser, smtpFrom: existing.smtpFrom, encryption: existing.encryption, fromName: existing.fromName, fromEmail: existing.fromEmail }
       : null;
     if (existing) {
+      ensureSavedPasswordStaysWithItsServer(
+        { host: body.smtpHost, user: body.smtpUser, password: body.smtpPass },
+        { host: existing.smtpHost, user: existing.smtpUser, password: existing.smtpPass },
+      );
       existing.smtpHost = body.smtpHost;
       existing.smtpPort = body.smtpPort;
       existing.smtpUser = body.smtpUser;
@@ -1553,6 +1558,14 @@ export class WorkspaceController {
       permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
       isSystemAdmin: user.isSystemAdmin,
     });
+    const existing =
+      await this.emailSenderRepository.findByWorkspaceId(workspaceId);
+    const password = passwordForConnectionTest(
+      { host: body.smtpHost, user: body.smtpUser, password: body.smtpPass },
+      existing && { host: existing.smtpHost, user: existing.smtpUser, password: existing.smtpPass },
+    );
+    if (!password) return PASSWORD_REQUIRED;
+
     const auditLog = new CreateAuditLogEntry(
       this.idGenerator,
       this.auditLogRepository,
@@ -1570,7 +1583,7 @@ export class WorkspaceController {
         host: body.smtpHost,
         port: body.smtpPort,
         secure: body.smtpPort === 465,
-        auth: { user: body.smtpUser, pass: body.smtpPass },
+        auth: { user: body.smtpUser, pass: password },
         tls,
         ...(encryption === "none" && { ignoreTLS: true }),
         connectionTimeout: 10000,

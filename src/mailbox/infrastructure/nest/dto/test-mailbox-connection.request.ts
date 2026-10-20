@@ -14,7 +14,7 @@ export class TestMailboxConnectionRequest {
   @IsNotEmpty()
   imapUser!: string;
 
-  /** Empty or `__keep__` reuses the stored password of `mailboxId`. */
+  /** Empty or `__keep__` reuses the stored password of `mailboxId`, only with its same host and user. */
   @IsOptional()
   @IsString()
   imapPass?: string;

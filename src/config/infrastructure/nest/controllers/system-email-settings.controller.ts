@@ -14,6 +14,7 @@ import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category
 import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
 import { connectionErrorDetail } from '../../../../shared/infrastructure/connection-error-detail';
 import { connectionErrorKind } from '../../../../shared/infrastructure/connection-error-kind';
+import { PASSWORD_REQUIRED, ensureSavedPasswordStaysWithItsServer, passwordForConnectionTest } from '../../../../shared/domain/stored-password';
 import { ResolveMailServer } from '../../../../email/domain/services/mail-server-resolve';
 import { NodeMailDnsLookup } from '../../../../email/infrastructure/dns/node-mail-dns-lookup';
 import { ResolveMailServerRequest } from '../../../../email/infrastructure/nest/dto/resolve-mail-server.request';
@@ -63,6 +64,10 @@ export class SystemEmailSettingsController {
   ) {
     this.ensureAdmin(user);
     const existing = await this.repository.find();
+    ensureSavedPasswordStaysWithItsServer(
+      { host: body.smtpHost, user: body.smtpUser, password: body.smtpPass },
+      existing && { host: existing.smtpHost, user: existing.smtpUser, password: existing.smtpPass },
+    );
     const settings = new SystemEmailSettings({
       id: existing?.getId() ?? this.idGenerator.create(),
       smtpHost: body.smtpHost,
@@ -119,15 +124,12 @@ export class SystemEmailSettingsController {
   ) {
     this.ensureAdmin(user);
 
-    let password = body.smtpPass;
-    if (!password || password === '__keep__') {
-      const existing = await this.repository.find();
-      if (existing?.smtpPass) password = existing.smtpPass;
-    }
-
-    if (!password) {
-      return { success: false, error: 'Password is required' };
-    }
+    const existing = await this.repository.find();
+    const password = passwordForConnectionTest(
+      { host: body.smtpHost, user: body.smtpUser, password: body.smtpPass },
+      existing && { host: existing.smtpHost, user: existing.smtpUser, password: existing.smtpPass },
+    );
+    if (!password) return PASSWORD_REQUIRED;
 
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const nodemailer = require('nodemailer');

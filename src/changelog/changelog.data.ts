@@ -16,6 +16,35 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.35.1',
+    date: '2026-10-19',
+    categories: [
+      {
+        title: { en: 'Portal', es: 'Portal' },
+        features: [
+          { en: 'With the portal closed, someone already signed in goes straight to their workspace instead of the sign-in page, also on the custom domain', es: 'Con el portal cerrado, quien ya tiene sesión va directo a su workspace en vez de a la página de inicio de sesión, también en el dominio propio' },
+          { en: 'With the portal closed, the custom domain\'s address opens the usual sign-in page', es: 'Con el portal cerrado, la dirección del dominio propio abre el inicio de sesión habitual' },
+          { en: 'Changes to the portal and knowledge base settings apply at once, without reloading the page', es: 'Los cambios en los ajustes del portal y de la base de conocimiento se aplican al momento, sin recargar la página' },
+        ],
+      },
+      {
+        title: { en: 'Sign-in', es: 'Inicio de sesión' },
+        features: [
+          { en: 'A custom domain picks up the main address\'s session again even if that tab tried before without one', es: 'El dominio propio vuelve a recoger la sesión de la dirección principal aunque esa pestaña lo intentara antes sin ella' },
+        ],
+      },
+      {
+        title: { en: 'Email', es: 'Email' },
+        features: [
+          { en: 'Testing a saved custom email sender\'s connection uses its saved password, as the mailboxes and system email already did', es: 'Probar la conexión del remitente personalizado ya guardado usa su contraseña guardada, como ya hacían los buzones y el correo del sistema' },
+          { en: 'Connection tests only use a saved password with its same server and user; for another one, type it', es: 'Las pruebas de conexión solo usan la contraseña guardada con su mismo servidor y usuario; para otro, hay que escribirla' },
+          { en: 'When editing the sender, system email or a mailbox, the password field warns when a change of server or user means typing it again', es: 'Al editar el remitente, el correo del sistema o un buzón, el campo de contraseña avisa cuando un cambio de servidor o usuario obliga a escribirla de nuevo' },
+          { en: 'Saving with another server or user requires typing the password', es: 'Guardar con otro servidor o usuario exige escribir la contraseña' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.35.0',
     date: '2026-10-18',
     categories: [

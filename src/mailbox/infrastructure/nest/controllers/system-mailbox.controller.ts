@@ -28,6 +28,7 @@ import { UpdateMailboxRequest } from '../dto/update-mailbox.request';
 import { TestMailboxConnectionRequest } from '../dto/test-mailbox-connection.request';
 import { connectionErrorDetail } from '../../../../shared/infrastructure/connection-error-detail';
 import { connectionErrorKind } from '../../../../shared/infrastructure/connection-error-kind';
+import { PASSWORD_REQUIRED, passwordForConnectionTest } from '../../../../shared/domain/stored-password';
 
 @Controller('admin/platform-mailbox')
 export class SystemMailboxController {
@@ -206,18 +207,12 @@ export class SystemMailboxController {
   ) {
     this.ensureAdmin(user);
 
-    // If password is empty or __keep__, use the stored password
-    let password = body.imapPass;
-    if (!password || password === '__keep__') {
-      const existing = await this.mailboxRepository.findSystemMailbox();
-      if (existing && existing.imapPass) {
-        password = existing.imapPass;
-      }
-    }
-
-    if (!password) {
-      return { success: false, error: 'Password is required', folders: [] };
-    }
+    const existing = await this.mailboxRepository.findSystemMailbox();
+    const password = passwordForConnectionTest(
+      { host: body.imapHost, user: body.imapUser, password: body.imapPass },
+      existing && { host: existing.imapHost, user: existing.imapUser, password: existing.imapPass },
+    );
+    if (!password) return { ...PASSWORD_REQUIRED, folders: [] };
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
