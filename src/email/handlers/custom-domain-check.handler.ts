@@ -59,7 +59,7 @@ export class CustomDomainCheckHandler {
           domain: event.domain,
           failingSince: new Date(event.failingSince).toLocaleDateString(lang === 'es' ? 'es-ES' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
           // On the installation's own address: the custom domain may be the thing that is broken
-          settingsUrl: `${this.frontendUrl}/dashboard/workspaces/${event.workspaceSlug}/settings`,
+          settingsUrl: `${this.frontendUrl}/dashboard/workspaces/${event.workspaceSlug}/settings/custom-domain`,
           lang,
         };
         const subject = template.subject(data);

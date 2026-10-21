@@ -31,4 +31,12 @@ export class SqlTicketReferenceRewriter implements TicketReferenceRewriter {
       return rows.length;
     });
   }
+
+  // The random format needs the workspace secret, so the comparison is made here and not in SQL
+  async countDiffering(workspaceId: string, format: TicketReferenceFormat): Promise<number> {
+    const rows: { ticketNumber: number; reference: string | null }[] = await this.dataSource.query(
+      `SELECT "ticketNumber", reference FROM tickets WHERE "workspaceId" = $1`, [workspaceId],
+    );
+    return rows.filter((r) => r.reference !== formatTicketReference(Number(r.ticketNumber), format)).length;
+  }
 }

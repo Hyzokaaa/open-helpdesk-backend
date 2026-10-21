@@ -4,4 +4,6 @@ import { TicketReferenceFormat } from '../../ticket/domain/ticket-reference';
 export interface TicketReferenceRewriter {
   /** Returns how many tickets were rewritten, soft-deleted ones included. */
   rewriteAll(workspaceId: string, format: TicketReferenceFormat): Promise<number>;
+  /** How many tickets, soft-deleted ones included, have a reference other than theirs in this format. */
+  countDiffering(workspaceId: string, format: TicketReferenceFormat): Promise<number>;
 }

@@ -19,6 +19,9 @@ class RecordingRewriter implements TicketReferenceRewriter {
     this.calls.push({ workspaceId, format });
     return 7;
   }
+  async countDiffering() {
+    return 0;
+  }
 }
 
 describe('ConvertTicketReferences', () => {

@@ -76,6 +76,7 @@ import { formatTicketReference, ticketReferenceFormatOf } from "../../../../tick
 import { SqlWorkspaceFileKeys } from "../../typeorm/workspace-file-keys.sql";
 import { SqlTicketReferenceRewriter } from "../../typeorm/ticket-reference-rewriter.sql";
 import { ConvertTicketReferences } from "../../../domain/services/workspace-ticket-reference-convert";
+import { CountTicketsToConvert } from "../../../domain/services/workspace-ticket-reference-count-to-convert";
 import { Workspace } from "../../../domain/entities/workspace";
 import { NestEventPublisher } from "../../../../shared/infrastructure/nest-event-publisher";
 import { GetWorkspaceQuery } from "../../../application/queries/get-workspace.query";
@@ -906,6 +907,7 @@ export class WorkspaceController {
       style: settings?.style ?? "sequential",
       prefix: settings?.prefix ?? "TK",
       example: formatTicketReference(42, ticketReferenceFormatOf(settings)),
+      toConvert: await this.countTicketsToConvert(workspaceId),
     };
   }
 
@@ -941,7 +943,14 @@ export class WorkspaceController {
       style: settings.style,
       prefix: settings.prefix,
       example: formatTicketReference(42, ticketReferenceFormatOf(settings)),
+      toConvert: await this.countTicketsToConvert(workspaceId),
     };
+  }
+
+  /** Tickets whose reference a conversion would change; none means there is nothing to convert. */
+  private countTicketsToConvert(workspaceId: string): Promise<number> {
+    return new CountTicketsToConvert(this.ticketReferenceRepository, new SqlTicketReferenceRewriter(this.dataSource))
+      .execute({ workspaceId });
   }
 
   /**

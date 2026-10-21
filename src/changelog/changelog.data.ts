@@ -16,6 +16,32 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.36.0',
+    date: '2026-10-20',
+    categories: [
+      {
+        title: { en: 'Settings', es: 'Ajustes' },
+        features: [
+          { en: 'Workspace settings have a menu on the left with a page for each section, and each section has its own address to share or bookmark', es: 'Los ajustes del espacio tienen un menú a la izquierda con una página por sección, y cada sección tiene su propia dirección para compartirla o guardarla' },
+          { en: 'Search the settings by section or field, in English or Spanish; press / to start', es: 'Busca en los ajustes por sección o por campo, en inglés o en español; pulsa / para empezar' },
+          { en: 'System settings use the same menu and search', es: 'Los ajustes del sistema usan el mismo menú y buscador' },
+          { en: 'A new General section shows the workspace name, address and members, also to the owner', es: 'Nueva sección General con el nombre, la dirección y los miembros del espacio; también la ve el dueño' },
+          { en: 'Leaving a section with unsaved changes asks before discarding them', es: 'Al salir de una sección con cambios sin guardar se pide confirmación antes de descartarlos' },
+          { en: 'Removing the SLA policy can be undone for a few seconds', es: 'Quitar la política de SLA se puede deshacer durante unos segundos' },
+          { en: 'Convert tickets is only available when some tickets use another reference format, and says how many', es: 'Convertir tickets solo se activa cuando hay tickets con la referencia en otro formato, e indica cuántos' },
+          { en: 'On a phone, settings open as a list of sections', es: 'En el móvil, los ajustes se abren como una lista de secciones' },
+        ],
+      },
+      {
+        title: { en: 'Navigation', es: 'Navegación' },
+        features: [
+          { en: 'The sidebar folds into a strip of icons with a button or the [ key, and remembers your choice', es: 'La barra lateral se pliega en una tira de iconos con un botón o la tecla [, y recuerda tu elección' },
+          { en: 'Every link in the sidebar and the user menu has an icon; when folded, names show on hover', es: 'Todos los enlaces de la barra lateral y del menú de usuario tienen icono; plegada, el nombre aparece al pasar el ratón' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.35.1',
     date: '2026-10-19',
     categories: [
