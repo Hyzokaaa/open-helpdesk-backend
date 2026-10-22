@@ -10,4 +10,6 @@ export interface CommentRepository {
     limit: number,
   ): Promise<PaginatedResult<Comment>>;
   update(comment: Comment): Promise<void>;
+  /** Whether this person commented on the ticket between the two moments (a closing comment). */
+  hasCommentBy(ticketId: string, authorId: string, from: Date, to: Date): Promise<boolean>;
 }

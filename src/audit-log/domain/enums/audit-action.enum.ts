@@ -3,6 +3,8 @@ export enum AuditAction {
   TICKET_CREATED = 'ticket-created',
   TICKET_UPDATED = 'ticket-updated',
   TICKET_STATUS_CHANGED = 'ticket-status-changed',
+  /** A resolved or discarded ticket taken back to work, with its reason. */
+  TICKET_REOPENED = 'ticket-reopened',
   TICKET_ASSIGNED = 'ticket-assigned',
   TICKET_PICKED_UP = 'ticket-picked-up',
   /** Never emitted: transfers are recorded as transfer-request-* entries. */

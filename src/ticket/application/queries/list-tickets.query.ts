@@ -36,6 +36,8 @@ export interface TicketListItem {
   organizationId: string | null;
   firstResponseBreached: boolean;
   resolutionBreached: boolean;
+  /** How many times it was reopened. */
+  reopenCount: number;
 }
 
 export class ListTicketsQuery
@@ -95,6 +97,7 @@ export class ListTicketsQuery
         organizationId: ticket.organizationId,
         firstResponseBreached: ticket.firstResponseBreached,
         resolutionBreached: ticket.resolutionBreached,
+        reopenCount: ticket.reopenCount,
       })),
       total: result.total,
       page: result.page,

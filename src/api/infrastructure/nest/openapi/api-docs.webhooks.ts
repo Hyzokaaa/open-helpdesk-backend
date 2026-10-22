@@ -4,6 +4,7 @@ import { WebhookEvent } from '../../../../webhook/domain/enums/webhook-event.enu
 import { WebhookDeliveryService } from '../../../../webhook/infrastructure/nest/services/webhook-delivery.service';
 import { TicketPriority } from '../../../../ticket/domain/enums/ticket-priority.enum';
 import { TicketStatus } from '../../../../ticket/domain/enums/ticket-status.enum';
+import { TicketReopenReason } from '../../../../ticket/domain/enums/ticket-reopen-reason.enum';
 import { NOT_DELIVERED_EXTENSION } from './api-docs.constants';
 
 /*
@@ -81,6 +82,42 @@ export class WebhookTicketStatusChangedData extends WebhookWorkspaceFields {
 
   @ApiProperty({ example: ULID, description: 'User who changed the status.' })
   changedById!: string;
+}
+
+/** Mirrors TicketReopenedEvent as emitted by ReopenTicketCommand. */
+export class WebhookTicketReopenedData extends WebhookWorkspaceFields {
+  @ApiProperty({ example: ULID })
+  ticketId!: string;
+
+  @ApiProperty({ example: 'Cannot log in to the portal', description: 'Ticket title.' })
+  ticketName!: string;
+
+  @ApiProperty({ enum: [TicketStatus.RESOLVED, TicketStatus.DISCARDED], description: 'Status it was reopened from.' })
+  oldStatus!: TicketStatus;
+
+  @ApiProperty({ enum: [TicketStatus.OPEN, TicketStatus.PENDING, TicketStatus.IN_PROGRESS], description: 'Where it went back to: `pending` or `in-progress` with an assignee, or `open` (the queue, nobody assigned).' })
+  newStatus!: TicketStatus;
+
+  @ApiProperty({ example: ULID, description: 'User who reopened it: a team member, or the requester from the portal.' })
+  reopenedById!: string;
+
+  @ApiProperty({ description: 'Whether the requester reopened it from the portal.' })
+  byRequester!: boolean;
+
+  @ApiProperty({ enum: TicketReopenReason, enumName: 'TicketReopenReason' })
+  reason!: TicketReopenReason;
+
+  @ApiProperty({ description: "Why, in the team's words or the requester's message." })
+  note!: string;
+
+  @ApiProperty({ type: String, nullable: true, example: ULID, description: 'Who had resolved it; null when it was discarded unresolved.' })
+  previousResolvedById!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, example: ULID })
+  assigneeId!: string | null;
+
+  @ApiProperty({ example: 1, description: 'How many times it has been reopened, this one included.' })
+  reopenCount!: number;
 }
 
 /** Mirrors TicketAssignedEvent as emitted by AssignTicketCommand. */
@@ -215,6 +252,14 @@ export class WebhookTicketStatusChangedPayload extends WebhookEnvelopeFields {
   data!: WebhookTicketStatusChangedData;
 }
 
+export class WebhookTicketReopenedPayload extends WebhookEnvelopeFields {
+  @ApiProperty({ enum: [WebhookEvent.TICKET_REOPENED] })
+  event!: string;
+
+  @ApiProperty({ type: () => WebhookTicketReopenedData })
+  data!: WebhookTicketReopenedData;
+}
+
 export class WebhookTicketAssignedPayload extends WebhookEnvelopeFields {
   @ApiProperty({ enum: [WebhookEvent.TICKET_ASSIGNED] })
   event!: string;
@@ -271,12 +316,17 @@ const WEBHOOK_EVENT_DOCS: Record<WebhookEvent, WebhookEventDoc> = {
   },
   [WebhookEvent.TICKET_STATUS_CHANGED]: {
     summary: 'Ticket status changed',
-    description: 'A ticket moved to another status, in the web app or through the public API. Note the camelCase event name.',
+    description: 'A ticket moved to another status, in the web app or through the public API. Note the camelCase event name. A reopen sends it too, besides `ticket.reopened`.',
     payload: WebhookTicketStatusChangedPayload,
+  },
+  [WebhookEvent.TICKET_REOPENED]: {
+    summary: 'Ticket reopened',
+    description: 'A resolved or discarded ticket was taken back to work: by the team, with a reason, or by the requester from the portal. `ticket.statusChanged` is sent as well.',
+    payload: WebhookTicketReopenedPayload,
   },
   [WebhookEvent.TICKET_ASSIGNED]: {
     summary: 'Ticket assigned',
-    description: 'A ticket was assigned, reassigned or unassigned, in the web app or through the public API.',
+    description: 'A ticket was assigned, reassigned or unassigned, in the web app or through the public API. A status change sends it too when it moves the assignee: to `open` unassigns, and an unassigned ticket moved to `pending` or `in-progress` is assigned to whoever moved it.',
     payload: WebhookTicketAssignedPayload,
   },
   [WebhookEvent.TICKET_DELETED]: {
@@ -294,6 +344,7 @@ const WEBHOOK_EVENT_DOCS: Record<WebhookEvent, WebhookEventDoc> = {
 export const WEBHOOK_PAYLOAD_MODELS: Function[] = [
   WebhookTicketCreatedPayload,
   WebhookTicketStatusChangedPayload,
+  WebhookTicketReopenedPayload,
   WebhookTicketAssignedPayload,
   WebhookTicketUpdatedPayload,
   WebhookTicketDeletedPayload,

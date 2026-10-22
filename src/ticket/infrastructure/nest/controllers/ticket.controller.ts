@@ -1,3 +1,4 @@
+import { userAuditLabel } from '../../../../user/domain/user-audit-label';
 import {
   Body,
   Controller,
@@ -87,7 +88,11 @@ import { PickupTicketRequest } from '../dto/pickup-ticket.request';
 import { TransferTicketRequest } from '../dto/transfer-ticket.request';
 import { AddTicketParticipantRequest } from '../dto/add-ticket-participant.request';
 import { UpdateTicketAiCacheRequest } from '../dto/update-ticket-ai-cache.request';
-import { TicketFilterDto } from '../dto/ticket-filter.dto';
+import { TicketFilterDto, ticketFiltersOf } from '../dto/ticket-filter.dto';
+import { ReopenTicketRequest } from '../dto/reopen-ticket.request';
+import { TypeOrmCommentRepository } from '../../../../comment/infrastructure/typeorm/repositories/typeorm-comment.repository';
+import { ReopenTicket } from '../../../domain/services/ticket-reopen';
+import { ReopenTicketCommand } from '../../../application/commands/reopen-ticket.command';
 import { TypeOrmOrganizationRepository } from '../../../../organization/infrastructure/typeorm/repositories/typeorm-organization.repository';
 import { TypeOrmDepartmentRepository } from '../../../../department/infrastructure/typeorm/repositories/typeorm-department.repository';
 import { TypeOrmProjectRepository } from '../../../../project/infrastructure/typeorm/repositories/typeorm-project.repository';
@@ -105,6 +110,7 @@ export class TicketController {
     @Inject() private readonly ticketRepository: TypeOrmTicketRepository,
     @Inject() private readonly portalAccessRepository: TypeOrmTicketPortalAccessRepository,
     @Inject() private readonly emailQuoteRepository: TypeOrmEmailQuoteRepository,
+    @Inject() private readonly commentRepository: TypeOrmCommentRepository,
     @Inject() private readonly workspaceRepository: TypeOrmWorkspaceRepository,
     @Inject() private readonly ticketReferenceRepository: TypeOrmWorkspaceTicketReferenceRepository,
     @Inject() private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
@@ -218,21 +224,7 @@ export class TicketController {
     return query.execute({
       workspaceId: workspace.getId(),
       userId: user.userId,
-      filters: {
-        search: filters.search,
-        status: filters.status,
-        excludeStatus: filters.excludeStatus,
-        priority: filters.priority,
-        tagIds: filters.tagIds,
-        departmentId: filters.departmentId,
-        organizationId: filters.organizationId,
-        projectId: filters.projectId,
-        categoryId: filters.categoryId,
-        assigneeId: filters.assigneeId,
-        reporterId: filters.reporterId,
-        sortBy: filters.sortBy,
-        sortOrder: filters.sortOrder,
-      },
+      filters: ticketFiltersOf(filters, user.userId),
       page: filters.page,
       limit: filters.limit,
       isSystemAdmin: user.isSystemAdmin,
@@ -249,7 +241,7 @@ export class TicketController {
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new ChangeTicketStatus(this.ticketRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-    const changeStatusCommand = new ChangeTicketStatusCommand(service, this.ticketRepository, ensurePermission, this.eventPublisher, auditLog);
+    const changeStatusCommand = new ChangeTicketStatusCommand(service, this.ticketRepository, ensurePermission, this.eventPublisher, auditLog, new EnsureTicketAssignee(this.memberRepository), userAuditLabel(this.userRepository));
     const command = new BulkChangeStatusCommand(changeStatusCommand);
     return command.execute({
       ticketIds: body.ticketIds,
@@ -293,7 +285,7 @@ export class TicketController {
   ) {
     const workspace = await this.resolveWorkspace(slug);
     const ensureAccess = this.createEnsureTicketAccess();
-    const query = new GetTicketQuery(this.ticketRepository, ensureAccess, new SummarizeUsers(this.userRepository), this.auditLogRepository, this.emailQuoteRepository);
+    const query = new GetTicketQuery(this.ticketRepository, ensureAccess, new SummarizeUsers(this.userRepository), this.auditLogRepository, this.emailQuoteRepository, this.commentRepository);
     return query.execute({ ticketId: id, workspaceId: workspace.getId(), userId: user.userId, isSystemAdmin: user.isSystemAdmin });
   }
 
@@ -355,11 +347,38 @@ export class TicketController {
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new ChangeTicketStatus(this.ticketRepository);
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-    const command = new ChangeTicketStatusCommand(service, this.ticketRepository, ensurePermission, this.eventPublisher, auditLog);
+    const command = new ChangeTicketStatusCommand(service, this.ticketRepository, ensurePermission, this.eventPublisher, auditLog, new EnsureTicketAssignee(this.memberRepository), userAuditLabel(this.userRepository));
     return command.execute({
       ticketId: id,
       status: body.status,
       discardReason: body.discardReason,
+      workspaceId: workspace.getId(),
+      workspaceName: workspace.name,
+      workspaceSlug: workspace.slug,
+      userId: user.userId,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+  }
+
+  /** Reopens a resolved or discarded ticket with a reason: back to work (In progress unless chosen) with whoever had it. */
+  @Post(':id/reopen')
+  async reopen(
+    @Param('slug') slug: string,
+    @Param('id') id: string,
+    @Body() body: ReopenTicketRequest,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspace = await this.resolveWorkspace(slug);
+    await this.createEnsureTicketAccess().ensureFull({ ticketId: id, userId: user.userId, workspaceId: workspace.getId(), isSystemAdmin: user.isSystemAdmin });
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    const command = new ReopenTicketCommand(new ReopenTicket(this.ticketRepository, this.memberRepository), ensurePermission, this.eventPublisher, auditLog, userAuditLabel(this.userRepository));
+    return command.execute({
+      ticketId: id,
+      reason: body.reason,
+      note: body.note,
+      assigneeId: body.assigneeId,
+      status: body.status,
       workspaceId: workspace.getId(),
       workspaceName: workspace.name,
       workspaceSlug: workspace.slug,

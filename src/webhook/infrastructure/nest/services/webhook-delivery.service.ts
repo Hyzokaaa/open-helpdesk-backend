@@ -28,6 +28,11 @@ export class WebhookDeliveryService {
     await this.deliver('ticket.statusChanged', data);
   }
 
+  @OnEvent('ticket.reopened')
+  async onTicketReopened(event: BaseEvent): Promise<void> {
+    await this.deliver('ticket.reopened', event);
+  }
+
   @OnEvent('ticket.assigned')
   async onTicketAssigned(event: BaseEvent): Promise<void> {
     await this.deliver('ticket.assigned', event);

@@ -132,9 +132,10 @@ describe('Writes by id stay inside the caller\'s workspace', () => {
 
   describe('department members', () => {
     const departmentMembers = { created: [] as unknown[], removed: [] as unknown[],
-      async create(m: unknown) { this.created.push(m); }, async delete(d: string, u: string) { this.removed.push([d, u]); } };
+      async create(m: unknown) { this.created.push(m); }, async delete(d: string, u: string) { this.removed.push([d, u]); },
+      async findByDepartmentId() { return []; } };
     const workspaceMembers = { async findByWorkspaceAndUser(workspaceId: string, userId: string) {
-      return workspaceId === MINE && userId === 'member' ? { userId } : null; } };
+      return workspaceId === MINE && userId === 'member' ? { userId, role: 'agent' } : null; } };
 
     beforeEach(() => { departmentMembers.created = []; departmentMembers.removed = []; });
 

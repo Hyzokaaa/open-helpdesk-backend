@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Between, Repository } from 'typeorm';
 import { PaginatedResult } from '../../../../shared/domain/paginated-result';
 import { Comment } from '../../../domain/entities/comment';
 import { CommentRepository } from '../../../domain/repositories/comment.repository';
@@ -41,6 +41,10 @@ export class TypeOrmCommentRepository implements CommentRepository {
       page,
       limit,
     };
+  }
+
+  async hasCommentBy(ticketId: string, authorId: string, from: Date, to: Date): Promise<boolean> {
+    return (await this.repository.count({ where: { ticketId, authorId, createdAt: Between(from, to) } })) > 0;
   }
 
   async findByTicketIdWithDates(ticketId: string): Promise<Array<{ id: string; content: string; authorId: string; createdAt: Date }>> {

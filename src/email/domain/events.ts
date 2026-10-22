@@ -55,6 +55,25 @@ export interface StatusChangedEvent {
   quiet?: boolean;
 }
 
+/** A closed ticket taken back to work: by the team with a reason, or by the requester from the portal. */
+export interface TicketReopenedEvent {
+  ticketId: string;
+  ticketName: string;
+  oldStatus: string;
+  newStatus: string;
+  reopenedById: string;
+  byRequester: boolean;
+  reason: string;
+  /** Seen by the team only: never sent to the requester. */
+  note: string;
+  previousResolvedById: string | null;
+  assigneeId: string | null;
+  reopenCount: number;
+  workspaceId: string;
+  workspaceName: string;
+  workspaceSlug: string;
+}
+
 export interface TransferRequestCreatedEvent {
   requestId: string;
   ticketId: string;

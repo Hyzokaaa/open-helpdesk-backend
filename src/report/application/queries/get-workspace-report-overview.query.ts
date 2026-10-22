@@ -49,7 +49,7 @@ export class GetWorkspaceReportOverviewQuery {
     const [resolvedResult] = await this.dataSource.query(
       `SELECT COUNT(*) as count FROM tickets
        WHERE "workspaceId" = $1${rvDate.sql} AND "deletedAt" IS NULL
-         AND "discardReason" IS NULL`,
+         AND "resolvedAt" IS NOT NULL AND "discardReason" IS NULL`,
       [props.workspaceId, ...rvDate.params],
     );
 

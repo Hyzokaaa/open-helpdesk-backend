@@ -23,6 +23,10 @@ export class MockCommentRepository implements CommentRepository {
     return { items: items.slice((page - 1) * limit, page * limit), total: items.length, page, limit };
   }
 
+  async hasCommentBy(ticketId: string, authorId: string, from: Date, to: Date): Promise<boolean> {
+    return this.comments.some((c) => c.ticketId === ticketId && c.authorId === authorId && !!c.createdAt && c.createdAt >= from && c.createdAt <= to);
+  }
+
   getAll(): Comment[] {
     return this.comments;
   }

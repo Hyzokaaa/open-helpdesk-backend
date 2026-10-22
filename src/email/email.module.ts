@@ -7,6 +7,7 @@ import { TicketCreatedHandler } from './handlers/ticket-created.handler';
 import { TicketAssignedHandler } from './handlers/ticket-assigned.handler';
 import { NewCommentHandler } from './handlers/new-comment.handler';
 import { StatusChangedHandler } from './handlers/status-changed.handler';
+import { TicketReopenedHandler } from './handlers/ticket-reopened.handler';
 import { CsatSurveyHandler } from './handlers/csat-survey.handler';
 import { TransferRequestHandler } from './handlers/transfer-request.handler';
 import { UserModule } from '../user/user.module';
@@ -49,6 +50,7 @@ import { AttachmentModule } from '../attachment/attachment.module';
     TicketAssignedHandler,
     NewCommentHandler,
     StatusChangedHandler,
+    TicketReopenedHandler,
     CsatSurveyHandler,
     TransferRequestHandler,
     WorkspaceLifecycleHandler,

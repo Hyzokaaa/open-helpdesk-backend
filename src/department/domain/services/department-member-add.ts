@@ -3,7 +3,8 @@ import { DepartmentMember } from '../entities/department-member';
 import { DepartmentMemberRepository } from '../repositories/department-member.repository';
 import { DepartmentRepository } from '../repositories/department.repository';
 import { WorkspaceMemberRepository } from '../../../workspace/domain/repositories/workspace-member.repository';
-import { EntityNotFoundError } from '../../../shared/domain/errors';
+import { ConflictError, DomainValidationError, EntityNotFoundError } from '../../../shared/domain/errors';
+import { DEPARTMENT_ROLES } from './department-members-set';
 
 interface AddDepartmentMemberProps {
   departmentId: string;
@@ -27,6 +28,11 @@ export class AddDepartmentMember {
     }
     const workspaceMember = await this.workspaceMemberRepository.findByWorkspaceAndUser(props.workspaceId, props.userId);
     if (!workspaceMember) throw new EntityNotFoundError('Member not found');
+    if (!DEPARTMENT_ROLES.includes(workspaceMember.role)) {
+      throw new DomainValidationError('Only admins, supervisors and agents can be in a department');
+    }
+    const current = await this.repository.findByDepartmentId(props.departmentId);
+    if (current.some((m) => m.userId === props.userId)) throw new ConflictError('Already in this department');
 
     const member = new DepartmentMember({
       id: this.idGenerator.create(),

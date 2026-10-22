@@ -58,7 +58,7 @@ describe('public API OpenAPI document', () => {
     expect(API_DOCS_REDIRECTS).toEqual(['/docs', '/docs/', '/api/v1/docs', '/api/v1/docs/']);
   });
 
-  it('documents only /api/v1 paths, all nine operations of the public controller', () => {
+  it('documents only /api/v1 paths, all ten operations of the public controller', () => {
     const paths = Object.keys(document.paths);
     expect(paths.every((p) => p.startsWith('/api/v1/'))).toBe(true);
     expect(operations(document).map(({ method, path }) => `${method.toUpperCase()} ${path}`).sort()).toEqual([
@@ -71,6 +71,7 @@ describe('public API OpenAPI document', () => {
       'POST /api/v1/auth/exchange',
       'POST /api/v1/tickets',
       'POST /api/v1/tickets/{id}/comments',
+      'POST /api/v1/tickets/{id}/reopen',
     ]);
   });
 

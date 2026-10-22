@@ -139,6 +139,17 @@ export class TicketModel {
   @Column({ type: 'timestamptz', nullable: true })
   descriptionEditedAt!: Date | null;
 
+  /** The first time it was resolved; resolvedAt is the current resolution and empties on reopen. */
+  @Column({ type: 'timestamptz', nullable: true })
+  firstResolvedAt!: Date | null;
+
+  @Column({ default: 0 })
+  reopenCount!: number;
+
+  /** The last reopen: who, when, why and who had resolved it (TicketReopen). */
+  @Column({ type: 'jsonb', nullable: true })
+  lastReopen!: Record<string, unknown> | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 

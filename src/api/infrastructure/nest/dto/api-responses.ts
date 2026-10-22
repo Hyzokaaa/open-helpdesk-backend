@@ -62,6 +62,9 @@ export class ApiTicketListItem {
 
   @ApiProperty()
   resolutionBreached!: boolean;
+
+  @ApiProperty({ example: 0, description: 'How many times it was reopened.' })
+  reopenCount!: number;
 }
 
 export class ApiTicketPage {
@@ -127,11 +130,17 @@ export class ApiTicketDetail {
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
   firstResponseAt!: string | null;
 
-  @ApiProperty({ type: String, format: 'date-time', nullable: true })
+  @ApiProperty({ type: String, format: 'date-time', nullable: true, description: 'The current resolution; empty while the ticket is open again after a reopen.' })
   resolvedAt!: string | null;
 
   @ApiProperty({ type: String, nullable: true })
   resolvedById!: string | null;
+
+  @ApiProperty({ type: String, format: 'date-time', nullable: true, description: 'The first time it was resolved, kept through reopens.' })
+  firstResolvedAt!: string | null;
+
+  @ApiProperty({ example: 0, description: 'How many times it was reopened.' })
+  reopenCount!: number;
 
   @ApiProperty({ example: 'TK-000042', description: 'Ticket reference in the workspace format. Opaque: show it, do not parse it.' })
   ticketNumber!: string;
@@ -189,6 +198,20 @@ export class ApiCreatedTicket {
  * PATCH /tickets/:id returns UpdateTicketResponse when a field other than status or assignee
  * changed, and only the id otherwise; the optional fields cover both.
  */
+export class ApiReopenedTicket {
+  @ApiProperty({ example: ULID })
+  id!: string;
+
+  @ApiProperty({ enum: [TicketStatus.OPEN, TicketStatus.PENDING, TicketStatus.IN_PROGRESS], description: 'The `status` asked for (`in-progress` when left out), with whoever had it; `open` (the queue) when asked for, or when nobody on the team can take it.' })
+  status!: TicketStatus;
+
+  @ApiProperty({ type: String, nullable: true, example: ULID })
+  assigneeId!: string | null;
+
+  @ApiProperty({ description: 'How many times it has been reopened, this one included.', example: 1 })
+  reopenCount!: number;
+}
+
 export class ApiUpdatedTicket {
   @ApiProperty({ example: ULID })
   id!: string;

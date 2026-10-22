@@ -3,6 +3,7 @@ import { TicketPriority } from '../enums/ticket-priority.enum';
 import { TicketDiscardReason } from '../enums/ticket-discard-reason.enum';
 import { TicketSource } from '../enums/ticket-source.enum';
 import { TicketStatus } from '../enums/ticket-status.enum';
+import { TicketReopen } from '../ticket-reopen';
 
 interface Props {
   id: string;
@@ -35,6 +36,9 @@ interface Props {
   mailboxId?: string | null;
   originDate?: Date | null;
   descriptionEditedAt?: Date | null;
+  firstResolvedAt?: Date | null;
+  reopenCount?: number;
+  lastReopen?: TicketReopen | null;
 }
 
 export class Ticket {
@@ -69,6 +73,10 @@ export class Ticket {
   mailboxId: string | null;
   originDate: Date | null;
   descriptionEditedAt: Date | null;
+  /** The first time it was resolved; kept when it is reopened and resolved again. */
+  firstResolvedAt: Date | null;
+  reopenCount: number;
+  lastReopen: TicketReopen | null;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -101,6 +109,9 @@ export class Ticket {
     this.mailboxId = props.mailboxId ?? null;
     this.originDate = props.originDate ?? null;
     this.descriptionEditedAt = props.descriptionEditedAt ?? null;
+    this.firstResolvedAt = props.firstResolvedAt ?? null;
+    this.reopenCount = props.reopenCount ?? 0;
+    this.lastReopen = props.lastReopen ?? null;
   }
 
   getId(): string {

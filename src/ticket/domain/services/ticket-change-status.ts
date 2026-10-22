@@ -3,6 +3,11 @@ import { Ticket } from '../entities/ticket';
 import { TicketDiscardReason } from '../enums/ticket-discard-reason.enum';
 import { TicketStatus } from '../enums/ticket-status.enum';
 import { TicketRepository } from '../repositories/ticket.repository';
+import { isClosedStatus, markResolved } from '../ticket-resolution';
+import { assigneeForStatus } from '../ticket-assignment-rule';
+
+/** Said when a closed ticket is moved back to work: that is reopening, with its own reason. */
+export const USE_REOPEN_MESSAGE = 'A resolved or discarded ticket is reopened with POST /tickets/:id/reopen, giving a reason';
 
 const ALL_STATUSES = [
   TicketStatus.OPEN,
@@ -28,6 +33,8 @@ interface ChangeTicketStatusProps {
   discardReason?: TicketDiscardReason;
   userId: string;
   canMoveToOpen?: boolean;
+  /** Who takes it when it goes to work with nobody assigned (whoever moved it); null refuses it. */
+  takerId?: string | null;
 }
 
 export class ChangeTicketStatus {
@@ -39,6 +46,11 @@ export class ChangeTicketStatus {
       throw new EntityNotFoundError('Ticket not found');
     }
 
+    // Reopening has its own action, with a reason; changing the status never does it
+    if (isClosedStatus(ticket.status) && !isClosedStatus(props.status)) {
+      throw new DomainValidationError(USE_REOPEN_MESSAGE);
+    }
+
     const allowed = props.canMoveToOpen
       ? ALL_STATUSES
       : ALLOWED_TRANSITIONS[ticket.status];
@@ -48,16 +60,13 @@ export class ChangeTicketStatus {
       );
     }
 
-    if (props.status === TicketStatus.OPEN) {
-      ticket.assigneeId = null;
-    }
+    // The queue lets go of whoever had it; work with nobody takes whoever moved it
+    ticket.assigneeId = assigneeForStatus(props.status, ticket.assigneeId, props.takerId ?? null);
 
     ticket.status = props.status;
 
     if (props.status === TicketStatus.RESOLVED) {
-      ticket.resolvedAt = new Date();
-      ticket.resolvedById = props.userId;
-      ticket.discardReason = null;
+      markResolved(ticket, props.userId);
     } else if (props.status === TicketStatus.DISCARDED) {
       if (!props.discardReason) {
         throw new DomainValidationError('Discard reason is required');

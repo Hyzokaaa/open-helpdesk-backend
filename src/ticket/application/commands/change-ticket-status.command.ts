@@ -8,7 +8,10 @@ import { ChangeTicketStatus } from '../../domain/services/ticket-change-status';
 import { EnsureWorkspacePermission } from '../../../workspace/domain/services/workspace-ensure-permission';
 import { PERMISSIONS, hasPermission } from '../../../workspace/domain/permissions';
 import { WorkspaceRole } from '../../../workspace/domain/enums/workspace-role.enum';
-import { StatusChangedEvent } from '../../../email/domain/events';
+import { StatusChangedEvent, TicketAssignedEvent } from '../../../email/domain/events';
+import { EnsureTicketAssignee } from '../../domain/services/ticket-ensure-assignee';
+import { DescribeUser } from '../../../user/domain/user-audit-label';
+import { isWorkStatus } from '../../domain/ticket-assignment-rule';
 import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
 import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
@@ -25,11 +28,17 @@ interface Props {
   isSystemAdmin: boolean;
   /** Set when the action came through the public API, with the key that made it. */
   apiKeyId?: string;
+  /**
+   * Whether whoever moves an unassigned ticket to work takes it, as a pickup would (the default).
+   * Bulk changes say no: those tickets are left out and flagged, rather than taken by the dozen.
+   */
+  takeIfUnassigned?: boolean;
 }
 
 export interface ChangeStatusResponse {
   id: string;
   status: string;
+  assigneeId: string | null;
   resolvedAt: Date | null;
 }
 
@@ -40,6 +49,9 @@ export class ChangeTicketStatusCommand implements Command<Props, ChangeStatusRes
     private readonly ensurePermission: EnsureWorkspacePermission,
     private readonly eventPublisher: EventPublisher,
     private readonly createAuditLog: CreateAuditLogEntry,
+    /** Checks that whoever moves it can hold it; left out, they can. */
+    private readonly ensureAssignee?: EnsureTicketAssignee,
+    private readonly describeUser: DescribeUser = async () => null,
   ) {}
 
   async execute(props: Props): Promise<ChangeStatusResponse> {
@@ -71,19 +83,22 @@ export class ChangeTicketStatusCommand implements Command<Props, ChangeStatusRes
     const canMoveToOpen = ctx.role === WorkspaceRole.ADMIN || ctx.role === WorkspaceRole.SUPERVISOR;
 
     const oldStatus = ticket.status;
+    const previousAssigneeId = ticket.assigneeId;
     const updated = await this.changeStatus.execute({
       ticketId: props.ticketId,
       status: props.status,
       discardReason: props.discardReason,
       userId: props.userId,
       canMoveToOpen,
+      // Only work with nobody assigned needs somebody to take it
+      takerId: props.takeIfUnassigned === false || ticket.assigneeId || !isWorkStatus(props.status) ? null : await this.takerFor(props),
     });
 
     const event: StatusChangedEvent = {
       ticketId: props.ticketId,
       ticketName: ticket.name,
       oldStatus,
-      newStatus: props.status,
+      newStatus: updated.status,
       changedById: props.userId,
       workspaceId: props.workspaceId,
       workspaceName: props.workspaceName,
@@ -104,15 +119,62 @@ export class ChangeTicketStatusCommand implements Command<Props, ChangeStatusRes
         ...(props.apiKeyId ? { apiKeyId: props.apiKeyId } : {}),
         ticketName: ticket.name,
         before: { status: oldStatus },
-        after: { status: props.status },
+        after: { status: updated.status },
         ...(props.status === TicketStatus.DISCARDED && { discardReason: props.discardReason }),
       },
     });
 
+    // The status moved the assignee (to the queue lets go, to work takes): told as an assignment,
+    // the mirror of AssignTicketCommand, so notifications, webhooks and the log see it
+    if (updated.assigneeId !== previousAssigneeId) {
+      const assigned: TicketAssignedEvent = {
+        ticketId: props.ticketId,
+        ticketName: ticket.name,
+        newAssigneeId: updated.assigneeId,
+        previousAssigneeId,
+        assignedById: props.userId,
+        workspaceId: props.workspaceId,
+        workspaceName: props.workspaceName,
+        workspaceSlug: props.workspaceSlug,
+      };
+      this.eventPublisher.emit('ticket.assigned', assigned);
+
+      const label = async (id: string | null) => (id ? await this.describeUser(id) : null);
+      await this.createAuditLog.execute({
+        action: AuditAction.TICKET_ASSIGNED,
+        category: AuditCategory.TICKET,
+        level: AuditLevel.INFO,
+        source: props.apiKeyId ? 'api' : 'ui',
+        entityType: 'ticket',
+        entityId: props.ticketId,
+        userId: props.userId,
+        workspaceId: props.workspaceId,
+        metadata: {
+          ...(props.apiKeyId ? { apiKeyId: props.apiKeyId } : {}),
+          ticketName: ticket.name,
+          before: { assignee: await label(previousAssigneeId) },
+          after: { assignee: await label(updated.assigneeId) },
+          reason: 'status-changed',
+        },
+      });
+    }
+
     return {
       id: updated.getId(),
       status: updated.status,
+      assigneeId: updated.assigneeId,
       resolvedAt: updated.resolvedAt,
     };
+  }
+
+  /** Whoever moves it, if they can hold tickets; otherwise nobody, and work with nobody is refused. */
+  private async takerFor(props: Props): Promise<string | null> {
+    if (!this.ensureAssignee) return props.userId;
+    try {
+      await this.ensureAssignee.execute({ workspaceId: props.workspaceId, userId: props.userId });
+      return props.userId;
+    } catch {
+      return null;
+    }
   }
 }

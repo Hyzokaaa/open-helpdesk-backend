@@ -12,14 +12,21 @@ export interface TicketFilters {
   ticketNumber?: number | null;
   /** Spellings of the term as a stored reference (with and without the workspace prefix). */
   referenceCandidates?: string[];
-  status?: TicketStatus;
+  /** Tickets in any of these statuses. */
+  statuses?: TicketStatus[];
   excludeStatus?: string;
-  priority?: TicketPriority;
+  priorities?: TicketPriority[];
+  /** Tickets with any of these tags. */
   tagIds?: string[];
-  departmentId?: string;
-  organizationId?: string;
+  /** In these lists, null stands for "has none". */
+  departmentIds?: (string | null)[];
+  /** Also the tickets of the departments this user is an agent of ("My departments"). */
+  departmentsOfUserId?: string;
+  organizationIds?: (string | null)[];
   projectId?: string;
-  categoryId?: string;
+  categoryIds?: (string | null)[];
+  /** Only the tickets reopened at least once. */
+  reopened?: boolean;
   assigneeId?: string;
   reporterId?: string;
   registeredById?: string;

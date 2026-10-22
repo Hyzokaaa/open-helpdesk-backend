@@ -130,6 +130,20 @@ export interface WorkspaceExportTicket {
   registeredByEmail?: string | null;
   originDate?: string | null;
   descriptionEditedAt?: string | null;
+  /** Since 1.38: the first resolution, kept through reopens. */
+  firstResolvedAt?: string | null;
+  /** Since 1.38. */
+  reopenCount?: number;
+  /** Since 1.38: the last reopen, its people by email. */
+  lastReopen?: {
+    byEmail: string | null;
+    at: string;
+    reason: string;
+    note: string;
+    fromStatus: string;
+    previousResolvedByEmail: string | null;
+    previousResolvedAt: string | null;
+  } | null;
   createdAt: string | null;
   updatedAt: string | null;
 }

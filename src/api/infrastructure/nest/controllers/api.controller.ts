@@ -1,3 +1,4 @@
+import { userAuditLabel } from '../../../../user/domain/user-audit-label';
 import {
   Body,
   Controller,
@@ -47,6 +48,9 @@ import { DeleteTicketCommand } from '../../../../ticket/application/commands/del
 import { CreateCommentCommand } from '../../../../comment/application/commands/create-comment.command';
 import { GetTicketQuery } from '../../../../ticket/application/queries/get-ticket.query';
 import { ListTicketsQuery } from '../../../../ticket/application/queries/list-tickets.query';
+import { ReopenTicketCommand } from '../../../../ticket/application/commands/reopen-ticket.command';
+import { ReopenTicket } from '../../../../ticket/domain/services/ticket-reopen';
+import { ReopenTicketRequest } from '../../../../ticket/infrastructure/nest/dto/reopen-ticket.request';
 import { ListTicketCommentsQuery } from '../../../../comment/application/queries/list-ticket-comments.query';
 import { TypeOrmTicketRepository } from '../../../../ticket/infrastructure/typeorm/repositories/typeorm-ticket.repository';
 import { TypeOrmTicketPortalAccessRepository } from '../../../../ticket/infrastructure/typeorm/repositories/typeorm-ticket-portal-access.repository';
@@ -78,6 +82,7 @@ import {
   ApiTicketDetail,
   ApiTicketPage,
   ApiUpdatedTicket,
+  ApiReopenedTicket,
 } from '../dto/api-responses';
 import { ApiScopedOperation } from '../openapi/api-operation.decorators';
 import { API_KEY_SECURITY_SCHEME } from '../openapi/api-docs.constants';
@@ -96,6 +101,7 @@ import { EnsureTicketAssignee } from '../../../../ticket/domain/services/ticket-
 import { TypeOrmTicketCategoryRepository } from '../../../../project/infrastructure/typeorm/repositories/typeorm-ticket-category.repository';
 import { TypeOrmTagRepository } from '../../../../tag/infrastructure/typeorm/repositories/typeorm-tag.repository';
 import { TicketReferenceFormats } from '../../../../ticket/domain/services/ticket-reference-formats';
+import { ensureAssignmentFits } from '../../../../ticket/domain/ticket-assignment-rule';
 import { TypeOrmWorkspaceTicketReferenceRepository } from '../../../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-ticket-reference.repository';
 
 const TICKET_ID_PARAM = ApiParam({ name: 'id', description: 'Ticket id (ULID), not the TK- number.', example: '01JABCDEF0123456789ABCDEFG' });
@@ -146,9 +152,9 @@ export class ApiController {
   @PAGE_QUERY
   @LIMIT_QUERY
   @ApiQuery({ name: 'search', required: false, description: 'Text searched in title and body. A ticket number (`TK-000042`, `42`) also matches that ticket.' })
-  @ApiQuery({ name: 'status', required: false, enum: TicketStatus, enumName: 'TicketStatus' })
+  @ApiQuery({ name: 'status', required: false, enum: TicketStatus, enumName: 'TicketStatus', isArray: true, style: 'form', explode: false, description: 'One status or several, comma-separated; tickets in any of them match.', example: 'open,pending' })
   @ApiQuery({ name: 'excludeStatus', required: false, description: 'Comma-separated statuses to leave out.', example: 'resolved,discarded' })
-  @ApiQuery({ name: 'priority', required: false, enum: TicketPriority, enumName: 'TicketPriority' })
+  @ApiQuery({ name: 'priority', required: false, enum: TicketPriority, enumName: 'TicketPriority', isArray: true, style: 'form', explode: false, description: 'One priority or several, comma-separated.', example: 'high,critical' })
   @ApiQuery({ name: 'tagIds', required: false, description: 'Comma-separated tag ids; tickets with any of them match.' })
   @ApiQuery({ name: 'assigneeId', required: false, description: 'User id of the assignee.' })
   @ApiQuery({ name: 'reporterId', required: false, description: 'User id of who opened the ticket.' })
@@ -172,9 +178,9 @@ export class ApiController {
       userId: user.userId,
       filters: {
         search: filters.search,
-        status: filters.status,
+        statuses: filters.status,
         excludeStatus: filters.excludeStatus,
-        priority: filters.priority,
+        priorities: filters.priority,
         tagIds: filters.tagIds,
         assigneeId: filters.assigneeId,
         reporterId: filters.reporterId,
@@ -277,7 +283,7 @@ export class ApiController {
   @ApiScopedOperation({
     scope: ApiKeyScope.TICKETS_WRITE,
     summary: 'Update a ticket',
-    description: 'Send only the fields to change. They are applied in this order, each as its own step: `status`, then `assigneeId`, then the remaining fields. A step that fails stops the request but does not undo the steps before it.\n\nThe response holds the updated fields when any field other than `status` or `assigneeId` was sent, and only the `id` otherwise.',
+    description: 'Send only the fields to change. They are applied in this order, each as its own step: `assigneeId`, then `status`, then the remaining fields. A step that fails stops the request but does not undo the steps before it.\n\nStatus and assignee follow one rule: `open` is the queue, with nobody assigned, while `pending` and `in-progress` always have somebody. Sent together they must fit, or it is a 400 before any step (`open` with an `assigneeId`, or `pending`/`in-progress` with `assigneeId: null`). Sent alone, the other follows: assigning an `open` ticket makes it `pending`, unassigning work makes it `open`, moving to `open` unassigns it, and moving an unassigned ticket to `pending` or `in-progress` assigns it to the key\'s creator (400 if they cannot hold tickets).\n\nThe response holds the updated fields when any field other than `status` or `assigneeId` was sent, and only the `id` otherwise.',
     validates: true,
     addressesTicket: true,
   })
@@ -295,14 +301,17 @@ export class ApiController {
 
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
 
-    // Handle status change
-    if (body.status) {
+    // Both at once must fit (the queue takes nobody, work needs somebody), checked before any step
+    const both = !!body.status && body.assigneeId !== undefined;
+    if (both) ensureAssignmentFits(body.status!, body.assigneeId ?? null);
+
+    const changeStatus = async (status: TicketStatus) => {
       const statusService = new ChangeTicketStatus(this.ticketRepository);
       const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
-      const statusCommand = new ChangeTicketStatusCommand(statusService, this.ticketRepository, ensurePermission, this.eventPublisher, auditLog);
+      const statusCommand = new ChangeTicketStatusCommand(statusService, this.ticketRepository, ensurePermission, this.eventPublisher, auditLog, new EnsureTicketAssignee(this.memberRepository), userAuditLabel(this.userRepository));
       await statusCommand.execute({
         ticketId: id,
-        status: body.status,
+        status,
         workspaceId: workspace.getId(),
         workspaceName: workspace.name,
         workspaceSlug: workspace.slug,
@@ -310,20 +319,19 @@ export class ApiController {
         isSystemAdmin: user.isSystemAdmin,
         apiKeyId: user.apiKeyId,
       });
-    }
+    };
 
-    // Handle assignee change
-    if (body.assigneeId !== undefined) {
+    const changeAssignee = async (assigneeId: string | null) => {
       const assignService = new AssignTicket(this.ticketRepository);
       const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
       const ticket = await this.ticketRepository.findById(id);
       if (!ticket || ticket.workspaceId !== workspace.getId()) throw new EntityNotFoundError('Ticket not found');
-      const assignee = body.assigneeId ? await this.userRepository.findById(body.assigneeId) : null;
+      const assignee = assigneeId ? await this.userRepository.findById(assigneeId) : null;
       const prevAssignee = ticket.assigneeId ? await this.userRepository.findById(ticket.assigneeId) : null;
       const assignCommand = new AssignTicketCommand(assignService, this.ticketRepository, ensurePermission, this.eventPublisher, auditLog, new EnsureTicketAssignee(this.memberRepository));
       await assignCommand.execute({
         ticketId: id,
-        assigneeId: body.assigneeId,
+        assigneeId,
         assigneeLabel: assignee ? `${assignee.firstName} ${assignee.lastName} (${assignee.email})` : null,
         previousAssigneeLabel: prevAssignee ? `${prevAssignee.firstName} ${prevAssignee.lastName} (${prevAssignee.email})` : null,
         workspaceId: workspace.getId(),
@@ -333,6 +341,15 @@ export class ApiController {
         isSystemAdmin: user.isSystemAdmin,
         apiKeyId: user.apiKeyId,
       });
+    };
+
+    // With both, the assignee goes first, so the status lands on whoever was asked for rather than
+    // on the key's creator; to the queue, the status alone lets go of whoever had it
+    if (both && body.status === TicketStatus.OPEN) {
+      await changeStatus(body.status);
+    } else {
+      if (body.assigneeId !== undefined) await changeAssignee(body.assigneeId);
+      if (body.status) await changeStatus(body.status);
     }
 
     // Handle field updates
@@ -423,6 +440,47 @@ export class ApiController {
       page: pagination.page,
       limit: pagination.limit,
     });
+  }
+
+  @Post('tickets/:id/reopen')
+  @ApiTags('Tickets')
+  @ApiScopedOperation({
+    scope: ApiKeyScope.TICKETS_WRITE,
+    summary: 'Reopen a ticket',
+    description: 'Takes a `resolved` or `discarded` ticket back to work, with a reason and a note of at least 20 characters that only the team sees. It goes back to `in-progress` with whoever had it, or to `open` when that person is no longer on the team. Send `status` to choose where it goes (`open`, `pending` or `in-progress`) and `assigneeId` to choose who takes it; both the queue and choosing someone need the assign permission, and `open` takes nobody. The key creator needs the reopen permission. Sends the `ticket.reopened` webhook, besides `ticket.statusChanged`.',
+    validates: true,
+    addressesTicket: true,
+  })
+  @TICKET_ID_PARAM
+  @ApiCreatedResponse({ type: ApiReopenedTicket })
+  async reopenTicket(
+    @Param('id') id: string,
+    @Body() body: ReopenTicketRequest,
+    @CurrentUser() user: AuthUser,
+  ) {
+    this.requireScope(user, ApiKeyScope.TICKETS_WRITE);
+    const workspaceId = this.resolveWorkspaceId(user);
+    const workspace = await this.workspaceRepository.findById(workspaceId);
+    if (!workspace) throw new EntityNotFoundError('Workspace not found');
+    await this.createEnsureTicketAccess().ensureFull({ ticketId: id, userId: user.userId, workspaceId, isSystemAdmin: user.isSystemAdmin });
+
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    const command = new ReopenTicketCommand(new ReopenTicket(this.ticketRepository, this.memberRepository), ensurePermission, this.eventPublisher, auditLog, userAuditLabel(this.userRepository));
+    const result = await command.execute({
+      ticketId: id,
+      reason: body.reason,
+      note: body.note,
+      assigneeId: body.assigneeId,
+      status: body.status,
+      workspaceId,
+      workspaceName: workspace.name,
+      workspaceSlug: workspace.slug,
+      userId: user.userId,
+      isSystemAdmin: user.isSystemAdmin,
+      apiKeyId: user.apiKeyId,
+    });
+    return { id: result.id, status: result.status, assigneeId: result.assigneeId, reopenCount: result.reopenCount };
   }
 
   @Post('tickets/:id/comments')

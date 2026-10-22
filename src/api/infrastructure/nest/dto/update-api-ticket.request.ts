@@ -33,7 +33,7 @@ export class UpdateApiTicketRequest {
   @ApiPropertyOptional({
     enum: TicketStatus,
     enumName: 'TicketStatus',
-    description: 'New status. Follows the ticket workflow: only admins and supervisors can move a ticket back to `open`, and `discarded` is rejected because this endpoint takes no discard reason.',
+    description: 'New status. Follows the ticket workflow: only admins and supervisors can move a ticket back to `open`, and `discarded` is rejected because this endpoint takes no discard reason. A `resolved` or `discarded` ticket is not moved back to `open`, `pending` or `in-progress` here (400): reopen it with `POST /api/tickets/{id}/reopen`, giving a reason. Moving to `open` unassigns it; moving an unassigned ticket to `pending` or `in-progress` assigns it to the key\'s creator.',
   })
   @IsEnum(TicketStatus)
   @IsOptional()
@@ -42,7 +42,7 @@ export class UpdateApiTicketRequest {
   @ApiPropertyOptional({
     type: String,
     nullable: true,
-    description: 'User id of the new assignee, who must be an agent of the workspace. `null` unassigns the ticket.',
+    description: 'User id of the new assignee, who must be an agent of the workspace. `null` unassigns the ticket. Sent with `status`, they must fit: `open` takes no assignee, and `pending` or `in-progress` need one.',
   })
   @IsString()
   @IsOptional()

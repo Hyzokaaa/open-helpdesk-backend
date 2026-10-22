@@ -9,6 +9,10 @@ import { WorkspaceRole } from '../../../../src/workspace/domain/enums/workspace-
 import { MockTicketRepository } from '../../../mocks/mock-ticket.repository';
 import { MockWorkspaceMemberRepository } from '../../../mocks/mock-workspace-member.repository';
 import { AccessDeniedError } from '../../../../src/shared/domain/errors';
+import { EnsureTicketAssignee } from '../../../../src/ticket/domain/services/ticket-ensure-assignee';
+import { NEEDS_ASSIGNEE_MESSAGE } from '../../../../src/ticket/domain/ticket-assignment-rule';
+import { BulkChangeStatusCommand } from '../../../../src/ticket/application/commands/bulk-change-status.command';
+import { AuditAction } from '../../../../src/audit-log/domain/enums/audit-action.enum';
 import { CreateAuditLogEntry } from '../../../../src/audit-log/domain/services/audit-log-create';
 import { FakeIdGenerator } from '../../../mocks/fake-id-generator';
 import { TicketDiscardReason } from '../../../../src/ticket/domain/enums/ticket-discard-reason.enum';
@@ -72,6 +76,7 @@ describe('ChangeTicketStatusCommand', () => {
       new EnsureWorkspacePermission(memberRepository),
       eventPublisher,
       createAuditLog,
+      new EnsureTicketAssignee(memberRepository),
     );
   });
 
@@ -127,15 +132,48 @@ describe('ChangeTicketStatusCommand', () => {
     expect(ticket!.assigneeId).toBe('agent-1');
   });
 
-  it('lets a supervisor move an unassigned open ticket without taking it', async () => {
+  it('a supervisor moving an unassigned open ticket to work takes it, told as an assignment', async () => {
     seedTicket(TicketStatus.OPEN, null);
     seedMember('sup-1', WorkspaceRole.SUPERVISOR);
 
     const result = await run('sup-1', TicketStatus.IN_PROGRESS);
 
     expect(result.status).toBe(TicketStatus.IN_PROGRESS);
-    const ticket = await ticketRepository.findById('ticket-1');
-    expect(ticket!.assigneeId).toBeNull();
+    expect(result.assigneeId).toBe('sup-1');
+    expect(emitted).toEqual(['ticket.statusChanged', 'ticket.assigned']);
+    expect(audited.map((e) => e.action)).toEqual([AuditAction.TICKET_STATUS_CHANGED, AuditAction.TICKET_ASSIGNED]);
+    expect(audited[1].metadata).toMatchObject({ reason: 'status-changed' });
+  });
+
+  it('moving to the queue lets go of whoever had it, told as an unassignment', async () => {
+    seedTicket(TicketStatus.IN_PROGRESS, 'agent-2');
+    seedMember('sup-1', WorkspaceRole.SUPERVISOR);
+
+    const result = await run('sup-1', TicketStatus.OPEN);
+
+    expect(result).toMatchObject({ status: TicketStatus.OPEN, assigneeId: null });
+    expect(emitted).toEqual(['ticket.statusChanged', 'ticket.assigned']);
+  });
+
+  it('a status that keeps the assignee is not told as an assignment', async () => {
+    seedTicket(TicketStatus.PENDING, 'agent-2');
+    seedMember('sup-1', WorkspaceRole.SUPERVISOR);
+
+    await run('sup-1', TicketStatus.IN_PROGRESS);
+
+    expect(emitted).toEqual(['ticket.statusChanged']);
+  });
+
+  it('bulk does not take tickets: work with nobody assigned is refused', async () => {
+    seedTicket(TicketStatus.OPEN, null);
+    seedMember('sup-1', WorkspaceRole.SUPERVISOR);
+
+    await expect(command.execute({ ticketId: 'ticket-1', status: TicketStatus.PENDING, workspaceId: 'ws-1', workspaceName: 'Testing', workspaceSlug: 'testing', userId: 'sup-1', isSystemAdmin: false, takeIfUnassigned: false }))
+      .rejects.toThrow(NEEDS_ASSIGNEE_MESSAGE);
+
+    const results = await new BulkChangeStatusCommand(command).execute({ ticketIds: ['ticket-1'], status: TicketStatus.PENDING, workspaceId: 'ws-1', workspaceName: 'Testing', workspaceSlug: 'testing', userId: 'sup-1', isSystemAdmin: false });
+    expect(results).toEqual([expect.objectContaining({ ticketId: 'ticket-1', success: false, needsAssignee: true })]);
+    expect((await ticketRepository.findById('ticket-1'))!.status).toBe(TicketStatus.OPEN);
   });
 
   it('lets a workspace admin move a ticket assigned to someone else', async () => {
@@ -150,8 +188,14 @@ describe('ChangeTicketStatusCommand', () => {
   it('lets a system admin move any ticket without being a member', async () => {
     seedTicket(TicketStatus.OPEN, null);
 
-    const result = await run('root', TicketStatus.IN_PROGRESS, true);
+    const result = await run('root', TicketStatus.RESOLVED, true);
 
-    expect(result.status).toBe(TicketStatus.IN_PROGRESS);
+    expect(result.status).toBe(TicketStatus.RESOLVED);
+  });
+
+  it('a system admin who is not a member cannot take an unassigned ticket to work', async () => {
+    seedTicket(TicketStatus.OPEN, null);
+
+    await expect(run('root', TicketStatus.IN_PROGRESS, true)).rejects.toThrow(NEEDS_ASSIGNEE_MESSAGE);
   });
 });

@@ -10,6 +10,7 @@ import { DomainValidationError } from '../../../shared/domain/errors';
 import { WorkspaceRole } from '../enums/workspace-role.enum';
 import { TicketPriority } from '../../../ticket/domain/enums/ticket-priority.enum';
 import { TicketStatus } from '../../../ticket/domain/enums/ticket-status.enum';
+import { TicketReopenReason } from '../../../ticket/domain/enums/ticket-reopen-reason.enum';
 import { TicketDiscardReason } from '../../../ticket/domain/enums/ticket-discard-reason.enum';
 import { TicketSource } from '../../../ticket/domain/enums/ticket-source.enum';
 import { ParticipantRole } from '../../../ticket/domain/enums/participant-role.enum';
@@ -464,6 +465,20 @@ function validateExportData(data: WorkspaceExportData): void {
     optionalText(t, p, 'registeredByEmail');
     optionalDate(t, p, 'originDate');
     optionalDate(t, p, 'descriptionEditedAt');
+    optionalDate(t, p, 'firstResolvedAt');
+    if (t.reopenCount != null && (!Number.isInteger(t.reopenCount) || t.reopenCount < 0)) fail(`${p}.reopenCount`, 'must be a whole number');
+    if (t.lastReopen != null) {
+      const r = t.lastReopen;
+      if (typeof r !== 'object' || Array.isArray(r)) fail(`${p}.lastReopen`, 'must be an object');
+      else {
+        date(r, `${p}.lastReopen`, 'at');
+        member(r, `${p}.lastReopen`, 'reason', oneOf(TicketReopenReason));
+        member(r, `${p}.lastReopen`, 'fromStatus', oneOf(TicketStatus));
+        optionalText(r, `${p}.lastReopen`, 'byEmail');
+        optionalText(r, `${p}.lastReopen`, 'previousResolvedByEmail');
+        optionalDate(r, `${p}.lastReopen`, 'previousResolvedAt');
+      }
+    }
     optionalText(t, p, 'mailboxOriginId');
     if (t.customFields != null && (typeof t.customFields !== 'object' || Array.isArray(t.customFields))) {
       fail(`${p}.customFields`, 'must be an object');
@@ -1498,8 +1513,9 @@ export class ImportWorkspace {
               "firstResponseAt", "resolvedAt", "resolvedById",
               "firstResponseBreached", "resolutionBreached", "createdAt", "updatedAt",
               "organizationId", "departmentId", "projectId",
-              source, "registeredById", "originDate", "descriptionEditedAt", "mailboxId", reference
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)
+              source, "registeredById", "originDate", "descriptionEditedAt", "mailboxId", reference,
+              "firstResolvedAt", "reopenCount", "lastReopen"
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)
           `, [
             newId, t.name, sanitizeHtml(t.description ?? ''), t.priority, t.status, categoryIdFor(t.category),
             targetWorkspaceId, userIdFor(t.reporterEmail), userIdFor(t.assigneeEmail), ticketNumber,
@@ -1509,6 +1525,18 @@ export class ImportWorkspace {
             organizationIdFor(t.organizationId), departmentIdFor(t.departmentId), projectIdFor(t.projectId),
             t.source ?? TicketSource.UI, userIdFor(t.registeredByEmail ?? null), t.originDate ?? null, t.descriptionEditedAt ?? null,
             mailboxIdFor(t.mailboxOriginId), reference,
+            t.firstResolvedAt ?? null, t.reopenCount ?? 0,
+            t.lastReopen
+              ? JSON.stringify({
+                byId: userIdFor(t.lastReopen.byEmail ?? null),
+                at: t.lastReopen.at,
+                reason: t.lastReopen.reason,
+                note: t.lastReopen.note ?? '',
+                fromStatus: t.lastReopen.fromStatus,
+                previousResolvedById: userIdFor(t.lastReopen.previousResolvedByEmail ?? null),
+                previousResolvedAt: t.lastReopen.previousResolvedAt ?? null,
+              })
+              : null,
           ]);
           ticketIdMap.set(t.id, newId);
           links.record(LINK.ticket, originOf(t), newId);

@@ -16,6 +16,64 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.37.0',
+    date: '2026-10-22',
+    categories: [
+      {
+        title: { en: 'Tickets', es: 'Tickets' },
+        features: [
+          { en: 'Filter by several statuses at once (Open, Pending, In progress, Resolved, Discarded), or tick All', es: 'Filtra por varios estados a la vez (Abierto, Pendiente, En curso, Resuelto, Descartado), o marca Todos' },
+          { en: 'Every filter takes several values: priorities, departments, organizations and categories, with "No department", "No organization" and "No category"', es: 'Todos los filtros admiten varios valores: prioridades, departamentos, organizaciones y categorías, con "Sin departamento", "Sin organización" y "Sin categoría"' },
+          { en: '"My departments" shows the tickets of the departments you are in', es: '"Mis departamentos" muestra los tickets de los departamentos en los que estás' },
+          { en: 'The filters are remembered for each workspace in this browser, and the status chip always shows which tickets you see', es: 'Los filtros se recuerdan por workspace en este navegador, y el chip de estado siempre dice qué tickets ves' },
+          { en: 'The board reloads when you change the project, organization or category', es: 'El tablero se recarga al cambiar de proyecto, organización o categoría' },
+          { en: 'Reopen a resolved or discarded ticket giving the reason, and choose which column it goes back to and who handles it; whoever resolved it is told', es: 'Reabre un ticket resuelto o descartado indicando el motivo, y elige a qué columna vuelve y quién lo lleva; quien lo resolvió recibe un aviso' },
+          { en: 'Status and assignee always go together: moving a ticket to Open sends it back to the queue, and moving an unassigned one to Pending or In progress assigns it to you. Changing the status tells you before you confirm', es: 'Estado y asignado van siempre de la mano: pasar un ticket a Abierto lo devuelve a la cola, y pasar uno sin asignar a Pendiente o En curso te lo asigna a ti. El cambio de estado te avisa antes de confirmar' },
+        ],
+      },
+      {
+        title: { en: 'Departments', es: 'Departamentos' },
+        features: [
+          { en: 'Pick the agents when you create or edit a department, several at once, and save them with the rest', es: 'Elige los agentes al crear o editar un departamento, varios a la vez, y se guardan con el resto' },
+          { en: 'A department without agents says so and offers to add them; the list shows who is in each one', es: 'Un departamento sin agentes lo indica y ofrece añadirlos; la lista muestra quién está en cada uno' },
+          { en: 'The agent picker explains why someone cannot be added and links to Members and Invitations', es: 'El selector de agentes explica por qué no se puede añadir a alguien y enlaza a Miembros e Invitaciones' },
+        ],
+      },
+      {
+        title: { en: 'Portal', es: 'Portal' },
+        features: [
+          { en: 'Requesters can reopen their ticket for 14 days after it is resolved', es: 'El solicitante puede reabrir su ticket durante los 14 días siguientes a su resolución' },
+        ],
+      },
+      {
+        title: { en: 'Reports', es: 'Informes' },
+        features: [
+          { en: 'Reopened tickets no longer count as resolved', es: 'Los tickets reabiertos ya no cuentan como resueltos' },
+        ],
+      },
+      {
+        title: { en: 'API', es: 'API' },
+        features: [
+          { en: 'The ticket list accepts several statuses or priorities separated by commas (status=open,pending)', es: 'La lista de tickets acepta varios estados o prioridades separados por comas (status=open,pending)' },
+          { en: 'New POST /tickets/:id/reopen endpoint and ticket.reopened webhook', es: 'Nuevo endpoint POST /tickets/:id/reopen y webhook ticket.reopened' },
+          { en: 'Changing a closed ticket to an active status returns 400', es: 'Cambiar el estado de un ticket cerrado a uno activo devuelve 400' },
+          { en: 'In PATCH /tickets/:id, status and assigneeId sent together must fit, and the assignee is applied first', es: 'En PATCH /tickets/:id, status y assigneeId enviados juntos deben encajar, y el asignado se aplica primero' },
+        ],
+      },
+      {
+        title: { en: 'Lists', es: 'Listas' },
+        features: [
+          { en: 'The ticket list shows how many tickets there are and lets you go to any page; the page stays in the address', es: 'La lista de tickets dice cuántos hay y permite ir a cualquier página; la página queda en la dirección' },
+          { en: 'Choose 20, 50 or 100 tickets per page; this browser remembers it', es: 'Elige 20, 50 o 100 tickets por página; este navegador lo recuerda' },
+          { en: 'Changing the project, department, organization or category goes back to the first page, so tickets no longer seem to vanish', es: 'Cambiar de proyecto, departamento, organización o categoría vuelve a la primera página, así los tickets ya no parecen desaparecer' },
+          { en: 'The audit logs and My stats use the same page controls', es: 'Los registros de auditoría y Mis estadísticas usan los mismos controles de página' },
+          { en: 'Empty pages show their sidebar icon, say what the section is for and offer to create the first item; a filter that matches nothing offers to clear it', es: 'Las páginas vacías muestran su icono del menú, explican para qué sirve la sección y ofrecen crear el primer elemento; un filtro sin resultados ofrece limpiarlo' },
+          { en: 'Only members who can manage projects see the buttons to create, edit and delete them', es: 'Solo quien puede gestionar proyectos ve los botones para crearlos, editarlos y borrarlos' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.36.0',
     date: '2026-10-20',
     categories: [

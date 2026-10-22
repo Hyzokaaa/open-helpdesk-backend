@@ -15,6 +15,8 @@ import {
   TicketRepository,
 } from '../../../domain/repositories/ticket.repository';
 import { TicketModel } from '../models/ticket.model';
+import { inListCondition } from './in-list-condition';
+import { TicketReopen } from '../../../domain/ticket-reopen';
 import { TagModel } from '../../../../tag/infrastructure/typeorm/models/tag.model';
 
 @Injectable()
@@ -99,18 +101,16 @@ export class TypeOrmTicketRepository implements TicketRepository {
         { references, ticketNumber, search: `%${search}%` },
       );
     }
-    if (filters.status) {
-      qb.andWhere('ticket.status = :status', { status: filters.status });
-    }
+    const inList = (column: string, values: (string | null)[] | undefined, param: string) => {
+      const condition = inListCondition(column, values, param);
+      if (condition) qb.andWhere(condition.sql, condition.params);
+    };
+    inList('ticket.status', filters.statuses, 'statuses');
     if (filters.excludeStatus) {
       const excluded = filters.excludeStatus.split(',');
       qb.andWhere('ticket.status NOT IN (:...excluded)', { excluded });
     }
-    if (filters.priority) {
-      qb.andWhere('ticket.priority = :priority', {
-        priority: filters.priority,
-      });
-    }
+    inList('ticket.priority', filters.priorities, 'priorities');
     if (filters.assigneeId) {
       qb.andWhere('ticket.assigneeId = :assigneeId', {
         assigneeId: filters.assigneeId,
@@ -133,26 +133,25 @@ export class TypeOrmTicketRepository implements TicketRepository {
         { agentUserId: filters.agentUserId, openStatus: 'open' },
       );
     }
-    if (filters.departmentId) {
-      qb.andWhere('ticket.departmentId = :departmentId', {
-        departmentId: filters.departmentId,
+    // Departments: the ones chosen, those without one, and the caller's own, any of them
+    const departments = inListCondition('ticket.departmentId', filters.departmentIds, 'departmentIds');
+    const mine = filters.departmentsOfUserId
+      ? 'ticket.departmentId IN (SELECT dm."departmentId" FROM department_members dm WHERE dm."userId" = :departmentsOfUserId)'
+      : null;
+    if (departments || mine) {
+      qb.andWhere(`(${[departments?.sql, mine].filter(Boolean).join(' OR ')})`, {
+        ...departments?.params,
+        ...(mine ? { departmentsOfUserId: filters.departmentsOfUserId } : {}),
       });
     }
-    if (filters.organizationId) {
-      qb.andWhere('ticket.organizationId = :organizationId', {
-        organizationId: filters.organizationId,
-      });
-    }
+    inList('ticket.organizationId', filters.organizationIds, 'organizationIds');
     if (filters.projectId) {
       qb.andWhere('ticket.projectId = :projectId', {
         projectId: filters.projectId,
       });
     }
-    if (filters.categoryId) {
-      qb.andWhere('ticket.categoryId = :categoryId', {
-        categoryId: filters.categoryId,
-      });
-    }
+    inList('ticket.categoryId', filters.categoryIds, 'categoryIds');
+    if (filters.reopened) qb.andWhere('ticket.reopenCount > 0');
     if (filters.tagIds && filters.tagIds.length > 0) {
       qb.andWhere(
         'ticket.id IN ' +
@@ -261,6 +260,9 @@ export class TypeOrmTicketRepository implements TicketRepository {
       mailboxId: model.mailboxId ?? null,
       originDate: model.originDate ?? null,
       descriptionEditedAt: model.descriptionEditedAt ?? null,
+      firstResolvedAt: model.firstResolvedAt ?? null,
+      reopenCount: model.reopenCount ?? 0,
+      lastReopen: (model.lastReopen as unknown as TicketReopen | null) ?? null,
     });
   }
 
@@ -293,6 +295,9 @@ export class TypeOrmTicketRepository implements TicketRepository {
     model.mailboxId = ticket.mailboxId;
     model.originDate = ticket.originDate;
     model.descriptionEditedAt = ticket.descriptionEditedAt;
+    model.firstResolvedAt = ticket.firstResolvedAt;
+    model.reopenCount = ticket.reopenCount;
+    model.lastReopen = ticket.lastReopen as unknown as Record<string, unknown> | null;
     return model;
   }
 }

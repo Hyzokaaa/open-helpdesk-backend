@@ -2464,7 +2464,7 @@ describe('ImportWorkspace configuration', () => {
         emptyExport({ users: [alice], mailboxes: [mailbox()], tickets: [{ ...ticket('t-1', null), mailboxOriginId: 'mb-origin' }] }),
       );
       const [ticketInsert] = created.qr.find(/INSERT INTO tickets/);
-      expect(ticketInsert.sql).toMatch(/"mailboxId", reference\n/);
+      expect(ticketInsert.sql).toMatch(/"mailboxId", reference,\n/);
       expect(ticketInsert.params[26]).toBe('mb-here');
 
       const here = {

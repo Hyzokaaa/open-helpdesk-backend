@@ -1,3 +1,4 @@
+import { userAuditLabel } from '../../../../user/domain/user-audit-label';
 import {
   BadRequestException,
   Body,
@@ -24,6 +25,7 @@ import { CreateUser } from '../../../../user/domain/services/user-create';
 import { AddWorkspaceMember } from '../../../../workspace/domain/services/workspace-add-member';
 import { CreateTicket } from '../../../domain/services/ticket-create';
 import { CreateComment } from '../../../../comment/domain/services/comment-create';
+import { EnsureWorkspacePermission } from '../../../../workspace/domain/services/workspace-ensure-permission';
 import { ClaimStagedAttachments } from '../../../../attachment/domain/services/attachment-claim-staged';
 import { StageAttachment } from '../../../../attachment/domain/services/attachment-stage';
 import { StageUploadCommand, StageUploadResponse } from '../../.././../attachment/application/commands/stage-upload.command';
@@ -56,6 +58,11 @@ import { AutoEnrollOrganization } from '../../../../organization/domain/services
 import { ResolvePortalReporter } from '../../../domain/services/ticket-portal-resolve-reporter';
 import { commentPreview } from '../../../../comment/domain/comment-preview';
 import { ticketReferenceOf } from '../../../domain/ticket-reference';
+import { ReopenPortalTicketRequest } from '../dto/reopen-portal-ticket.request';
+import { ReopenTicket } from '../../../domain/services/ticket-reopen';
+import { ReopenTicketCommand } from '../../../application/commands/reopen-ticket.command';
+import { TicketReopenReason } from '../../../domain/enums/ticket-reopen-reason.enum';
+import { requesterReopenUntil } from '../../../domain/ticket-requester-reopen';
 
 /** Portal visitors have no account; their staged uploads are claimed only by portal tickets. */
 const PORTAL_UPLOADER = 'portal-anonymous';
@@ -299,6 +306,8 @@ export class PortalController {
       // Already in the portal's address; the page needs it to upload files with a reply
       workspaceSlug: workspace?.slug ?? '',
       workspacePalette: workspace?.palette ?? null,
+      // For the requester only: until when they can say it is not solved, while resolved; null otherwise
+      ...(ticket.reporterId === viewer.getId() && { reopenUntil: requesterReopenUntil(ticket, viewer.getId()) }),
       attachments: attachmentList,
       comments: comments.map((c) => ({
         id: c.id,
@@ -375,6 +384,54 @@ export class PortalController {
     }
 
     return { message: 'Comment added' };
+  }
+
+  /**
+   * The requester says it is not solved: the message is published as their reply and the ticket
+   * is reopened with it as the reason, within REQUESTER_REOPEN_DAYS (14) days of being resolved.
+   */
+  @Post('tickets/:portalToken/reopen')
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  async reopenPortalTicket(
+    @Param('portalToken') portalToken: string,
+    @Body() body: ReopenPortalTicketRequest,
+  ) {
+    const { ticket, workspace, user: author } = await this.resolveAccess(portalToken);
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    // Reopened first: outside the window, or not the requester, nothing is written
+    const command = new ReopenTicketCommand(new ReopenTicket(this.ticketRepository, this.memberRepository), new EnsureWorkspacePermission(this.memberRepository), this.eventPublisher, auditLog, userAuditLabel(this.userRepository));
+    const result = await command.execute({
+      ticketId: ticket.getId(),
+      reason: TicketReopenReason.REQUESTER,
+      note: body.content,
+      workspaceId: workspace.getId(),
+      workspaceName: workspace.name,
+      workspaceSlug: workspace.slug,
+      userId: author.getId(),
+      isSystemAdmin: false,
+      byRequester: true,
+    });
+
+    // Their message as a reply too, so it reads in the conversation. The reopen already told the
+    // team, with this message, so no comment notification on top
+    const comment = await new CreateComment(this.idGenerator, this.commentRepository).execute({
+      content: body.content,
+      ticketId: ticket.getId(),
+      authorId: author.getId(),
+    });
+    await auditLog.execute({
+      action: AuditAction.PORTAL_COMMENT_CREATED,
+      category: AuditCategory.TICKET,
+      level: AuditLevel.INFO,
+      source: 'portal',
+      entityType: 'ticket',
+      entityId: ticket.getId(),
+      userId: author.getId(),
+      workspaceId: ticket.workspaceId,
+      metadata: { ticketId: ticket.getId(), commentId: comment.getId(), ticketName: ticket.name, content: commentPreview(comment.content) },
+    });
+
+    return { status: result.status };
   }
 
   /** The ticket, its workspace and the person a portal link belongs to; a dead link is a 404. */

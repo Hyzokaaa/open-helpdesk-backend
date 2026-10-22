@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
 } from '@nestjs/common';
 import { CurrentUser } from '../../../../shared/nest/decorators/current-user.decorator';
 import { AuthUser } from '../../../../shared/nest/strategies/jwt.strategy';
@@ -22,6 +23,9 @@ import { UpdateDepartment } from '../../../domain/services/department-update';
 import { DeleteDepartment } from '../../../domain/services/department-delete';
 import { AddDepartmentMember } from '../../../domain/services/department-member-add';
 import { RemoveDepartmentMember } from '../../../domain/services/department-member-remove';
+import { SetDepartmentMembers } from '../../../domain/services/department-members-set';
+import { SetDepartmentMembersCommand } from '../../../application/commands/set-department-members.command';
+import { SetDepartmentMembersRequest } from '../dto/set-department-members.request';
 import { CreateDepartmentCommand } from '../../../application/commands/create-department.command';
 import { UpdateDepartmentCommand } from '../../../application/commands/update-department.command';
 import { DeleteDepartmentCommand } from '../../../application/commands/delete-department.command';
@@ -60,10 +64,11 @@ export class DepartmentController {
     const workspaceId = await this.resolveWorkspaceId(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
     const service = new CreateDepartment(this.idGenerator, this.departmentRepository);
-    const command = new CreateDepartmentCommand(service, ensurePermission);
+    const command = new CreateDepartmentCommand(service, ensurePermission, this.setMembersService());
     const result = await command.execute({
       name: body.name,
       description: body.description ?? null,
+      memberUserIds: body.memberUserIds,
       workspaceId,
       userId: user.userId,
       isSystemAdmin: user.isSystemAdmin,
@@ -81,6 +86,7 @@ export class DepartmentController {
       level: AuditLevel.INFO,
       source: 'ui',
     });
+    await this.auditMemberChanges(result.id, { added: result.memberUserIds, removed: [] }, user.userId, workspaceId);
 
     return result;
   }
@@ -92,7 +98,7 @@ export class DepartmentController {
   ) {
     const workspaceId = await this.resolveWorkspaceId(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
-    const query = new ListDepartmentsQuery(this.departmentRepository, this.departmentMemberRepository, ensurePermission);
+    const query = new ListDepartmentsQuery(this.departmentRepository, this.departmentMemberRepository, ensurePermission, this.userRepository);
     return query.execute({ workspaceId, userId: user.userId, isSystemAdmin: user.isSystemAdmin });
   }
 
@@ -207,6 +213,28 @@ export class DepartmentController {
     return result;
   }
 
+  /** Replaces the department's agents with the list sent; each one added or taken out is audited. */
+  @Put(':id/members')
+  async setMembers(
+    @Param('slug') slug: string,
+    @Param('id') id: string,
+    @Body() body: SetDepartmentMembersRequest,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
+    const command = new SetDepartmentMembersCommand(this.setMembersService(), ensurePermission);
+    const change = await command.execute({
+      departmentId: id,
+      userIds: body.userIds,
+      workspaceId,
+      currentUserId: user.userId,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+    await this.auditMemberChanges(id, change, user.userId, workspaceId);
+    return change;
+  }
+
   @Delete(':id/members/:userId')
   async removeMember(
     @Param('slug') slug: string,
@@ -240,6 +268,32 @@ export class DepartmentController {
     });
 
     return { removed: true };
+  }
+
+  private setMembersService(): SetDepartmentMembers {
+    return new SetDepartmentMembers(this.idGenerator, this.departmentMemberRepository, this.departmentRepository, this.memberRepository);
+  }
+
+  /** One entry per agent added or taken out, as when they are changed one at a time. */
+  private async auditMemberChanges(departmentId: string, change: { added: string[]; removed: string[] }, userId: string, workspaceId: string) {
+    const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
+    const entries = [
+      ...change.added.map((id) => [AuditAction.DEPARTMENT_MEMBER_ADDED, id] as const),
+      ...change.removed.map((id) => [AuditAction.DEPARTMENT_MEMBER_REMOVED, id] as const),
+    ];
+    for (const [action, memberUserId] of entries) {
+      await auditLog.execute({
+        action,
+        entityType: 'department',
+        entityId: departmentId,
+        userId,
+        workspaceId,
+        metadata: { memberUserId, ...(await this.memberAuditLabels(departmentId, memberUserId, workspaceId)) },
+        category: AuditCategory.CONFIG,
+        level: AuditLevel.INFO,
+        source: 'ui',
+      });
+    }
   }
 
   /** The department and member by name, so a member change reads in the audit log without lookups. */

@@ -178,7 +178,7 @@ export class ExportWorkspace {
           t."discardReason", t."firstResponseAt", t."resolvedAt",
           t."resolvedById", t."firstResponseBreached", t."resolutionBreached",
           t."organizationId", t."departmentId", t."projectId", t.source, t."registeredById", t."mailboxId",
-          t."originDate", t."descriptionEditedAt", t."createdAt", t."updatedAt",
+          t."originDate", t."descriptionEditedAt", t."firstResolvedAt", t."reopenCount", t."lastReopen", t."createdAt", t."updatedAt",
           COALESCE(array_agg(tt."tagsId") FILTER (WHERE tt."tagsId" IS NOT NULL), '{}') as "tagIds"
         FROM tickets t
         LEFT JOIN ticket_categories tc ON tc.id = t."categoryId"
@@ -309,7 +309,10 @@ export class ExportWorkspace {
       const users = new Map<string, any>(members.map((m: any) => [m.id, m]));
       const referenced = new Set<string>();
       const refer = (id: string | null | undefined) => { if (id && !users.has(id)) referenced.add(id); };
-      for (const t of tickets) { refer(t.reporterId); refer(t.assigneeId); refer(t.resolvedById); refer(t.registeredById); }
+      for (const t of tickets) {
+        refer(t.reporterId); refer(t.assigneeId); refer(t.resolvedById); refer(t.registeredById);
+        refer(t.lastReopen?.byId); refer(t.lastReopen?.previousResolvedById);
+      }
       for (const c of comments) {
         c.mentionedUserIds = simpleArrayOf(c.mentionedUserIds);
         refer(c.authorId);
@@ -423,6 +426,19 @@ export class ExportWorkspace {
           registeredByEmail: emailFor(t.registeredById),
           originDate: t.originDate?.toISOString() ?? null,
           descriptionEditedAt: t.descriptionEditedAt?.toISOString() ?? null,
+          firstResolvedAt: t.firstResolvedAt?.toISOString() ?? null,
+          reopenCount: t.reopenCount ?? 0,
+          lastReopen: t.lastReopen
+            ? {
+              byEmail: emailFor(t.lastReopen.byId),
+              at: t.lastReopen.at,
+              reason: t.lastReopen.reason,
+              note: t.lastReopen.note ?? '',
+              fromStatus: t.lastReopen.fromStatus,
+              previousResolvedByEmail: emailFor(t.lastReopen.previousResolvedById),
+              previousResolvedAt: t.lastReopen.previousResolvedAt ?? null,
+            }
+            : null,
           createdAt: t.createdAt?.toISOString() ?? null,
           updatedAt: t.updatedAt?.toISOString() ?? null,
         })),

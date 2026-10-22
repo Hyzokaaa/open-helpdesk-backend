@@ -38,7 +38,7 @@ describe('ChangeTicketStatus', () => {
   });
 
   it('should change status from pending to in-progress', async () => {
-    await repository.create(createTicket());
+    await repository.create(createTicket({ assigneeId: 'agent-1' }));
 
     const result = await service.execute({ ticketId: 'ticket-1', status: TicketStatus.IN_PROGRESS, userId: 'user-1' });
 
@@ -53,12 +53,21 @@ describe('ChangeTicketStatus', () => {
     expect(result.resolvedAt).toBeInstanceOf(Date);
   });
 
-  it('should clear resolvedAt when moving back from resolved to in-progress', async () => {
+  it('does not reopen: a closed ticket only moves between closed statuses', async () => {
     await repository.create(createTicket({ status: TicketStatus.RESOLVED, resolvedAt: new Date() }));
 
-    const result = await service.execute({ ticketId: 'ticket-1', status: TicketStatus.IN_PROGRESS, userId: 'user-1' });
+    for (const status of [TicketStatus.IN_PROGRESS, TicketStatus.PENDING, TicketStatus.OPEN]) {
+      await expect(service.execute({ ticketId: 'ticket-1', status, userId: 'user-1', canMoveToOpen: true }))
+        .rejects.toThrow(DomainValidationError);
+    }
+    const discarded = await service.execute({ ticketId: 'ticket-1', status: TicketStatus.DISCARDED, discardReason: TicketDiscardReason.DUPLICATE, userId: 'user-1' });
+    expect(discarded.status).toBe(TicketStatus.DISCARDED);
+  });
 
-    expect(result.resolvedAt).toBeNull();
+  it('keeps the first resolution apart', async () => {
+    await repository.create(createTicket({ status: TicketStatus.IN_PROGRESS }));
+    const first = await service.execute({ ticketId: 'ticket-1', status: TicketStatus.RESOLVED, userId: 'user-1' });
+    expect(first.firstResolvedAt).toEqual(first.resolvedAt);
   });
 
   it('should throw EntityNotFoundError when ticket does not exist', async () => {
@@ -89,16 +98,33 @@ describe('ChangeTicketStatus', () => {
     expect(result.assigneeId).toBeNull();
   });
 
-  it('should not auto-assign when moving from open (pickup is explicit)', async () => {
+  it('work with nobody assigned takes whoever moved it, as a pickup would', async () => {
     await repository.create(createTicket({ status: TicketStatus.OPEN }));
 
     const result = await service.execute({
       ticketId: 'ticket-1',
       status: TicketStatus.IN_PROGRESS,
       userId: 'user-2',
+      takerId: 'user-2',
     });
 
-    expect(result.assigneeId).toBeNull();
+    expect(result.assigneeId).toBe('user-2');
+  });
+
+  it('work with nobody assigned and nobody to take it is refused', async () => {
+    await repository.create(createTicket({ status: TicketStatus.OPEN }));
+
+    await expect(service.execute({ ticketId: 'ticket-1', status: TicketStatus.PENDING, userId: 'user-2', takerId: null }))
+      .rejects.toThrow(DomainValidationError);
+  });
+
+  it('keeps whoever had it, and the queue lets go of them', async () => {
+    await repository.create(createTicket({ assigneeId: 'agent-1' }));
+    const kept = await service.execute({ ticketId: 'ticket-1', status: TicketStatus.IN_PROGRESS, userId: 'user-2', takerId: 'user-2' });
+    expect(kept.assigneeId).toBe('agent-1');
+
+    const queued = await service.execute({ ticketId: 'ticket-1', status: TicketStatus.OPEN, userId: 'user-2', canMoveToOpen: true });
+    expect(queued.assigneeId).toBeNull();
   });
 
   it('should require discard reason when discarding', async () => {

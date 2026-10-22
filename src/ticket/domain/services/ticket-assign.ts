@@ -1,7 +1,7 @@
 import { EntityNotFoundError } from '../../../shared/domain/errors';
 import { Ticket } from '../entities/ticket';
-import { TicketStatus } from '../enums/ticket-status.enum';
 import { TicketRepository } from '../repositories/ticket.repository';
+import { statusForAssignee } from '../ticket-assignment-rule';
 
 interface AssignTicketProps {
   ticketId: string;
@@ -18,15 +18,8 @@ export class AssignTicket {
     }
 
     ticket.assigneeId = props.assigneeId;
-
-    if (props.assigneeId && ticket.status === TicketStatus.OPEN) {
-      ticket.status = TicketStatus.PENDING;
-    }
-
-    // The other way round: a ticket nobody owns is open, so it shows in the queue to be picked up
-    if (!props.assigneeId && (ticket.status === TicketStatus.PENDING || ticket.status === TicketStatus.IN_PROGRESS)) {
-      ticket.status = TicketStatus.OPEN;
-    }
+    // Assigned from the queue it becomes Pending; left with nobody, work goes back to the queue
+    ticket.status = statusForAssignee(ticket.status, props.assigneeId);
 
     await this.repository.update(ticket);
     return ticket;

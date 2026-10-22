@@ -110,6 +110,25 @@ const translations: Translations = {
     en: 'The status of {ticketName} has been updated.',
     es: 'El estado de {ticketName} ha sido actualizado.',
   },
+  // Ticket reopened
+  'ticketReopened.title': { en: 'Ticket reopened', es: 'Ticket reabierto' },
+  'ticketReopened.subject': { en: 'Ticket reopened', es: 'Ticket reabierto' },
+  'ticketReopened.body': {
+    en: '{name} reopened {ticketName}. It needs work again.',
+    es: '{name} ha reabierto {ticketName}. Vuelve a necesitar trabajo.',
+  },
+  'ticketReopened.resolvedBy': { en: 'It had been resolved by {name}.', es: 'Lo había resuelto {name}.' },
+  'ticketReopened.titleRequester': { en: 'We reopened your ticket', es: 'Hemos reabierto tu ticket' },
+  'ticketReopened.subjectRequester': { en: 'We reopened your ticket', es: 'Hemos reabierto tu ticket' },
+  'ticketReopened.bodyRequester': {
+    en: 'We are working on {ticketName} again. We will let you know when it is solved.',
+    es: 'Volvemos a trabajar en {ticketName}. Te avisaremos cuando esté resuelto.',
+  },
+  'reopenReason.issue-persists': { en: 'The problem is still there', es: 'El problema sigue' },
+  'reopenReason.closed-without-confirmation': { en: "Closed without the requester's confirmation", es: 'Se cerró sin la conformidad del solicitante' },
+  'reopenReason.work-missing': { en: 'Part of the work is missing', es: 'Falta parte del trabajo' },
+  'reopenReason.other': { en: 'Other', es: 'Otro' },
+  'reopenReason.requester': { en: 'The requester says it is not solved', es: 'El solicitante dice que no está resuelto' },
   // Password reset
   'passwordReset.subject': {
     en: 'Reset your password',
