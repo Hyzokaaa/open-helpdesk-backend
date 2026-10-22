@@ -36,7 +36,7 @@ export class VerifyCustomDomain {
     const token = workspace.domainVerificationToken;
 
     const dnsValid = await this.checkDns(domain);
-    const txtValid = await this.checkTxt(domain, token);
+    const txtValid = await keepsVerificationRecord(domain, token);
 
     if (dnsValid && txtValid) {
       workspace.customDomainVerified = true;
@@ -58,13 +58,15 @@ export class VerifyCustomDomain {
     return pointsToInstallation(domain, this.expectedCnameTarget);
   }
 
-  private async checkTxt(domain: string, token: string): Promise<boolean> {
-    try {
-      const txtRecords = await dns.resolveTxt(`_oh-verify.${domain}`);
-      return txtRecords.flat().some((t) => t === token);
-    } catch {
-      return false;
-    }
+}
+
+/** Whether the domain still publishes the TXT record that proved it belongs to the workspace. */
+export async function keepsVerificationRecord(domain: string, token: string): Promise<boolean> {
+  try {
+    const txtRecords = await dns.resolveTxt(`_oh-verify.${domain}`);
+    return txtRecords.flat().some((t) => t === token);
+  } catch {
+    return false;
   }
 }
 

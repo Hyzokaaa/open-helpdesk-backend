@@ -3,6 +3,7 @@ import { Public } from '../../../../shared/nest/decorators/public.decorator';
 import { TypeOrmWorkspaceRepository } from '../../typeorm/repositories/typeorm-workspace.repository';
 import { StorageService } from '../../../../shared/domain/storage-service';
 import { STORAGE_SERVICE } from '../../../../shared/shared.module';
+import { isCustomDomainTrusted } from '../../../domain/services/workspace-custom-domain-trust';
 
 @Controller('internal')
 export class DomainCheckController {
@@ -52,6 +53,8 @@ export class DomainCheckController {
         // What the domain shows someone signed out: the portal, or sign-in and maybe the articles
         portalEnabled: w.portalEnabled,
         publicKbEnabled: w.publicKbEnabled,
+        // Whether the installation hands sessions over to this domain (#37): its DNS still points here
+        sessionHandoff: isCustomDomainTrusted(w),
       })),
     );
 

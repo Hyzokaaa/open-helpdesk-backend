@@ -11,7 +11,7 @@ import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum'
 import { CustomDomainCheckEvent } from '../../../../email/domain/events';
 import { TypeOrmWorkspaceRepository } from '../../typeorm/repositories/typeorm-workspace.repository';
 import { CustomDomainCheckOutcome, RecheckCustomDomain } from '../../../domain/services/workspace-recheck-custom-domain';
-import { pointsToInstallation } from '../../../domain/services/workspace-verify-custom-domain';
+import { keepsVerificationRecord, pointsToInstallation } from '../../../domain/services/workspace-verify-custom-domain';
 import { Workspace } from '../../../domain/entities/workspace';
 
 const AUDIT: Partial<Record<CustomDomainCheckOutcome, { action: AuditAction; level: AuditLevel }>> = {
@@ -63,7 +63,7 @@ export class CustomDomainCheckScheduler implements OnApplicationBootstrap {
     const target = this.config.get<string>('CUSTOM_DOMAIN_CNAME_TARGET')?.trim();
     if (!target) return;
 
-    const recheck = new RecheckCustomDomain(this.workspaceRepository, (domain) => pointsToInstallation(domain, target));
+    const recheck = new RecheckCustomDomain(this.workspaceRepository, (domain) => pointsToInstallation(domain, target), keepsVerificationRecord);
     for (const workspace of await this.workspaceRepository.findWithVerifiedCustomDomain()) {
       try {
         const outcome = await recheck.execute(workspace, now);

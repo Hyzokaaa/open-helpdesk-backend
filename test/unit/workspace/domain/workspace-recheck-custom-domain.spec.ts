@@ -6,6 +6,7 @@ import { MockWorkspaceRepository } from '../../../mocks/mock-workspace.repositor
 describe('RecheckCustomDomain', () => {
   let workspaces: MockWorkspaceRepository;
   let pointsHere: boolean;
+  let publishedRecord: string | null;
   let recheck: RecheckCustomDomain;
   const day = (n: number) => new Date(Date.UTC(2026, 9, n, 5));
 
@@ -18,7 +19,8 @@ describe('RecheckCustomDomain', () => {
   beforeEach(() => {
     workspaces = new MockWorkspaceRepository();
     pointsHere = true;
-    recheck = new RecheckCustomDomain(workspaces, async () => pointsHere);
+    publishedRecord = null;
+    recheck = new RecheckCustomDomain(workspaces, async () => pointsHere, async (_domain, token) => token === publishedRecord);
   });
 
   it('leaves a domain that still points here untouched', async () => {
@@ -42,6 +44,37 @@ describe('RecheckCustomDomain', () => {
     expect(workspace.customDomainFailingSince).toEqual(day(1));
 
     await expect(recheck.execute(workspace, day(4))).resolves.toBe('still-distrusted');
+  });
+
+  it('keeps trusting a domain behind a proxy that still publishes its verification record', async () => {
+    const workspace = seed();
+    workspace.domainVerificationToken = 'oh-verify=abc';
+    pointsHere = false;
+    publishedRecord = 'oh-verify=abc';
+
+    await expect(recheck.execute(workspace, day(1))).resolves.toBe('ok');
+    expect(isCustomDomainTrusted(workspace)).toBe(true);
+  });
+
+  it('gives the trust back to a distrusted domain whose record is found, and only its own record counts', async () => {
+    const workspace = seed();
+    workspace.domainVerificationToken = 'oh-verify=abc';
+    pointsHere = false;
+    publishedRecord = 'oh-verify=someone-else';
+    for (const n of [1, 2, 3]) await recheck.execute(workspace, day(n));
+    expect(isCustomDomainTrusted(workspace)).toBe(false);
+
+    publishedRecord = 'oh-verify=abc';
+    await expect(recheck.execute(workspace, day(4))).resolves.toBe('recovered');
+    expect(isCustomDomainTrusted(workspace)).toBe(true);
+  });
+
+  it('has no record to look for on a domain added without DNS checks', async () => {
+    const workspace = seed();
+    pointsHere = false;
+    publishedRecord = null;
+
+    await expect(recheck.execute(workspace, day(1))).resolves.toBe('started-failing');
   });
 
   it('forgets a one-off failure as soon as the domain points here again', async () => {

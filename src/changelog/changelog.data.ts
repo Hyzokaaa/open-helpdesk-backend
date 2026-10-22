@@ -16,6 +16,20 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.37.2',
+    date: '2026-10-22',
+    categories: [
+      {
+        title: { en: 'Sign-in', es: 'Inicio de sesión' },
+        features: [
+          { en: 'Signing out and back in on a custom domain with Remember me keeps the session on the main address too', es: 'Al cerrar sesión y volver a entrar en un dominio propio con Recordarme, la dirección principal también conserva la sesión' },
+          { en: 'A custom domain that can no longer receive the session stays on its own sign-in page instead of stopping on the main address', es: 'Un dominio propio que ya no puede recibir la sesión se queda en su propio inicio de sesión, en vez de pararse en la dirección principal' },
+          { en: 'A custom domain behind a proxy such as Cloudflare stays trusted while it keeps its verification TXT record', es: 'Un dominio propio detrás de un proxy como Cloudflare sigue siendo de confianza mientras mantenga su registro TXT de verificación' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.37.0',
     date: '2026-10-22',
     categories: [
