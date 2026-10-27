@@ -3,6 +3,7 @@ import { PasswordHasher } from '../../../shared/domain/password-hasher';
 import { UserRepository } from '../../../user/domain/repositories/user.repository';
 import { WorkspaceMemberRepository } from '../repositories/workspace-member.repository';
 import { CreateUser } from '../../../user/domain/services/user-create';
+import { UserSignupMethod } from '../../../user/domain/enums/user-signup-method.enum';
 import { AddWorkspaceMember } from './workspace-add-member';
 import { WorkspaceRole } from '../enums/workspace-role.enum';
 import { randomBytes } from 'crypto';
@@ -62,6 +63,7 @@ export class ConfirmImportMembers {
           lastName: row.lastName,
           isEmailVerified: props.skipVerification,
           autoCreated: true,
+          signupMethod: UserSignupMethod.IMPORT,
         });
         created++;
         createdUsers.push({

@@ -16,6 +16,7 @@ import {
   UploadedFile,
   UseInterceptors,
 } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { Request, Response } from "express";
 import { diskStorage } from "multer";
@@ -48,7 +49,9 @@ import { UpdateWorkspace } from "../../../domain/services/workspace-update";
 import { UpdateWorkspaceCommand } from "../../../application/commands/update-workspace.command";
 import { UpdateWorkspacePalette } from "../../../domain/services/workspace-update-palette";
 import { SetCustomDomain } from "../../../domain/services/workspace-set-custom-domain";
-import { VerifyCustomDomain } from "../../../domain/services/workspace-verify-custom-domain";
+import { VerifyCustomDomain, keepsVerificationRecord, parseCustomDomainTarget, pointsToInstallation } from "../../../domain/services/workspace-verify-custom-domain";
+import { ConfirmCustomDomain } from "../../../domain/services/workspace-confirm-custom-domain";
+import { ConfirmCustomDomainCommand } from "../../../application/commands/confirm-custom-domain.command";
 import { SetBranding } from "../../../domain/services/workspace-set-branding";
 import { SetBrandingCommand } from "../../../application/commands/set-branding.command";
 import { StorageService } from "../../../../shared/domain/storage-service";
@@ -1658,7 +1661,7 @@ export class WorkspaceController {
    * the settings then say so instead of giving DNS instructions that cannot work.
    */
   private customDomainTarget(): string | null {
-    return this.config.get<string>("CUSTOM_DOMAIN_CNAME_TARGET")?.trim() || null;
+    return parseCustomDomainTarget(this.config.get<string>("CUSTOM_DOMAIN_CNAME_TARGET"));
   }
 
   @Patch(":slug/custom-domain")
@@ -1792,6 +1795,40 @@ export class WorkspaceController {
     }
 
     return result;
+  }
+
+  /**
+   * "Check now" on a verified domain the daily check finds failing: the same rule as that check, so
+   * a domain behind a proxy that keeps its TXT record gets its trust back without waiting a day.
+   * A failure counts nothing.
+   */
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  @Post(":slug/custom-domain/recheck")
+  async recheckCustomDomain(
+    @Param("slug") slug: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const workspaceId = await this.resolveWorkspaceId(slug);
+    await new EnsureWorkspacePermission(this.memberRepository).execute({
+      workspaceId,
+      userId: user.userId,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+      isSystemAdmin: user.isSystemAdmin,
+    });
+
+    const cnameTarget = this.customDomainTarget();
+    if (!cnameTarget) {
+      throw new DomainValidationError(
+        "This installation has no target for custom domains yet: its administrator must set CUSTOM_DOMAIN_CNAME_TARGET",
+      );
+    }
+    const service = new ConfirmCustomDomain(
+      this.workspaceRepository,
+      (domain) => pointsToInstallation(domain, cnameTarget),
+      keepsVerificationRecord,
+    );
+    const command = new ConfirmCustomDomainCommand(service, new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository));
+    return command.execute({ workspaceId, userId: user.userId });
   }
 
   @Patch(":slug/branding")

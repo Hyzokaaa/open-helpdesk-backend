@@ -5,6 +5,8 @@ import { User } from '../entities/user';
 import { normalizeUserName } from '../user-name';
 import { ensurePasswordAcceptable } from '../password-policy';
 import { UserRepository } from '../repositories/user.repository';
+import { UserSignupMethod } from '../enums/user-signup-method.enum';
+import { normalizeSignupSource, RawSignupSource } from '../user-signup-source';
 
 interface CreateUserProps {
   email: string;
@@ -14,6 +16,10 @@ interface CreateUserProps {
   isSystemAdmin?: boolean;
   isEmailVerified?: boolean;
   autoCreated?: boolean;
+  /** How the account came to exist; an auto-created account is a ticket's reporter unless told otherwise */
+  signupMethod?: UserSignupMethod;
+  /** Where the person came from, as their browser sent it with the signup */
+  signupSource?: RawSignupSource | null;
 }
 
 export class CreateUser {
@@ -44,6 +50,8 @@ export class CreateUser {
       language: 'en',
       theme: 'system',
       autoCreated: props.autoCreated ?? false,
+      signupMethod: props.signupMethod ?? (props.autoCreated ? UserSignupMethod.REPORTER : null),
+      signupSource: normalizeSignupSource(props.signupSource),
     });
 
     await this.repository.create(user);

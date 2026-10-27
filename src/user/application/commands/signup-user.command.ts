@@ -1,6 +1,7 @@
 import { Command } from '../../../shared/domain/command';
 import { DomainValidationError, ConflictError } from '../../../shared/domain/errors';
 import { CreateUser } from '../../domain/services/user-create';
+import { UserSignupMethod } from '../../domain/enums/user-signup-method.enum';
 import { StartUserSession } from '../../domain/services/user-session-start';
 import { CreateAccountForUser } from '../../../account/domain/services/account-create-for-user';
 import { AcceptInvitation } from '../../../workspace/domain/services/invitation-accept';
@@ -10,6 +11,7 @@ import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-lo
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
 import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
+import { RawSignupSource } from '../../domain/user-signup-source';
 
 interface Props {
   email: string;
@@ -17,6 +19,7 @@ interface Props {
   firstName: string;
   lastName: string;
   invitationToken: string;
+  signupSource?: RawSignupSource | null;
 }
 
 export interface SignupResponse {
@@ -61,6 +64,8 @@ export class SignupUserCommand implements Command<Props, SignupResponse> {
         firstName: props.firstName,
         lastName: props.lastName,
         isEmailVerified: true,
+        signupMethod: UserSignupMethod.INVITATION,
+        signupSource: props.signupSource,
       });
     } catch (err) {
       if (err instanceof ConflictError) throw new ConflictError('Email already registered');

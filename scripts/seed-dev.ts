@@ -16,8 +16,8 @@ const AppDataSource = new DataSource({
 });
 
 const ADMIN = {
-  email: "admin@admin.com",
-  password: "user1234",
+  email: "admin@example.com",
+  password: "admin1234",
   firstName: "System",
   lastName: "Admin",
   isSystemAdmin: true,

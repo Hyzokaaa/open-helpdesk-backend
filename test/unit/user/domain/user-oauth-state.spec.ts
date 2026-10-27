@@ -37,7 +37,15 @@ describe('OAuth state', () => {
 
     const result = await verify.execute({ state: started.state, browserNonce: started.browserNonce });
 
-    expect(result).toEqual({ redirect: 'https://help.acme.com' });
+    expect(result).toEqual({ redirect: 'https://help.acme.com', source: null });
+  });
+
+  it('carries the cleaned signup source to the callback', async () => {
+    const started = issue.execute({ source: { referrer: 'https://old.reddit.com/r/selfhosted', landingPath: '/pricing?x=1' } });
+
+    const result = await verify.execute({ state: started.state, browserNonce: started.browserNonce });
+
+    expect(result?.source).toMatchObject({ channel: 'reddit', referrer: 'old.reddit.com', landingPath: '/pricing' });
   });
 
   it('refuses a callback carried to another browser (login CSRF into the attacker account)', async () => {

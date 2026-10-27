@@ -11,7 +11,7 @@ import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum'
 import { CustomDomainCheckEvent } from '../../../../email/domain/events';
 import { TypeOrmWorkspaceRepository } from '../../typeorm/repositories/typeorm-workspace.repository';
 import { CustomDomainCheckOutcome, RecheckCustomDomain } from '../../../domain/services/workspace-recheck-custom-domain';
-import { keepsVerificationRecord, pointsToInstallation } from '../../../domain/services/workspace-verify-custom-domain';
+import { keepsVerificationRecord, parseCustomDomainTarget, pointsToInstallation } from '../../../domain/services/workspace-verify-custom-domain';
 import { Workspace } from '../../../domain/entities/workspace';
 
 const AUDIT: Partial<Record<CustomDomainCheckOutcome, { action: AuditAction; level: AuditLevel }>> = {
@@ -43,9 +43,20 @@ export class CustomDomainCheckScheduler implements OnApplicationBootstrap {
     private readonly config: ConfigService,
   ) {}
 
-  /** Custom domains in use without a target: tell the operator once, at startup. */
+  private target(): string | null {
+    return parseCustomDomainTarget(this.config.get<string>('CUSTOM_DOMAIN_CNAME_TARGET'));
+  }
+
+  /** A target that is not a host, or custom domains in use without one: tell the operator once, at startup. */
   async onApplicationBootstrap(): Promise<void> {
-    if (this.config.get<string>('CUSTOM_DOMAIN_CNAME_TARGET')?.trim()) return;
+    const raw = this.config.get<string>('CUSTOM_DOMAIN_CNAME_TARGET')?.trim();
+    if (raw && !this.target()) {
+      this.logger.warn(
+        `CUSTOM_DOMAIN_CNAME_TARGET is "${raw}", which is not a host name: it is ignored. `
+        + 'Set it to a host that resolves to this server, such as domains.yourcompany.com.',
+      );
+    }
+    if (this.target()) return;
     try {
       const count = (await this.workspaceRepository.findWithVerifiedCustomDomain()).length;
       if (count === 0) return;
@@ -60,7 +71,7 @@ export class CustomDomainCheckScheduler implements OnApplicationBootstrap {
 
   @Cron(CronExpression.EVERY_DAY_AT_5AM)
   async run(now: Date = new Date()): Promise<void> {
-    const target = this.config.get<string>('CUSTOM_DOMAIN_CNAME_TARGET')?.trim();
+    const target = this.target();
     if (!target) return;
 
     const recheck = new RecheckCustomDomain(this.workspaceRepository, (domain) => pointsToInstallation(domain, target), keepsVerificationRecord);

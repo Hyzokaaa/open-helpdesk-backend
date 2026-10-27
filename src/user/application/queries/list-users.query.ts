@@ -2,6 +2,8 @@ import { Query } from '../../../shared/domain/query';
 import { AccessDeniedError } from '../../../shared/domain/errors';
 import { SortOptions } from '../../../shared/domain/sort-options';
 import { UserRepository } from '../../domain/repositories/user.repository';
+import { UserSignupMethod } from '../../domain/enums/user-signup-method.enum';
+import { UserSignupSource } from '../../domain/user-signup-source';
 
 interface Props {
   sort?: SortOptions;
@@ -16,6 +18,9 @@ export interface UserListItem {
   lastName: string;
   isSystemAdmin: boolean;
   isActive: boolean;
+  createdAt: string | null;
+  signupMethod: UserSignupMethod | null;
+  signupSource: UserSignupSource | null;
   planId?: string;
 }
 
@@ -35,6 +40,9 @@ export class ListUsersQuery implements Query<Props, UserListItem[]> {
       lastName: u.lastName,
       isSystemAdmin: u.isSystemAdmin,
       isActive: u.isActive,
+      createdAt: u.createdAt?.toISOString() ?? null,
+      signupMethod: u.signupMethod,
+      signupSource: u.signupSource,
     }));
   }
 }

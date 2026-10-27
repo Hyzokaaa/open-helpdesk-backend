@@ -2,7 +2,7 @@ services:
   postgres:
     image: postgres:18-alpine
     ports:
-      - "5433:5432"
+      - "${DB_PORT:-5432}:5432"
     environment:
       POSTGRES_DB: open_helpdesk
       POSTGRES_USER: postgres

@@ -5,6 +5,7 @@ import { SortOptions } from '../../../../shared/domain/sort-options';
 import { User } from '../../../domain/entities/user';
 import { UserRepository } from '../../../domain/repositories/user.repository';
 import { UserModel } from '../models/user.model';
+import { UserSignupMethod } from '../../../domain/enums/user-signup-method.enum';
 
 @Injectable()
 export class TypeOrmUserRepository implements UserRepository {
@@ -35,6 +36,7 @@ export class TypeOrmUserRepository implements UserRepository {
     isSystemAdmin: { col: 'user.isSystemAdmin', lower: false },
     isActive: { col: 'user.isActive', lower: false },
     createdAt: { col: 'user.createdAt', lower: false },
+    signupChannel: { col: `"user"."signupSource"->>'channel'`, lower: true },
   };
 
   async findAll(sort?: SortOptions): Promise<User[]> {
@@ -43,7 +45,8 @@ export class TypeOrmUserRepository implements UserRepository {
       ?? { col: 'user.createdAt', lower: false };
     const sortOrder = sort?.sortOrder === 'ASC' ? 'ASC' : 'DESC';
     const expr = field.lower ? `LOWER(${field.col})` : field.col;
-    qb.orderBy(expr, sortOrder);
+    // Accounts without a signup source go last whichever way the list is sorted
+    qb.orderBy(expr, sortOrder, 'NULLS LAST');
     const models = await qb.getMany();
     return models.map((m) => this.toDomain(m));
   }
@@ -74,7 +77,11 @@ export class TypeOrmUserRepository implements UserRepository {
       dateFormat: model.dateFormat,
       timezone: model.timezone,
       autoCreated: model.autoCreated,
+      authProvider: model.authProvider,
       avatarKey: model.avatarKey,
+      signupMethod: (model.signupMethod as UserSignupMethod | null) ?? null,
+      signupSource: model.signupSource ?? null,
+      createdAt: model.createdAt ?? null,
     });
   }
 
@@ -93,7 +100,10 @@ export class TypeOrmUserRepository implements UserRepository {
     model.dateFormat = user.dateFormat;
     model.timezone = user.timezone;
     model.autoCreated = user.autoCreated;
+    model.authProvider = user.authProvider;
     model.avatarKey = user.avatarKey;
+    model.signupMethod = user.signupMethod;
+    model.signupSource = user.signupSource;
     return model;
   }
 }

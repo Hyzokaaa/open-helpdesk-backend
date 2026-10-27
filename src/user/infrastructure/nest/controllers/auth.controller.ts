@@ -210,6 +210,7 @@ export class AuthController {
       firstName: body.firstName,
       lastName: body.lastName,
       invitationToken: body.invitationToken,
+      signupSource: body.signupSource,
     });
   }
 
@@ -462,6 +463,7 @@ export class AuthController {
         lastName: oauthUser.lastName,
         authProvider: oauthUser.authProvider,
         emailVerified: oauthUser.emailVerified,
+        signupSource: verified.source,
       });
 
       const user = await this.userRepository.findByEmail(oauthUser.email);

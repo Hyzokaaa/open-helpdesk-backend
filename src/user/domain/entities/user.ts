@@ -1,4 +1,6 @@
 import { Id } from '../../../shared/domain/id';
+import { UserSignupMethod } from '../enums/user-signup-method.enum';
+import { UserSignupSource } from '../user-signup-source';
 
 interface Props {
   id: string;
@@ -16,6 +18,9 @@ interface Props {
   autoCreated?: boolean;
   authProvider?: string | null;
   avatarKey?: string | null;
+  signupMethod?: UserSignupMethod | null;
+  signupSource?: UserSignupSource | null;
+  createdAt?: Date | null;
 }
 
 export class User {
@@ -34,6 +39,10 @@ export class User {
   autoCreated: boolean;
   authProvider: string | null;
   avatarKey: string | null;
+  signupMethod: UserSignupMethod | null;
+  signupSource: UserSignupSource | null;
+  /** Set by the database; the signup source is only accepted shortly after it */
+  readonly createdAt: Date | null;
 
   constructor(props: Props) {
     this.id = new Id(props.id);
@@ -51,6 +60,9 @@ export class User {
     this.autoCreated = props.autoCreated ?? false;
     this.authProvider = props.authProvider ?? null;
     this.avatarKey = props.avatarKey ?? null;
+    this.signupMethod = props.signupMethod ?? null;
+    this.signupSource = props.signupSource ?? null;
+    this.createdAt = props.createdAt ?? null;
   }
 
   getId(): string {

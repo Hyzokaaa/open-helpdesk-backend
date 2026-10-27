@@ -2,7 +2,9 @@ import { AccessDeniedError } from '../../../shared/domain/errors';
 import { IdGenerator } from '../../../shared/domain/id-generator';
 import { PasswordHasher } from '../../../shared/domain/password-hasher';
 import { User } from '../entities/user';
+import { UserSignupMethod } from '../enums/user-signup-method.enum';
 import { normalizeUserName } from '../user-name';
+import { normalizeSignupSource, RawSignupSource } from '../user-signup-source';
 import { UserRepository } from '../repositories/user.repository';
 
 interface AuthenticateOAuthProps {
@@ -12,6 +14,8 @@ interface AuthenticateOAuthProps {
   authProvider: string;
   /** Whether the provider itself vouches that the address belongs to the person signing in. */
   emailVerified: boolean;
+  /** Where the person came from; only kept when this sign-in creates the account */
+  signupSource?: RawSignupSource | null;
 }
 
 export class AuthenticateOAuth {
@@ -60,6 +64,8 @@ export class AuthenticateOAuth {
       theme: 'system',
       autoCreated: false,
       authProvider: props.authProvider,
+      signupMethod: props.authProvider === 'google' ? UserSignupMethod.GOOGLE : null,
+      signupSource: normalizeSignupSource(props.signupSource),
     });
 
     await this.repository.create(user);

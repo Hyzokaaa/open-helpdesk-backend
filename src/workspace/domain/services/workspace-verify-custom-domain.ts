@@ -16,9 +16,42 @@ export interface DomainVerificationResult {
 }
 
 /** DNS names compare case-insensitively and may carry the root's trailing dot. */
-function normalizeHost(host: string): string {
-  return host.trim().toLowerCase().replace(/.$/, '');
+export function normalizeHost(host: string): string {
+  return host.trim().toLowerCase().replace(/\.$/, '');
 }
+
+const HOSTNAME = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
+
+/**
+ * The host from CUSTOM_DOMAIN_CNAME_TARGET, forgiving what people paste from a browser: a scheme,
+ * a path, a port or the trailing dot. Null when it is empty or still not a host name.
+ */
+export function parseCustomDomainTarget(raw: string | null | undefined): string | null {
+  const host = normalizeHost(raw ?? '')
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//, '')
+    .split(/[/?#]/)[0]
+    .replace(/:\d*$/, '')
+    .replace(/\.$/, '');
+  return HOSTNAME.test(host) ? host : null;
+}
+
+/** The DNS queries the checks need; the system resolver and a public one both provide them. */
+export interface DnsLookup {
+  resolveCname(host: string): Promise<string[]>;
+  resolve4(host: string): Promise<string[]>;
+  resolveTxt(host: string): Promise<string[][]>;
+}
+
+const publicResolver = new dns.Resolver({ timeout: 3000, tries: 1 });
+publicResolver.setServers(['1.1.1.1', '8.8.8.8']);
+
+/**
+ * The system resolver first, then a public one. The server can see its own names differently from
+ * the rest of the world (a hosts file, the DNS of LXD or Docker, a company DNS), and a domain that
+ * points here for everyone else must not fail for that. Where outbound DNS is blocked, the public
+ * resolver only adds its timeout, and the system answer still decides.
+ */
+const DEFAULT_LOOKUPS: DnsLookup[] = [dns, publicResolver];
 
 export class VerifyCustomDomain {
   constructor(
@@ -61,27 +94,35 @@ export class VerifyCustomDomain {
 }
 
 /** Whether the domain still publishes the TXT record that proved it belongs to the workspace. */
-export async function keepsVerificationRecord(domain: string, token: string): Promise<boolean> {
-  try {
-    const txtRecords = await dns.resolveTxt(`_oh-verify.${domain}`);
-    return txtRecords.flat().some((t) => t === token);
-  } catch {
-    return false;
+export async function keepsVerificationRecord(domain: string, token: string, lookups: DnsLookup[] = DEFAULT_LOOKUPS): Promise<boolean> {
+  for (const lookup of lookups) {
+    try {
+      const txtRecords = await lookup.resolveTxt(`_oh-verify.${domain}`);
+      if (txtRecords.flat().some((t) => t === token)) return true;
+    } catch {}
   }
+  return false;
 }
 
 /** Whether the domain's DNS points to the installation: a CNAME to the target, or an A record with its IPs. */
-export async function pointsToInstallation(domain: string, cnameTarget: string): Promise<boolean> {
+export async function pointsToInstallation(domain: string, cnameTarget: string, lookups: DnsLookup[] = DEFAULT_LOOKUPS): Promise<boolean> {
+  for (const lookup of lookups) {
+    if (await pointsToInstallationWith(lookup, domain, cnameTarget)) return true;
+  }
+  return false;
+}
+
+async function pointsToInstallationWith(lookup: DnsLookup, domain: string, cnameTarget: string): Promise<boolean> {
   try {
-    const cnames = await dns.resolveCname(domain);
+    const cnames = await lookup.resolveCname(domain);
     const expected = normalizeHost(cnameTarget);
     if (cnames.some((c) => normalizeHost(c) === expected)) return true;
   } catch {}
 
-  // Fallback: an A record resolving to the same IPs as the target
+  // Fallback: an A record resolving to the same IPs as the target, both seen by the same resolver
   try {
-    const domainIps = await dns.resolve4(domain);
-    const serverIps = await dns.resolve4(cnameTarget);
+    const domainIps = await lookup.resolve4(domain);
+    const serverIps = await lookup.resolve4(cnameTarget);
     if (domainIps.some((ip) => serverIps.includes(ip))) return true;
   } catch {}
 

@@ -4,6 +4,7 @@ import { PasswordHasher } from '../../../shared/domain/password-hasher';
 import { WorkspaceRole } from '../../../workspace/domain/enums/workspace-role.enum';
 import { WorkspaceMemberRepository } from '../../../workspace/domain/repositories/workspace-member.repository';
 import { User } from '../entities/user';
+import { UserSignupMethod } from '../enums/user-signup-method.enum';
 import { UserRepository } from '../repositories/user.repository';
 
 interface ExchangeTokenProps {
@@ -75,6 +76,7 @@ export class ExchangeToken {
       language: 'en',
       theme: 'system',
       autoCreated: true,
+      signupMethod: UserSignupMethod.INTEGRATION,
     });
 
     await this.repository.create(user);

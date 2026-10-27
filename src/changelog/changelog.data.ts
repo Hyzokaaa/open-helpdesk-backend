@@ -16,6 +16,28 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.38.0',
+    date: '2026-10-27',
+    categories: [
+      {
+        title: { en: 'Custom domains', es: 'Dominios propios' },
+        features: [
+          { en: 'Check now on a custom domain that stopped passing the daily check: it is trusted again at once if its DNS or its verification TXT record is found, without waiting for the next day', es: 'Comprobar ahora en un dominio propio que dejó de pasar la comprobación diaria: si se encuentra su DNS o su registro TXT de verificación, vuelve a ser de confianza al momento, sin esperar al día siguiente' },
+          { en: 'When the installation cannot be reached while signing in on a custom domain, the page says so and asks to reload, instead of saying the address does not belong to it', es: 'Si al entrar en un dominio propio no se puede conectar con la instalación, la página lo dice y pide recargar, en vez de decir que la dirección no le pertenece' },
+          { en: 'A custom domain that points to the installation passes the checks even when the server sees its own address differently from the rest of the world, as in some containers', es: 'Un dominio propio que apunta a la instalación pasa las comprobaciones aunque el servidor vea su propia dirección de otra forma que el resto del mundo, como pasa en algunos contenedores' },
+          { en: 'Self-hosted: CUSTOM_DOMAIN_CNAME_TARGET also works if it is pasted with https://, a path or a port, a value that is not a host name is reported at startup, and without it the custom domain settings say the installation has none set', es: 'Instalación propia: CUSTOM_DOMAIN_CNAME_TARGET también funciona si se pega con https://, una ruta o un puerto, un valor que no es un nombre de host se avisa al arrancar y, sin él, los ajustes del dominio propio dicen que la instalación no lo tiene configurado' },
+        ],
+      },
+      {
+        title: { en: 'Users', es: 'Usuarios' },
+        features: [
+          { en: 'The system user list shows where each person came from (Reddit, Google, a link with ?ref= or utm tags, or direct), how their account was created and when, and can be sorted by it. Hover it to see the details', es: 'La lista de usuarios del sistema muestra de dónde llegó cada persona (Reddit, Google, un enlace con ?ref= o etiquetas utm, o directo), cómo se creó su cuenta y cuándo, y se puede ordenar por ello. Al pasar el ratón se ven los detalles' },
+          { en: 'Where someone came from is recorded only for accounts created from now on; existing accounts show how they were created when it is known. Between visits it is only remembered if the visitor accepted the cookies of the banner', es: 'De dónde llegó alguien se guarda solo en las cuentas creadas a partir de ahora; las que ya existían muestran cómo se crearon cuando se sabe. Entre una visita y otra solo se recuerda si la persona aceptó las cookies del aviso' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.37.2',
     date: '2026-10-22',
     categories: [

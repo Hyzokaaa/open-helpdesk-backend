@@ -1,6 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from 'crypto';
 import { TokenService } from '../../../shared/domain/token-service';
 import { ConsumeOneTimeToken, newTokenId } from './user-token-consume';
+import { normalizeSignupSource, RawSignupSource, UserSignupSource } from '../user-signup-source';
 
 export const OAUTH_STATE_TYPE = 'oauth-state';
 /** How long the person has to complete the provider's sign-in page. */
@@ -9,6 +10,8 @@ export const OAUTH_STATE_TTL_SECONDS = 600;
 interface IssueOAuthStateProps {
   /** Frontend to return to; still checked against the allowed origins on the way back. */
   redirect?: string | null;
+  /** Where the person came from, carried to the callback in case this sign-in creates the account. */
+  source?: RawSignupSource | null;
 }
 
 export interface IssuedOAuthState {
@@ -33,7 +36,7 @@ export class IssueOAuthState {
   execute(props: IssueOAuthStateProps): IssuedOAuthState {
     const browserNonce = randomBytes(32).toString('base64url');
     const state = this.tokenService.sign(
-      { type: OAUTH_STATE_TYPE, jti: newTokenId(), nonce: hashNonce(browserNonce), redirect: props.redirect ?? null },
+      { type: OAUTH_STATE_TYPE, jti: newTokenId(), nonce: hashNonce(browserNonce), redirect: props.redirect ?? null, source: normalizeSignupSource(props.source) },
       { expiresIn: `${OAUTH_STATE_TTL_SECONDS}s` },
     );
     return { state, browserNonce };
@@ -48,8 +51,8 @@ interface VerifyOAuthStateProps {
 export class VerifyOAuthState {
   constructor(private readonly consumeToken: ConsumeOneTimeToken) {}
 
-  /** The redirect asked for at the start; null when the state is not valid for this browser. */
-  async execute(props: VerifyOAuthStateProps): Promise<{ redirect: string | null } | null> {
+  /** What was asked for at the start; null when the state is not valid for this browser. */
+  async execute(props: VerifyOAuthStateProps): Promise<{ redirect: string | null; source: UserSignupSource | null } | null> {
     if (!props.state || !props.browserNonce) return null;
 
     const payload = await this.consumeToken.execute({ token: props.state, type: OAUTH_STATE_TYPE });
@@ -59,6 +62,9 @@ export class VerifyOAuthState {
     const actual = Buffer.from(hashNonce(props.browserNonce));
     if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) return null;
 
-    return { redirect: typeof payload.redirect === 'string' ? payload.redirect : null };
+    return {
+      redirect: typeof payload.redirect === 'string' ? payload.redirect : null,
+      source: normalizeSignupSource(payload.source as RawSignupSource | null),
+    };
   }
 }

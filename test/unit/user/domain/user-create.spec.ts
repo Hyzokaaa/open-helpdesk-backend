@@ -4,6 +4,7 @@ import { FakeIdGenerator } from '../../../mocks/fake-id-generator';
 import { FakePasswordHasher } from '../../../mocks/fake-password-hasher';
 import { MockUserRepository } from '../../../mocks/mock-user.repository';
 import { ConflictError } from '../../../../src/shared/domain/errors';
+import { UserSignupMethod } from '../../../../src/user/domain/enums/user-signup-method.enum';
 
 describe('CreateUser', () => {
   let service: CreateUser;
@@ -76,5 +77,37 @@ describe('CreateUser', () => {
         lastName: 'User',
       }),
     ).rejects.toThrow(ConflictError);
+  });
+
+  describe('signup method', () => {
+    const base = { email: 'm@example.com', password: 'secret123', firstName: 'M', lastName: 'N' };
+
+    it('keeps the method it is told', async () => {
+      const user = await service.execute({ ...base, signupMethod: UserSignupMethod.INVITATION });
+      expect(user.signupMethod).toBe(UserSignupMethod.INVITATION);
+    });
+
+    it('makes an auto-created account a reporter unless told otherwise', async () => {
+      expect((await service.execute({ ...base, autoCreated: true })).signupMethod).toBe(UserSignupMethod.REPORTER);
+      const imported = await service.execute({ ...base, email: 'i@example.com', autoCreated: true, signupMethod: UserSignupMethod.IMPORT });
+      expect(imported.signupMethod).toBe(UserSignupMethod.IMPORT);
+    });
+
+    it('leaves it empty when nobody says how', async () => {
+      expect((await service.execute(base)).signupMethod).toBeNull();
+    });
+  });
+
+  describe('signup source', () => {
+    const base = { email: 's@example.com', password: 'secret123', firstName: 'S', lastName: 'T' };
+
+    it('keeps the cleaned source sent with the signup', async () => {
+      const user = await service.execute({ ...base, signupSource: { utmSource: 'Google', landingPath: '/?q=1' } });
+      expect(user.signupSource).toMatchObject({ channel: 'google', utmSource: 'google', landingPath: '/' });
+    });
+
+    it('leaves it empty when the browser sent none', async () => {
+      expect((await service.execute(base)).signupSource).toBeNull();
+    });
   });
 });

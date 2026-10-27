@@ -2,6 +2,7 @@ import { TokenService } from '../../../shared/domain/token-service';
 import { Command } from '../../../shared/domain/command';
 import { AuthenticateOAuth } from '../../domain/services/user-authenticate-oauth';
 import { newTokenId } from '../../domain/services/user-token-consume';
+import { RawSignupSource } from '../../domain/user-signup-source';
 
 interface Props {
   email: string;
@@ -9,6 +10,7 @@ interface Props {
   lastName: string;
   authProvider: string;
   emailVerified: boolean;
+  signupSource?: RawSignupSource | null;
 }
 
 export interface OAuthLoginResponse {
@@ -31,6 +33,7 @@ export class OAuthLoginCommand implements Command<Props, OAuthLoginResponse> {
       lastName: props.lastName,
       authProvider: props.authProvider,
       emailVerified: props.emailVerified,
+      signupSource: props.signupSource,
     });
 
     // The redirect URL ends up in browser history and logs, so it carries a short-lived code

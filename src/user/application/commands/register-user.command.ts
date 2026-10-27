@@ -1,6 +1,7 @@
 import { Command } from '../../../shared/domain/command';
 import { AccessDeniedError } from '../../../shared/domain/errors';
 import { CreateUser } from '../../domain/services/user-create';
+import { UserSignupMethod } from '../../domain/enums/user-signup-method.enum';
 
 interface Props {
   email: string;
@@ -32,6 +33,7 @@ export class RegisterUserCommand implements Command<Props, RegisterUserResponse>
       lastName: props.lastName,
       isSystemAdmin: props.isSystemAdmin,
       isEmailVerified: props.isEmailVerified,
+      signupMethod: UserSignupMethod.ADMIN,
     });
 
     return { id: user.getId(), email: user.email };

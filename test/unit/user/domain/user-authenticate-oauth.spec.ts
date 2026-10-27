@@ -41,4 +41,18 @@ describe('AuthenticateOAuth', () => {
     const user = await signIn('new@acme.com', true);
     expect(user.isEmailVerified).toBe(true);
   });
+
+  describe('signup source', () => {
+    const withSource = (email: string) =>
+      new AuthenticateOAuth(new FakeIdGenerator(), users, new FakePasswordHasher())
+        .execute({ email, firstName: 'Eve', lastName: 'X', authProvider: 'google', emailVerified: true, signupSource: { ref: 'Reddit' } });
+
+    it('keeps it on the account this sign-in creates', async () => {
+      expect((await withSource('new@acme.com')).signupSource?.channel).toBe('reddit');
+    });
+
+    it('never gives it to an existing account', async () => {
+      expect((await withSource('ceo@acme.com')).signupSource).toBeNull();
+    });
+  });
 });

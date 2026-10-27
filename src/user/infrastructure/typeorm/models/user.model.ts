@@ -5,6 +5,7 @@ import {
   PrimaryColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { UserSignupSource } from '../../../domain/user-signup-source';
 
 @Entity('users')
 export class UserModel {
@@ -52,6 +53,12 @@ export class UserModel {
 
   @Column({ type: 'varchar', nullable: true, default: null })
   avatarKey!: string | null;
+
+  @Column({ type: 'varchar', nullable: true, default: null })
+  signupMethod!: string | null;
+
+  @Column({ type: 'jsonb', nullable: true, default: null })
+  signupSource!: UserSignupSource | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
