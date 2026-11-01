@@ -14,6 +14,8 @@ interface DispatchProps {
   inAppPrefKey: keyof NotificationPreference;
   /** Omit for in-app-only notifications. */
   emailPrefKey?: keyof NotificationPreference;
+  /** False to only work out the email recipients, without notifying in the app. */
+  inApp?: boolean;
 }
 
 export interface DispatchResult {
@@ -34,7 +36,7 @@ export class DispatchNotifications {
     const prefs = await this.preferenceRepository.findByUserIds(userIds);
 
     // In-app notifications
-    for (const user of props.users) {
+    for (const user of props.inApp === false ? [] : props.users) {
       if (this.shouldNotifyInApp(prefs.get(user.getId()), props.inAppPrefKey)) {
         await this.notificationRepository.create(
           new Notification({

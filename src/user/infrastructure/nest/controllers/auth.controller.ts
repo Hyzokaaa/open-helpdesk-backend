@@ -464,6 +464,7 @@ export class AuthController {
         authProvider: oauthUser.authProvider,
         emailVerified: oauthUser.emailVerified,
         signupSource: verified.source,
+        accountCreated: !before,
       });
 
       const user = await this.userRepository.findByEmail(oauthUser.email);

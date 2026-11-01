@@ -13,20 +13,13 @@ import { EmailService, SendEmailResult } from '../../../../email/domain/email.se
 import { EMAIL_SERVICE } from '../../../../email/email.constants';
 import { UpgradeAvailableTemplate } from '../../../../email/templates/upgrade-available.template';
 import { resolveBackendVersion } from '../resolve-backend-version';
+import { bringsNewerBackend } from '../../../domain/services/version-newer-release';
 import { RecordEmailSend } from '../../../../audit-log/domain/services/audit-log-record-email-send';
 import { TypeOrmAuditLogRepository } from '../../../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
 import { eachEmailRecipient } from '../../../../email/domain/each-email-recipient';
 import { connectionErrorDetail } from '../../../../shared/infrastructure/connection-error-detail';
 
 const backendVersion: string = resolveBackendVersion();
-
-function isNewer(latest: string, current: string): boolean {
-  const [lMaj, lMin, lPat] = latest.split('.').map(Number);
-  const [cMaj, cMin, cPat] = current.split('.').map(Number);
-  if (lMaj !== cMaj) return lMaj > cMaj;
-  if (lMin !== cMin) return lMin > cMin;
-  return lPat > cPat;
-}
 
 @Injectable()
 export class VersionCheckScheduler {
@@ -50,7 +43,7 @@ export class VersionCheckScheduler {
     try {
       const result = await this.versionCheck.execute();
       const latestProduct = result.latestRelease?.product;
-      if (!latestProduct || !isNewer(latestProduct, backendVersion)) return;
+      if (!latestProduct || !bringsNewerBackend(result.latestRelease, backendVersion)) return;
 
       let settings = await this.notificationSettingsRepository.find();
       if (!settings) {

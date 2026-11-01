@@ -299,7 +299,7 @@ export class UserController {
 
   @Get()
   list(@Query() sort: SortDto, @CurrentUser() user: AuthUser) {
-    const query = new ListUsersQuery(this.userRepository);
+    const query = new ListUsersQuery(this.userRepository, this.storage);
     return query.execute({ sort, requestingUserIsAdmin: user.isSystemAdmin });
   }
 

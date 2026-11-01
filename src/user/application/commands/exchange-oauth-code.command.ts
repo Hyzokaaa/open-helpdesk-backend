@@ -13,6 +13,8 @@ interface Props {
 export interface ExchangeOAuthCodeResponse {
   accessToken: string;
   refreshToken: string;
+  /** The provider, only when this sign-in created the account. */
+  signupMethod?: string;
 }
 
 export class ExchangeOAuthCodeCommand implements Command<Props, ExchangeOAuthCodeResponse> {
@@ -31,6 +33,10 @@ export class ExchangeOAuthCodeCommand implements Command<Props, ExchangeOAuthCod
     if (!user || !user.isActive) throw new InvalidCredentialsError('Invalid sign-in code');
 
     const tokens = await this.startSession.execute({ user, rememberMe: props.rememberMe });
-    return { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken };
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      ...(typeof payload.signupMethod === 'string' ? { signupMethod: payload.signupMethod } : {}),
+    };
   }
 }

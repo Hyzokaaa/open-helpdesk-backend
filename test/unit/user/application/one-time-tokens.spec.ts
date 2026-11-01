@@ -63,10 +63,15 @@ describe('Single-use sign-in codes and reset links', () => {
       new StartUserSession(new MockUserSessionRepository(), new FakeIdGenerator(), new SignAccessToken(tokenService, policy.accessTokenTtl), policy),
     ).execute({ code, rememberMe: false });
 
-    const issueCode = async () => {
+    const issueCode = async (accountCreated?: boolean) => {
       const login = new OAuthLoginCommand(new AuthenticateOAuth(new FakeIdGenerator(), users, hasher), tokenService);
-      return (await login.execute({ email: 'john@example.com', firstName: 'John', lastName: 'Doe', authProvider: 'google', emailVerified: true })).code;
+      return (await login.execute({ email: 'john@example.com', firstName: 'John', lastName: 'Doe', authProvider: 'google', emailVerified: true, accountCreated })).code;
     };
+
+    it('tells the client the provider only when the sign-in created the account', async () => {
+      await expect(exchange(await issueCode(true))).resolves.toMatchObject({ signupMethod: 'google' });
+      await expect(exchange(await issueCode())).resolves.not.toHaveProperty('signupMethod');
+    });
 
     it('opens a session once, and a replay of the same code (leaked from history or logs) opens nothing', async () => {
       const code = await issueCode();

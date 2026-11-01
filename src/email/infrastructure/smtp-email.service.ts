@@ -9,6 +9,7 @@ import {
 import { SystemEmailSettingsRepository } from '../../config/domain/repositories/system-email-settings.repository';
 import { connectionErrorDetail } from '../../shared/infrastructure/connection-error-detail';
 import { connectionErrorKind } from '../../shared/infrastructure/connection-error-kind';
+import { smtpSendOutcome } from './smtp-send-outcome';
 
 export class SmtpEmailService implements EmailService {
   private readonly logger = new Logger(SmtpEmailService.name);
@@ -116,7 +117,7 @@ export class SmtpEmailService implements EmailService {
     let lastErrorCode: string | undefined;
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
-        await transporter.sendMail({
+        const info = await transporter.sendMail({
           from: sender,
           to: recipient,
           subject: params.subject,
@@ -128,7 +129,7 @@ export class SmtpEmailService implements EmailService {
         });
 
         this.logger.log(`Email sent to ${recipient}: ${params.subject}`);
-        return { success: true };
+        return { success: true, ...smtpSendOutcome(info) };
       } catch (error) {
         const msg = connectionErrorDetail(error);
         lastError = msg;

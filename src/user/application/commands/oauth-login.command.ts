@@ -11,6 +11,8 @@ interface Props {
   authProvider: string;
   emailVerified: boolean;
   signupSource?: RawSignupSource | null;
+  /** This sign-in created the account; the code carries it so the client can count the signup. */
+  accountCreated?: boolean;
 }
 
 export interface OAuthLoginResponse {
@@ -38,7 +40,12 @@ export class OAuthLoginCommand implements Command<Props, OAuthLoginResponse> {
 
     // The redirect URL ends up in browser history and logs, so it carries a short-lived code
     // instead of the session tokens themselves.
-    const code = this.tokenService.sign({ sub: user.getId(), type: OAUTH_CODE_TYPE, jti: newTokenId() }, { expiresIn: '60s' });
+    const code = this.tokenService.sign({
+      sub: user.getId(),
+      type: OAUTH_CODE_TYPE,
+      jti: newTokenId(),
+      ...(props.accountCreated ? { signupMethod: props.authProvider } : {}),
+    }, { expiresIn: '60s' });
     return { code };
   }
 }

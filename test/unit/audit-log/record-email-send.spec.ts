@@ -23,6 +23,15 @@ describe('Recording an email send', () => {
     expect(entry.metadata).toEqual({ type: 'ticket-notification', to: ['a@x.com'], subject: 'New ticket', ticketId: 't-1', via: 'workspace' });
   });
 
+  it('records what the server answered on a sent email, with its queue id and refused recipients', async () => {
+    await record({
+      success: true, via: 'global', response: '250 2.0.0 Ok: queued as 4F2A1', messageId: '<m-1@x.com>', rejected: ['b@x.com'],
+    });
+    expect(repository.entries[0].metadata).toMatchObject({
+      response: '250 2.0.0 Ok: queued as 4F2A1', messageId: '<m-1@x.com>', rejected: ['b@x.com'],
+    });
+  });
+
   it('records a failed send as an error with the server answer', async () => {
     await record({ success: false, via: 'global', error: 'Invalid login: 535', errorCode: 'auth-failed' });
     const entry = repository.entries[0];

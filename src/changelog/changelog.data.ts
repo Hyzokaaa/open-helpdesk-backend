@@ -16,6 +16,32 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.39.0',
+    date: '2026-10-31',
+    categories: [
+      {
+        title: { en: 'Users', es: 'Usuarios' },
+        features: [
+          { en: 'People without a photo get their own generated avatar instead of initials, kept if they change their name. Inside a workspace the team wears a headset on it, so agents stand out from customers', es: 'Quien no tiene foto recibe un avatar generado propio en lugar de las iniciales, que se mantiene aunque cambie de nombre. Dentro de un workspace el del equipo lleva unos auriculares, para distinguir a los agentes de los clientes' },
+          { en: 'Photos and avatars in the members, contacts and system users lists, and the profile card also opens when hovering a person\'s avatar in tickets', es: 'Fotos y avatares en las listas de miembros, contactos y usuarios del sistema, y la tarjeta de perfil también se abre al pasar sobre el avatar de una persona en los tickets' },
+        ],
+      },
+      {
+        title: { en: 'Audit log', es: 'Registro de auditoría' },
+        features: [
+          { en: 'Sent emails in the audit log now show what the mail server answered, with its queue id, plus the Message-ID and any recipient it refused, so an email can be traced in the server\'s logs', es: 'Los correos enviados del registro de auditoría muestran ahora lo que respondió el servidor de correo, con su id de cola, el Message-ID y los destinatarios que rechazó, para poder seguir el correo en los logs del servidor' },
+        ],
+      },
+      {
+        title: { en: 'Updates', es: 'Actualizaciones' },
+        features: [
+          { en: 'Administration → Updates shows what each new version brings, all the ones not seen yet if several came at once, marked in the sidebar until they are seen', es: 'Administración → Actualizaciones muestra lo que trae cada versión nueva, todas las que no se habían visto si llegaron varias a la vez, marcadas en el sidebar hasta que se ven' },
+          { en: 'The new-version notice no longer arrives right after installing that version, the In the app switch is respected, and the notice settings sit in one row above the news', es: 'El aviso de versión nueva ya no llega justo después de instalar esa versión, se respeta el interruptor En la app y los ajustes del aviso están en una fila encima de las novedades' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.38.0',
     date: '2026-10-27',
     categories: [

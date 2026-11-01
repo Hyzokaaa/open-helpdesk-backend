@@ -4,6 +4,7 @@ import { SmtpConfig } from '../../workspace/domain/entities/workspace-email-send
 import { SendEmailParams, SendEmailResult } from './email.service';
 import { connectionErrorDetail } from '../../shared/infrastructure/connection-error-detail';
 import { connectionErrorKind } from '../../shared/infrastructure/connection-error-kind';
+import { smtpSendOutcome } from '../infrastructure/smtp-send-outcome';
 
 const logger = new Logger('WorkspaceEmailSend');
 
@@ -26,7 +27,7 @@ export async function sendViaWorkspaceSmtp(config: SmtpConfig, params: SendEmail
   const recipient = Array.isArray(params.to) ? params.to.join(', ') : params.to;
 
   try {
-    await transporter.sendMail({
+    const info = await transporter.sendMail({
       from: params.from || config.from,
       to: recipient,
       subject: params.subject,
@@ -37,7 +38,7 @@ export async function sendViaWorkspaceSmtp(config: SmtpConfig, params: SendEmail
       ...(params.references && { references: params.references }),
     });
     logger.log(`Email sent via workspace SMTP to ${recipient}: ${params.subject}`);
-    return { success: true };
+    return { success: true, ...smtpSendOutcome(info) };
   } catch (error) {
     const msg = connectionErrorDetail(error);
     logger.error(`Workspace SMTP send failed for ${recipient}: ${msg}`);

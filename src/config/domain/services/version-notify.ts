@@ -28,6 +28,8 @@ export class NotifyVersionUpdate {
       workspaceSlug: '',
       inAppPrefKey: 'inAppUpgradeAvailable',
       emailPrefKey: 'emailUpgradeAvailable',
+      // The installation's "In the app" switch; the email one is applied by whoever sends it
+      inApp: this.settings.upgradeInApp,
     });
 
     return {

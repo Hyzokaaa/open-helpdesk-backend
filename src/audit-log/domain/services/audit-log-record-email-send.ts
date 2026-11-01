@@ -11,6 +11,9 @@ interface SendOutcome {
   mock?: boolean;
   error?: string;
   errorCode?: string;
+  response?: string;
+  messageId?: string;
+  rejected?: string[];
   via?: 'workspace' | 'global';
 }
 
@@ -58,7 +61,12 @@ export class RecordEmailSend {
       ...(props.ticketName && { ticketName: props.ticketName }),
       ...(result.via && !result.mock && { via: result.via }),
     };
-    if (!sent) {
+    if (sent) {
+      // The server's own words with its queue id, so the email can be followed in its logs
+      if (result.response) metadata.response = result.response;
+      if (result.messageId) metadata.messageId = result.messageId;
+      if (result.rejected?.length) metadata.rejected = result.rejected;
+    } else {
       metadata.reason = result.mock ? 'no-email-service' : 'send-failed';
       if (result.error) metadata.error = result.error;
       if (result.errorCode) metadata.errorCode = result.errorCode;
