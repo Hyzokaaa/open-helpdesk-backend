@@ -294,9 +294,10 @@ export class RouteInboundEmail {
       await this.ticketRepository.update(ticket);
     }
 
-    this.eventPublisher.emit('ticket.created', ticketEvent);
-
+    // Files first, so the notices can carry them
     await this.uploadAttachments(parsed, ticket.getId(), null, user.getId());
+
+    this.eventPublisher.emit('ticket.created', ticketEvent);
 
     return { action: 'ticket-created', ticketId: ticket.getId(), authorId: user.getId() };
   }

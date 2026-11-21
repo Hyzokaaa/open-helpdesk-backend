@@ -59,6 +59,17 @@ export class TypeOrmNotificationPreferenceRepository
       inAppInvitationExpired: model.inAppInvitationExpired,
       inAppUnattendedReply: model.inAppUnattendedReply,
       emailUnattendedReply: model.emailUnattendedReply,
+      inAppMentioned: model.inAppMentioned,
+      emailMentioned: model.emailMentioned,
+      matrixEnabled: model.matrixEnabled,
+      matrixTicketCreated: model.matrixTicketCreated,
+      matrixTicketAssigned: model.matrixTicketAssigned,
+      matrixStatusChanged: model.matrixStatusChanged,
+      matrixTicketUnassigned: model.matrixTicketUnassigned,
+      matrixCommentCreated: model.matrixCommentCreated,
+      matrixTransferRequest: model.matrixTransferRequest,
+      matrixUnattendedReply: model.matrixUnattendedReply,
+      matrixMentioned: model.matrixMentioned,
       bellUnreadOnly: model.bellUnreadOnly,
     });
   }
@@ -88,6 +99,17 @@ export class TypeOrmNotificationPreferenceRepository
     model.inAppInvitationExpired = pref.inAppInvitationExpired;
     model.inAppUnattendedReply = pref.inAppUnattendedReply;
     model.emailUnattendedReply = pref.emailUnattendedReply;
+    model.inAppMentioned = pref.inAppMentioned;
+    model.emailMentioned = pref.emailMentioned;
+    model.matrixEnabled = pref.matrixEnabled;
+    model.matrixTicketCreated = pref.matrixTicketCreated;
+    model.matrixTicketAssigned = pref.matrixTicketAssigned;
+    model.matrixStatusChanged = pref.matrixStatusChanged;
+    model.matrixTicketUnassigned = pref.matrixTicketUnassigned;
+    model.matrixCommentCreated = pref.matrixCommentCreated;
+    model.matrixTransferRequest = pref.matrixTransferRequest;
+    model.matrixUnattendedReply = pref.matrixUnattendedReply;
+    model.matrixMentioned = pref.matrixMentioned;
     model.bellUnreadOnly = pref.bellUnreadOnly;
     return model;
   }

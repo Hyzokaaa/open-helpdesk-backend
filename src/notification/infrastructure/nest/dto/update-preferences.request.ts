@@ -25,5 +25,16 @@ export class UpdatePreferencesRequest {
   @IsOptional() @IsBoolean() inAppInvitationExpired?: boolean;
   @IsOptional() @IsBoolean() inAppUnattendedReply?: boolean;
   @IsOptional() @IsBoolean() emailUnattendedReply?: boolean;
+  @IsOptional() @IsBoolean() inAppMentioned?: boolean;
+  @IsOptional() @IsBoolean() emailMentioned?: boolean;
+  @IsOptional() @IsBoolean() matrixEnabled?: boolean;
+  @IsOptional() @IsBoolean() matrixTicketCreated?: boolean;
+  @IsOptional() @IsBoolean() matrixTicketAssigned?: boolean;
+  @IsOptional() @IsBoolean() matrixStatusChanged?: boolean;
+  @IsOptional() @IsBoolean() matrixTicketUnassigned?: boolean;
+  @IsOptional() @IsBoolean() matrixCommentCreated?: boolean;
+  @IsOptional() @IsBoolean() matrixTransferRequest?: boolean;
+  @IsOptional() @IsBoolean() matrixUnattendedReply?: boolean;
+  @IsOptional() @IsBoolean() matrixMentioned?: boolean;
   @IsOptional() @IsBoolean() bellUnreadOnly?: boolean;
 }

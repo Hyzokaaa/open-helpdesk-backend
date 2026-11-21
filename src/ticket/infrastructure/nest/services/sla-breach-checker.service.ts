@@ -6,6 +6,8 @@ import { CreateAuditLogEntry } from '../../../../audit-log/domain/services/audit
 import { AuditAction } from '../../../../audit-log/domain/enums/audit-action.enum';
 import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
+import { NestEventPublisher } from '../../../../shared/infrastructure/nest-event-publisher';
+import { TicketSlaBreachedEvent } from '../../../../email/domain/events';
 
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
 
@@ -18,6 +20,7 @@ export class SlaBreachCheckerService implements OnModuleInit, OnModuleDestroy {
     private readonly dataSource: DataSource,
     @Inject() private readonly idGenerator: UlidGenerator,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
+    @Inject() private readonly eventPublisher: NestEventPublisher,
   ) {}
 
   onModuleInit(): void {
@@ -72,6 +75,7 @@ export class SlaBreachCheckerService implements OnModuleInit, OnModuleDestroy {
 
             for (const ticketId of breachedIds) {
               await this.emitAudit(AuditAction.SLA_FIRST_RESPONSE_BREACHED, ticketId, ws.id, { priority, targetHours: hours });
+              this.emitBreach({ ticketId, workspaceId: ws.id, target: 'first-response', targetHours: Number(hours) });
             }
           }
         }
@@ -97,6 +101,7 @@ export class SlaBreachCheckerService implements OnModuleInit, OnModuleDestroy {
 
             for (const ticketId of breachedIds) {
               await this.emitAudit(AuditAction.SLA_RESOLUTION_BREACHED, ticketId, ws.id, { priority, targetHours: hours });
+              this.emitBreach({ ticketId, workspaceId: ws.id, target: 'resolution', targetHours: Number(hours) });
             }
           }
         }
@@ -110,6 +115,11 @@ export class SlaBreachCheckerService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       this.logger.error(`SLA breach check failed: ${error}`);
     }
+  }
+
+  /** For the chat notices (Matrix); the flag and the audit entry above are the record. */
+  private emitBreach(event: TicketSlaBreachedEvent): void {
+    this.eventPublisher.emit('ticket.slaBreached', event);
   }
 
   private async emitAudit(action: AuditAction, ticketId: string, workspaceId: string, metadata: Record<string, unknown>): Promise<void> {

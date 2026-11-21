@@ -7,6 +7,8 @@ interface Props {
   title: string;
   ticketId: string | null;
   workspaceSlug: string;
+  /** Where opening it takes you, for a notice that is not about a ticket. */
+  link?: string | null;
   isRead: boolean;
   createdAt?: Date;
 }
@@ -18,6 +20,7 @@ export class Notification {
   title: string;
   ticketId: string | null;
   workspaceSlug: string;
+  link: string | null;
   isRead: boolean;
   createdAt?: Date;
 
@@ -28,6 +31,7 @@ export class Notification {
     this.title = props.title;
     this.ticketId = props.ticketId;
     this.workspaceSlug = props.workspaceSlug;
+    this.link = props.link ?? null;
     this.isRead = props.isRead;
     this.createdAt = props.createdAt;
   }

@@ -7,6 +7,7 @@ import { NotificationPreferenceModel } from './infrastructure/typeorm/models/not
 import { TypeOrmNotificationRepository } from './infrastructure/typeorm/repositories/typeorm-notification.repository';
 import { TypeOrmNotificationPreferenceRepository } from './infrastructure/typeorm/repositories/typeorm-notification-preference.repository';
 import { NotificationController } from './infrastructure/nest/controllers/notification.controller';
+import { NoticeCatalogProvider } from './infrastructure/nest/services/notice-catalog.provider';
 
 @Module({
   imports: [
@@ -18,10 +19,12 @@ import { NotificationController } from './infrastructure/nest/controllers/notifi
   providers: [
     TypeOrmNotificationRepository,
     TypeOrmNotificationPreferenceRepository,
+    NoticeCatalogProvider,
   ],
   exports: [
     TypeOrmNotificationRepository,
     TypeOrmNotificationPreferenceRepository,
+    NoticeCatalogProvider,
   ],
 })
 export class NotificationModule {}

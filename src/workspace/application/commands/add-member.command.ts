@@ -7,6 +7,8 @@ import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-lo
 import { AuditAction } from '../../../audit-log/domain/enums/audit-action.enum';
 import { AuditCategory } from '../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../audit-log/domain/enums/audit-level.enum';
+import { EventPublisher } from '../../../shared/domain/event-publisher';
+import { WORKSPACE_MEMBERS_JOINED_EVENT, WorkspaceMembersJoinedEvent } from '../../../workspace/domain/workspace-member-events';
 
 interface Props {
   workspaceId: string;
@@ -29,6 +31,7 @@ export class AddMemberCommand implements Command<Props, AddMemberResponse> {
     private readonly addMember: AddWorkspaceMember,
     private readonly ensurePermission: EnsureWorkspacePermission,
     private readonly createAuditLog: CreateAuditLogEntry,
+    private readonly eventPublisher: EventPublisher,
   ) {}
 
   async execute(props: Props): Promise<AddMemberResponse> {
@@ -44,6 +47,8 @@ export class AddMemberCommand implements Command<Props, AddMemberResponse> {
       userId: props.userId,
       role: props.role,
     });
+    const joined: WorkspaceMembersJoinedEvent = { workspaceId: props.workspaceId, members: [{ userId: member.userId, role: member.role }], actorId: props.requestingUserId };
+    this.eventPublisher.emit(WORKSPACE_MEMBERS_JOINED_EVENT, joined);
 
     await this.createAuditLog.execute({
       action: AuditAction.MEMBER_ADDED,

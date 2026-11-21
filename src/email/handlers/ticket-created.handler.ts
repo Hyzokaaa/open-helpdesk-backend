@@ -23,6 +23,7 @@ import { TypeOrmTicketParticipantRepository } from '../../ticket/infrastructure/
 import { TypeOrmAuditLogRepository } from '../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
 import { ResolveTicketStakeholders } from '../../notification/domain/services/notification-resolve-ticket-stakeholders';
 import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
+import { NestEventPublisher } from '../../shared/infrastructure/nest-event-publisher';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
 import { WorkspaceFrontendResolver } from '../../shared/infrastructure/workspace-frontend-resolver';
 import { RecordEmailSend } from '../../audit-log/domain/services/audit-log-record-email-send';
@@ -54,6 +55,7 @@ export class TicketCreatedHandler {
     private readonly categoryRepository: TypeOrmTicketCategoryRepository,
     private readonly workspaceRepository: TypeOrmWorkspaceRepository,
     private readonly portalAccessRepository: TypeOrmTicketPortalAccessRepository,
+    private readonly events: NestEventPublisher,
   ) {}
 
   @OnEvent('ticket.created')
@@ -81,7 +83,7 @@ export class TicketCreatedHandler {
     const users = [...ticketStakeholders, ...extraAdmins];
     if (users.length === 0) return;
 
-    const dispatch = new DispatchNotifications(this.idGenerator, this.notificationRepository, this.preferenceRepository);
+    const dispatch = new DispatchNotifications(this.idGenerator, this.notificationRepository, this.preferenceRepository, this.events);
     const { emailRecipients } = await dispatch.execute({
       users,
       type: NotificationType.TICKET_CREATED,
@@ -90,6 +92,7 @@ export class TicketCreatedHandler {
       workspaceSlug: event.workspaceSlug,
       inAppPrefKey: 'inAppTicketCreated',
       emailPrefKey: 'emailTicketCreated',
+      matrix: { prefKey: 'matrixTicketCreated', notice: { kind: 'ticket-created' } },
     });
 
     if (emailRecipients.size === 0) return;

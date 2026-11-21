@@ -76,6 +76,39 @@ export class NotificationPreferenceModel {
   @Column({ default: true })
   emailUnattendedReply!: boolean;
 
+  @Column({ default: true })
+  inAppMentioned!: boolean;
+
+  @Column({ default: true })
+  emailMentioned!: boolean;
+
+  @Column({ default: false })
+  matrixEnabled!: boolean;
+
+  @Column({ default: true })
+  matrixTicketCreated!: boolean;
+
+  @Column({ default: true })
+  matrixTicketAssigned!: boolean;
+
+  @Column({ default: true })
+  matrixStatusChanged!: boolean;
+
+  @Column({ default: true })
+  matrixTicketUnassigned!: boolean;
+
+  @Column({ default: true })
+  matrixCommentCreated!: boolean;
+
+  @Column({ default: true })
+  matrixTransferRequest!: boolean;
+
+  @Column({ default: true })
+  matrixUnattendedReply!: boolean;
+
+  @Column({ default: true })
+  matrixMentioned!: boolean;
+
   @Column({ default: false })
   bellUnreadOnly!: boolean;
 

@@ -17,6 +17,8 @@ import { TypeOrmAuditLogRepository } from '../../audit-log/infrastructure/typeor
 import { ResolveTicketStakeholders } from '../../notification/domain/services/notification-resolve-ticket-stakeholders';
 import { ResolveUnattendedReplyRecipients } from '../../notification/domain/services/notification-resolve-unattended-reply';
 import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
+import { DispatchCommentNotifications } from '../../notification/domain/services/notification-dispatch-comment';
+import { NestEventPublisher } from '../../shared/infrastructure/nest-event-publisher';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
 import { WorkspaceFrontendResolver } from '../../shared/infrastructure/workspace-frontend-resolver';
 import { ticketThreadHeaders } from '../domain/ticket-email-thread';
@@ -51,6 +53,7 @@ export class NewCommentHandler {
     private readonly portalAccessRepository: TypeOrmTicketPortalAccessRepository,
     private readonly attachmentRepository: TypeOrmAttachmentRepository,
     private readonly workspaceRepository: TypeOrmWorkspaceRepository,
+    private readonly events: NestEventPublisher,
   ) {}
 
   @OnEvent('comment.created')
@@ -59,7 +62,11 @@ export class NewCommentHandler {
     await this.alertUnattendedReply(event, notified);
   }
 
-  /** The people of the ticket, plus anyone mentioned. Returns who was told. */
+  /**
+   * The people of the ticket, plus anyone mentioned. A mentioned team member hears "you were mentioned"
+   * instead of the comment, on each channel they want mentions on; elsewhere they get the comment as
+   * anyone would. Never both on one channel. Returns who was told.
+   */
   private async notifyStakeholders(event: NewCommentEvent): Promise<Set<string>> {
     const resolveStakeholders = new ResolveTicketStakeholders(this.ticketRepository, this.participantRepository, this.userRepository);
     const stakeholders = await resolveStakeholders.execute({
@@ -74,17 +81,18 @@ export class NewCommentHandler {
     const users = [...stakeholders, ...extraMentioned];
     if (users.length === 0) return new Set();
 
-    const dispatch = new DispatchNotifications(this.idGenerator, this.notificationRepository, this.preferenceRepository);
-    const { emailRecipients } = await dispatch.execute({
+    const dispatch = new DispatchNotifications(this.idGenerator, this.notificationRepository, this.preferenceRepository, this.events);
+    const { mentioned, comment } = await new DispatchCommentNotifications(dispatch, this.memberRepository).execute({
       users,
-      type: NotificationType.COMMENT_CREATED,
-      title: `${event.authorName} on ${event.ticketName}`,
+      mentionedUserIds: event.mentionedUserIds,
+      authorName: event.authorName,
+      ticketName: event.ticketName,
       ticketId: event.ticketId,
+      workspaceId: event.workspaceId,
       workspaceSlug: event.workspaceSlug,
-      inAppPrefKey: 'inAppCommentCreated',
-      emailPrefKey: 'emailCommentCreated',
     });
-    await this.sendEmails(event, users, emailRecipients, false);
+    await this.sendEmails(event, mentioned.users, mentioned.emailRecipients, 'mentioned');
+    await this.sendEmails(event, comment.users, comment.emailRecipients, 'comment');
     return new Set(users.map((u) => u.getId()));
   }
 
@@ -98,7 +106,7 @@ export class NewCommentHandler {
       .filter((u) => !alreadyNotified.has(u.getId()));
     if (users.length === 0) return;
 
-    const dispatch = new DispatchNotifications(this.idGenerator, this.notificationRepository, this.preferenceRepository);
+    const dispatch = new DispatchNotifications(this.idGenerator, this.notificationRepository, this.preferenceRepository, this.events);
     const { emailRecipients } = await dispatch.execute({
       users,
       type: NotificationType.UNATTENDED_REPLY,
@@ -107,11 +115,12 @@ export class NewCommentHandler {
       workspaceSlug: event.workspaceSlug,
       inAppPrefKey: 'inAppUnattendedReply',
       emailPrefKey: 'emailUnattendedReply',
+      matrix: { prefKey: 'matrixUnattendedReply', notice: { kind: 'unattended-reply', actorName: event.authorName } },
     });
-    await this.sendEmails(event, users, emailRecipients, true);
+    await this.sendEmails(event, users, emailRecipients, 'unattended');
   }
 
-  private async sendEmails(event: NewCommentEvent, users: User[], emailRecipients: Map<string, string[]>, unattended: boolean): Promise<void> {
+  private async sendEmails(event: NewCommentEvent, users: User[], emailRecipients: Map<string, string[]>, kind: 'comment' | 'unattended' | 'mentioned'): Promise<void> {
     if (emailRecipients.size === 0) return;
 
     const template = new NewCommentTemplate();
@@ -151,7 +160,8 @@ export class NewCommentHandler {
         commentContent: event.commentContent,
         files,
         canReply: !!replyMailbox,
-        unattended,
+        unattended: kind === 'unattended',
+        mentioned: kind === 'mentioned',
         workspaceName: event.workspaceName,
         lang,
       };
@@ -164,7 +174,7 @@ export class NewCommentHandler {
         ...(replyMailbox && { replyTo: replyMailbox.address }),
       });
       await new RecordEmailSend(this.idGenerator, this.auditLogRepository).execute({
-        result, type: unattended ? 'unattended-reply' : 'comment-notification', to: emails, subject, workspaceId: event.workspaceId, ticketId: event.ticketId, ticketName: event.ticketName, ticketReference: event.ticketNumber,
+        result, type: { comment: 'comment-notification', unattended: 'unattended-reply', mentioned: 'mention-notification' }[kind], to: emails, subject, workspaceId: event.workspaceId, ticketId: event.ticketId, ticketName: event.ticketName, ticketReference: event.ticketNumber,
       });
     }
   }

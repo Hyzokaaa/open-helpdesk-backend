@@ -8,6 +8,7 @@ import { AcceptInvitation } from '../../../domain/services/invitation-accept';
 import { RejectInvitation } from '../../../domain/services/invitation-reject';
 import { AcceptInvitationCommand } from '../../../application/commands/accept-invitation.command';
 import { RejectInvitationCommand } from '../../../application/commands/reject-invitation.command';
+import { InvitationTokenRequest } from '../dto/invitation-token.request';
 import { GetInvitationByTokenQuery } from '../../../application/queries/get-invitation-by-token.query';
 import { TypeOrmWorkspaceRepository } from '../../typeorm/repositories/typeorm-workspace.repository';
 import { TypeOrmWorkspaceMemberRepository } from '../../typeorm/repositories/typeorm-workspace-member.repository';
@@ -19,6 +20,7 @@ import { AuditAction } from '../../../../audit-log/domain/enums/audit-action.enu
 import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
 import { EntityNotFoundError } from '../../../../shared/domain/errors';
+import { NestEventPublisher } from '../../../../shared/infrastructure/nest-event-publisher';
 
 @Controller('invitations')
 export class InvitationPublicController {
@@ -29,6 +31,7 @@ export class InvitationPublicController {
     @Inject() private readonly userRepository: TypeOrmUserRepository,
     @Inject() private readonly idGenerator: UlidGenerator,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
+    @Inject() private readonly eventPublisher: NestEventPublisher,
   ) {}
 
   @Public()
@@ -41,7 +44,7 @@ export class InvitationPublicController {
   @SkipEmailVerification()
   @Post('accept')
   async accept(
-    @Body() body: { token: string },
+    @Body() body: InvitationTokenRequest,
     @CurrentUser() user: AuthUser,
   ) {
     const invitation = await this.invitationRepository.findByToken(body.token);
@@ -50,7 +53,7 @@ export class InvitationPublicController {
       throw new EntityNotFoundError('Invitation not found');
     }
     const service = new AcceptInvitation(this.idGenerator, this.invitationRepository, this.memberRepository);
-    const command = new AcceptInvitationCommand(service);
+    const command = new AcceptInvitationCommand(service, this.eventPublisher);
     const result = await command.execute({ token: body.token, userId: user.userId, userEmail: user.email });
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
@@ -72,13 +75,13 @@ export class InvitationPublicController {
   @SkipEmailVerification()
   @Post('reject')
   async reject(
-    @Body() body: { token: string },
+    @Body() body: InvitationTokenRequest,
     @CurrentUser() user: AuthUser,
   ) {
     const invitation = await this.invitationRepository.findByToken(body.token);
     const service = new RejectInvitation(this.invitationRepository);
     const command = new RejectInvitationCommand(service);
-    await command.execute({ token: body.token });
+    await command.execute({ token: body.token, userEmail: user.email });
 
     const auditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     await auditLog.execute({

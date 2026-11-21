@@ -14,6 +14,7 @@ import { TypeOrmTicketRepository } from '../../ticket/infrastructure/typeorm/rep
 import { sendWorkspaceEmail } from '../domain/resolve-email-sender';
 import { TypeOrmAuditLogRepository } from '../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
 import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
+import { NestEventPublisher } from '../../shared/infrastructure/nest-event-publisher';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
 import { WorkspaceFrontendResolver } from '../../shared/infrastructure/workspace-frontend-resolver';
 import { ticketThreadHeaders } from '../domain/ticket-email-thread';
@@ -35,6 +36,7 @@ export class TicketAssignedHandler {
     private readonly emailSenderRepository: TypeOrmWorkspaceEmailSenderRepository,
     private readonly auditLogRepository: TypeOrmAuditLogRepository,
     private readonly frontendResolver: WorkspaceFrontendResolver,
+    private readonly events: NestEventPublisher,
   ) {}
 
   @OnEvent('ticket.assigned')
@@ -42,7 +44,7 @@ export class TicketAssignedHandler {
     const template = new TicketAssignedTemplate();
     const frontendUrl = await this.frontendResolver.resolve(event.workspaceId);
     const ticketUrl = `${frontendUrl}/dashboard/workspaces/${event.workspaceSlug}/tickets/${event.ticketId}`;
-    const dispatch = new DispatchNotifications(this.idGenerator, this.notificationRepository, this.preferenceRepository);
+    const dispatch = new DispatchNotifications(this.idGenerator, this.notificationRepository, this.preferenceRepository, this.events);
     const ticket = await this.ticketRepository.findById(event.ticketId);
     const mailbox = ticket?.mailboxId
       ? await this.mailboxRepository.findById(ticket.mailboxId)
@@ -62,6 +64,7 @@ export class TicketAssignedHandler {
           workspaceSlug: event.workspaceSlug,
           inAppPrefKey: 'inAppTicketAssigned',
           emailPrefKey: 'emailTicketAssigned',
+          matrix: { prefKey: 'matrixTicketAssigned', notice: { kind: 'unassigned' } },
         });
 
         for (const [lang, emails] of eachEmailRecipient(emailRecipients)) {
@@ -93,6 +96,7 @@ export class TicketAssignedHandler {
           workspaceSlug: event.workspaceSlug,
           inAppPrefKey: 'inAppTicketAssigned',
           emailPrefKey: 'emailTicketAssigned',
+          matrix: { prefKey: 'matrixTicketAssigned', notice: { kind: 'assigned' } },
         });
 
         for (const [lang, emails] of eachEmailRecipient(emailRecipients)) {

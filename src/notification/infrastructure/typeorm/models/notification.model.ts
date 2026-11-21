@@ -32,6 +32,9 @@ export class NotificationModel {
   @Column()
   workspaceSlug!: string;
 
+  @Column({ type: 'varchar', nullable: true })
+  link!: string | null;
+
   @Column({ default: false })
   isRead!: boolean;
 

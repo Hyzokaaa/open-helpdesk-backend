@@ -4,6 +4,7 @@ import { WorkspaceInvitationRepository } from '../repositories/workspace-invitat
 import { WorkspaceMemberRepository } from '../repositories/workspace-member.repository';
 import { WorkspaceMember } from '../entities/workspace-member';
 import { InvitationStatus } from '../enums/invitation-status.enum';
+import { WorkspaceRole } from '../enums/workspace-role.enum';
 
 interface AcceptInvitationProps {
   token: string;
@@ -18,7 +19,8 @@ export class AcceptInvitation {
     private readonly memberRepository: WorkspaceMemberRepository,
   ) {}
 
-  async execute(props: AcceptInvitationProps): Promise<{ workspaceId: string; role: string }> {
+  /** `joined` is false when they were already in the workspace. */
+  async execute(props: AcceptInvitationProps): Promise<{ workspaceId: string; role: WorkspaceRole; joined: boolean }> {
     const invitation = await this.invitationRepository.findByToken(props.token);
     if (!invitation) {
       throw new EntityNotFoundError('Invitation not found');
@@ -45,7 +47,7 @@ export class AcceptInvitation {
     if (existingMember) {
       invitation.accept();
       await this.invitationRepository.update(invitation);
-      return { workspaceId: invitation.workspaceId, role: existingMember.role };
+      return { workspaceId: invitation.workspaceId, role: existingMember.role, joined: false };
     }
 
     const member = new WorkspaceMember({
@@ -59,6 +61,6 @@ export class AcceptInvitation {
     invitation.accept();
     await this.invitationRepository.update(invitation);
 
-    return { workspaceId: invitation.workspaceId, role: invitation.role };
+    return { workspaceId: invitation.workspaceId, role: invitation.role, joined: true };
   }
 }

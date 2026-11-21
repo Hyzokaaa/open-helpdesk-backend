@@ -202,7 +202,7 @@ export class AuthController {
     const createAuditLog = new CreateAuditLogEntry(this.idGenerator, this.auditLogRepository);
     const command = new SignupUserCommand(
       createUser, createAccount, acceptInvitation,
-      this.invitationRepository, this.createStartSession(), createAuditLog,
+      this.invitationRepository, this.createStartSession(), createAuditLog, this.eventPublisher,
     );
     return command.execute({
       email: body.email,

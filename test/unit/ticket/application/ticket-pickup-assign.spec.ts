@@ -49,8 +49,8 @@ describe('Picking up and assigning tickets', () => {
       await new PickupTicketCommand(new PickupTicket(w.tickets), w.ensurePermission(), w.auditLog(), events)
         .execute({ ticketId: 'ticket-a', workspaceId: WS_A, workspaceName: 'A', workspaceSlug: 'a', userId: 'agent-a', isSystemAdmin: false });
       expect(events.events.map((e) => e.event)).toEqual(['ticket.statusChanged', 'ticket.assigned']);
-      expect(events.events[0].data).toMatchObject({ oldStatus: TicketStatus.OPEN, newStatus: TicketStatus.PENDING, changedById: 'agent-a' });
-      expect(events.events[1].data).toMatchObject({ newAssigneeId: 'agent-a', previousAssigneeId: null, assignedById: 'agent-a' });
+      expect(events.events[0].data).toMatchObject({ oldStatus: TicketStatus.OPEN, newStatus: TicketStatus.PENDING, changedById: 'agent-a', assigneeChange: { newAssigneeId: 'agent-a' } });
+      expect(events.events[1].data).toMatchObject({ newAssigneeId: 'agent-a', previousAssigneeId: null, assignedById: 'agent-a', followsStatusChange: true });
     });
   });
 
@@ -96,6 +96,10 @@ describe('Picking up and assigning tickets', () => {
       await assign().execute(props('agent-a'));
       const statusEvents = events.events.filter((e) => e.event === 'ticket.statusChanged').map((e) => e.data);
       expect(statusEvents).toEqual([expect.objectContaining({ oldStatus: 'open', newStatus: 'pending', quiet: true })]);
+      // The assignment carries the status it moved, so one notice can tell both
+      const assigned = events.events.find((e) => e.event === 'ticket.assigned')?.data;
+      expect(assigned).toMatchObject({ statusChange: { oldStatus: 'open', newStatus: 'pending' } });
+      expect(assigned).not.toHaveProperty('followsStatusChange');
     });
 
     it('a ticket in progress left unassigned goes back to the queue; a closed one keeps its status', async () => {

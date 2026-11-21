@@ -103,6 +103,7 @@ export class ChangeTicketStatusCommand implements Command<Props, ChangeStatusRes
       workspaceId: props.workspaceId,
       workspaceName: props.workspaceName,
       workspaceSlug: props.workspaceSlug,
+      ...(updated.assigneeId !== previousAssigneeId && { assigneeChange: { newAssigneeId: updated.assigneeId } }),
     };
     this.eventPublisher.emit('ticket.statusChanged', event);
 
@@ -136,6 +137,7 @@ export class ChangeTicketStatusCommand implements Command<Props, ChangeStatusRes
         workspaceId: props.workspaceId,
         workspaceName: props.workspaceName,
         workspaceSlug: props.workspaceSlug,
+        followsStatusChange: true,
       };
       this.eventPublisher.emit('ticket.assigned', assigned);
 

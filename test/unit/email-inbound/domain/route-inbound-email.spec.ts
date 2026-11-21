@@ -257,6 +257,18 @@ describe('RouteInboundEmail', () => {
     expect(ticketEvents).toHaveLength(1);
   });
 
+  it('keeps the email\'s files before announcing the new ticket, so its notices can carry them', async () => {
+    const eventsWhenFileKept: number[] = [];
+    (service as any).createAttachment = { execute: async () => { eventsWhenFileKept.push(eventPublisher.events.filter((e) => e.event === 'ticket.created').length); } };
+    await service.execute({
+      ...baseParsedEmail(),
+      attachments: [{ filename: 'shot.png', mimeType: 'image/png', size: 3, content: Buffer.from('png') }],
+    } as any);
+
+    expect(eventsWhenFileKept).toEqual([0]);
+    expect(eventPublisher.events.filter((e) => e.event === 'ticket.created')).toHaveLength(1);
+  });
+
   it('should emit comment.created event when adding a comment to existing ticket', async () => {
     userRepository.seed(new User({
       id: 'u-existing',

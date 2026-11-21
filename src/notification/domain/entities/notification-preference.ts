@@ -22,6 +22,17 @@ interface Props {
   inAppInvitationExpired?: boolean;
   inAppUnattendedReply?: boolean;
   emailUnattendedReply?: boolean;
+  inAppMentioned?: boolean;
+  emailMentioned?: boolean;
+  matrixEnabled?: boolean;
+  matrixTicketCreated?: boolean;
+  matrixTicketAssigned?: boolean;
+  matrixStatusChanged?: boolean;
+  matrixTicketUnassigned?: boolean;
+  matrixCommentCreated?: boolean;
+  matrixTransferRequest?: boolean;
+  matrixUnattendedReply?: boolean;
+  matrixMentioned?: boolean;
   bellUnreadOnly: boolean;
 }
 
@@ -47,6 +58,17 @@ export class NotificationPreference {
   inAppInvitationExpired: boolean;
   inAppUnattendedReply: boolean;
   emailUnattendedReply: boolean;
+  inAppMentioned: boolean;
+  emailMentioned: boolean;
+  matrixEnabled: boolean;
+  matrixTicketCreated: boolean;
+  matrixTicketAssigned: boolean;
+  matrixStatusChanged: boolean;
+  matrixTicketUnassigned: boolean;
+  matrixCommentCreated: boolean;
+  matrixTransferRequest: boolean;
+  matrixUnattendedReply: boolean;
+  matrixMentioned: boolean;
   bellUnreadOnly: boolean;
 
   constructor(props: Props) {
@@ -71,6 +93,17 @@ export class NotificationPreference {
     this.inAppInvitationExpired = props.inAppInvitationExpired ?? true;
     this.inAppUnattendedReply = props.inAppUnattendedReply ?? true;
     this.emailUnattendedReply = props.emailUnattendedReply ?? true;
+    this.inAppMentioned = props.inAppMentioned ?? true;
+    this.emailMentioned = props.emailMentioned ?? true;
+    this.matrixEnabled = props.matrixEnabled ?? false;
+    this.matrixTicketCreated = props.matrixTicketCreated ?? true;
+    this.matrixTicketAssigned = props.matrixTicketAssigned ?? true;
+    this.matrixStatusChanged = props.matrixStatusChanged ?? true;
+    this.matrixTicketUnassigned = props.matrixTicketUnassigned ?? true;
+    this.matrixCommentCreated = props.matrixCommentCreated ?? true;
+    this.matrixTransferRequest = props.matrixTransferRequest ?? true;
+    this.matrixUnattendedReply = props.matrixUnattendedReply ?? true;
+    this.matrixMentioned = props.matrixMentioned ?? true;
     this.bellUnreadOnly = props.bellUnreadOnly;
   }
 

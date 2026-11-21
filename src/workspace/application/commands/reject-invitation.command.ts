@@ -3,6 +3,7 @@ import { RejectInvitation } from '../../domain/services/invitation-reject';
 
 interface Props {
   token: string;
+  userEmail: string;
 }
 
 export class RejectInvitationCommand implements Command<Props, void> {

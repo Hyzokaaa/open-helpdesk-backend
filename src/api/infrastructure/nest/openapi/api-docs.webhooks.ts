@@ -1,3 +1,4 @@
+import { privateNetworkUrlsAllowed } from '../../../../shared/infrastructure/private-network';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EVENT_LISTENER_METADATA } from '@nestjs/event-emitter/dist/constants';
 import { WebhookEvent } from '../../../../webhook/domain/enums/webhook-event.enum';
@@ -419,7 +420,10 @@ export function buildWebhookDeliveryExtension(): Record<string, unknown> {
     retries: 0,
     successStatus: '2xx',
     failure: 'A non-2xx status, a network error or the timeout is logged on the server and the delivery is dropped. There are no retries and no delivery log.',
-    redirects: 'followed',
+    // This installation's rule: a hosted one keeps webhooks off its private network
+    redirects: privateNetworkUrlsAllowed()
+      ? 'followed'
+      : 'not followed: a redirect counts as a failure. Addresses on a private network (or names that resolve to one) are refused when saving and at every delivery.',
     ordering: 'Each webhook subscribed to the event gets its own request, sent without waiting for the others. There is no ordering guarantee between events.',
     subscription: 'Only active webhooks of the workspace where the event happened that selected the event receive it.',
   };

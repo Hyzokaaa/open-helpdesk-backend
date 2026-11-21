@@ -60,6 +60,7 @@ export class PickupTicketCommand implements Command<Props, PickupTicketResponse>
       workspaceId: props.workspaceId,
       workspaceName: props.workspaceName ?? '',
       workspaceSlug: props.workspaceSlug ?? '',
+      assigneeChange: { newAssigneeId: props.userId },
     };
     this.eventPublisher?.emit('ticket.statusChanged', statusChanged);
     const assigned: TicketAssignedEvent = {
@@ -71,6 +72,7 @@ export class PickupTicketCommand implements Command<Props, PickupTicketResponse>
       workspaceId: props.workspaceId,
       workspaceName: props.workspaceName ?? '',
       workspaceSlug: props.workspaceSlug ?? '',
+      followsStatusChange: true,
     };
     this.eventPublisher?.emit('ticket.assigned', assigned);
 

@@ -20,4 +20,9 @@ export class WorkspaceFrontendResolver {
     }
     return this.frontendUrl;
   }
+
+  /** The installation's own address, for what is about no workspace. */
+  installation(): string {
+    return this.frontendUrl;
+  }
 }

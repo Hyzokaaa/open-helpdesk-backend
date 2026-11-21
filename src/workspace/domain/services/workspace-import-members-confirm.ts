@@ -32,6 +32,8 @@ interface ConfirmImportResult {
   added: number;
   skipped: number;
   createdUsers: CreatedUserInfo[];
+  /** Everyone who came into the workspace, new account or not. */
+  addedMembers: Array<{ userId: string; role: WorkspaceRole }>;
 }
 
 export class ConfirmImportMembers {
@@ -50,6 +52,7 @@ export class ConfirmImportMembers {
     let added = 0;
     let skipped = 0;
     const createdUsers: CreatedUserInfo[] = [];
+    const addedMembers: ConfirmImportResult['addedMembers'] = [];
 
     for (const row of props.rows) {
       let user = await this.userRepository.findByEmail(row.email.toLowerCase());
@@ -89,8 +92,9 @@ export class ConfirmImportMembers {
         role: row.role,
       });
       added++;
+      addedMembers.push({ userId: user.getId(), role: row.role });
     }
 
-    return { created, added, skipped, createdUsers };
+    return { created, added, skipped, createdUsers, addedMembers };
   }
 }

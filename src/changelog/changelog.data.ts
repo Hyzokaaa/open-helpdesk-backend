@@ -16,6 +16,58 @@ export interface ChangelogVersion {
 
 export const coreChangelog: ChangelogVersion[] = [
   {
+    version: '1.40.0',
+    date: '2026-11-21',
+    categories: [
+      {
+        title: { en: 'Matrix', es: 'Matrix' },
+        features: [
+          { en: 'Workspace notices in a Matrix room: new tickets, customer replies, assignments, status changes and missed SLA targets. Each ticket gets one message and its later notices answer in its thread. The installation has a bot that a workspace can replace with a custom bot, and Disconnect ends the bot\'s session on the server', es: 'Avisos del workspace en una sala de Matrix: tickets nuevos, respuestas de clientes, asignaciones, cambios de estado y plazos de SLA incumplidos. Cada ticket tiene un mensaje y sus avisos siguientes responden en su hilo. La instalación tiene un bot que cada workspace puede sustituir por un bot personalizado, y Desconectar cierra la sesión del bot en el servidor' },
+          { en: 'Status notices say where the ticket went from and to, and one action that also assigns the ticket is one notice. Comments by the team can be announced too', es: 'Los avisos de estado dicen de dónde a dónde pasó el ticket, y una acción que además lo asigna es un solo aviso. También se pueden anunciar los comentarios del equipo' },
+          { en: 'Notices count the attachments, and with Include attachments the images and documents of new tickets and comments arrive in the ticket\'s thread', es: 'Los avisos cuentan los adjuntos y, con Incluir adjuntos, las imágenes y documentos de los tickets nuevos y de los comentarios llegan al hilo del ticket' },
+          { en: 'Check room shows the room\'s real name and members before saving it, so a mistyped room shows at once', es: 'Comprobar sala muestra el nombre real de la sala y sus miembros antes de guardarla, para ver enseguida si la sala está mal escrita' },
+          { en: 'Personal notices on Matrix: each team member connects their own Matrix account in Settings → Notifications with a code the bot sends them, and chooses which events reach them there, next to email and in-app. They arrive in a private chat with the bot, threaded per ticket, with the subject but never the ticket\'s text', es: 'Avisos personales en Matrix: cada miembro del equipo conecta su propia cuenta de Matrix en Ajustes → Notificaciones con un código que le manda el bot, y elige qué eventos le llegan por ahí, junto al correo y la app. Llegan a un chat privado con el bot, en un hilo por ticket, con el asunto pero nunca el texto del ticket' },
+          { en: 'The settings list the bots that may write to you and for which workspaces. Leaving one bot\'s chat pauses only that bot, and Reconnect invites you to a new chat', es: 'Los ajustes muestran qué bots pueden escribirte y para qué workspaces. Salir del chat de un bot pausa solo ese bot, y Reconectar te invita a un chat nuevo' },
+          { en: 'A room for each organization, project or department besides the whole workspace\'s, which can leave out the tickets another room already tells of', es: 'Una sala por organización, proyecto o departamento además de la del workspace entero, que puede dejar fuera los tickets que ya cuenta otra sala' },
+          { en: 'The bot can create the room itself and invite the team as its admins, and can leave a room when its notices stop', es: 'El bot puede crear la sala él mismo e invitar al equipo como administradores, y puede salir de una sala cuando dejan sus avisos' },
+          { en: 'When another account replaces the bot, the new one is brought into the rooms and private chats before the old session ends', es: 'Cuando otra cuenta sustituye al bot, la nueva entra en las salas y chats privados antes de que se cierre la sesión anterior' },
+          { en: 'On a busy queue at most 20 notices a minute reach each room and each person; the rest are summed up in one line', es: 'Con mucha actividad llegan como mucho 20 avisos por minuto a cada sala y a cada persona; el resto se resume en una línea' },
+          { en: 'Opening the settings shows whether the bot is still in each room without making it join, and a room only checked but not saved is left again. The bot\'s server has to be reached over https', es: 'Al abrir los ajustes se ve si el bot sigue en cada sala sin que entre en ninguna, y una sala solo comprobada y no guardada se abandona de nuevo. Al servidor del bot hay que llegar por https' },
+          { en: 'The bot is connected right on the Matrix settings page, and the rooms and the events a room can hear of show even before there is a bot. With no bot yet, Settings → Notifications shows the Matrix channel locked, says what is missing and links to where one is connected', es: 'El bot se conecta en la misma página de ajustes de Matrix, y las salas y los eventos que puede avisar una sala se ven aunque todavía no haya bot. Sin bot, Ajustes → Notificaciones muestra el canal de Matrix bloqueado, dice qué falta y enlaza a donde se conecta' },
+        ],
+      },
+      {
+        title: { en: 'Comments', es: 'Comentarios' },
+        features: [
+          { en: 'Typing @ offers the ticket\'s people first: its assignee, requester, followers and whoever wrote in it. Typing a name adds the rest of the team after them. A customer can be mentioned only when they are on the ticket', es: 'Al escribir @ salen primero las personas del ticket: quien lo tiene asignado, quien lo pidió, los seguidores y quien ha escrito en él. Al escribir un nombre aparece después el resto del equipo. A un cliente solo se le puede mencionar si está en el ticket' },
+          { en: 'New notice "Mentioned me", by email, in the app and on Matrix: a team member mentioned in a comment hears it even with comment notices off, and gets it instead of the comment notice, never both', es: 'Nuevo aviso "Me mencionaron", por correo, en la app y por Matrix: a quien mencionan en un comentario le llega aunque tenga apagados los avisos de comentarios, y en lugar del aviso del comentario, nunca los dos' },
+        ],
+      },
+      {
+        title: { en: 'Notifications', es: 'Notificaciones' },
+        features: [
+          { en: 'New notice "New team member" for workspace admins, by email, in the app and on Matrix: someone joined the team by invitation, was added or was imported (a whole import is one notice), and opening it marks who joined on the members page. Customers are left out', es: 'Nuevo aviso "Nuevo miembro" para los admins del workspace, por correo, en la app y por Matrix: alguien entró en el equipo por invitación, alta o importación (una importación entera es un solo aviso), y al abrirlo la página de miembros marca a quien entró. Los clientes no cuentan' },
+          { en: 'Settings → Notifications has a Team and account group, with each of its notices on or off by channel', es: 'Ajustes → Notificaciones tiene el grupo Equipo y cuenta, con cada uno de sus avisos activable por canal' },
+        ],
+      },
+      {
+        title: { en: 'Interface', es: 'Interfaz' },
+        features: [
+          { en: 'Confirmation dialogs show Confirm and Cancel in the app\'s language', es: 'Los diálogos de confirmación muestran Confirmar y Cancelar en el idioma de la app' },
+          { en: 'The bell shows two lines of each notification, so a long one still says what happened', es: 'La campana muestra dos líneas de cada notificación, así que una larga sigue diciendo qué pasó' },
+          { en: 'The members page fits a phone: the email goes under the name', es: 'La página de miembros cabe en el móvil: el email va bajo el nombre' },
+        ],
+      },
+      {
+        title: { en: 'Security', es: 'Seguridad' },
+        features: [
+          { en: 'Accepting or rejecting an invitation needs the link it was sent with, and only the invited person can reject it', es: 'Aceptar o rechazar una invitación exige el enlace con el que se envió, y solo la persona invitada puede rechazarla' },
+          { en: 'Self-hosted installations can keep webhooks and a workspace\'s own Matrix server off the private network with ALLOW_PRIVATE_NETWORK_URLS=false, now passed by the docker-compose file. Stored secrets such as a bot\'s token are encrypted, with SECRETS_ENCRYPTION_KEY or a key derived from JWT_SECRET', es: 'Las instalaciones propias pueden mantener los webhooks y el servidor de Matrix de un workspace fuera de la red privada con ALLOW_PRIVATE_NETWORK_URLS=false, que ahora pasa el docker-compose. Los secretos guardados, como el token de un bot, van cifrados, con SECRETS_ENCRYPTION_KEY o una clave derivada de JWT_SECRET' },
+        ],
+      },
+    ],
+  },
+  {
     version: '1.39.0',
     date: '2026-10-31',
     categories: [

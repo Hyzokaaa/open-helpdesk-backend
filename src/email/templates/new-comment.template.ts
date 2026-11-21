@@ -23,6 +23,8 @@ interface Data {
   canReply: boolean;
   /** Sent to admins and supervisors because nobody on the team owns or follows the ticket. */
   unattended?: boolean;
+  /** Sent to a team member mentioned in the comment. */
+  mentioned?: boolean;
   workspaceName: string;
   lang: string;
 }
@@ -49,7 +51,9 @@ export class NewCommentTemplate {
     const footerKey = data.canReply ? 'newComment.footer' : data.ticketUrl ? 'newComment.footerNoReply' : 'newComment.footerPlain';
     const notice = data.unattended
       ? `<p style="background-color: #fef3c7; color: #92400e; padding: 8px 12px; border-radius: 6px; font-size: 13px; margin: 0 0 16px;">${t('newComment.unattendedNotice', data.lang)}</p>`
-      : '';
+      : data.mentioned
+        ? `<p style="background-color: #ecfdf5; color: #065f46; padding: 8px 12px; border-radius: 6px; font-size: 13px; margin: 0 0 16px;">${t('newComment.mentionedNotice', data.lang, { authorName: escapeHtml(data.authorName) })}</p>`
+        : '';
     const content = `
       ${notice}
       <p style="color: #4b5563;"><strong>${escapeHtml(data.authorName)}:</strong></p>

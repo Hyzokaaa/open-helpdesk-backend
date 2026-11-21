@@ -13,6 +13,8 @@ interface UpdateWebhookProps {
 export class UpdateWebhook {
   constructor(
     private readonly repository: WebhookRepository,
+    /** Refuses a URL the installation does not let workspaces call (its private network). */
+    private readonly ensureReachable: (url: string) => Promise<void> = async () => undefined,
   ) {}
 
   async execute(props: UpdateWebhookProps): Promise<Webhook> {
@@ -20,6 +22,10 @@ export class UpdateWebhook {
     if (!webhook || webhook.workspaceId !== props.workspaceId) {
       throw new EntityNotFoundError('Webhook not found');
     }
+
+    // Checked on every save, before changing anything, so an older webhook to a private address
+    // cannot be kept or turned back on
+    await this.ensureReachable(props.url ?? webhook.url);
 
     if (props.url !== undefined) webhook.url = props.url;
     if (props.events !== undefined) webhook.events = props.events;

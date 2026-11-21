@@ -82,6 +82,55 @@ describe('WebhookDeliveryService', () => {
     expect(JSON.parse(calls[0].init.body as string)).toMatchObject({ event, data: { ticketId: 't-1' } });
   });
 
+  it('keeps the fields that only steer our own notices out of the payload', async () => {
+    webhooks = [hook(['ticket.statusChanged', 'ticket.assigned'])];
+    await service().onTicketStatusChanged({ workspaceId: 'ws-1', ticketId: 't-1', quiet: true, assigneeChange: { newAssigneeId: 'u' } } as any);
+    await service().onTicketAssigned({ workspaceId: 'ws-1', ticketId: 't-1', statusChange: { oldStatus: 'open', newStatus: 'pending' }, followsStatusChange: true } as any);
+    await flush();
+    expect(calls.map((c) => JSON.parse(c.init.body as string).data)).toEqual([
+      { workspaceId: 'ws-1', ticketId: 't-1' },
+      { workspaceId: 'ws-1', ticketId: 't-1' },
+    ]);
+  });
+
+  describe('when workspaces may not reach the private network (ALLOW_PRIVATE_NETWORK_URLS=false)', () => {
+    const at = (url: string) => new Webhook({ id: 'wh-1', workspaceId: 'ws-1', url, events: ['ticket.created'], secret: SECRET, isActive: true, createdAt: null });
+    beforeEach(() => { process.env.ALLOW_PRIVATE_NETWORK_URLS = 'false'; });
+    afterEach(() => { delete process.env.ALLOW_PRIVATE_NETWORK_URLS; });
+
+    it('does not call a private address, checked again at every delivery', async () => {
+      webhooks = [at('http://127.0.0.1:5432/hook'), at('http://169.254.169.254/latest/meta-data')];
+      const instance = service();
+      const warn = jest.spyOn((instance as any).logger, 'warn').mockImplementation(() => undefined);
+      await instance.onTicketCreated({ workspaceId: 'ws-1' });
+      await flush();
+      expect(calls).toHaveLength(0);
+      expect(warn).toHaveBeenCalledTimes(2);
+      expect(String(warn.mock.calls[1][0])).toContain('169.254.169.254');
+      expect(String(warn.mock.calls[1][0])).not.toContain('meta-data');
+    });
+
+    it('sends the same signed envelope through the request that checks the address when connecting', async () => {
+      webhooks = [at('https://hooks.example.com/in/secret-path')];
+      const instance = service();
+      const sent: Array<{ url: string; options: any }> = [];
+      (instance as any).publicRequest = async (url: string, options: any) => { sent.push({ url, options }); return { status: 302, headers: {}, body: Buffer.alloc(0) }; };
+      const warn = jest.spyOn((instance as any).logger, 'warn').mockImplementation(() => undefined);
+      await instance.onTicketCreated({ workspaceId: 'ws-1', ticketId: 't-1' });
+      await flush();
+
+      expect(calls).toHaveLength(0);
+      expect(sent).toHaveLength(1);
+      const { options } = sent[0];
+      expect(options.method).toBe('POST');
+      expect(options.headers[WEBHOOK_SIGNATURE_HEADER]).toBe(createHmac('sha256', SECRET).update(options.body).digest('hex'));
+      expect(JSON.parse(options.body)).toMatchObject({ event: 'ticket.created', data: { ticketId: 't-1' } });
+      // A redirect is not followed, and the log keeps only the host
+      expect(String(warn.mock.calls[0][0])).toContain('redirect');
+      expect(String(warn.mock.calls[0][0])).not.toContain('secret-path');
+    });
+  });
+
   it('makes a single attempt: a failed delivery is not retried', async () => {
     webhooks = [hook(['ticket.created'])];
     fetchImpl = async () => new Response(null, { status: 500 });

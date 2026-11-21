@@ -22,6 +22,7 @@ import { TicketModule } from "./ticket/ticket.module";
 import { CommentModule } from "./comment/comment.module";
 import { AttachmentModule } from "./attachment/attachment.module";
 import { NotificationModule } from "./notification/notification.module";
+import { NoticeModule } from "./notification/notice.module";
 import { EmailModule } from "./email/email.module";
 import { AccountModule } from "./account/account.module";
 import { AuditLogModule } from "./audit-log/audit-log.module";
@@ -34,6 +35,7 @@ import { MailboxModule } from "./mailbox/mailbox.module";
 import { EmailInboundModule } from "./email-inbound/email-inbound.module";
 import { ApiKeyModule } from "./api-key/api-key.module";
 import { WebhookModule } from "./webhook/webhook.module";
+import { MatrixModule } from "./matrix/matrix.module";
 import { ApiModule } from "./api/api.module";
 import { AIModule } from "./ai/ai.module";
 import { KnowledgeBaseModule } from "./knowledge-base/knowledge-base.module";
@@ -89,6 +91,7 @@ import { SystemMailboxController } from "./mailbox/infrastructure/nest/controlle
     CommentModule,
     AttachmentModule,
     NotificationModule,
+    NoticeModule,
     EmailModule,
     AccountModule,
     AuditLogModule,
@@ -101,6 +104,7 @@ import { SystemMailboxController } from "./mailbox/infrastructure/nest/controlle
     EmailInboundModule,
     ApiKeyModule,
     WebhookModule,
+    MatrixModule,
     ApiModule,
     AIModule,
     KnowledgeBaseModule,

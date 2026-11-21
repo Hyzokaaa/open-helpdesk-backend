@@ -5,6 +5,8 @@ import { UserSignupMethod } from '../../domain/enums/user-signup-method.enum';
 import { StartUserSession } from '../../domain/services/user-session-start';
 import { CreateAccountForUser } from '../../../account/domain/services/account-create-for-user';
 import { AcceptInvitation } from '../../../workspace/domain/services/invitation-accept';
+import { EventPublisher } from '../../../shared/domain/event-publisher';
+import { WORKSPACE_MEMBERS_JOINED_EVENT, WorkspaceMembersJoinedEvent } from '../../../workspace/domain/workspace-member-events';
 import { WorkspaceInvitationRepository } from '../../../workspace/domain/repositories/workspace-invitation.repository';
 import { InvitationStatus } from '../../../workspace/domain/enums/invitation-status.enum';
 import { CreateAuditLogEntry } from '../../../audit-log/domain/services/audit-log-create';
@@ -42,6 +44,7 @@ export class SignupUserCommand implements Command<Props, SignupResponse> {
     private readonly invitationRepository: WorkspaceInvitationRepository,
     private readonly startSession: StartUserSession,
     private readonly createAuditLog: CreateAuditLogEntry,
+    private readonly eventPublisher: EventPublisher,
   ) {}
 
   async execute(props: Props): Promise<SignupResponse> {
@@ -77,11 +80,15 @@ export class SignupUserCommand implements Command<Props, SignupResponse> {
       firstName: props.firstName,
     });
 
-    await this.acceptInvitation.execute({
+    const accepted = await this.acceptInvitation.execute({
       token: props.invitationToken,
       userId: user.getId(),
       userEmail: user.email,
     });
+    if (accepted.joined) {
+      const joined: WorkspaceMembersJoinedEvent = { workspaceId: accepted.workspaceId, members: [{ userId: user.getId(), role: accepted.role }], actorId: null };
+      this.eventPublisher.emit(WORKSPACE_MEMBERS_JOINED_EVENT, joined);
+    }
 
     const { accessToken, refreshToken } = await this.startSession.execute({ user, rememberMe: false });
 

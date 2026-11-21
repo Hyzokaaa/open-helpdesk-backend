@@ -1,5 +1,7 @@
 import { Query } from '../../../shared/domain/query';
 import { NotificationRepository } from '../../domain/repositories/notification.repository';
+import { NoticeCatalog } from '../../domain/notice-catalog';
+import { NoticeText } from '../../domain/notice-kind';
 
 interface Props {
   userId: string;
@@ -12,6 +14,10 @@ export interface NotificationListItem {
   title: string;
   ticketId: string | null;
   workspaceSlug: string;
+  /** Where it takes you, for a notice that is not about a ticket. */
+  link: string | null;
+  /** The name of a catalogued kind (an extension's too), which the client cannot know. */
+  label: NoticeText | null;
   isRead: boolean;
   createdAt: Date | undefined;
 }
@@ -22,7 +28,10 @@ export interface ListNotificationsResponse {
 }
 
 export class ListNotificationsQuery implements Query<Props, ListNotificationsResponse> {
-  constructor(private readonly repository: NotificationRepository) {}
+  constructor(
+    private readonly repository: NotificationRepository,
+    private readonly catalog: NoticeCatalog,
+  ) {}
 
   async execute(props: Props): Promise<ListNotificationsResponse> {
     const [notifications, unreadCount] = await Promise.all([
@@ -38,6 +47,8 @@ export class ListNotificationsQuery implements Query<Props, ListNotificationsRes
         title: n.title,
         ticketId: n.ticketId,
         workspaceSlug: n.workspaceSlug,
+        link: n.link,
+        label: this.catalog.get(n.type)?.label ?? null,
         isRead: n.isRead,
         createdAt: n.createdAt,
       })),

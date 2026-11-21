@@ -24,6 +24,10 @@ export interface TicketAssignedEvent {
   workspaceId: string;
   workspaceName: string;
   workspaceSlug: string;
+  /** The assignment also moved the status (a queued ticket assigned becomes pending). Not in webhook payloads. */
+  statusChange?: { oldStatus: string; newStatus: string };
+  /** Set when a status change caused this assignment: its own event already tells both. Not in webhook payloads. */
+  followsStatusChange?: boolean;
 }
 
 export interface NewCommentEvent {
@@ -53,6 +57,8 @@ export interface StatusChangedEvent {
   workspaceSlug: string;
   /** Set when the change only follows another one people were already told about (an assignment). */
   quiet?: boolean;
+  /** The status change also moved the assignee (to work takes, to the queue lets go). Not in webhook payloads. */
+  assigneeChange?: { newAssigneeId: string | null };
 }
 
 /** A closed ticket taken back to work: by the team with a reason, or by the requester from the portal. */
@@ -97,6 +103,14 @@ export interface TransferRequestResolvedEvent {
   workspaceId: string;
   workspaceName: string;
   workspaceSlug: string;
+}
+
+/** A ticket went past one of its workspace's SLA targets (ticket.slaBreached), found by the periodic check. */
+export interface TicketSlaBreachedEvent {
+  ticketId: string;
+  workspaceId: string;
+  target: 'first-response' | 'resolution';
+  targetHours: number;
 }
 
 /** One edited ticket field. Reference fields (and tags) also carry their display names when known. */

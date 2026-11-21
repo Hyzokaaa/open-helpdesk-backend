@@ -1,4 +1,5 @@
-import { ConflictError, EntityNotFoundError } from '../../../../src/shared/domain/errors';
+import { ConflictError, DomainValidationError, EntityNotFoundError } from '../../../../src/shared/domain/errors';
+import { RejectInvitation } from '../../../../src/workspace/domain/services/invitation-reject';
 import { CreateInvitation } from '../../../../src/workspace/domain/services/invitation-create';
 import { ResendInvitation } from '../../../../src/workspace/domain/services/invitation-resend';
 import { CancelInvitation } from '../../../../src/workspace/domain/services/invitation-cancel';
@@ -99,5 +100,39 @@ describe('Inviting an email that already has a pending invitation', () => {
     expect(invitation.getId()).not.toBe('inv-old');
     expect((await repository.findById('inv-old'))!.status).toBe(InvitationStatus.CANCELLED);
     expect((await repository.findPendingByWorkspaceAndEmail('ws-1', 'a@example.com'))!.getId()).toBe(invitation.getId());
+  });
+});
+
+describe('Rejecting an invitation', () => {
+  let repository: MockWorkspaceInvitationRepository;
+  let reject: RejectInvitation;
+
+  beforeEach(async () => {
+    repository = new MockWorkspaceInvitationRepository();
+    reject = new RejectInvitation(repository);
+    await repository.create(new WorkspaceInvitation({
+      id: 'inv-1',
+      workspaceId: 'ws-1',
+      email: 'a@example.com',
+      role: WorkspaceRole.AGENT,
+      token: 'the-token',
+      status: InvitationStatus.PENDING,
+      expiresAt: new Date(Date.now() + 60_000),
+      invitedById: 'user-1',
+    }));
+  });
+
+  it('is up to the person it was sent to', async () => {
+    await reject.execute({ token: 'the-token', userEmail: 'a@example.com' });
+    expect((await repository.findById('inv-1'))!.status).toBe(InvitationStatus.REJECTED);
+  });
+
+  it('is refused to anyone else holding the link, and the invitation stays pending', async () => {
+    await expect(reject.execute({ token: 'the-token', userEmail: 'b@example.com' })).rejects.toThrow(DomainValidationError);
+    expect((await repository.findById('inv-1'))!.status).toBe(InvitationStatus.PENDING);
+  });
+
+  it('finds nothing without a token', async () => {
+    await expect(reject.execute({ token: '', userEmail: 'a@example.com' })).rejects.toThrow(EntityNotFoundError);
   });
 });

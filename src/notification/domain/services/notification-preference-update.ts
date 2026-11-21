@@ -23,6 +23,17 @@ interface UpdatePreferenceProps {
   inAppInvitationExpired?: boolean;
   inAppUnattendedReply?: boolean;
   emailUnattendedReply?: boolean;
+  inAppMentioned?: boolean;
+  emailMentioned?: boolean;
+  matrixEnabled?: boolean;
+  matrixTicketCreated?: boolean;
+  matrixTicketAssigned?: boolean;
+  matrixStatusChanged?: boolean;
+  matrixTicketUnassigned?: boolean;
+  matrixCommentCreated?: boolean;
+  matrixTransferRequest?: boolean;
+  matrixUnattendedReply?: boolean;
+  matrixMentioned?: boolean;
   bellUnreadOnly?: boolean;
 }
 
@@ -58,6 +69,17 @@ export class UpdateNotificationPreference {
         inAppInvitationExpired: true,
         inAppUnattendedReply: true,
         emailUnattendedReply: true,
+        inAppMentioned: true,
+        emailMentioned: true,
+        matrixEnabled: false,
+        matrixTicketCreated: true,
+        matrixTicketAssigned: true,
+        matrixStatusChanged: true,
+        matrixTicketUnassigned: true,
+        matrixCommentCreated: true,
+        matrixTransferRequest: true,
+        matrixUnattendedReply: true,
+        matrixMentioned: true,
         bellUnreadOnly: false,
       });
     }
@@ -81,6 +103,17 @@ export class UpdateNotificationPreference {
     if (props.inAppInvitationExpired !== undefined) pref.inAppInvitationExpired = props.inAppInvitationExpired;
     if (props.inAppUnattendedReply !== undefined) pref.inAppUnattendedReply = props.inAppUnattendedReply;
     if (props.emailUnattendedReply !== undefined) pref.emailUnattendedReply = props.emailUnattendedReply;
+    if (props.inAppMentioned !== undefined) pref.inAppMentioned = props.inAppMentioned;
+    if (props.emailMentioned !== undefined) pref.emailMentioned = props.emailMentioned;
+    if (props.matrixEnabled !== undefined) pref.matrixEnabled = props.matrixEnabled;
+    if (props.matrixTicketCreated !== undefined) pref.matrixTicketCreated = props.matrixTicketCreated;
+    if (props.matrixTicketAssigned !== undefined) pref.matrixTicketAssigned = props.matrixTicketAssigned;
+    if (props.matrixStatusChanged !== undefined) pref.matrixStatusChanged = props.matrixStatusChanged;
+    if (props.matrixTicketUnassigned !== undefined) pref.matrixTicketUnassigned = props.matrixTicketUnassigned;
+    if (props.matrixCommentCreated !== undefined) pref.matrixCommentCreated = props.matrixCommentCreated;
+    if (props.matrixTransferRequest !== undefined) pref.matrixTransferRequest = props.matrixTransferRequest;
+    if (props.matrixUnattendedReply !== undefined) pref.matrixUnattendedReply = props.matrixUnattendedReply;
+    if (props.matrixMentioned !== undefined) pref.matrixMentioned = props.matrixMentioned;
     if (props.bellUnreadOnly !== undefined) pref.bellUnreadOnly = props.bellUnreadOnly;
 
     await this.repository.upsert(pref);

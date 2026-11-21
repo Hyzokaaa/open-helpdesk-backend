@@ -16,6 +16,7 @@ import { TypeOrmTicketParticipantRepository } from '../../ticket/infrastructure/
 import { TypeOrmAuditLogRepository } from '../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
 import { ResolveTicketStakeholders } from '../../notification/domain/services/notification-resolve-ticket-stakeholders';
 import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
+import { NestEventPublisher } from '../../shared/infrastructure/nest-event-publisher';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
 import { WorkspaceFrontendResolver } from '../../shared/infrastructure/workspace-frontend-resolver';
 import { TypeOrmWorkspaceMemberRepository } from '../../workspace/infrastructure/typeorm/repositories/typeorm-workspace-member.repository';
@@ -54,6 +55,7 @@ export class TicketReopenedHandler {
     private readonly memberRepository: TypeOrmWorkspaceMemberRepository,
     private readonly portalAccessRepository: TypeOrmTicketPortalAccessRepository,
     private readonly workspaceRepository: TypeOrmWorkspaceRepository,
+    private readonly events: NestEventPublisher,
   ) {}
 
   @OnEvent('ticket.reopened')
@@ -98,7 +100,7 @@ export class TicketReopenedHandler {
     reopenedBy: string,
   ): Promise<void> {
     if (users.length === 0) return;
-    const dispatch = new DispatchNotifications(this.idGenerator, this.notificationRepository, this.preferenceRepository);
+    const dispatch = new DispatchNotifications(this.idGenerator, this.notificationRepository, this.preferenceRepository, this.events);
     const { emailRecipients } = await dispatch.execute({
       users,
       type: NotificationType.STATUS_CHANGED,
@@ -107,6 +109,8 @@ export class TicketReopenedHandler {
       workspaceSlug: event.workspaceSlug,
       inAppPrefKey: 'inAppStatusChanged',
       emailPrefKey: 'emailStatusChanged',
+      // The team only: a customer's own notices stay in the app and by email
+      matrix: team ? { prefKey: 'matrixStatusChanged', notice: { kind: 'reopened', oldStatus: event.oldStatus, newStatus: event.newStatus } } : undefined,
     });
     if (emailRecipients.size === 0) return;
 

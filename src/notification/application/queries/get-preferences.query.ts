@@ -25,6 +25,17 @@ export interface PreferencesResponse {
   inAppInvitationExpired: boolean;
   inAppUnattendedReply: boolean;
   emailUnattendedReply: boolean;
+  inAppMentioned: boolean;
+  emailMentioned: boolean;
+  matrixEnabled: boolean;
+  matrixTicketCreated: boolean;
+  matrixTicketAssigned: boolean;
+  matrixStatusChanged: boolean;
+  matrixTicketUnassigned: boolean;
+  matrixCommentCreated: boolean;
+  matrixTransferRequest: boolean;
+  matrixUnattendedReply: boolean;
+  matrixMentioned: boolean;
   bellUnreadOnly: boolean;
 }
 
@@ -48,6 +59,17 @@ const DEFAULTS: PreferencesResponse = {
   inAppInvitationExpired: true,
   inAppUnattendedReply: true,
   emailUnattendedReply: true,
+  inAppMentioned: true,
+  emailMentioned: true,
+  matrixEnabled: false,
+  matrixTicketCreated: true,
+  matrixTicketAssigned: true,
+  matrixStatusChanged: true,
+  matrixTicketUnassigned: true,
+  matrixCommentCreated: true,
+  matrixTransferRequest: true,
+  matrixUnattendedReply: true,
+  matrixMentioned: true,
   bellUnreadOnly: false,
 };
 
@@ -78,6 +100,17 @@ export class GetPreferencesQuery implements Query<Props, PreferencesResponse> {
       inAppInvitationExpired: pref.inAppInvitationExpired,
       inAppUnattendedReply: pref.inAppUnattendedReply,
       emailUnattendedReply: pref.emailUnattendedReply,
+      inAppMentioned: pref.inAppMentioned,
+      emailMentioned: pref.emailMentioned,
+      matrixEnabled: pref.matrixEnabled,
+      matrixTicketCreated: pref.matrixTicketCreated,
+      matrixTicketAssigned: pref.matrixTicketAssigned,
+      matrixStatusChanged: pref.matrixStatusChanged,
+      matrixTicketUnassigned: pref.matrixTicketUnassigned,
+      matrixCommentCreated: pref.matrixCommentCreated,
+      matrixTransferRequest: pref.matrixTransferRequest,
+      matrixUnattendedReply: pref.matrixUnattendedReply,
+      matrixMentioned: pref.matrixMentioned,
       bellUnreadOnly: pref.bellUnreadOnly,
     };
   }

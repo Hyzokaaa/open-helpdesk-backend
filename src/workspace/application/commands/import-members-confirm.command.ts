@@ -3,6 +3,8 @@ import { EnsureWorkspacePermission } from '../../domain/services/workspace-ensur
 import { ConfirmImportMembers } from '../../domain/services/workspace-import-members-confirm';
 import { PERMISSIONS } from '../../domain/permissions';
 import { WorkspaceRole } from '../../domain/enums/workspace-role.enum';
+import { EventPublisher } from '../../../shared/domain/event-publisher';
+import { WORKSPACE_MEMBERS_JOINED_EVENT, WorkspaceMembersJoinedEvent } from '../../../workspace/domain/workspace-member-events';
 
 interface ImportRow {
   email: string;
@@ -30,6 +32,7 @@ export class ImportMembersConfirmCommand implements Command<Props, ConfirmResult
   constructor(
     private readonly confirmImport: ConfirmImportMembers,
     private readonly ensurePermission: EnsureWorkspacePermission,
+    private readonly eventPublisher: EventPublisher,
   ) {}
 
   async execute(props: Props): Promise<ConfirmResult> {
@@ -40,10 +43,15 @@ export class ImportMembersConfirmCommand implements Command<Props, ConfirmResult
       isSystemAdmin: props.isSystemAdmin,
     });
 
-    return this.confirmImport.execute({
+    const { addedMembers, ...result } = await this.confirmImport.execute({
       workspaceId: props.workspaceId,
       rows: props.rows,
       skipVerification: props.skipVerification,
     });
+    if (addedMembers.length > 0) {
+      const joined: WorkspaceMembersJoinedEvent = { workspaceId: props.workspaceId, members: addedMembers, actorId: props.requestingUserId };
+      this.eventPublisher.emit(WORKSPACE_MEMBERS_JOINED_EVENT, joined);
+    }
+    return result;
   }
 }

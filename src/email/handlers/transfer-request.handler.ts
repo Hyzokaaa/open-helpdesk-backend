@@ -14,6 +14,7 @@ import { TypeOrmTicketRepository } from '../../ticket/infrastructure/typeorm/rep
 import { sendWorkspaceEmail } from '../domain/resolve-email-sender';
 import { TypeOrmAuditLogRepository } from '../../audit-log/infrastructure/typeorm/repositories/typeorm-audit-log.repository';
 import { DispatchNotifications } from '../../notification/domain/services/notification-dispatch';
+import { NestEventPublisher } from '../../shared/infrastructure/nest-event-publisher';
 import { NotificationType } from '../../notification/domain/enums/notification-type.enum';
 import { WorkspaceFrontendResolver } from '../../shared/infrastructure/workspace-frontend-resolver';
 import { eachEmailRecipient } from '../domain/each-email-recipient';
@@ -34,6 +35,7 @@ export class TransferRequestHandler {
     private readonly emailSenderRepository: TypeOrmWorkspaceEmailSenderRepository,
     private readonly auditLogRepository: TypeOrmAuditLogRepository,
     private readonly frontendResolver: WorkspaceFrontendResolver,
+    private readonly events: NestEventPublisher,
   ) {}
 
   @OnEvent('transfer-request.created')
@@ -41,7 +43,7 @@ export class TransferRequestHandler {
     const users = await this.userRepository.findByIds([event.targetUserId]);
     if (users.length === 0) return;
 
-    const dispatch = new DispatchNotifications(this.idGenerator, this.notificationRepository, this.preferenceRepository);
+    const dispatch = new DispatchNotifications(this.idGenerator, this.notificationRepository, this.preferenceRepository, this.events);
     const { emailRecipients } = await dispatch.execute({
       users,
       type: NotificationType.TRANSFER_REQUEST,
@@ -50,6 +52,7 @@ export class TransferRequestHandler {
       workspaceSlug: event.workspaceSlug,
       inAppPrefKey: 'inAppTransferRequest',
       emailPrefKey: 'emailTransferRequest',
+      matrix: { prefKey: 'matrixTransferRequest', notice: { kind: 'transfer-request', actorName: event.requesterName } },
     });
 
     if (emailRecipients.size === 0) return;
@@ -90,7 +93,7 @@ export class TransferRequestHandler {
     const users = await this.userRepository.findByIds([notifyUserId]);
     if (users.length === 0) return;
 
-    const dispatch = new DispatchNotifications(this.idGenerator, this.notificationRepository, this.preferenceRepository);
+    const dispatch = new DispatchNotifications(this.idGenerator, this.notificationRepository, this.preferenceRepository, this.events);
     const { emailRecipients } = await dispatch.execute({
       users,
       type: NotificationType.TRANSFER_REQUEST,
@@ -99,6 +102,7 @@ export class TransferRequestHandler {
       workspaceSlug: event.workspaceSlug,
       inAppPrefKey: 'inAppTransferRequest',
       emailPrefKey: 'emailTransferRequest',
+      matrix: { prefKey: 'matrixTransferRequest', notice: { kind: `transfer-${event.resolution}` } },
     });
 
     if (emailRecipients.size === 0) return;

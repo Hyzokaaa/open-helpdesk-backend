@@ -16,6 +16,7 @@ const STATUS_MAP: Record<string, HttpStatus> = {
   ConflictError: HttpStatus.CONFLICT,
   DomainValidationError: HttpStatus.BAD_REQUEST,
   InvalidCredentialsError: HttpStatus.UNAUTHORIZED,
+  TooManyRequestsError: HttpStatus.TOO_MANY_REQUESTS,
 };
 
 /** Told about every refused request, to audit it. Failing to record never changes the response. */
@@ -40,6 +41,7 @@ export class DomainExceptionFilter implements ExceptionFilter {
       statusCode: status,
       message: exception.message,
       error: exception.name,
+      ...(exception.code ? { code: exception.code } : {}),
     });
   }
 }

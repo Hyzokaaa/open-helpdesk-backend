@@ -14,9 +14,12 @@ export class CreateWebhook {
   constructor(
     private readonly idGenerator: IdGenerator,
     private readonly repository: WebhookRepository,
+    /** Refuses a URL the installation does not let workspaces call (its private network). */
+    private readonly ensureReachable: (url: string) => Promise<void> = async () => undefined,
   ) {}
 
   async execute(props: CreateWebhookProps): Promise<Webhook> {
+    await this.ensureReachable(props.url);
     const secret = props.secret || randomBytes(32).toString('hex');
 
     const webhook = new Webhook({

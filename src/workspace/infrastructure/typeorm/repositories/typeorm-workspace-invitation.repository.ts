@@ -24,6 +24,8 @@ export class TypeOrmWorkspaceInvitationRepository implements WorkspaceInvitation
   }
 
   async findByToken(token: string): Promise<WorkspaceInvitation | null> {
+    // TypeORM drops an undefined condition, and would then return any invitation at all
+    if (!token) return null;
     const model = await this.repository.findOneBy({ token });
     return model ? this.toDomain(model) : null;
   }

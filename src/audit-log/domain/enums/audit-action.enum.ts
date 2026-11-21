@@ -210,6 +210,19 @@ export enum AuditAction {
   WEBHOOK_UPDATED = 'webhook-updated',
   WEBHOOK_DELETED = 'webhook-deleted',
 
+  // Matrix notices
+  MATRIX_BOT_CONNECTED = 'matrix-bot-connected',
+  MATRIX_BOT_DISCONNECTED = 'matrix-bot-disconnected',
+  MATRIX_ROOM_CONFIGURED = 'matrix-room-configured',
+  MATRIX_ROOM_REMOVED = 'matrix-room-removed',
+  MATRIX_ROOM_PAUSED = 'matrix-room-paused',
+  MATRIX_TEST_NOTICE = 'matrix-test-notice',
+  /** A user verified their own Matrix account for personal notices. */
+  MATRIX_ACCOUNT_CONNECTED = 'matrix-account-connected',
+  MATRIX_ACCOUNT_DISCONNECTED = 'matrix-account-disconnected',
+  /** The user left or blocked a bot's direct chat: their Matrix notices stopped. */
+  MATRIX_ACCOUNT_LOST = 'matrix-account-lost',
+
   // API keys
   API_KEY_CREATED = 'api-key-created',
   API_KEY_DELETED = 'api-key-deleted',

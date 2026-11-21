@@ -78,6 +78,7 @@ export class AssignTicketCommand implements Command<Props, AssignTicketResponse>
       workspaceId: props.workspaceId,
       workspaceName: props.workspaceName,
       workspaceSlug: props.workspaceSlug,
+      ...(updated.status !== previousStatus && { statusChange: { oldStatus: previousStatus, newStatus: updated.status } }),
     };
     this.eventPublisher.emit('ticket.assigned', event);
 

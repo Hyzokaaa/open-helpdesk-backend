@@ -92,6 +92,10 @@ const translations: Translations = {
     en: 'The customer answered a ticket nobody on the team owns or follows yet.',
     es: 'El cliente respondió en un ticket que nadie del equipo tiene asignado ni sigue todavía.',
   },
+  'newComment.mentionedNotice': {
+    en: '{authorName} mentioned you in this comment.',
+    es: '{authorName} te mencionó en este comentario.',
+  },
   'newComment.files': {
     en: 'Attached files, available in the ticket:',
     es: 'Archivos adjuntos, disponibles en el ticket:',
@@ -427,6 +431,15 @@ const translations: Translations = {
   'upgradeAvailable.button': {
     en: 'View Release',
     es: 'Ver Version',
+  },
+  // The end of a notice that is not about a ticket (NoticeTemplate)
+  'notice.manage': {
+    en: 'You can turn this notice off in Settings → Notifications.',
+    es: 'Puedes desactivar este aviso en Ajustes → Notificaciones.',
+  },
+  'notice.mandatory': {
+    en: 'This notice is always sent by email.',
+    es: 'Este aviso llega siempre por correo.',
   },
   'upgradeAvailable.disable': {
     en: 'You can disable upgrade notifications in Admin Settings.',

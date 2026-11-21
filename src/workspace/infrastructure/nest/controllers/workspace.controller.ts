@@ -496,7 +496,7 @@ export class WorkspaceController {
       this.auditLogRepository,
     );
     const targetUser = await this.userRepository.findById(body.userId);
-    const command = new AddMemberCommand(service, ensurePermission, auditLog);
+    const command = new AddMemberCommand(service, ensurePermission, auditLog, this.eventPublisher);
     return command.execute({
       workspaceId,
       userId: body.userId,

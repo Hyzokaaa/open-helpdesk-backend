@@ -23,6 +23,7 @@ import { AuditAction } from '../../../../audit-log/domain/enums/audit-action.enu
 import { AuditCategory } from '../../../../audit-log/domain/enums/audit-category.enum';
 import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum';
 import { UpdatePreferencesRequest } from '../dto/update-preferences.request';
+import { NoticeCatalogProvider } from '../services/notice-catalog.provider';
 
 @Controller('notifications')
 export class NotificationController {
@@ -33,6 +34,7 @@ export class NotificationController {
     private readonly preferenceRepository: TypeOrmNotificationPreferenceRepository,
     @Inject() private readonly idGenerator: UlidGenerator,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
+    @Inject() private readonly noticeCatalog: NoticeCatalogProvider,
   ) {}
 
   @Get()
@@ -40,7 +42,7 @@ export class NotificationController {
     @CurrentUser() user: AuthUser,
     @Query('unreadOnly') unreadOnly: string,
   ) {
-    const query = new ListNotificationsQuery(this.notificationRepository);
+    const query = new ListNotificationsQuery(this.notificationRepository, this.noticeCatalog.catalog);
     return query.execute({ userId: user.userId, unreadOnly: unreadOnly === 'true' });
   }
 

@@ -37,6 +37,7 @@ import { AuditLevel } from '../../../../audit-log/domain/enums/audit-level.enum'
 import { sendImportWelcomeEmails } from '../import-welcome-emails';
 import { WorkspaceFrontendResolver } from '../../../../shared/infrastructure/workspace-frontend-resolver';
 import { RecordEmailSend } from '../../../../audit-log/domain/services/audit-log-record-email-send';
+import { NestEventPublisher } from '../../../../shared/infrastructure/nest-event-publisher';
 
 @Controller('workspaces')
 export class WorkspaceImportController {
@@ -50,6 +51,7 @@ export class WorkspaceImportController {
     @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
     @Inject() private readonly frontendResolver: WorkspaceFrontendResolver,
+    @Inject() private readonly eventPublisher: NestEventPublisher,
   ) {}
 
   @Get(':slug/members/import/template')
@@ -119,7 +121,7 @@ export class WorkspaceImportController {
       this.passwordHasher,
     );
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
-    const command = new ImportMembersConfirmCommand(confirmService, ensurePermission);
+    const command = new ImportMembersConfirmCommand(confirmService, ensurePermission, this.eventPublisher);
 
     const result = await command.execute({
       workspaceId: workspace.getId(),

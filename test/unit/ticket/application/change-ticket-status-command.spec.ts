@@ -23,6 +23,7 @@ describe('ChangeTicketStatusCommand', () => {
   let ticketRepository: MockTicketRepository;
   let memberRepository: MockWorkspaceMemberRepository;
   let emitted: string[];
+  let payloads: Record<string, any>;
   let audited: AuditLogEntry[];
 
   const seedTicket = (status: TicketStatus, assigneeId: string | null) => {
@@ -66,8 +67,9 @@ describe('ChangeTicketStatusCommand', () => {
     ticketRepository = new MockTicketRepository();
     memberRepository = new MockWorkspaceMemberRepository();
     emitted = [];
+    payloads = {};
     audited = [];
-    const eventPublisher = { emit: (name: string) => { emitted.push(name); } };
+    const eventPublisher = { emit: (name: string, payload: unknown) => { emitted.push(name); payloads[name] = payload; } };
     const auditLogRepository = { create: async (entry: AuditLogEntry) => { audited.push(entry); }, findAll: async () => ({ data: [], total: 0, page: 1, limit: 10 }) };
     const createAuditLog = new CreateAuditLogEntry(new FakeIdGenerator(), auditLogRepository as any);
     command = new ChangeTicketStatusCommand(
@@ -141,6 +143,9 @@ describe('ChangeTicketStatusCommand', () => {
     expect(result.status).toBe(TicketStatus.IN_PROGRESS);
     expect(result.assigneeId).toBe('sup-1');
     expect(emitted).toEqual(['ticket.statusChanged', 'ticket.assigned']);
+    // One action: the status change says whom it assigned, and the assignment says what caused it
+    expect(payloads['ticket.statusChanged'].assigneeChange).toEqual({ newAssigneeId: 'sup-1' });
+    expect(payloads['ticket.assigned'].followsStatusChange).toBe(true);
     expect(audited.map((e) => e.action)).toEqual([AuditAction.TICKET_STATUS_CHANGED, AuditAction.TICKET_ASSIGNED]);
     expect(audited[1].metadata).toMatchObject({ reason: 'status-changed' });
   });
@@ -162,6 +167,7 @@ describe('ChangeTicketStatusCommand', () => {
     await run('sup-1', TicketStatus.IN_PROGRESS);
 
     expect(emitted).toEqual(['ticket.statusChanged']);
+    expect(payloads['ticket.statusChanged'].assigneeChange).toBeUndefined();
   });
 
   it('bulk does not take tickets: work with nobody assigned is refused', async () => {

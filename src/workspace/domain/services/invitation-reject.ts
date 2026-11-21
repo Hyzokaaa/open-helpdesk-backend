@@ -4,6 +4,8 @@ import { InvitationStatus } from '../enums/invitation-status.enum';
 
 interface RejectInvitationProps {
   token: string;
+  /** Who rejects it: only the person it was sent to may, as only they may accept it */
+  userEmail: string;
 }
 
 export class RejectInvitation {
@@ -19,6 +21,10 @@ export class RejectInvitation {
 
     if (invitation.status !== InvitationStatus.PENDING) {
       throw new DomainValidationError('Invitation is no longer valid');
+    }
+
+    if (invitation.email !== props.userEmail) {
+      throw new DomainValidationError('This invitation was sent to a different email address');
     }
 
     invitation.reject();

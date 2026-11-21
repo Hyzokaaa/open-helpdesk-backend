@@ -31,6 +31,7 @@ import { EnsureWorkspacePermission } from '../../../../workspace/domain/services
 import { CreateWebhookRequest } from '../dto/create-webhook.request';
 import { UpdateWebhookRequest } from '../dto/update-webhook.request';
 import { webhookUrlHost } from '../../../domain/webhook-url-host';
+import { ensurePublicUrl, privateNetworkUrlsAllowed } from '../../../../shared/infrastructure/private-network';
 
 @Controller('workspaces/:slug/webhooks')
 export class WebhookController {
@@ -42,6 +43,11 @@ export class WebhookController {
     @Inject() private readonly auditLogRepository: TypeOrmAuditLogRepository,
   ) {}
 
+  /** With ALLOW_PRIVATE_NETWORK_URLS=false (hosted), webhooks may not point at the private network. */
+  private ensureReachable(): (url: string) => Promise<void> {
+    return privateNetworkUrlsAllowed() ? async () => undefined : (url) => ensurePublicUrl(url);
+  }
+
   @Post()
   async create(
     @Param('slug') slug: string,
@@ -50,7 +56,7 @@ export class WebhookController {
   ) {
     const workspace = await this.resolveWorkspace(slug);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
-    const service = new CreateWebhook(this.idGenerator, this.webhookRepository);
+    const service = new CreateWebhook(this.idGenerator, this.webhookRepository, this.ensureReachable());
     const command = new CreateWebhookCommand(service, ensurePermission);
     const result = await command.execute({
       workspaceId: workspace.getId(),
@@ -102,7 +108,7 @@ export class WebhookController {
     const workspace = await this.resolveWorkspace(slug);
     const previous = await this.webhookRepository.findById(id);
     const ensurePermission = new EnsureWorkspacePermission(this.memberRepository);
-    const service = new UpdateWebhook(this.webhookRepository);
+    const service = new UpdateWebhook(this.webhookRepository, this.ensureReachable());
     const command = new UpdateWebhookCommand(service, ensurePermission);
     const result = await command.execute({
       id,

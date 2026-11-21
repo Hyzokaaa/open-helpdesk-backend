@@ -15,6 +15,7 @@ import { JwtTokenService } from './infrastructure/jwt-token-service';
 import { SeederService } from './infrastructure/seeder.service';
 import { AccessTokenVerifier } from './infrastructure/access-token-verifier';
 import { SessionLiveness } from './infrastructure/session-liveness';
+import { EnvSecretCipher } from './infrastructure/aes-secret-cipher';
 import { JwtStrategy } from './nest/strategies/jwt.strategy';
 import { StorageFileController } from './infrastructure/nest/controllers/storage-file.controller';
 import { UserModel } from '../user/infrastructure/typeorm/models/user.model';
@@ -63,7 +64,7 @@ const filesystemProvider: Provider = {
     }),
   ],
   controllers: [StorageFileController],
-  providers: [AppClockSubscriber, UlidGenerator, BcryptPasswordHasher, S3StorageService, FilesystemStorageService, storageProvider, filesystemProvider, NestEventPublisher, JwtTokenService, AccessTokenVerifier, SessionLiveness, SeederService, JwtStrategy, ...buildOAuthProviders()],
-  exports: [UlidGenerator, BcryptPasswordHasher, S3StorageService, FilesystemStorageService, STORAGE_SERVICE, NestEventPublisher, JwtTokenService, AccessTokenVerifier, SessionLiveness, JwtModule, PassportModule],
+  providers: [AppClockSubscriber, UlidGenerator, BcryptPasswordHasher, S3StorageService, FilesystemStorageService, storageProvider, filesystemProvider, NestEventPublisher, JwtTokenService, AccessTokenVerifier, SessionLiveness, EnvSecretCipher, SeederService, JwtStrategy, ...buildOAuthProviders()],
+  exports: [UlidGenerator, BcryptPasswordHasher, S3StorageService, FilesystemStorageService, STORAGE_SERVICE, NestEventPublisher, JwtTokenService, AccessTokenVerifier, SessionLiveness, EnvSecretCipher, JwtModule, PassportModule],
 })
 export class SharedModule {}

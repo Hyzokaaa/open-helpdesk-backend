@@ -53,6 +53,7 @@ export class TypeOrmNotificationRepository implements NotificationRepository {
       title: model.title,
       ticketId: model.ticketId,
       workspaceSlug: model.workspaceSlug,
+      link: model.link,
       isRead: model.isRead,
       createdAt: model.createdAt,
     });
@@ -66,6 +67,7 @@ export class TypeOrmNotificationRepository implements NotificationRepository {
     model.title = notification.title;
     model.ticketId = notification.ticketId;
     model.workspaceSlug = notification.workspaceSlug;
+    model.link = notification.link;
     model.isRead = notification.isRead;
     return model;
   }

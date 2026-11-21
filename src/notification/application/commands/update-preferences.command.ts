@@ -22,6 +22,17 @@ interface Props {
   inAppInvitationExpired?: boolean;
   inAppUnattendedReply?: boolean;
   emailUnattendedReply?: boolean;
+  inAppMentioned?: boolean;
+  emailMentioned?: boolean;
+  matrixEnabled?: boolean;
+  matrixTicketCreated?: boolean;
+  matrixTicketAssigned?: boolean;
+  matrixStatusChanged?: boolean;
+  matrixTicketUnassigned?: boolean;
+  matrixCommentCreated?: boolean;
+  matrixTransferRequest?: boolean;
+  matrixUnattendedReply?: boolean;
+  matrixMentioned?: boolean;
   bellUnreadOnly?: boolean;
 }
 
@@ -45,6 +56,17 @@ export interface UpdatePreferencesResponse {
   inAppInvitationExpired: boolean;
   inAppUnattendedReply: boolean;
   emailUnattendedReply: boolean;
+  inAppMentioned: boolean;
+  emailMentioned: boolean;
+  matrixEnabled: boolean;
+  matrixTicketCreated: boolean;
+  matrixTicketAssigned: boolean;
+  matrixStatusChanged: boolean;
+  matrixTicketUnassigned: boolean;
+  matrixCommentCreated: boolean;
+  matrixTransferRequest: boolean;
+  matrixUnattendedReply: boolean;
+  matrixMentioned: boolean;
   bellUnreadOnly: boolean;
 }
 
@@ -76,6 +98,17 @@ export class UpdatePreferencesCommand implements Command<Props, UpdatePreference
       inAppInvitationExpired: pref.inAppInvitationExpired,
       inAppUnattendedReply: pref.inAppUnattendedReply,
       emailUnattendedReply: pref.emailUnattendedReply,
+      inAppMentioned: pref.inAppMentioned,
+      emailMentioned: pref.emailMentioned,
+      matrixEnabled: pref.matrixEnabled,
+      matrixTicketCreated: pref.matrixTicketCreated,
+      matrixTicketAssigned: pref.matrixTicketAssigned,
+      matrixStatusChanged: pref.matrixStatusChanged,
+      matrixTicketUnassigned: pref.matrixTicketUnassigned,
+      matrixCommentCreated: pref.matrixCommentCreated,
+      matrixTransferRequest: pref.matrixTransferRequest,
+      matrixUnattendedReply: pref.matrixUnattendedReply,
+      matrixMentioned: pref.matrixMentioned,
       bellUnreadOnly: pref.bellUnreadOnly,
     };
   }
